@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Company</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .image-text-container {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center; /* Center the text box and image as a unit */
+            height: auto; /* Adjust to fit content height */
+            padding: 20px 0; /* Add padding for spacing */
+        }
+
+        .text-container {
+            margin-right: 20px; /* Adjust this value to set the space between the text and the image */
+        }
+
+        .text-container {
+            max-width: 75%;
+        }
+
+        .image-container {
+            max-width: 50%;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .small-images-container {
+            display: flex;
+            gap: 10px; /* Adjust the gap between images */
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .small-image {
+            max-width: 30%; /* Adjust the percentage to make the image smaller */
+            height: auto;
+        }
+
+        .image-list {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            margin-bottom: 10px; /* Added margin-bottom for space downstream */
+        }
+
+        .image-item {
+            flex: 1;
+            text-align: left;
+            margin-left: -40px; /* Adjust this value to move the images further to the left */
+        }
+
+        .image-item img {
+            max-width: 10%; /* Adjust this value to make the images smaller */
+            height: auto;
+        }
+
+        .text-box {
+            padding: 20px;
+            margin: 20px 0;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .container {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .picture-space {
+            width: 30px; /* Adjust as needed */
+            height: 20px; /* Adjust as needed */
+            background-color: #f0f0f0; /* Light grey background */
+            margin: 0 auto;
+        }
+
+        .footer {
+            padding: 10px;
+            background-color: #222;
+            color: white;
+            text-align: center;
+            margin-top: 20px; /* Reduce the space above the footer */
+        }
+
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 10px 0;
+            background-color: #007BFF;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="hausbaumbiz.png" alt="Company Logo" class="logo">
+        <nav class="nav-buttons">
+            <button onclick="location.href='homepage.html'">Home</button>
+            <button onclick="location.href='registration.html'">Register</button>
+            <button onclick="location.href='login.html'">Login</button>
+        </nav>
+    </header>
+    <main>
+        <div class="image-text-container">
+            <div class="text-container">
+                <h1>Hausbaum</h1>
+                <h2 style="color:#0abab5;">for Businesses and Services</h2>
+                <p>- is loctaed at 4465 Fulton Ave NW</p>
+                <p>- North Canton, Ohio 44718</p>
+                <p>  </p>
+                <p> </P>
+                <p>Our email is rankfl@yahoo.com</p>
+            </div>
+            <div class="image-container">
+                <img src="contact.png" alt="Woman">
+            </div>
+        </div>
+    </main>
+    <footer>
+        <p>Contact us at: rankflv@yahoo.com</p>
+        <div class="contact-buttons">
+            <button onclick="location.href='#'">Facebook</button>
+            <button onclick="location.href='#'">Twitter</button>
+            <button onclick="location.href='#'">LinkedIn</button>
+        </div>
+    </footer>
+    <script src="scripts.js"></script>
+</body>
+</html>
