@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hausbaum Content Restrictions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 100%;
+            margin: 20px;
+            border-radius: 8px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        header img {
+            max-width: 300px;
+        }
+        header a {
+            display: block;
+            margin-top: 10px;
+            color: #000000;
+            text-decoration: none;
+        }
+        header a:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            color: #333;
+        }
+        ul {
+            list-style-type: disc;
+            margin-left: 20px;
+        }
+        .agreement {
+            margin-top: 20px;
+        }
+        #nextButton {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: not-allowed;
+        }
+        #nextButton.enabled {
+            cursor: pointer;
+            background-color: #28a745;
+        }
+    </style>
+    <script>
+        function toggleButton() {
+            const checkBox = document.getElementById('agreeCheckBox');
+            const nextButton = document.getElementById('nextButton');
+            if (checkBox.checked) {
+                nextButton.disabled = false;
+                nextButton.classList.add('enabled');
+            } else {
+                nextButton.disabled = true;
+                nextButton.classList.remove('enabled');
+            }
+        }
+    </script>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <img src="hausbaumbiz.png" alt="Your Logo">
+        <a href="your-link-url" target="_blank">Home</a>
+    </header>
+
+    <h1>Hausbaum Content Restrictions</h1>
+    <p>Before proceeding, please read and agree to the following content restrictions:</p>
+<ul>
+    <li><b>Nudity or Sexual Content:</b> Explicit nudity or sexual content, or content intended to be sexually provocative.</li>
+    <li><b>Hate Speech:</b> Content that promotes violence or hatred against individuals or groups based on attributes such as race, ethnicity, religion, disability, gender, age, veteran status, sexual orientation, or gender identity.</li>
+    <li><b>Harassment and Cyberbullying:</b> Content that targets individuals with prolonged or malicious insults, or reveals someone’s personal information without their consent.</li>
+    <li><b>Harmful or Dangerous Content:</b> Content that promotes dangerous or illegal activities that can result in serious harm or death, or glorifies or incites acts of violence.</li>
+    <li><b>Violent or Graphic Content:</b> Content that is excessively violent or gory, or shows serious injury or death with no educational, documentary, scientific, or artistic purpose.</li>
+    <li><b>Spam, Deceptive Practices, and Scams:</b> Content designed to scam, mislead, or deceive users, or artificially increase views, likes, comments, or other metrics.</li>
+    <li><b>Impersonation:</b> Content intended to impersonate a person or channel in a misleading or deceptive manner.</li>
+    <li><b>Child Safety:</b> Content that endangers the emotional and physical well-being of minors, or depicts minors in a sexually suggestive manner.</li>
+    <li><b>Misinformation:</b> Content that spreads false information that could cause harm.</li>
+    <li><b>Regulated Goods:</b> Content that promotes or sells regulated goods such as drugs, firearms, and certain controlled substances.</li>
+    <li><b>Copyright Violations:</b> Content that infringes on someone else's copyright.</li>
+</ul>
+
+    <div class="agreement">
+        <input type="checkbox" id="agreeCheckBox" onclick="toggleButton()">
+        <label for="agreeCheckBox">I have read and agree to the content restrictions.</label>
+    </div>
+    <button id="nextButton" disabled>Next</button>
+</div>
+
+</body>
+</html>
