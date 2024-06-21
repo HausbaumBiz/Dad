@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            margin: 0;
+        }
+        #video-container {
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            text-align: center;
+            margin-right: 20px;
+        }
+        #video-player {
+            width: 100%;
+            max-width: 640px;
+        }
+        #file-input {
+            margin-top: 10px;
+        }
+        #info-container {
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            max-width: 300px;
+            width: 100%;
+        }
+        .info-item {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div id="video-container">
+        <h2>Your Hausbaum Commercial</h2>
+        <video id="video-player" controls>
+            Your browser does not support the video tag.
+        </video>
+        <input type="file" id="file-input" accept="video/*">
+    </div>
+    <div id="info-container">
+        <h2>Business Information</h2>
+        <div id="businessInfo"></div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const videoPlayer = document.getElementById('video-player');
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const fileURL = URL.createObjectURL(file);
+                videoPlayer.src = fileURL;
+                videoPlayer.play();
+            }
+        });
+
+        // Retrieve data from localStorage and display it
+        document.addEventListener('DOMContentLoaded', () => {
+            const businessInfo = JSON.parse(localStorage.getItem('businessData'));
+            if (businessInfo) {
+                const infoContainer = document.getElementById('businessInfo');
+                for (const [key, value] of Object.entries(businessInfo)) {
+                    const div = document.createElement('div');
+                    div.className = 'info-item';
+                    div.textContent = `${key}: ${value}`;
+                    infoContainer.appendChild(div);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
