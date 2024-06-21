@@ -1,0 +1,117 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+}
+
+header {
+    width: 100%;
+    background-color: #f8f9fa;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+header img {
+    max-height: 300px;
+}
+header button {
+    padding: 10px 20px;
+    font-size: 16px;
+    border: none;
+    background-color: #f8f9fa;
+    color: black;
+    cursor: pointer;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+header button:hover {
+    background-color: #f4f4f4;
+}
+
+/* Styles for the new top button */
+#top-button-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px 0;
+    width: 100%; /* Ensure the container takes the full width of the page */
+}
+
+.top-link {
+    padding: 10px 20px;
+   
+    border: none;
+    color: black;
+    text-decoration: none;
+    border-radius: 5px;
+}
+
+.top-link:hover {
+    background-color: #f4f4f4;
+}
+
+#container {
+    display: flex;
+    width: 80%;
+    margin: 20px auto;
+}
+
+.image-container {
+    flex: 1;
+    margin-right: 20px;
+}
+
+.image-container img {
+    width: 100%;
+    height: auto;
+    max-width: 500px; /* Adjust this value to change the max width of the image */
+}
+
+.content {
+    flex: 2;
+}
+
+h1, h2 {
+    text-align: center;
+}
+
+.category {
+    margin-bottom: 20px;
+}
+
+.subcategory {
+    margin-left: 20px;
+}
+
+ul {
+    list-style-type: none;
+}
+
+#selected-box {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-top: 20px;
+    text-align: left;
+}
+
+#selected-box h2 {
+    text-align: left;
+    margin: 0 0 10px 0;
+}
+
+#submit-button {
+    display: block;
+    margin: 20px auto 0 auto; /* Center the button */
+    padding: 10px 20px;
+    background-color: #444;
+    border: none;
+    color: white;
+    cursor: pointer;
+}
+
+#submit-button:hover {
+    background-color: #555;
+}
