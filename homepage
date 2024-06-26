@@ -23,7 +23,7 @@
     </style>
 
 	
-
+	
 	
 </head>
 <body>
@@ -40,7 +40,7 @@
     <main>
         <div class="image-text-container">
             <div class="image-container">
-                <img src="groupofworkers2.png" alt="Woman">
+                <img src="fence-3.png" alt="Woman">
             </div>
             <div class="text-container">
                 <h1>Welcome to Hausbaum</h1>
@@ -49,7 +49,7 @@
                 <p>It is the premier site dedicated to shining a spotlight on small businesses and individual service providers in your community.</p>
                 <p>Use your webcam, smartphone, or any video recording device,</p>
                 <p>Upload your commercial and we will show your talents to those in your service area.</p>
-                <h2 style="color:#4fb756;">All for Free!</h2>
+                <h2 style="color:black">All for Free!</h2>
                 <p>Whether you're a roofer, lawn care expert, a tutor specializing in Math or Foreign Languages,</p>
                 <p>an accomplished musician offering lessons, a coach or athlete providing instruction</p>
                 <p>we have the perfect solution to get you noticed.</p>
@@ -82,3 +82,4 @@
     <script src="scripts.js"></script>
 </body>
 </html>
+
