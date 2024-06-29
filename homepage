@@ -4,8 +4,149 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Company</title>
-    <link rel="stylesheet" href="styles.css">
-	<style>
+    <style>
+        body {
+            font-family: 'Bookman Old Style', serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f0f0f0;
+        }
+
+        header {
+            background-color: #f5fffa;
+            padding: 50px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+            position: relative;
+        }
+
+        .header-strip {
+            background-color: #f5fffa; /* Default strip color */
+            width: 100%;
+            padding: 10px 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .logo {
+            height: 350px; /* 3 times the original height */
+            margin-bottom: 10px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .nav-buttons button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #f5fffa;
+            color: black;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .nav-buttons button:hover {
+            color: #0abab5;
+        }
+
+        main {
+            flex: 1;
+            padding: 20px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 2em;
+            color: #333;
+        }
+
+        .image-list {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .image-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f8f8;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .image-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .image-item img {
+            max-width: 100px;
+            margin-bottom: 100px;
+        }
+
+        footer {
+            background-color: #f5fffa;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .contact-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .contact-buttons button {
+            padding: 10px 15px;
+            border: none;
+            background-color: #f5fffa;
+            color: black;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .contact-buttons button:hover {
+            color: #0abab5;
+        }
+
+        .image-text-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Centers the container horizontally */
+            justify-content: center;
+        }
+
+        .image-container {
+            display: flex;
+            justify-content: center; /* Centers the container horizontally */
+        }
+
+        .image-container img {
+            display: block;
+            margin-left: 150px; /* Centers the image inside the container */
+        }
 
         .text-box {
             padding: 20px;
@@ -19,12 +160,7 @@
             text-align: center;
             margin: 20px 0;
         }
-	
     </style>
-
-	
-	
-	
 </head>
 <body>
     <header>
@@ -49,21 +185,20 @@
                 <p>It is the premier site dedicated to shining a spotlight on small businesses and individual service providers in your community.</p>
                 <p>Use your webcam, smartphone, or any video recording device,</p>
                 <p>Upload your commercial and we will show your talents to those in your service area.</p>
-                <h2 style="color:black">All for Free!</h2>
-                <p>Whether you're a roofer, lawn care expert, a tutor specializing in Math or Foreign Languages,</p>
-                <p>an accomplished musician offering lessons, a coach or athlete providing instruction</p>
+                <h1 style="color:black">All for Free!</h1>
+                <h2>Whether you're</h2>
+				<p>a roofer</p><p>a lawn care expert<p/><p>a plumber<p/><p>an electrician<p/>           <p>a tutor specializing in math or foreign languages</p>
+                <p>an accomplished musician offering lessons</p> <p>a coach or athlete providing instruction</p> <p>a wedding planner<p/> <p>an auto mechanic<p/> <p>a dog groomer<p/><p>ect. ect. ect.<p/>
                 <p>we have the perfect solution to get you noticed.</p>
             </div>
         </div>
 
-        <!-- New text box just below the top text and picture -->
         <div class="text-box">
             <h2>Add your commercial to our searchable database</h2>
             <p>so local customers can find you easily and contact you directly</p>
             <p>Your commercial will be streamable to thousands of customers in your service area!</p>
         </div>
 
-        <!-- Centered commercial image and button just below the new text box -->
         <div class="container">
             <div class="picture-space">
                 <img src="blackpainter.png" alt="commercial" style="max-width: 30%; height: auto;">
@@ -79,7 +214,7 @@
             <button onclick="location.href='#'">LinkedIn</button>
         </div>
     </footer>
-    <script src="scripts.js"></script>
+   
 </body>
 </html>
 
