@@ -1,84 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Company</title>
-    <link rel="stylesheet" href="styles.css">
-	<style>
+<meta charset="UTF-8">
+<title>Hausbaum Registration</title>
+<link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
 
-        .text-box {
-            padding: 20px;
-            margin: 20px 0;
-            background-color: #f9f9f9;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
 
-        .container {
-            text-align: center;
-            margin: 20px 0;
-        }
-	
-    </style>
+    .container {
+        margin-top: 50px;
+    }
 
-	
+    .form-container {
+        border: 1px solid #ccc; /* Thin border around the form */
+        padding: 20px;
+        border-radius: 5px;
+    }
 
-	
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    h2 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    /* Added styles for image */
+    .image-container {
+        padding: 20px;
+        text-align: center; /* Center the image */
+    }
+
+    .image-container img {
+        max-width: 200px; /* Set the maximum width of the image */
+        height: auto; /* Maintain the aspect ratio */
+    }
+
+    /* Style for the Home Page button */
+    .home-page-button {
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    .custom-button {
+        background-color: #f8f9fa; /* Default button color */
+        color: black; /* Text color */
+        border: none;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+</style>
 </head>
 <body>
-    <header>
-        <img src="hausbaumbiz.png" alt="Company Logo" class="logo">
-        <div class="header-strip">
-            <nav class="nav-buttons">
-                <button onclick="location.href='contactus.html'">Contact Us</button>
-                <button onclick="location.href='registration.html'">Register</button>
-                <button onclick="location.href='login.html'">Login</button>
-            </nav>
-        </div>
-    </header>
-    <main>
-        <div class="image-text-container">
+<div class="container">
+    <!-- Home Page Button -->
+    <div class="home-page-button">
+        <a href="homepage.html" class="custom-button">Home Page</a>
+    </div>
+
+    <div class="row">
+        <!-- Column for Image -->
+        <div class="col-lg-4">
             <div class="image-container">
-                <img src="groupofworkers2.png" alt="Woman">
-            </div>
-            <div class="text-container">
-                <h1>Welcome to Hausbaum</h1>
-                <h2 style="color:#0abab5;">for Businesses and Services</h2>
-                <p>Hausbaum is a platform for Community Commercials.</p>
-                <p>It is the premier site dedicated to shining a spotlight on small businesses and individual service providers in your community.</p>
-                <p>Use your webcam, smartphone, or any video recording device,</p>
-                <p>Upload your commercial and we will show your talents to those in your service area.</p>
-                <h2 style="color:#4fb756;">All for Free!</h2>
-                <p>Whether you're a roofer, lawn care expert, a tutor specializing in Math or Foreign Languages,</p>
-                <p>an accomplished musician offering lessons, a coach or athlete providing instruction</p>
-                <p>we have the perfect solution to get you noticed.</p>
+                <img src="hausbaumbiz.png" alt="Descriptive Alt Text" class="img-fluid">
             </div>
         </div>
 
-        <!-- New text box just below the top text and picture -->
-        <div class="text-box">
-            <h2>Add your commercial to our searchable database</h2>
-            <p>so local customers can find you easily and contact you directly</p>
-            <p>Your commercial will be streamable to thousands of customers in your service area!</p>
-        </div>
+        <!-- Column for the Form -->
+        <div class="col-lg-4 offset-lg-4"> <!-- Adjusted for better alignment -->
+            <div class="form-container">
+                <h2>Login</h2>
 
-        <!-- Centered commercial image and button just below the new text box -->
-        <div class="container">
-            <div class="picture-space">
-                <img src="blackpainter.png" alt="commercial" style="max-width: 30%; height: auto;">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="text" id="email" class="form-control" required="">
+                    <span class="text-danger" id="emailError"></span>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="text" id="password" class="form-control" required="">
+                </div>
+
+                <div class="form-group" style="margin-right: 17%; text-align: right;"> <!-- Custom right margin -->
+                    <input type="submit" class="btn btn-primary" name="signup" value="Submit">
+                    <a href="registration.html" class="btn btn-default">Need an account? Create One Here.</a>
+                </div>
+
             </div>
-            <a href="registration.html" class="button">Register</a>
         </div>
-    </main>
-    <footer>
-        <p>Contact us at: contact@company.com</p>
-        <div class="contact-buttons">
-            <button onclick="location.href='#'">Facebook</button>
-            <button onclick="location.href='#'">Twitter</button>
-            <button onclick="location.href='#'">LinkedIn</button>
-        </div>
-    </footer>
-    <script src="scripts.js"></script>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    function insertCharacter(char) {
+        var output = document.getElementById('output');
+        var passwordInput = document.getElementById('passwordInput');
+
+        if (char === 'DEL') {
+            output.value = output.value.slice(0, -1);
+        } else {
+            output.value += char;
+        }
+    }
+
+    function deleteCharacter() {
+        var output = document.getElementById('output');
+        output.value = output.value.slice(0, -1);
+    }
+
+    function moveToNextField() {
+        // Find the current active element
+        var currentElement = document.activeElement;
+        // Find all input fields
+        var inputFields = document.querySelectorAll('input[type="text"], input[type="email"], input[type="password"], textarea');
+        // Find the index of the current element among input fields
+        var currentIndex = Array.prototype.indexOf.call(inputFields, currentElement);
+        // If the current element is found and there is a next input field
+        if (currentIndex > -1 && currentIndex < inputFields.length - 1) {
+            // Move focus to the next input field
+            inputFields[currentIndex + 1].focus();
+        }
+    }
+</script>
+
 </body>
 </html>
