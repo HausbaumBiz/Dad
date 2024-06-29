@@ -127,6 +127,40 @@
             <ul id="zipResults"></ul>
         </div>
     </div>
-    <script src="script.js"></script>
+    <script>
+        document.getElementById('zipForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const zipCode = document.getElementById('zipCode').value;
+            getZipCodesWithinRadius(zipCode);
+        });
+
+        function getZipCodesWithinRadius(zipCode) {
+            const apiKey = 'OqTaNoRbB24LqNAC3uerOsfW0wgFCfM0HWtjhGkuB1drTYz8pX50VfEnI70nDfQw'; // Replace with your actual API key from ZipCodeAPI
+            const radius = 40; // miles
+            const url = `https://www.zipcodeapi.com/rest/${apiKey}/radius.json/${zipCode}/${radius}/mile`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const zipResults = document.getElementById('zipResults');
+                    zipResults.innerHTML = '';
+
+                    if (data.zip_codes) {
+                        data.zip_codes.forEach(zip => {
+                            const li = document.createElement('li');
+                            li.textContent = zip.zip_code;
+                            zipResults.appendChild(li);
+                        });
+                    } else {
+                        zipResults.textContent = 'No results found or invalid ZIP code.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching ZIP codes:', error);
+                    document.getElementById('zipResults').textContent = 'Error fetching ZIP codes. Please try again later.';
+                });
+        }
+    </script>
 </body>
 </html>
+
