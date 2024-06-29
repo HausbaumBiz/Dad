@@ -4,18 +4,137 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Company</title>
-    <link rel="stylesheet" href="styles.css">
     <style>
+        body {
+            font-family: 'Bookman Old Style', serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f0f0f0;
+        }
+
+        header {
+            background-color: #f5fffa;
+            padding: 50px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+            position: relative;
+        }
+
+        .logo {
+            height: 300px;
+            margin-bottom: 20px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            width: 100%;
+            position: absolute;
+            bottom: 10px;
+        }
+
+        .nav-buttons button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #f5fffa;
+            color: black;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .nav-buttons button:hover {
+            color: #0abab5;
+        }
+
+        main {
+            flex: 1;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+            color: #333;
+        }
+
+        .image-list {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .image-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f8f8;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .image-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .image-item img {
+            max-width: 100px;
+            margin-bottom: 10px;
+        }
+
+        footer {
+            background-color: #f5fffa;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .contact-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .contact-buttons button {
+            padding: 10px 15px;
+            border: none;
+            background-color: #f5fffa;
+            color: black;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .contact-buttons button:hover {
+            color: #0abab5;
+        }
+
         .image-text-container {
             display: flex;
             align-items: flex-start;
-            justify-content: center; /* Center the text box and image as a unit */
-            height: auto; /* Adjust to fit content height */
-            padding: 20px 0; /* Add padding for spacing */
+            justify-content: center;
+            height: auto;
+            padding: 20px 0;
         }
 
         .text-container {
-            margin-right: 20px; /* Adjust this value to set the space between the text and the image */
+            margin-right: 20px;
         }
 
         .text-container {
@@ -33,13 +152,13 @@
 
         .small-images-container {
             display: flex;
-            gap: 10px; /* Adjust the gap between images */
+            gap: 10px;
             margin-top: 20px;
             justify-content: center;
         }
 
         .small-image {
-            max-width: 30%; /* Adjust the percentage to make the image smaller */
+            max-width: 30%;
             height: auto;
         }
 
@@ -47,17 +166,17 @@
             display: flex;
             justify-content: space-between;
             margin-top: 20px;
-            margin-bottom: 10px; /* Added margin-bottom for space downstream */
+            margin-bottom: 10px;
         }
 
         .image-item {
             flex: 1;
             text-align: left;
-            margin-left: -40px; /* Adjust this value to move the images further to the left */
+            margin-left: -40px;
         }
 
         .image-item img {
-            max-width: 10%; /* Adjust this value to make the images smaller */
+            max-width: 10%;
             height: auto;
         }
 
@@ -75,9 +194,9 @@
         }
 
         .picture-space {
-            width: 30px; /* Adjust as needed */
-            height: 20px; /* Adjust as needed */
-            background-color: #f0f0f0; /* Light grey background */
+            width: 30px;
+            height: 20px;
+            background-color: #f0f0f0;
             margin: 0 auto;
         }
 
@@ -86,7 +205,7 @@
             background-color: #222;
             color: white;
             text-align: center;
-            margin-top: 20px; /* Reduce the space above the footer */
+            margin-top: 20px;
         }
 
         .button {
@@ -136,3 +255,5 @@
     <script src="scripts.js"></script>
 </body>
 </html>
+
+
