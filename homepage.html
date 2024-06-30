@@ -160,6 +160,26 @@
             text-align: center;
             margin: 20px 0;
         }
+
+        .video-text-container {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .video-text-container video {
+            flex: 1;
+        }
+
+        .video-text-box {
+            flex: 1;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            max-width: 500px;
+        }
     </style>
 </head>
 <body>
@@ -187,7 +207,7 @@
                 <p>Upload your commercial and we will show your talents to those in your service area.</p>
                 <h1 style="color:black">All for Free!</h1>
                 <h2>Whether you're</h2>
-				<p>a roofer</p><p>a lawn care expert<p/><p>a plumber<p/><p>an electrician<p/>           <p>a tutor specializing in math or foreign languages</p>
+                <p>a roofer</p><p>a lawn care expert<p/><p>a plumber<p/><p>an electrician<p/>           <p>a tutor specializing in math or foreign languages</p>
                 <p>an accomplished musician offering lessons</p> <p>a coach or athlete providing instruction</p> <p>a wedding planner<p/> <p>an auto mechanic<p/> <p>a dog groomer<p/><p>ect. ect. ect.<p/>
                 <p>we have the perfect solution to get you noticed.</p>
             </div>
@@ -195,16 +215,30 @@
 
         <div class="text-box">
             <h2>Add your commercial to our searchable database</h2>
-            <p>so local customers can find you easily and contact you directly</p>
+            <p>so local customers can find you easily and contact you directly.</p>
             <p>Your commercial will be streamable to thousands of customers in your service area!</p>
         </div>
-
+       <!-- Video Player Section with Text Box -->
+        <div class="video-text-container">
+            <video width="600" controls>
+                <source src="sample-commercial.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <div class="video-text-box">
+                <h2>Hausbaum</h2>
+                <p>This is a sample commercial showcasing the kind of high-quality advertisements you can upload to our platform. Your commercial will reach thousands of potential customers in your area, helping to grow your business and connect with the community.</p>
+                <p>Be creative, be engaging, and make sure to highlight what makes your service unique!</p>
+				<p>There is no need to provide contact information, location, phone number, or hours of opperation in your commercial as that will be provided next to your comercial in a text box like this one.
+            </div>
+        </div>
         <div class="container">
             <div class="picture-space">
                 <img src="blackpainter.png" alt="commercial" style="max-width: 30%; height: auto;">
             </div>
             <a href="registration.html" class="button">Register</a>
         </div>
+
+       
     </main>
     <footer>
         <p>Contact us at: contact@company.com</p>
@@ -214,7 +248,5 @@
             <button onclick="location.href='#'">LinkedIn</button>
         </div>
     </footer>
-   
-</body>
 </html>
 
