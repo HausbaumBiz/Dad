@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Company</title>
+    <style>
+        body {
+            font-family: 'Bookman Old Style', serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f0f0f0;
+        }
+
+        header {
+            background-color: #f5fffa;
+            padding: 50px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+            position: relative;
+        }
+
+        .logo {
+            height: 300px;
+            margin-bottom: 20px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            width: 100%;
+            position: absolute;
+            bottom: 10px;
+        }
+
+        .nav-buttons button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #f5fffa;
+            color: black;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .nav-buttons button:hover {
+            color: #0abab5;
+        }
+
+        main {
+            flex: 1;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+            color: #333;
+        }
+
+        .image-list {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .image-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f8f8;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .image-item:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .image-item img {
+            max-width: 100px;
+            margin-bottom: 10px;
+        }
+
+        footer {
+            background-color: #f5fffa;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .contact-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .contact-buttons button {
+            padding: 10px 15px;
+            border: none;
+            background-color: #f5fffa;
+            color: black;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .contact-buttons button:hover {
+            color: #0abab5;
+        }
+
+        .image-text-container {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            height: auto;
+            padding: 20px 0;
+        }
+
+        .text-container {
+            margin-right: 20px;
+        }
+
+        .text-container {
+            max-width: 75%;
+        }
+
+        .image-container {
+            max-width: 50%;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .small-images-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .small-image {
+            max-width: 30%;
+            height: auto;
+        }
+
+        .image-list {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .image-item {
+            flex: 1;
+            text-align: left;
+            margin-left: -40px;
+        }
+
+        .image-item img {
+            max-width: 10%;
+            height: auto;
+        }
+
+        .text-box {
+            padding: 20px;
+            margin: 20px 0;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .container {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .picture-space {
+            width: 30px;
+            height: 20px;
+            background-color: #f0f0f0;
+            margin: 0 auto;
+        }
+
+        .footer {
+            padding: 10px;
+            background-color: #222;
+            color: white;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 10px 0;
+            background-color: #007BFF;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="hausbaumbiz.png" alt="Company Logo" class="logo">
+        <nav class="nav-buttons">
+            <button onclick="location.href='userhomepage.html'">Home</button>
+            <button onclick="location.href='registration.html'">Register</button>
+            <button onclick="location.href='login.html'">Login</button>
+        </nav>
+    </header>
+    <main>
+        <div class="image-text-container">
+            <div class="text-container">
+                <h1>Hausbaum</h1>
+                <h2 style="color:#0abab5;">for Businesses and Services</h2>
+                <p>- is loctaed at 4465 Fulton Ave NW</p>
+                <p>- North Canton, Ohio 44718</p>
+                <p>  </p>
+                <p> </P>
+                <p>Our email is rankfl@yahoo.com</p>
+            </div>
+            <div class="image-container">
+                <img src="contact.png" alt="Woman">
+            </div>
+        </div>
+    </main>
+    <footer>
+        <p>Contact us at: rankflv@yahoo.com</p>
+        <div class="contact-buttons">
+            <button onclick="location.href='#'">Facebook</button>
+            <button onclick="location.href='#'">Twitter</button>
+            <button onclick="location.href='#'">LinkedIn</button>
+        </div>
+    </footer>
+    <script src="scripts.js"></script>
+</body>
+</html>
+
