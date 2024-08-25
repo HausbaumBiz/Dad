@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Category and Subcategory Selector</title>
+<style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #f8f9fa;
+            padding: 10px 20px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header .logo img {
+            max-height: 250px;
+        }
+
+        header nav button {
+            padding: 10px 20px;
+            background-color: #444;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin-left: 20px; /* Space between logo and button */
+        }
+
+        header nav button:hover {
+            background-color: #555;
+        }
+
+        #container {
+            display: flex;
+            width: 80%;
+            margin: 20px auto;
+        }
+
+        .image-container {
+            flex: 1;
+            margin-right: 20px;
+        }
+
+        .image-container img {
+            width: 100%;
+            height: auto;
+            max-width: 500px; /* Adjust this value to change the max width of the image */
+        }
+
+        .image-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .image-column img {
+            width: 100px; /* Default width, can be adjusted individually */
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            flex: 2;
+        }
+
+        h1, h2 {
+            text-align: center;
+        }
+
+        .category {
+            margin-bottom: 20px;
+        }
+
+        .subcategory {
+            margin-left: 20px;
+        }
+
+        ul {
+            list-style-type: none;
+        }
+
+        #selected-box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        #selected-box h2 {
+            text-align: left;
+            margin: 0 0 10px 0;
+        }
+
+        #submit-button {
+            display: block;
+            margin: 20px auto 0 auto; /* Center the button */
+            padding: 10px 20px;
+            background-color: #444;
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+
+        #submit-button:hover {
+            background-color: #555;
+        }
+
+        .custom-box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: left;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .custom-box img {
+            width: 300px;
+            height: auto;
+            margin-right: 20px;
+        }
+
+        .custom-box h3 {
+            margin: 0;
+        }
+
+        /* Style for the pop-up form */
+        #popup-form {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            padding: 20px;
+			text-align: center;
+            background-color: white;
+            border: 5px solid #000; /* Add a solid black border */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        #popup-form input[type="text"], #popup-form textarea {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+        }
+
+        #popup-form button {
+            padding: 10px 20px;
+            background-color: #444;
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+
+        #popup-form button:hover {
+            background-color: #555;
+        }
+
+        /* Style for the logo inside the pop-up form */
+        #popup-logo {
+            display: block;
+            margin: 0 auto 20px auto;
+            max-width: 200px; /* Adjust the size as needed */
+        }
+
+        /* Style for the close button inside the pop-up form */
+        #close-button {
+            display: block;
+            padding: 10px 20px;
+            background-color: #444;
+            border: none;
+            color: white;
+            cursor: pointer;
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+        }
+
+        #close-button:hover {
+            background-color: #555;
+        }
+
+        /* Style for the overlay */
+        #overlay {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+<header>
+<div class="header-content">
+<div class="logo">
+<img alt="Logo" id="logo" src="hausbaumbiz.png"/>
+</div>
+<nav>
+<button onclick="window.location.href='userhomepagewithpennysaver3.html'">Home</button>
+</nav>
+</div>
+</header>
+<div id="container">
+<div class="image-container">
+<img alt="Placeholder Image" id="left-image" src="clipboard.png"/>
+</div>
+<div class="content">
+<h1>Looking to Hire? Select the Job type.</h1>
+<div id="categories"></div>
+<div class="custom-box">
+<div>
+<h3><a href="usermenu2-1.html">Lawn, Garden and Snow Removal</a></h3>
+<ul>
+<li><label for="lawn1"> Lawn &amp; Landscaping</label></li>
+<li><label for="lawn2"> Lawn Treatment</label></li>
+<li><label for="lawn3"> Landscape Lighting</label></li>
+<li><label for="lawn4"> Lawn Mower and Lawn Equipment and Snow Removal Equipment Repair</label></li>
+<li><label for="lawn5"> Tree Service</label></li>
+<li><label for="lawn6"> Plant Nurseries</label></li>
+<li><label for="lawn7"> Mulch Delivery</label></li>
+<li><label for="lawn8"> Soil Tilling</label></li>
+<li><label for="lawn9"> Leaf Removal</label></li>
+<li><label for="lawn10"> Hardscaping</label></li>
+<li><label for="lawn11"> Snow Removal</label></li>
+<li><label for="lawn12"> Other Lawn, Garden and Snow Removal</label></li>
+</ul>
+<h3><a href="usermenu2-2.html">Outside Home Maintenance and Repair</a></h3>
+<ul>
+<li><label for="outside1"> Roofing</label></li>
+<li><label for="outside2"> Masonry Stone and Brick</label></li>
+<li><label for="outside3"> Glass Block</label></li>
+<li><label for="outside4"> Siding</label></li>
+<li><label for="outside5"> Deck Cleaning/Refinishing</label></li>
+<li><label for="outside6"> Garage Doors</label></li>
+<li><label for="outside7"> House Painting</label></li>
+<li><label for="outside8"> Pressure Washing</label></li>
+<li><label for="outside9"> Foundation Repair</label></li>
+<li><label for="outside10"> Gutter Cleaning/Repair</label></li>
+<li><label for="outside11"> Septic Tank Service</label></li>
+<li><label for="outside12"> Well &amp; Water Pump Repair</label></li>
+<li><label for="outside13"> Other Outside Home Maintenance and Repair</label></li>
+</ul>
+<h3><a href="usermenu2-3.html">Outdoor Structure Assembly/Construction and Fencing</a></h3>
+<ul>
+<li><label for="structure1"> Deck/Patio/Porch Construction</label></li>
+<li><label for="structure2"> Patio and Patio Enclosures</label></li>
+<li><label for="structure3"> Exterior Cooking Areas</label></li>
+<li><label for="structure4"> Awnings/Canopies</label></li>
+<li><label for="structure5"> Playground Equipment Installation/Basketball Hoops</label></li>
+<li><label for="structure6"> Fountains and Waterscaping</label></li>
+<li><label for="structure7"> Pond Construction</label></li>
+<li><label for="structure8"> Solar Panel Installation</label></li>
+<li><label for="structure9"> Power Generator Installation</label></li>
+<li><label for="structure10"> Driveway Gate Installation</label></li>
+<li><label for="structure11"> Earthquake Retrofitting</label></li>
+<li><label for="structure12"> Mailbox Installation/Repair</label></li>
+<li><label for="structure13"> Fences</label></li>
+<li><label for="structure14"> Other Outdoor Structure Assembly/Construction and Fencing</label></li>
+</ul>
+<h3><a href="usermenu2-4.html">Pool Services</a></h3>
+<ul>
+<li><label for="pool1"> Swimming Pool Installers/Builders</label></li>
+<li><label for="pool2"> Swimming Pool Maintenance/Cleaning</label></li>
+<li><label for="pool3"> Other Pool Services</label></li>
+</ul>
+<h3><a href="usermenu2-5.html">Asphalt, Concrete, Stone and Gravel</a></h3>
+<ul>
+<li><label for="asphalt1"> Concrete Driveways</label></li>
+<li><label for="asphalt2"> Asphalt Driveways</label></li>
+<li><label for="asphalt3"> Other Driveways</label></li>
+<li><label for="asphalt4"> Stone &amp; Gravel</label></li>
+<li><label for="asphalt5"> Stamped Concrete</label></li>
+<li><label for="asphalt6"> Concrete Repair</label></li>
+<li><label for="asphalt7"> Other Asphalt, Concrete, Stone and Grave</label></li>
+</ul>
+<h3><a href="usermenu2-6.html">Home Construction and Design</a></h3>
+<ul>
+<li><label for="homeconstruction1"> General Contractors</label></li>
+<li><label for="homeconstruction2"> Architect</label></li>
+<li><label for="homeconstruction3"> Home Remodeling</label></li>
+<li><label for="homeconstruction4"> Demolition</label></li>
+<li><label for="homeconstruction5"> Excavating/Earth Moving</label></li>
+<li><label for="homeconstruction6"> Land Surveyors</label></li>
+<li><label for="homeconstruction7"> Other Home Construction and Design</label></li>
+</ul>
+<h3><a href="usermenu2-7.html">Inside Home Maintenance and Repair</a></h3>
+<ul>
+<li><label for="inside1"> Electricians</label></li>
+<li><label for="inside2"> Plumbers</label></li>
+<li><label for="inside3"> Heating, Ventilation, and Air Conditioning Services</label></li>
+<li><label for="inside4"> Appliance Repair and Installation</label></li>
+<li><label for="inside5"> Indoor Painting</label></li>
+<li><label for="inside6"> Drywalling and Repair</label></li>
+<li><label for="inside7"> Marble &amp; Granite</label></li>
+<li><label for="inside8"> Water Softeners</label></li>
+<li><label for="inside9"> Water Heaters</label></li>
+<li><label for="inside10"> Insulation</label></li>
+<li><label for="inside11"> Air Duct Cleaning</label></li>
+<li><label for="inside12"> Dryer Duct Cleaning</label></li>
+<li><label for="inside13"> Central Vacuum Cleaning</label></li>
+<li><label for="inside14"> Mold Removal</label></li>
+<li><label for="inside15"> Plaster Work</label></li>
+<li><label for="inside16"> Water Damage Repair</label></li>
+<li><label for="inside17"> Basement Waterproofing</label></li>
+<li><label for="inside18"> Wallpaper Hanging and Removing</label></li>
+<li><label for="inside19"> Countertop Installation</label></li>
+<li><label for="inside20"> Ceiling Fan Installation</label></li>
+<li><label for="inside21"> Bathtub Refinishing</label></li>
+<li><label for="inside22"> Cabinet Resurfacing</label></li>
+<li><label for="inside23"> Cabinet Makers</label></li>
+<li><label for="inside24"> Tile Installation</label></li>
+<li><label for="inside25"> Other Inside Home Maintenance and Repair</label></li>
+</ul>
+<h3><a href="usermenu2-8.html">Windows and Doors</a></h3>
+<ul>
+<li><label for="windows1"> Window Replacement</label></li>
+<li><label for="windows2"> Door Installation</label></li>
+<li><label for="windows3"> Window Security Film</label></li>
+<li><label for="windows4"> Window Tinting</label></li>
+<li><label for="windows5"> Window Dressing/Curtains</label></li>
+<li><label for="windows6"> Blind/Drapery Cleaning</label></li>
+<li><label for="windows7"> Locksmith</label></li>
+<li><label for="windows8"> Other Windows and Doors</label></li>
+</ul>
+<h3><a href="usermenu2-9.html">Floor/Carpet Care and Installation</a></h3>
+<ul>
+<li><label for="floor1"> Carpet Installation</label></li>
+<li><label for="floor2"> Hardwood Floor Installation</label></li>
+<li><label for="floor3"> Epoxy Flooring</label></li>
+<li><label for="floor4"> Tile Flooring</label></li>
+<li><label for="floor5"> Laminate Flooring</label></li>
+<li><label for="floor6"> Carpet Cleaning</label></li>
+<li><label for="floor7"> Floor Buffing and Cleaning</label></li>
+<li><label for="floor8"> Oriental Rug Cleaning</label></li>
+<li><label for="floor9"> Other Floor/Carpet Care and Installation</label></li>
+</ul>
+<h3><a href="usermenu2-10.html#">Audio/Visual and Home Security</a></h3>
+<ul>
+<li><label for="audiovisuall"> Smart Home Setup</label></li>
+<li><label for="audiovisual2"> Home Security Solutions</label></li>
+<li><label for="audiovisual3"> Cinema Room Setup</label></li>
+<li><label for="audiovisual4"> Telecommunication</label></li>
+<li><label for="audiovisual5"> Cable/Satellite/Antenna Television</label></li>
+<li><label for="audiovisual6"> Computer Repair</label></li>
+<li><label for="audiovisual7"> Other Audio/Visual and Home Security</label></li>
+</ul>
+<h3><a href="usermenu2-11.html">Home Hazard Mitigation</a></h3>
+<ul>
+<li><label for="hazard1"> Lead-Based Paint Abatement</label></li>
+<li><label for="hazard2"> Radon Mitigation</label></li>
+<li><label for="hazard3"> Mold Removal</label></li>
+<li><label for="hazard4"> Asbestos Removal</label></li>
+<li><label for="hazard5"> Smoke/Carbon Monoxide Detector Installation</label></li>
+<li><label for="hazard6"> Fire Extinguisher Maintenance</label></li>
+<li><label for="hazard7"> Other Home Hazard Mitigation</label></li>
+</ul>
+<h3><a href="usermenu2-12.html">Pest Control/ Wildlife Removal</a></h3>
+<ul>
+<li><label for="pest1"> Rodent/ Small Animal Infestations</label></li>
+<li><label for="pest2"> Wildlife Removal</label></li>
+<li><label for="pest3"> Insect and Bug Control</label></li>
+<li><label for="pest4"> Other Pest Control/ Wildlife Removal</label></li>
+</ul>
+<h3><a href="usermenu2-13.html">Trash Cleanup and Removal</a></h3>
+<ul>
+<li><label for="trash1"> Biohazard Cleanup</label></li>
+<li><label for="trash2"> Dumpster Rental</label></li>
+<li><label for="trash3"> Hauling/Old Furniture and Appliance Removal</label></li>
+<li><label for="trash4"> Document Shredding</label></li>
+<li><label for="trash5"> Trash/Junk Removal</label></li>
+<li><label for="trash6"> Other Trash Cleanup and Removal</label></li>
+</ul>
+<h3><a href="usermenu2-14.html">Home and Office Cleaning</a></h3>
+<ul>
+<li><label for="cleaning1"> House Cleaning</label></li>
+<li><label for="cleaning2"> Office Cleaning</label></li>
+<li><label for="cleaning3"> Window Cleaning</label></li>
+<li><label for="cleaning4"> Deep Carpet and Floor Cleaning</label></li>
+<li><label for="cleaning5"> Other Home and Office Cleaning</label></li>
+</ul>
+<h3><a href="usermenu2-15.html">Fireplaces and Chimneys</a></h3>
+<ul>
+<li><label for="fireplace1"> Chimney Sweep</label></li>
+<li><label for="fireplace2"> Chimney and Chimney Cap Repair</label></li>
+<li><label for="fireplace3"> Gas Fireplace Repair</label></li>
+<li><label for="fireplace4"> Fireplace Services</label></li>
+<li><label for="fireplace5"> Firewood Suppliers</label></li>
+<li><label for="fireplace6"> Heating Oil Suppliers</label></li>
+<li><label for="fireplace7"> Other Fireplaces and Chimneys</label></li>
+</ul>
+<h3><a href="usermenu2-16.html">Movers/Moving Trucks</a></h3>
+<ul>
+<li><label for="movers1"> Moving Truck Rental</label></li>
+<li><label for="movers2"> Piano Movers</label></li>
+<li><label for="movers3"> Movers</label></li>
+<li><label for="movers4"> Other Movers/Moving Trucks</label></li>
+</ul>
+<h3><a href="usermenu2-17.html">Handymen</a></h3>
+<ul>
+<li><label for="handymen1"> Odd Jobs and Repairs</label></li>
+<li><label for="handymen2"> Product Assembly</label></li>
+<li><label for="handymen3"> Other Handymen</label></li>
+</ul>
+</div>
+</div></div></div></body></html>

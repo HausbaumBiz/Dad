@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Whiteboard with Image Upload, Textures, and Links</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .ad-box {
+            width: 900px;
+            height: 450px;
+            border: 2px solid black;
+            margin-bottom: 20px;
+            background-color: white;
+            z-index: 1000; /* Keep it above other elements */
+        }
+
+        .ad-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 10px;
+            background-color: lightgrey;
+            border-bottom: 2px solid black;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            height: calc(100% - 50px); /* Adjust for the title height */
+        }
+
+        .grid-item {
+            border: 1px solid lightgrey;
+            width: 100%;
+            height: 100%;
+        }
+
+        .whiteboard-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            width: 100%;
+            margin-top: 20px; /* Space between ad box and whiteboard */
+            margin-bottom: 20px;
+        }
+
+        .menu-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 50%;
+            max-width: 600px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: #169586;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .container {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .container label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .container input, .container select, .container button {
+            margin-bottom: 10px;
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        .whiteboard {
+            border: 2px solid black;
+            position: relative;
+            overflow: hidden;
+            cursor: text;
+            display: none; /* Hide all whiteboards initially */
+            background-color: white; /* Default background color */
+            background-size: 100% 100%; /* Ensure the texture covers the entire whiteboard */
+            background-repeat: no-repeat; /* Do not repeat the texture */
+            margin-bottom: 20px;
+        }
+
+        #whiteboard1 {
+            width: 300px;
+            height: 150px;
+        }
+
+        #whiteboard2 {
+            width: 600px;
+            height: 150px;
+        }
+
+        #whiteboard3 {
+            width: 900px;
+            height: 150px;
+        }
+
+        #whiteboard4 {
+            width: 300px;
+            height: 300px;
+        }
+
+        #whiteboard5 {
+            width: 300px;
+            height: 450px;
+        }
+
+        #whiteboard6 {
+            width: 900px;
+            height: 300px;
+        }
+
+        #whiteboard7 {
+            width: 600px;
+            height: 300px;
+        }
+
+        #whiteboard8 {
+            width: 600px;
+            height: 450px;
+        }
+
+        #whiteboard9 {
+            width: 900px;
+            height: 450px;
+        }
+
+        .text-input {
+            position: absolute;
+            cursor: text;
+            outline: none;
+            white-space: nowrap;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            background-color: black;
+            animation: blink 1s infinite;
+            position: absolute;
+        }
+
+        .resizable {
+            position: absolute;
+            border: 1px dashed #000;
+        }
+
+        .resizable img {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .resizer {
+            width: 10px;
+            height: 10px;
+            border: 1px solid black;
+            background-color: white;
+            position: absolute;
+            cursor: pointer;
+        }
+
+        .resizer.ne {
+            top: -5px;
+            right: -5px;
+            cursor: ne-resize;
+        }
+
+        .resizer.se {
+            bottom: -5px;
+            right: -5px;
+            cursor: se-resize;
+        }
+
+        .resizer.sw {
+            bottom: -5px;
+            left: -5px;
+            cursor: sw-resize;
+        }
+
+        .resizer.nw {
+            top: -5px;
+            left: -5px;
+            cursor: nw-resize;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        ::selection {
+            background: lightblue;
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            background-color: #fff;
+            border: 2px solid #000;
+            z-index: 1000;
+            display: none; /* Initially hidden */
+        }
+
+        .carousel {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .carousel img, .carousel iframe {
+            max-width: 500px;
+            max-height: 400px;
+        }
+
+        .carousel-button {
+            background-color: transparent;
+            border: none;
+            font-size: 2em;
+            cursor: pointer;
+        }
+
+        .icon {
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        .carousel-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .carousel-content {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .carousel-content.active {
+            display: flex;
+        }
+
+      .button-container {
+    display: flex;
+    justify-content: center;  /* Center the buttons as a group horizontally */
+    margin: 20px 0;           /* Add vertical space around the button group */
+    gap: 10px;                /* Add space between the buttons */
+}
+
+.button-container button, 
+.button-container img {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #169586;
+    color: white;
+    border: none;
+    border-radius: 5px;
+}
+
+.button-container img {
+    width: 40px; /* Adjust the size of the icon */
+    height: 40px;
+}
+
+/* Add space below the button group and above the text container */
+.menu-container {
+    margin-top: 30px;
+}
+
+
+    </style>
+</head>
+<body>
+
+<div class="ad-box">
+    <div class="ad-title">Your Ad Box</div>
+    <div class="grid-container">
+        <div class="grid-item"></div>
+        <div class="grid-item"></div>
+        <div class="grid-item"></div>
+        <div class="grid-item"></div>
+        <div class="grid-item"></div>
+        <div class="grid-item"></div>
+        <div class="grid-item"></div>
+        <div class="grid-item"></div>
+        <div class="grid-item"></div>
+    </div>
+</div>
+
+<div class="whiteboard-container">
+    <div id="whiteboard1" class="whiteboard"></div>
+    <div id="whiteboard2" class="whiteboard"></div>
+    <div id="whiteboard3" class="whiteboard"></div>
+    <div id="whiteboard4" class="whiteboard"></div>
+    <div id="whiteboard5" class="whiteboard"></div>
+    <div id="whiteboard6" class="whiteboard"></div>
+    <div id="whiteboard7" class="whiteboard"></div>
+    <div id="whiteboard8" class="whiteboard"></div>
+    <div id="whiteboard9" class="whiteboard"></div>
+
+    <!-- Clear and Undo Button Container -->
+<div class="button-container">
+    <button onclick="undoLast()">Undo</button>
+    <button onclick="clearWhiteboard()">Clear Board</button>
+    <img id="lockToggleButton" src="unlock.png" alt="Lock/Unlock" onclick="toggleLock()" style="cursor: pointer;">
+</div>
+<div class="menu-container">
+
+    <!-- Whiteboard Size Container -->
+    <div class="container">
+        <label for="whiteboardSelector">Select Whiteboard Size:</label>
+        <select id="whiteboardSelector" onchange="selectWhiteboard()">
+            <option value="whiteboard1">150x300 px</option>
+            <option value="whiteboard2">150x600 px</option>
+            <option value="whiteboard3">150x900 px</option>
+            <option value="whiteboard4">300x300 px</option>
+            <option value="whiteboard5">450x300 px</option>
+            <option value="whiteboard6">300x900 px</option>
+            <option value="whiteboard7">300x600 px</option>
+            <option value="whiteboard8">450x600 px</option>
+            <option value="whiteboard9">450x900 px</option>
+        </select>
+    </div>
+
+    <!-- Text Container -->
+    <div class="container">
+        <label>Text</label>
+        <label for="fontSize">Font Size:</label>
+        <input type="number" id="fontSize" value="20" min="5" oninput="updateSelectedTextStyle()">
+
+        <label for="fontColor">Font Color:</label>
+        <input type="color" id="fontColor" value="#000000" oninput="updateSelectedTextStyle()">
+
+        <label for="fontStyle">Font Style:</label>
+        <select id="fontStyle" onchange="updateSelectedTextStyle()">
+            <option value="Arial">Arial</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Georgia">Georgia</option>
+        </select>
+    </div>
+
+    <!-- Background Container -->
+    <div class="container">
+        <label>Background</label>
+        <label for="backgroundColor">Background Color:</label>
+        <input type="color" id="backgroundColor" value="#FFFFFF" onchange="updateWhiteboardBackgroundColor()">
+
+        <label for="textureSelector">Select Texture:</label>
+        <select id="textureSelector" onchange="updateWhiteboardTexture()">
+            <option value="">None</option>
+            <option value="floral.png">Floral</option>
+            <option value="felt.png">Felt</option>
+            <option value="wood1.png">Wood</option>
+            <option value="brick-wall.png">Brick Wall</option>
+            <option value="argyle.png">Argyle</option>
+        </select>
+    </div>
+
+    <!-- Add Web Link Container -->
+    <div class="container">
+        <label>Add Web Link</label>
+        <label for="linkInput">Add Link:</label>
+        <input type="text" id="linkInput" placeholder="https://example.com">
+        <button onclick="addLinkToWhiteboard()">Add Link</button>
+        <button onclick="removeLastLink()">Remove Link</button>
+    </div>
+
+    <!-- Attachments Container -->
+ <div class="container">
+    <label>Attachments</label>
+    <label for="modalLinkInput">Add Modal Link:</label>
+    <input type="text" id="modalLinkInput" placeholder="Click here for info">
+    <button onclick="addModalLinkToWhiteboard()">Add Modal Link</button>
+    <button onclick="removeLastModalLink()">Remove Modal Link</button>
+
+    <!-- New Clear Attachments Button -->
+    <button onclick="clearAttachments()">Clear Attachments</button>
+
+        <!-- File Attachment Inputs -->
+        <label for="attachment1">Attachment 1:</label>
+        <input type="file" id="attachment1" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 0)">
+        <label for="attachment2">Attachment 2:</label>
+        <input type="file" id="attachment2" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 1)">
+        <label for="attachment3">Attachment 3:</label>
+        <input type="file" id="attachment3" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 2)">
+        <label for="attachment4">Attachment 4:</label>
+        <input type="file" id="attachment4" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 3)">
+        <label for="attachment5">Attachment 5:</label>
+        <input type="file" id="attachment5" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 4)">
+        <label for="attachment6">Attachment 6:</label>
+        <input type="file" id="attachment6" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 5)">
+        <label for="attachment7">Attachment 7:</label>
+        <input type="file" id="attachment7" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 6)">
+        <label for="attachment8">Attachment 8:</label>
+        <input type="file" id="attachment8" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 7)">
+        <label for="attachment9">Attachment 9:</label>
+        <input type="file" id="attachment9" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 8)">
+        <label for="attachment10">Attachment 10:</label>
+        <input type="file" id="attachment10" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" onchange="handleAttachmentUpload(this, 9)">
+    </div>
+
+</div>
+
+<!-- Modal structure -->
+<div id="modal" class="modal">
+    <div class="carousel">
+        <button class="carousel-button" onclick="prevSlide()">❮</button>
+        <div id="carousel-container" class="carousel-container">
+            <!-- Carousel items will be added here -->
+        </div>
+        <button class="carousel-button" onclick="nextSlide()">❯</button>
+    </div>
+    <button onclick="closeModal()">Close</button>
+</div>
+
+</body>
+</html>
+
+<script>
+    let elements = [];
+    let currentWhiteboard = 'whiteboard1'; // Default to the first whiteboard
+    let activeCursor = null;
+    let attachments = []; // Array to store attachment objects
+    let currentSlide = 0;
+
+    function selectWhiteboard() {
+        // Hide all whiteboards
+        document.querySelectorAll('.whiteboard').forEach(whiteboard => {
+            whiteboard.style.display = 'none';
+        });
+
+        // Show the selected whiteboard
+        currentWhiteboard = document.getElementById('whiteboardSelector').value;
+        document.getElementById(currentWhiteboard).style.display = 'block';
+
+        // Update the background color and texture input to match the current whiteboard's background
+        const currentBgColor = document.getElementById(currentWhiteboard).style.backgroundColor || '#FFFFFF';
+        document.getElementById('backgroundColor').value = rgbToHex(currentBgColor);
+
+        const currentTexture = document.getElementById(currentWhiteboard).style.backgroundImage;
+        document.getElementById('textureSelector').value = currentTexture ? currentTexture.slice(5, -2) : "";
+    }
+
+    function initializeWhiteboard(whiteboardId) {
+        document.getElementById(whiteboardId).addEventListener('click', function (e) {
+            if (e.button !== 0) return; // Only respond to left mouse button
+
+            const whiteboard = document.getElementById(whiteboardId);
+
+            // Remove existing cursor
+            if (activeCursor) {
+                activeCursor.remove();
+            }
+
+            let fontSize = document.getElementById('fontSize').value;
+            fontSize = Math.max(5, fontSize) + 'px';
+            const fontColor = document.getElementById('fontColor').value;
+            const fontStyle = document.getElementById('fontStyle').value;
+
+            const textElement = document.createElement('div');
+            textElement.className = 'text-input';
+            textElement.contentEditable = true;
+            textElement.style.fontSize = fontSize;
+            textElement.style.color = fontColor;
+            textElement.style.fontFamily = fontStyle;
+            textElement.style.left = e.clientX - whiteboard.offsetLeft + 'px';
+            textElement.style.top = e.clientY - whiteboard.offsetTop + 'px';
+            textElement.innerText = '';
+
+            whiteboard.appendChild(textElement);
+            elements.push(textElement);
+
+            activeCursor = document.createElement('div');
+            activeCursor.className = 'cursor';
+            activeCursor.style.height = fontSize;
+            activeCursor.style.left = textElement.style.left;
+            activeCursor.style.top = textElement.style.top;
+
+            whiteboard.appendChild(activeCursor);
+
+            textElement.addEventListener('input', function () {
+                const rect = textElement.getBoundingClientRect();
+                activeCursor.style.left = rect.right - whiteboard.offsetLeft + 'px';
+                activeCursor.style.top = rect.top - whiteboard.offsetTop + 'px';
+            });
+
+            textElement.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // Move the cursor to the next line
+                    activeCursor.style.left = parseInt(activeCursor.style.left) + 10 + 'px';
+                    activeCursor.style.top = parseInt(activeCursor.style.top) + parseInt(fontSize) + 'px';
+                }
+            });
+
+            textElement.focus();
+
+            makeDraggable(textElement);
+        });
+    }
+
+    function makeDraggable(element) {
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        element.addEventListener('mousedown', function (e) {
+            if (e.button === 2) return; // Ignore right mouse button
+            isDragging = true;
+            offsetX = e.clientX - element.getBoundingClientRect().left;
+            offsetY = e.clientY - element.getBoundingClientRect().top;
+
+            // Bring the element to the front
+            element.style.zIndex = '1000';
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (isDragging) {
+                // Update the position of the element
+                element.style.left = e.clientX - offsetX + 'px';
+                element.style.top = e.clientY - offsetY + 'px';
+
+                // Update the cursor's position to follow exactly on top of the element
+                if (activeCursor) {
+                    activeCursor.style.left = element.style.left;
+                    activeCursor.style.top = element.style.top;
+                }
+            }
+        });
+
+        document.addEventListener('mouseup', function () {
+            if (isDragging) {
+                isDragging = false;
+                // Reset the zIndex after dragging
+                element.style.zIndex = 'initial';
+            }
+        });
+    }
+
+    function updateSelectedTextStyle() {
+        const fontSize = Math.max(5, document.getElementById('fontSize').value) + 'px';
+        const fontColor = document.getElementById('fontColor').value;
+        const fontStyle = document.getElementById('fontStyle').value;
+
+        if (window.getSelection) {
+            const sel = window.getSelection();
+            if (sel.rangeCount && sel.getRangeAt(0).startContainer.parentElement.contentEditable) {
+                const range = sel.getRangeAt(0);
+                const selectedText = range.extractContents();
+                const span = document.createElement('span');
+                span.style.fontSize = fontSize;
+                span.style.color = fontColor;
+                span.style.fontFamily = fontStyle;
+                span.appendChild(selectedText);
+                range.insertNode(span);
+                sel.removeAllRanges(); // Clear selection
+
+                // Update the cursor position
+                if (activeCursor) {
+                    const rect = span.getBoundingClientRect();
+                    const whiteboard = document.getElementById(currentWhiteboard);
+                    activeCursor.style.left = rect.right - whiteboard.offsetLeft + 'px';
+                    activeCursor.style.top = rect.top - whiteboard.offsetTop  + 'px';
+                }
+            }
+        }
+    }
+
+    function updateWhiteboardBackgroundColor() {
+        const backgroundColor = document.getElementById('backgroundColor').value;
+        const whiteboard = document.getElementById(currentWhiteboard);
+        whiteboard.style.backgroundColor = backgroundColor;
+    }
+
+    function updateWhiteboardTexture() {
+        const texture = document.getElementById('textureSelector').value;
+        const whiteboard = document.getElementById(currentWhiteboard);
+        whiteboard.style.backgroundImage = texture ? `url(${texture})` : '';
+        whiteboard.style.backgroundSize = "100% 100%";  // Ensure the texture covers the entire whiteboard
+        whiteboard.style.backgroundRepeat = "no-repeat"; // Do not repeat the texture pattern
+    }
+
+    function clearWhiteboard() {
+        const whiteboard = document.getElementById(currentWhiteboard);
+        whiteboard.innerHTML = '';
+        elements = [];
+        activeCursor = null;
+    }
+
+    function undoLast() {
+        if (elements.length > 0) {
+            const lastElement = elements.pop();
+            lastElement.remove();
+            if (activeCursor) {
+                activeCursor.remove();
+                activeCursor = null;
+            }
+        }
+    }
+
+    function uploadImage() {
+        const fileInput = document.getElementById('imageUpload');
+        const whiteboard = document.getElementById(currentWhiteboard);
+
+        if (fileInput.files && fileInput.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const imgContainer = document.createElement('div');
+                imgContainer.className = 'resizable';
+                imgContainer.style.left = '10px';
+                imgContainer.style.top = '10px';
+                imgContainer.style.width = '100px';
+                imgContainer.style.height = '100px';
+
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                imgContainer.appendChild(img);
+
+                const resizers = createResizers();
+                resizers.forEach(resizer => imgContainer.appendChild(resizer));
+
+                whiteboard.appendChild(imgContainer);
+                elements.push(imgContainer);
+
+                makeDraggable(imgContainer);
+                makeResizable(imgContainer, resizers);
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        }
+    }
+
+    function createResizers() {
+        const resizers = [];
+        const positions = ['nw', 'ne', 'sw', 'se'];
+        positions.forEach(pos => {
+            const resizer = document.createElement('div');
+            resizer.className = 'resizer ' + pos;
+            resizers.push(resizer);
+        });
+        return resizers;
+    }
+
+    function makeResizable(element, resizers) {
+        resizers.forEach(resizer => {
+            resizer.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startWidth = parseInt(document.defaultView.getComputedStyle(element).width, 10);
+                const startHeight = parseInt(document.defaultView.getComputedStyle(element).height, 10);
+                const startLeft = parseInt(document.defaultView.getComputedStyle(element).left, 10);
+                const startTop = parseInt(document.defaultView.getComputedStyle(element).top, 10);
+
+                function doDrag(e) {
+                    if (resizer.classList.contains('se')) {
+                        element.style.width = startWidth + e.clientX - startX + 'px';
+                        element.style.height = startHeight + e.clientY - startY + 'px';
+                    } else if (resizer.classList.contains('sw')) {
+                        element.style.width = startWidth - e.clientX - startX + 'px';
+                        element.style.height = startHeight + e.clientY - startY + 'px';
+                        element.style.left = startLeft + e.clientX - startX + 'px';
+                    } else if (resizer.classList.contains('ne')) {
+                        element.style.width = startWidth + e.clientX - startX + 'px';
+                        element.style.height = startHeight - e.clientY - startY + 'px';
+                        element.style.top = startTop + e.clientY - startY + 'px';
+                    } else if (resizer.classList.contains('nw')) {
+                        element.style.width = startWidth - e.clientX - startX + 'px';
+                        element.style.height = startHeight - e.clientY - startY + 'px';
+                        element.style.left = startLeft + e.clientX - startX + 'px';
+                        element.style.top = startTop + e.clientY - startY + 'px';
+                    }
+                }
+
+                function stopDrag() {
+                    document.removeEventListener('mousemove', doDrag, false);
+                    document.removeEventListener('mouseup', stopDrag, false);
+                }
+
+                document.addEventListener('mousemove', doDrag, false);
+                document.addEventListener('mouseup', stopDrag, false);
+            });
+        });
+    }
+
+    function addLinkToWhiteboard() {
+        const link = document.getElementById('linkInput').value;
+        if (!link) return;
+
+        const whiteboard = document.getElementById(currentWhiteboard);
+        const linkElement = document.createElement('a');
+        linkElement.href = link;
+        linkElement.innerText = link;
+        linkElement.target = '_blank'; // Opens the link in a new tab
+        linkElement.style.position = 'absolute';
+        linkElement.style.left = '10px'; // Default position, adjust as needed
+        linkElement.style.top = '10px'; // Default position, adjust as needed
+        linkElement.style.fontSize = document.getElementById('fontSize').value + 'px';
+        linkElement.style.color = document.getElementById('fontColor').value;
+        linkElement.style.fontFamily = document.getElementById('fontStyle').value;
+
+        whiteboard.appendChild(linkElement);
+        elements.push(linkElement);
+
+        makeDraggable(linkElement);
+    }
+
+    function removeLastLink() {
+        const whiteboard = document.getElementById(currentWhiteboard);
+        const links = whiteboard.getElementsByTagName('a');
+        if (links.length > 0) {
+            const lastLink = links[links.length - 1];
+            lastLink.remove();
+        }
+    }
+
+    function addModalLinkToWhiteboard() {
+        const linkText = document.getElementById('modalLinkInput').value;
+        if (!linkText) return;
+
+        const whiteboard = document.getElementById(currentWhiteboard);
+        const modalLinkElement = document.createElement('a');
+        modalLinkElement.href = '#';
+        modalLinkElement.innerText = linkText;
+        modalLinkElement.style.position = 'absolute';
+        modalLinkElement.style.left = '10px'; // Default position, adjust as needed
+        modalLinkElement.style.top = '50px'; // Default position, adjust as needed
+        modalLinkElement.style.fontSize = document.getElementById('fontSize').value + 'px';
+        modalLinkElement.style.color = document.getElementById('fontColor').value;
+        modalLinkElement.style.fontFamily = document.getElementById('fontStyle').value;
+
+        // Modal event listener
+        modalLinkElement.addEventListener('click', function(e) {
+            e.preventDefault();
+            openModal();
+        });
+
+        whiteboard.appendChild(modalLinkElement);
+        elements.push(modalLinkElement);
+
+        makeDraggable(modalLinkElement);
+    }
+
+    function removeLastModalLink() {
+        const whiteboard = document.getElementById(currentWhiteboard);
+        const modalLinks = Array.from(whiteboard.getElementsByTagName('a')).filter(link => link.href === '#');
+        if (modalLinks.length > 0) {
+            const lastModalLink = modalLinks[modalLinks.length - 1];
+            lastModalLink.remove();
+        }
+    }
+
+    function handleAttachmentUpload(input, index) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            attachments[index] = {
+                name: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
+                type: file.type,
+                data: e.target.result
+            };
+            updateCarousel();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function updateCarousel() {
+        const container = document.getElementById('carousel-container');
+        container.innerHTML = '';
+
+        attachments.forEach((attachment, index) => {
+            if (!attachment) return;
+
+            const slide = document.createElement('div');
+            slide.className = 'carousel-content';
+            slide.id = 'slide-' + index;
+
+            let contentElement;
+            if (attachment.type.startsWith('image/')) {
+                contentElement = document.createElement('img');
+                contentElement.src = attachment.data;
+            } else if (attachment.type === 'application/pdf') {
+                contentElement = document.createElement('iframe');
+                contentElement.src = attachment.data;
+                contentElement.style.width = '500px';
+                contentElement.style.height = '400px';
+            }
+
+            const title = document.createElement('h3');
+            title.innerText = attachment.name;
+
+            const printIcon = document.createElement('img');
+            printIcon.src = 'printer.png'; // Replace with your print icon URL
+            printIcon.className = 'icon';
+            printIcon.onclick = function () {
+                printAttachment(attachment);
+            };
+
+            const downloadIcon = document.createElement('img');
+            downloadIcon.src = 'download.png'; // Replace with your download icon URL
+            downloadIcon.className = 'icon';
+            downloadIcon.onclick = function () {
+                downloadAttachment(attachment);
+            };
+
+            slide.appendChild(title);
+            slide.appendChild(contentElement);
+            slide.appendChild(printIcon);
+            slide.appendChild(downloadIcon);
+
+            container.appendChild(slide);
+        });
+
+        showSlide(currentSlide);
+    }
+
+    function openModal() {
+        const modal = document.getElementById('modal');
+        modal.style.display = 'block';
+        showSlide(currentSlide);
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('modal');
+        modal.style.display = 'none';
+    }
+
+    function showSlide(index) {
+        const slides = document.getElementsByClassName('carousel-content');
+        if (index >= slides.length) currentSlide = 0;
+        if (index < 0) currentSlide = slides.length - 1;
+
+        for (let i = 0; i < slides.length; i++) {
+            slides[i].classList.remove('active');
+        }
+        slides[currentSlide].classList.add('active');
+    }
+
+    function nextSlide() {
+        currentSlide++;
+        showSlide(currentSlide);
+    }
+
+    function prevSlide() {
+        currentSlide--;
+        showSlide(currentSlide);
+    }
+
+    function printAttachment(attachment) {
+        const win = window.open();
+        if (attachment.type.startsWith('image/')) {
+            win.document.write('<img src="' + attachment.data + '" onload="window.print();window.close()" />');
+        } else if (attachment.type === 'application/pdf') {
+            win.document.write('<iframe src="' + attachment.data + '" onload="window.print();window.close()" style="width:100%; height:100%;"></iframe>');
+        }
+        win.document.close();
+    }
+
+    function downloadAttachment(attachment) {
+        const link = document.createElement('a');
+        link.href = attachment.data;
+        link.download = attachment.name;
+        link.click();
+    }
+	
+	function clearAttachments() {
+    // Clear the attachments array
+    attachments = [];
+
+    // Clear the file input fields
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    fileInputs.forEach(input => input.value = '');
+
+    // Update the carousel to reflect no attachments
+    updateCarousel();
+}
+
+    function rgbToHex(rgb) {
+        const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb);
+        return result ? "#" + (
+            (1 << 24) + 
+            (parseInt(result[1]) << 16) + 
+            (parseInt(result[2]) << 8) + 
+            parseInt(result[3])
+        ).toString(16).slice(1).toUpperCase() : rgb;
+    }
+
+    // Initialize all whiteboards
+    initializeWhiteboard('whiteboard1');
+    initializeWhiteboard('whiteboard2');
+    initializeWhiteboard('whiteboard3');
+    initializeWhiteboard('whiteboard4');
+    initializeWhiteboard('whiteboard5');
+    initializeWhiteboard('whiteboard6');
+    initializeWhiteboard('whiteboard7');
+    initializeWhiteboard('whiteboard8');
+    initializeWhiteboard('whiteboard9');
+
+    // Show the default whiteboard on load
+    document.getElementById(currentWhiteboard).style.display = 'block';
+	
+	let isWhiteboardLocked = false;
+
+function toggleLock() {
+    const lockToggleButton = document.getElementById('lockToggleButton');
+    const whiteboard = document.getElementById(currentWhiteboard);
+
+    if (isWhiteboardLocked) {
+        // Unlock the whiteboard
+        lockToggleButton.src = 'unlock.png';
+        whiteboard.style.pointerEvents = 'auto'; // Enable interaction
+        isWhiteboardLocked = false;
+    } else {
+        // Lock the whiteboard
+        lockToggleButton.src = 'lock.png';
+        whiteboard.style.pointerEvents = 'none'; // Disable interaction
+        isWhiteboardLocked = true;
+    }
+}
+
+</script>
+
+</body>
+</html>
