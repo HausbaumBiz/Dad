@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Category and Subcategory Selector</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #f8f9fa;
+            padding: 10px 20px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header .logo img {
+            max-height: 250px;
+        }
+
+        header nav button {
+            padding: 10px 20px;
+            background-color: #444;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin-left: 20px; /* Space between logo and button */
+        }
+
+        header nav button:hover {
+            background-color: #555;
+        }
+
+        #container {
+            display: flex;
+            width: 80%;
+            margin: 20px auto;
+        }
+
+        .image-container {
+            flex: 1;
+            margin-right: 20px;
+        }
+
+        .image-container img {
+            width: 100%;
+            height: auto;
+            max-width: 500px; /* Adjust this value to change the max width of the image */
+        }
+
+        .image-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .image-column img {
+            width: 100px; /* Default width, can be adjusted individually */
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            flex: 2;
+        }
+
+        h1, h2 {
+            text-align: center;
+        }
+
+        .category {
+            margin-bottom: 20px;
+        }
+
+        .subcategory {
+            margin-left: 20px;
+        }
+
+        ul {
+            list-style-type: none;
+        }
+
+        #selected-box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        #selected-box h2 {
+            text-align: left;
+            margin: 0 0 10px 0;
+        }
+
+        #submit-button {
+            display: block;
+            margin: 20px auto 0 auto; /* Center the button */
+            padding: 10px 20px;
+            background-color: #444;
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+
+        #submit-button:hover {
+            background-color: #555;
+        }
+
+        .custom-box {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: left;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .custom-box img {
+            width: 300px;
+            height: auto;
+            margin-right: 20px;
+        }
+
+        .custom-box h3 {
+            margin: 0;
+        }
+
+        /* Style for the pop-up form */
+        #popup-form {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            padding: 20px;
+			text-align: center;
+            background-color: white;
+            border: 5px solid #000; /* Add a solid black border */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        #popup-form input[type="text"], #popup-form textarea {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+        }
+
+        #popup-form button {
+            padding: 10px 20px;
+            background-color: #444;
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+
+        #popup-form button:hover {
+            background-color: #555;
+        }
+
+        /* Style for the logo inside the pop-up form */
+        #popup-logo {
+            display: block;
+            margin: 0 auto 20px auto;
+            max-width: 200px; /* Adjust the size as needed */
+        }
+
+        /* Style for the close button inside the pop-up form */
+        #close-button {
+            display: block;
+            padding: 10px 20px;
+            background-color: #444;
+            border: none;
+            color: white;
+            cursor: pointer;
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+        }
+
+        #close-button:hover {
+            background-color: #555;
+        }
+
+        /* Style for the overlay */
+        #overlay {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+	</head>
+	
+	
+	<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <img src="hausbaumbiz.png" alt="Logo" id="logo">
+            </div>
+            <nav>
+                <button onclick="window.location.href='userhomepagewithpennysaver3.html'">Home</button>
+			
+            </nav>
+        </div>
+    </header>
+  <header>
+        </div>
+        <div class="content">
+         
+            <div id="categories"></div>
+            <div class="custom-box">
+                <div>
+                    <h3>Filter Your Search Further or Browse the Entire Category.</h3>
+                    <ul>
+                        <li><input type="checkbox" id="athletics1" value="Baseball/Softball" class="athletics-checkbox"><label for="athletics1"> Baseball/Softball</label></li>
+                        <li><input type="checkbox" id="athletics2" value="Golf" class="athletics-checkbox"><label for="athletics2"> Golf</label></li>
+                        <li><input type="checkbox" id="athletics3" value="Tennis" class="athletics-checkbox"><label for="athletics3"> Tennis</label></li>
+                        <li><input type="checkbox" id="athletics4" value="Basketball" class="athletics-checkbox"><label for="athletics4"> Basketball</label></li>
+                        <li><input type="checkbox" id="athletics5" value="Football" class="athletics-checkbox"><label for="athletics5"> Football</label></li>
+                        <li><input type="checkbox" id="athletics6" value="Soccer" class="athletics-checkbox"><label for="athletics6"> Soccer</label></li>
+                        <li><input type="checkbox" id="athletics7" value="Ice Skating" class="athletics-checkbox"><label for="athletics7"> Ice Skating</label></li>
+                        <li><input type="checkbox" id="athletics8" value="Gymnastics" class="athletics-checkbox"><label for="athletics8"> Gymnastics</label></li>
+                        <li><input type="checkbox" id="athletics9" value="Pickleball" class="athletics-checkbox"><label for="athletics9"> Pickleball</label></li>
+                        <li><input type="checkbox" id="athletics10" value="Table Tennis" class="athletics-checkbox"><label for="athletics10"> Table Tennis</label></li>
+                        <li><input type="checkbox" id="athletics11" value="Dance" class="athletics-checkbox"><label for="athletics11"> Dance</label></li>
+                        <li><input type="checkbox" id="athletics12" value="Personal Trainers" class="athletics-checkbox"><label for="athletics12"> Personal Trainers</label></li>
+                        <li><input type="checkbox" id="athletics13" value="Group Fitness Classes" class="athletics-checkbox"><label for="athletics13"> Group Fitness Classes</label></li>
+						<li><input type="checkbox" id="athletics14" value="Other Athletics, Personal Trainers, ect" class="athletics-checkbox"><label for="athletics14"> Other Athletics, Personal Trainers, ect</label></li>
+                    </ul>
+<!-- Add the filter button here -->
+<button id="filter-button" onclick="applyFilters()">Apply Filters</button>
+ </header>
+
+<script>
+    function applyFilters() {
+        let selectedFilters = [];
+        const checkboxes = document.querySelectorAll('.athletics-checkbox');
+        checkboxes.forEach(checkbox => {
+            if (checkbox.checked) {
+                selectedFilters.push(checkbox.value);
+            }
+        });
+
+        alert('Selected filters: ' + selectedFilters.join(', '));
+        // You can replace the alert with your logic to filter the content
+    }
+</script>
+
+<h2>Athletics, Personal Trainers, Group Fitness Classes and Dance Instruction</h2>
+
+
+
+					
+
+	</body>
+	
+
+	
+</html>

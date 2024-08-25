@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Whiteboard</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #FFFFFF;
+            overflow: hidden;
+        }
+
+        #toolbar {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #canvas {
+            border: 2px solid black;
+            cursor: crosshair;
+        }
+
+        #canvas.typing {
+            cursor: text;
+        }
+
+        .color-picker {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin: 5px;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .size-picker {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin: 5px;
+            cursor: pointer;
+            display: inline-block;
+            border: 1px solid black;
+        }
+
+        .selected {
+            box-shadow: 0px 0px 5px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        #fontSizeSelector {
+            margin-top: 10px;
+        }
+
+        #imageUploader {
+            margin-top: 10px;
+        }
+
+        #resizeInputContainer {
+            margin-top: 10px;
+        }
+
+        #resizeInput {
+            width: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <button id="drawMode">Draw</button>
+        <button id="typeMode">Type</button>
+        <button id="eraserMode">Eraser</button>
+        <button id="clearBoard">Clear Board</button>
+        <button id="toggleBoard">Turn Board Black</button>
+        <button id="saveImage">Save</button>
+        <button id="eraseMarkings">Erase Markings</button>
+        <div id="colorOptions">
+            <div class="color-picker" style="background-color: black;" data-color="black"></div>
+            <div class="color-picker" style="background-color: red;" data-color="red"></div>
+            <div class="color-picker" style="background-color: green;" data-color="green"></div>
+            <div class="color-picker" style="background-color: blue;" data-color="blue"></div>
+            <div class="color-picker" style="background-color: orange;" data-color="orange"></div>
+            <div class="color-picker" style="background-color: purple;" data-color="purple"></div>
+            <div class="color-picker" style="background-color: white;" data-color="white"></div>
+        </div>
+        <div id="sizeOptions">
+            <div class="size-picker" style="width: 4px; height: 4px;" data-size="2"></div>
+            <div class="size-picker" style="width: 8px; height: 8px;" data-size="4"></div>
+            <div class="size-picker" style="width: 12px; height: 12px;" data-size="6"></div>
+            <div class="size-picker" style="width: 16px; height: 16px;" data-size="8"></div>
+            <div class="size-picker" style="width: 20px; height: 20px;" data-size="10"></div>
+            <div class="size-picker" style="width: 24px; height: 24px;" data-size="12"></div>
+            <div class="size-picker" style="width: 48px; height: 48px;" data-size="26"></div>
+        </div>
+        <div id="fontSizeSelector">
+            <label for="fontSize">Font Size:</label>
+            <select id="fontSize">
+                <option value="10">10px</option>
+                <option value="14">14px</option>
+                <option value="18">18px</option>
+                <option value="22">22px</option>
+                <option value="24">24px</option>
+                <option value="26">26px</option>
+                <option value="30">30px</option>
+                <option value="34">34px</option>
+                <option value="48">48px</option>
+            </select>
+        </div>
+        <div id="imageUploader">
+            <label for="imageUpload">Upload Image:</label>
+            <input type="file" id="imageUpload" accept="image/png, image/jpeg, image/webp">
+        </div>
+        <div id="resizeInputContainer">
+            <label for="resizeInput">Resize Image (%):</label>
+            <input type="number" id="resizeInput" value="100" min="1" max="100">
+            <button id="applyResize">Apply</button>
+            
+            <!-- New Rotate Image Input -->
+            <label for="rotateInput">Rotate Image (°):</label>
+            <input type="number" id="rotateInput" value="0" min="0" max="360">
+            <button id="applyRotate">Apply</button>
+        </div>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let isTyping = false;
+        let isErasing = false;
+        let startX, startY;
+        let currentColor = 'black';
+        let currentSize = 2;
+        let currentFontSize = '20px';
+        let boardIsBlack = false;
+        let uploadedImage = null;
+        let uploadedImageWidth = 0;
+        let uploadedImageHeight = 0;
+        let initialImageWidth = 0;
+        let initialImageHeight = 0;
+        let currentRotation = 0;  // Keep track of the current rotation
+
+        // Resize canvas to fill the browser window
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Drawing mode
+        document.getElementById('drawMode').addEventListener('click', () => {
+            isTyping = false;
+            isErasing = false;
+            canvas.classList.remove('typing');
+            canvas.classList.remove('eraser');
+        });
+
+        // Typing mode
+        document.getElementById('typeMode').addEventListener('click', () => {
+            isTyping = true;
+            isErasing = false;
+            canvas.classList.add('typing');
+            canvas.classList.remove('eraser');
+        });
+
+        // Eraser mode
+        document.getElementById('eraserMode').addEventListener('click', () => {
+            isErasing = true;
+            isTyping = false;
+            canvas.classList.add('eraser');
+            canvas.classList.remove('typing');
+            ctx.strokeStyle = boardIsBlack ? 'black' : 'white';
+            ctx.lineWidth = currentSize;
+        });
+
+        // Handle color change
+        document.querySelectorAll('.color-picker').forEach(colorPicker => {
+            colorPicker.addEventListener('click', (e) => {
+                currentColor = e.target.getAttribute('data-color');
+                ctx.strokeStyle = currentColor;
+                ctx.fillStyle = currentColor;
+
+                document.querySelectorAll('.color-picker').forEach(picker => picker.classList.remove('selected'));
+                e.target.classList.add('selected');
+            });
+        });
+
+        // Handle size change
+        document.querySelectorAll('.size-picker').forEach(sizePicker => {
+            sizePicker.addEventListener('click', (e) => {
+                currentSize = e.target.getAttribute('data-size');
+                ctx.lineWidth = currentSize;
+
+                document.querySelectorAll('.size-picker').forEach(picker => picker.classList.remove('selected'));
+                e.target.classList.add('selected');
+            });
+        });
+
+        // Handle font size change
+        document.getElementById('fontSize').addEventListener('change', (e) => {
+            currentFontSize = e.target.value + 'px';
+        });
+
+        // Toggle the board between black and white
+        document.getElementById('toggleBoard').addEventListener('click', () => {
+            if (!boardIsBlack) {
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                currentColor = 'white';  // Automatically switch color to white
+                ctx.strokeStyle = currentColor;
+                ctx.fillStyle = currentColor;
+                document.getElementById('toggleBoard').innerText = 'Turn Board White';
+            } else {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                currentColor = 'black';  // Automatically switch color to black
+                ctx.strokeStyle = currentColor;
+                ctx.fillStyle = currentColor;
+                document.getElementById('toggleBoard').innerText = 'Turn Board Black';
+            }
+            boardIsBlack = !boardIsBlack;
+        });
+
+        // Clear the entire board
+        document.getElementById('clearBoard').addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (boardIsBlack) {
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = currentColor;
+            }
+            uploadedImage = null;  // Clear uploaded image
+        });
+
+        // Erase only the markings, keeping the uploaded image and background
+        document.getElementById('eraseMarkings').addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (boardIsBlack) {
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            if (uploadedImage) {
+                drawImageCentered(uploadedImage);
+            }
+        });
+
+        // Save the canvas as an image
+        document.getElementById('saveImage').addEventListener('click', async () => {
+            try {
+                const options = {
+                    types: [
+                        {
+                            description: 'Image Files',
+                            accept: {
+                                'image/png': ['.png'],
+                            },
+                        },
+                    ],
+                };
+                
+                const handle = await showSaveFilePicker(options);
+                const writable = await handle.createWritable();
+                
+                // Convert canvas to Blob and save
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                await writable.write(blob);
+                await writable.close();
+                
+                alert('Image saved successfully.');
+            } catch (err) {
+                console.error('Error saving the image:', err);
+                alert('Failed to save image.');
+            }
+        });
+
+        // Drawing or erasing
+        canvas.addEventListener('mousedown', (e) => {
+            if (!isTyping) {
+                isDrawing = true;
+                ctx.beginPath();
+                ctx.moveTo(e.clientX, e.clientY);
+            } else {
+                startX = e.clientX;
+                startY = e.clientY;
+                drawMarker(startX, startY);
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDrawing) {
+                ctx.lineTo(e.clientX, e.clientY);
+                ctx.stroke();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+        });
+
+        // Typing
+        canvas.addEventListener('click', (e) => {
+            if (isTyping) {
+                const text = prompt('Enter text:');
+                if (text) {
+                    clearMarker(startX, startY);
+                    ctx.font = currentFontSize + ' Arial';
+
+                    // Adjust marker clearing for font size
+                    clearMarker(startX, startY, parseInt(currentFontSize));
+
+                    ctx.fillText(text, startX, startY);
+                }
+            }
+        });
+
+        // Temporary marker
+        function drawMarker(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Modify clearMarker function to handle dynamic font sizes
+        function clearMarker(x, y, fontSize) {
+            const clearSize = fontSize * 2;  // Adjust size of the cleared area based on font size
+            ctx.clearRect(x - clearSize / 2, y - clearSize / 2, clearSize, clearSize);
+            if (boardIsBlack && currentColor === 'white') {
+                ctx.fillStyle = 'black';  // To clear marker on a white background
+                ctx.fillRect(x - clearSize / 2, y - clearSize / 2, clearSize, clearSize);
+                ctx.fillStyle = currentColor;
+            } else if (!boardIsBlack && currentColor === 'black') {
+                ctx.fillStyle = 'white';  // To clear marker on a black background
+                ctx.fillRect(x - clearSize / 2, y - clearSize / 2, clearSize, clearSize);
+                ctx.fillStyle = currentColor;
+            }
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.putImageData(imgData, 0, 0);
+            if (uploadedImage) {
+                drawImageCentered(uploadedImage);
+            }
+        });
+
+        // Handle image upload
+        document.getElementById('imageUpload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        uploadedImage = img;
+
+                        // Resize the image to fit the screen initially
+                        const canvasAspect = canvas.width / canvas.height;
+                        const imgAspect = img.width / img.height;
+
+                        if (imgAspect > canvasAspect) {
+                            uploadedImageWidth = canvas.width * 0.9; // Fit width, slightly smaller
+                            uploadedImageHeight = uploadedImageWidth / imgAspect;
+                        } else {
+                            uploadedImageHeight = canvas.height * 0.9; // Fit height, slightly smaller
+                            uploadedImageWidth = uploadedImageHeight * imgAspect;
+                        }
+
+                        initialImageWidth = uploadedImageWidth;
+                        initialImageHeight = uploadedImageHeight;
+
+                        drawImageCentered(img);
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Draw image centered on the canvas
+        function drawImageCentered(img) {
+            const x = (canvas.width - uploadedImageWidth) / 2;
+            const y = (canvas.height - uploadedImageHeight) / 2;
+            
+            // Clear canvas and set background color
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (boardIsBlack) {
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Save the current canvas state
+            ctx.save();
+
+            // Translate to the center of the image before rotating
+            ctx.translate(x + uploadedImageWidth / 2, y + uploadedImageHeight / 2);
+            ctx.rotate(currentRotation * Math.PI / 180);
+
+            // Draw the image with rotation applied
+            ctx.drawImage(img, -uploadedImageWidth / 2, -uploadedImageHeight / 2, uploadedImageWidth, uploadedImageHeight);
+
+            // Restore the canvas state
+            ctx.restore();
+        }
+
+        // Handle image resizing via input
+        document.getElementById('applyResize').addEventListener('click', () => {
+            const resizePercentage = parseInt(document.getElementById('resizeInput').value);
+            if (resizePercentage >= 1 && resizePercentage <= 100) {
+                uploadedImageWidth = initialImageWidth * (resizePercentage / 100);
+                uploadedImageHeight = initialImageHeight * (resizePercentage / 100);
+                drawImageCentered(uploadedImage);
+            } else {
+                alert("Please enter a value between 1 and 100.");
+            }
+        });
+
+        // Handle image rotation via input
+        document.getElementById('applyRotate').addEventListener('click', () => {
+            const rotateDegrees = parseInt(document.getElementById('rotateInput').value);
+            if (rotateDegrees >= 0 && rotateDegrees <= 360) {
+                currentRotation = rotateDegrees;
+                drawImageCentered(uploadedImage);
+            } else {
+                alert("Please enter a value between 0 and 360.");
+            }
+        });
+    </script>
+</body>
+</html>

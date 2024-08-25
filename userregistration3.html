@@ -63,7 +63,7 @@
 <body>
 <div class="container">
     <div class="home-page-button">
-        <a href="userhomepagewithpennysaver" class="custom-button">Home Page</a>
+        <a href="userhomepagewithpennysaver.html" class="custom-button">Home Page</a>
     </div>
 
     <div class="row">
@@ -72,10 +72,16 @@
                 <img src="hausbaumbiz.png" alt="Descriptive Alt Text" class="img-fluid">
             </div>
         </div>
+		    <div class="col-lg-4">
+        <div style="margin-top: 100px; color: black;">
+            By registering, you'll receive the Weekly Penny Saver directly in your inbox and gain the ability to rate hires, helping them earn well-deserved recognition.
+        </div>
+    </div>
+</div>
 
         <div class="col-lg-4 offset-lg-4">
             <div class="form-container">
-                <h2>Registration</h2>
+                <h2>User Registration</h2>
                 <p>Create an Account</p>
                 <div class="form-group">
                     <label for="firstName">First Name</label>
@@ -110,12 +116,13 @@
 
                 <div class="form-group" style="margin-right: 17%; text-align: right;">
                     <input type="button" class="btn btn-primary" value="Submit" onclick="sendVerificationCode()">
-                    <a href="login.html" class="btn btn-default">Already have an account? Login</a>
+                    <a href="Userlogin.html" class="btn btn-default">Already have an account? User Login</a>
                 </div>
 
                 <input type="hidden" id="verificationCode" value="">
             </div>
         </div>
+		
     </div>
 </div>
 
@@ -127,24 +134,34 @@ function sendVerificationCode() {
         return;
     }
 
-    var code = Math.floor(100000 + Math.random() * 900000); // Generate a 6-digit code
-    document.getElementById('verificationCode').value = code;
-
-    // Simulate sending email
-    console.log("Verification code sent to " + email + ": " + code);
-
-    // Display popup for code entry
-    var popupHtml = `
-        <div id="codePopup" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center;">
-            <div style="background:white; padding:20px; border-radius:5px; text-align:center;">
-                <h3>Enter Verification Code</h3>
-                <input type="text" id="userCode" class="form-control" placeholder="6-digit code">
-                <span id="codeError" class="text-danger"></span><br>
-                <button class="btn btn-primary" onclick="verifyCode()">Verify</button>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', popupHtml);
+    fetch('/api/sendCode', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ email: email })
+    })
+    .then(response => response.text())
+    .then(result => {
+        console.log(result);
+        if (result === "Verification code sent.") {
+            // Display popup for code entry
+            var popupHtml = `
+                <div id="codePopup" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center;">
+                    <div style="background:white; padding:20px; border-radius:5px; text-align:center;">
+                        <h3>Enter Verification Code</h3>
+                        <input type="text" id="userCode" class="form-control" placeholder="6-digit code">
+                        <span id="codeError" class="text-danger"></span><br>
+                        <button class="btn btn-primary" onclick="verifyCode()">Verify</button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', popupHtml);
+        } else {
+            document.getElementById('emailError').innerText = result;
+        }
+    })
+    .catch(error => console.error('Error:', error));
 }
 
 function verifyCode() {
