@@ -1,0 +1,433 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { Search, MapPin, ChevronRight, Facebook, Twitter, Linkedin } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
+import Link from "next/link"
+import Image from "next/image"
+import { ZipCodeDialog } from "@/components/zip-code-dialog"
+import { useToast } from "@/components/ui/use-toast"
+import { UserMenu } from "@/components/user-menu"
+
+export default function HomePage() {
+  const { toast } = useToast()
+  const [zipCode, setZipCode] = useState("")
+  const [savedZipCode, setSavedZipCode] = useState("")
+  const [categoriesActive, setCategoriesActive] = useState(false)
+  const [isZipDialogOpen, setIsZipDialogOpen] = useState(false)
+  const [selectedCategoryHref, setSelectedCategoryHref] = useState("")
+  const [userName, setUserName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const savedZip = localStorage.getItem("savedZipCode")
+    if (savedZip) {
+      setSavedZipCode(savedZip)
+      setCategoriesActive(true)
+    }
+
+    // Check for registration success cookie
+    const cookies = document.cookie.split(";")
+    const registrationSuccessCookie = cookies.find((cookie) => cookie.trim().startsWith("registrationSuccess="))
+
+    if (registrationSuccessCookie) {
+      // Show success toast
+      toast({
+        title: "Registration Successful",
+        description: "You have successfully registered and are now logged in.",
+        duration: 5000,
+      })
+
+      // Remove the cookie by setting it to expire
+      document.cookie = "registrationSuccess=; max-age=0; path=/;"
+    }
+
+    // Check for user ID cookie
+    const userIdCookie = cookies.find((cookie) => cookie.trim().startsWith("userId="))
+
+    if (userIdCookie) {
+      // Fetch user data
+      const fetchUserData = async () => {
+        try {
+          const userId = userIdCookie.split("=")[1].trim()
+          const response = await fetch(`/api/user?id=${userId}`)
+
+          if (response.ok) {
+            const userData = await response.json()
+            setUserName(`${userData.firstName} ${userData.lastName}`)
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error)
+        }
+      }
+
+      fetchUserData()
+    }
+  }, [toast])
+
+  const handleZipSubmit = () => {
+    if (zipCode) {
+      localStorage.setItem("savedZipCode", zipCode)
+      setSavedZipCode(zipCode)
+      setCategoriesActive(true)
+    } else {
+      alert("Please enter a Zip Code.")
+    }
+  }
+
+  const handleCategoryClick = (href: string, e: React.MouseEvent) => {
+    if (!categoriesActive) {
+      e.preventDefault()
+      setSelectedCategoryHref(href)
+      setIsZipDialogOpen(true)
+    }
+  }
+
+  const handleZipDialogSubmit = (zipCodeValue: string) => {
+    setZipCode(zipCodeValue)
+    localStorage.setItem("savedZipCode", zipCodeValue)
+    setSavedZipCode(zipCodeValue)
+    setCategoriesActive(true)
+
+    // If there was a selected category, navigate to it after setting the zip code
+    if (selectedCategoryHref) {
+      window.location.href = selectedCategoryHref
+    }
+  }
+
+  const categories = [
+    { title: "Home Improvement", image: "/roofer.png", href: "/home-improvement" },
+    { title: "Automotive Services", image: "/auto.png", href: "/automotive-services" },
+    { title: "Elder Care", image: "/home health.png", href: "/elder-care" },
+    { title: "Pet Care", image: "/cat and dog.png", href: "/pet-care" },
+    { title: "Weddings & Events", image: "/bride.png", href: "/weddings-events" },
+    { title: "Fitness & Athletics", image: "/baseball.png", href: "/fitness-athletics" },
+    { title: "Education & Tutoring", image: "/tutor.png", href: "/education-tutoring" },
+    { title: "Music Lessons", image: "/music lesson.png", href: "/music-lessons" },
+    { title: "Real Estate", image: "/realitor003.png", href: "/real-estate" },
+    { title: "Food & Dining", image: "/food service.png", href: "/food-dining" },
+    { title: "Retail Stores", image: "/retail.png", href: "/retail-stores" },
+    { title: "Legal Services", image: "/lawyer.png", href: "/legal-services" },
+    { title: "Funeral Services", image: "/funeral.png", href: "/funeral-services" },
+    { title: "Personal Assistants", image: "/assistant.png", href: "/personal-assistants" },
+    { title: "Travel & Vacation", image: "/travel agent.png", href: "/travel-vacation" },
+    { title: "Tailoring & Clothing", image: "/dress maker.png", href: "/tailoring-clothing" },
+    { title: "Arts & Entertainment", image: "/clown.png", href: "/arts-entertainment" },
+    { title: "Tech & IT Services", image: "/computer.png", href: "/tech-it-services" },
+    { title: "Beauty & Wellness", image: "/haircutting.png", href: "/beauty-wellness" },
+    { title: "Physical Rehabilitation", image: "/phyical.png", href: "/physical-rehabilitation" },
+    { title: "Healthcare Specialists", image: "/healthcare-specialist.png", href: "/medical-practitioners" },
+    { title: "Mental Health", image: "/couseling.png", href: "/mental-health" },
+    { title: "Financial Services", image: "/accountant.png", href: "/financial-services" },
+    { title: "Child Care", image: "/daycare.png", href: "/child-care" },
+  ]
+
+  // Add a featured categories array with the new images
+  const featuredCategories = [
+    { title: "Home Improvement", image: "/roofer.png", href: "/home-improvement" },
+    { title: "Automotive Services", image: "/auto.png", href: "/automotive-services" },
+    { title: "Pet Care", image: "/cat and dog.png", href: "/pet-care" },
+    { title: "Tech & IT Services", image: "/computer.png", href: "/tech-it-services" },
+  ]
+
+  // Hero section images
+  const heroImages = [
+    { src: "/lawyer001.png", alt: "Legal Professional" },
+    { src: "/Tailor.png", alt: "Tailoring Services" },
+    { src: "/therapy.png", alt: "Physical Therapy" },
+    { src: "/retail2.png", alt: "Retail Business Owner" },
+  ]
+
+  return (
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <header className="bg-white shadow-sm">
+        <div className="container mx-auto px-4 py-8 flex flex-col md:flex-row items-center justify-between">
+          <div className="flex items-center mb-4 md:mb-0">
+            <Image src="/hausbaumbiz03.png" alt="Hausbaum Logo" width={720} height={360} className="h-64 w-auto" />
+          </div>
+
+          <div className="flex flex-col items-center text-center md:mx-4">
+            <h2 className="text-lg font-medium text-gray-700 max-w-md">
+              Connecting you with trusted local experts and service professionals
+            </h2>
+            <div className="mt-2 text-sm text-gray-600">
+              {!userName && (
+                <>
+                  Looking to Hire?
+                  <Link href="/user-register" className="text-primary hover:text-primary/80 mx-1 font-medium">
+                    Sign up
+                  </Link>
+                  or
+                  <Link href="/user-login" className="text-primary hover:text-primary/80 mx-1 font-medium">
+                    Sign in
+                  </Link>
+                  or continue as a GUEST
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 md:mt-0 flex flex-col items-end">
+            <UserMenu userName={userName || undefined} />
+
+            <div className="text-sm text-gray-600 mt-2">
+              <Button variant="outline" asChild className="text-sm">
+                <Link href="/business-portal" className="flex items-center">
+                  Business Owner? Register or Login
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-grow container mx-auto px-4 py-8">
+        {/* Hero Section with Rotating Images */}
+        <div className="relative overflow-hidden rounded-xl mb-10 bg-gradient-to-r from-primary to-primary/80">
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage: "url('/texture0079.png')",
+              backgroundRepeat: "repeat",
+              mixBlendMode: "multiply",
+            }}
+          ></div>
+          <div className="container mx-auto px-4 py-16 md:py-24 flex flex-col md:flex-row items-center">
+            <div className="md:w-1/2 text-white z-10 mb-8 md:mb-0">
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">Find Local Experts You Can Trust</h1>
+              <p className="text-xl mb-6 text-white/90">
+                Connect with verified professionals in your area for all your service needs
+              </p>
+              <p className="text-2xl md:text-3xl mb-6 text-white font-semibold">Or Find A Job On Hausbaum</p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button size="lg" className="bg-white text-primary hover:bg-white/90" asChild>
+                  <Link href="/job-listings">Find A Job</Link>
+                </Button>
+              </div>
+            </div>
+            <div className="md:w-1/2 flex justify-center">
+              <div className="relative w-full max-w-md aspect-square">
+                <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-2">
+                  {heroImages.map((img, i) => (
+                    <div key={i} className="relative overflow-hidden rounded-lg">
+                      <Image src={img.src || "/placeholder.svg"} alt={img.alt} fill className="object-cover" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-xl mx-auto mb-10 bg-white rounded-lg shadow-md p-6">
+          <div className="flex flex-col items-center">
+            {savedZipCode && (
+              <div className="mb-4 flex items-center text-primary font-medium">
+                <MapPin className="mr-2 h-5 w-5" />
+                <span>You are searching in area code: {savedZipCode}</span>
+              </div>
+            )}
+
+            <div className="w-full flex space-x-2 items-center">
+              <div className="flex-grow">
+                <Input
+                  type="text"
+                  placeholder="Enter your zip code"
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <Button onClick={handleZipSubmit}>
+                <Search className="mr-2 h-4 w-4" />
+                Search
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {categoriesActive && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-center mb-6">Featured Businesses</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              {featuredCategories.map((category, index) => (
+                <div
+                  key={index}
+                  className="relative overflow-hidden rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105"
+                >
+                  <a href={category.href} onClick={(e) => handleCategoryClick(category.href, e)}>
+                    <div className="aspect-[4/3] relative">
+                      <Image
+                        src={category.image || "/placeholder.svg"}
+                        alt={category.title}
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                      <h3 className="absolute bottom-4 left-4 text-white font-bold text-xl">{category.title}</h3>
+                    </div>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <h2 className="text-2xl font-bold text-center mb-8">Select a Category</h2>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-12">
+          {categories.map((category, index) => (
+            <Card key={index} className="overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-105">
+              <a href={category.href} onClick={(e) => handleCategoryClick(category.href, e)}>
+                <div className="aspect-square relative overflow-hidden rounded-t-lg">
+                  <Image
+                    src={category.image || "/placeholder.svg"}
+                    alt={category.title}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <CardContent className="p-3">
+                  <h3 className="text-sm font-medium text-center line-clamp-2 h-10">{category.title}</h3>
+                </CardContent>
+              </a>
+            </Card>
+          ))}
+        </div>
+
+        <div className="max-w-5xl mx-auto mb-16">
+          <h2 className="text-2xl font-bold text-center mb-8">What Our Customers Say</h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="relative w-20 h-20 rounded-full overflow-hidden">
+                    <Image src="/whiteman-02.png" alt="Customer" fill className="object-cover" />
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground italic mb-4">
+                      "I found an excellent mechanic through Hausbaum. The service was quick and the work was
+                      top-notch!"
+                    </p>
+                    <p className="font-medium">Robert J.</p>
+                    <p className="text-xs text-muted-foreground">Car Owner</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="relative w-20 h-20 rounded-full overflow-hidden">
+                    <Image src="/wedding.png" alt="Customer" fill className="object-cover" />
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground italic mb-4">
+                      "Planning my wedding was so much easier with Hausbaum. I found all the vendors I needed in one
+                      place!"
+                    </p>
+                    <p className="font-medium">Sarah M.</p>
+                    <p className="text-xs text-muted-foreground">Newlywed</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="relative w-20 h-20 rounded-full overflow-hidden">
+                    <Image src="/hispanic-woman.png" alt="Customer" fill className="object-cover" />
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground italic mb-4">
+                      "As a tech professional, I've gained many new clients through Hausbaum. The platform is easy to
+                      use and great for business!"
+                    </p>
+                    <p className="font-medium">Maria L.</p>
+                    <p className="text-xs text-muted-foreground">IT Consultant</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="max-w-md mx-auto text-center mb-12">
+          <h3 className="text-xl font-semibold mb-4">This Week's Penny Saver</h3>
+          <Link
+            href="/penny-saver"
+            onClick={(e) => !categoriesActive && handleCategoryClick("/penny-saver", e)}
+            className="inline-block transition-all duration-300 hover:scale-105"
+          >
+            <div className="relative w-64 h-64 mx-auto bg-gradient-to-r from-amber-100 to-yellow-100 rounded-full overflow-hidden shadow-md hover:shadow-xl">
+              <div
+                className="absolute inset-0 opacity-20"
+                style={{
+                  backgroundImage: "url('/texture0079.png')",
+                  backgroundRepeat: "repeat",
+                  mixBlendMode: "multiply",
+                }}
+              ></div>
+              <Image src="/simple moneysaver.png" alt="Penny Saver" fill className="object-contain p-4 relative z-10" />
+              <div className="absolute inset-0 bg-yellow-400/20 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+            </div>
+          </Link>
+        </div>
+        <div className="max-w-md mx-auto text-center mb-12">
+          <Button
+            asChild
+            className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-full shadow-md hover:shadow-lg transition-all duration-300"
+          >
+            <Link href="/contact-us" className="text-lg font-medium">
+              Contact Us
+            </Link>
+          </Button>
+        </div>
+      </main>
+
+      <footer className="bg-primary text-white py-8 relative">
+        <div
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage: "url('/texture0079.png')",
+            backgroundRepeat: "repeat",
+            mixBlendMode: "multiply",
+          }}
+        ></div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="mb-4 md:mb-0">
+              <h2 className="text-xl font-bold">Hausbaum</h2>
+              <p className="text-sm mt-2">© {new Date().getFullYear()} Hausbaum. All rights reserved.</p>
+            </div>
+
+            <div className="flex space-x-4">
+              <Button variant="ghost" size="icon" className="text-white hover:bg-primary-foreground/10">
+                <Facebook className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="text-white hover:bg-primary-foreground/10">
+                <Twitter className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="text-white hover:bg-primary-foreground/10">
+                <Linkedin className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {/* Zip Code Dialog */}
+      <ZipCodeDialog
+        isOpen={isZipDialogOpen}
+        onClose={() => setIsZipDialogOpen(false)}
+        onSubmit={handleZipDialogSubmit}
+      />
+    </div>
+  )
+}
