@@ -12,6 +12,7 @@ import Image from "next/image"
 import { ZipCodeDialog } from "@/components/zip-code-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { UserMenu } from "@/components/user-menu"
+import { useRouter, usePathname } from "next/navigation"
 
 export default function HomePage() {
   const { toast } = useToast()
@@ -22,6 +23,16 @@ export default function HomePage() {
   const [selectedCategoryHref, setSelectedCategoryHref] = useState("")
   const [userName, setUserName] = useState<string | null>(null)
 
+  const router = useRouter()
+  const pathname = usePathname()
+
+  const getCookieValue = (name: string) => {
+    const value = `; ${document.cookie}`
+    const parts = value.split(`; ${name}=`)
+    if (parts.length === 2) return parts.pop().split(";").shift()
+    return null
+  }
+
   useEffect(() => {
     const savedZip = localStorage.getItem("savedZipCode")
     if (savedZip) {
@@ -29,11 +40,8 @@ export default function HomePage() {
       setCategoriesActive(true)
     }
 
-    // Check for registration success cookie
-    const cookies = document.cookie.split(";")
-    const registrationSuccessCookie = cookies.find((cookie) => cookie.trim().startsWith("registrationSuccess="))
-
-    if (registrationSuccessCookie) {
+    const registrationSuccess = getCookieValue("registrationSuccess")
+    if (registrationSuccess) {
       // Show success toast
       toast({
         title: "Registration Successful",
@@ -41,20 +49,16 @@ export default function HomePage() {
         duration: 5000,
       })
 
-      // Remove the cookie by setting it to expire
+      // Remove the cookie
       document.cookie = "registrationSuccess=; max-age=0; path=/;"
     }
 
-    // Check for user ID cookie
-    const userIdCookie = cookies.find((cookie) => cookie.trim().startsWith("userId="))
-
-    if (userIdCookie) {
+    const userId = getCookieValue("userId")
+    if (userId) {
       // Fetch user data
       const fetchUserData = async () => {
         try {
-          const userId = userIdCookie.split("=")[1].trim()
           const response = await fetch(`/api/user?id=${userId}`)
-
           if (response.ok) {
             const userData = await response.json()
             setUserName(`${userData.firstName} ${userData.lastName}`)
@@ -65,8 +69,10 @@ export default function HomePage() {
       }
 
       fetchUserData()
+    } else {
+      setUserName(null)
     }
-  }, [toast])
+  }, [toast, pathname])
 
   const handleZipSubmit = () => {
     if (zipCode) {

@@ -54,6 +54,12 @@ export default function UserLoginPage() {
         })
       }
       // If successful, the server action will redirect
+      if (result.success) {
+        // The server action will handle the redirect, but we can force a refresh
+        // to ensure the main page re-renders with the new user data
+        window.location.href = "/"
+        return
+      }
     } catch (error) {
       toast({
         title: "An error occurred",
