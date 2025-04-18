@@ -45,27 +45,28 @@ export default function HomePage() {
       document.cookie = "registrationSuccess=; max-age=0; path=/;"
     }
 
-    // Check for user ID cookie
-    const userIdCookie = cookies.find((cookie) => cookie.trim().startsWith("userId="))
+    // Fetch user data with error handling and retry logic
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch("/api/user/session", {
+          method: "GET",
+          credentials: "include", // Important: include cookies in the request
+        })
 
-    if (userIdCookie) {
-      // Fetch user data
-      const fetchUserData = async () => {
-        try {
-          const userId = userIdCookie.split("=")[1].trim()
-          const response = await fetch(`/api/user?id=${userId}`)
-
-          if (response.ok) {
-            const userData = await response.json()
+        if (response.ok) {
+          const userData = await response.json()
+          if (userData && userData.firstName && userData.lastName) {
             setUserName(`${userData.firstName} ${userData.lastName}`)
           }
-        } catch (error) {
-          console.error("Error fetching user data:", error)
+        } else {
+          console.log("User not authenticated or session API returned an error")
         }
+      } catch (error) {
+        console.error("Error fetching user data:", error)
       }
-
-      fetchUserData()
     }
+
+    fetchUserData()
   }, [toast])
 
   const handleZipSubmit = () => {

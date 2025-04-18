@@ -38,6 +38,7 @@ export async function registerUser(formData: FormData) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 7, // 1 week
       path: "/",
+      sameSite: "lax", // Add this for better security
     })
 
     // Set a registration success cookie for the toast
@@ -73,6 +74,7 @@ export async function loginUser(formData: FormData) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 7, // 1 week
       path: "/",
+      sameSite: "lax", // Add this for better security
     })
 
     // Redirect to home page
