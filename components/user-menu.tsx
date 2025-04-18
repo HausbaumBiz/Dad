@@ -69,11 +69,10 @@ export function UserMenu({ userName }: UserMenuProps) {
           className="text-red-600 focus:text-red-600"
           onSelect={async (e) => {
             e.preventDefault()
-            const result = await logoutUser()
-            if (result.success) {
-              router.refresh()
-              router.push("/")
-            }
+            await logoutUser()
+
+            // Force a hard refresh to the home page
+            window.location.href = "/"
           }}
         >
           <LogOut className="mr-2 h-4 w-4" />
