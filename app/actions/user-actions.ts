@@ -54,10 +54,11 @@ export async function registerUser(formData: FormData) {
   return result
 }
 
-// Update the loginUser function to provide a more specific error message
+// Update the loginUser function to handle the "Remember me" preference
 export async function loginUser(formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
+  const rememberMe = formData.get("rememberMe") === "true"
 
   // Validate form data
   if (!email || !password) {
@@ -68,11 +69,16 @@ export async function loginUser(formData: FormData) {
   const result = await verifyCredentials(email, password)
 
   if (result.success && result.userId) {
+    // Set cookie expiration based on "Remember me" preference
+    const maxAge = rememberMe
+      ? 60 * 60 * 24 * 30 // 30 days if "Remember me" is checked
+      : 60 * 60 * 24 * 7 // 1 week if not checked
+
     // Set a session cookie
     cookies().set("userId", result.userId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 7, // 1 week
+      maxAge: maxAge,
       path: "/",
       sameSite: "lax", // Add this for better security
     })
