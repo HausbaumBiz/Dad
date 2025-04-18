@@ -39,7 +39,7 @@ let nextId = 1
 async function sendVerificationEmail(email: string, token: string) {
   // In a real app, you would send an actual email
   console.log(`Sending verification email to ${email} with token ${token}`)
-  console.log(`Verification link: http://localhost:3000/verify-email?token=${token}`)
+  // Remove the verification link that points to the deleted page
 
   return {
     success: true,
@@ -161,6 +161,9 @@ export async function verifyEmail(token: string) {
     verificationTokens.splice(tokenIndex, 1)
   }
 
-  // Redirect to login page
-  redirect("/business-login?verified=true")
+  // Return success instead of redirecting
+  return {
+    success: true,
+    message: "Email verified successfully",
+  }
 }
