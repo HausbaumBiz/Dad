@@ -60,13 +60,12 @@
     "zod": "^3.24.1",
     "crypto": "latest",
     "@upstash/redis": "latest",
-    "fs": "latest",
-    "path": "latest",
-    "sharp": "latest",
     "@vercel/kv": "latest",
     "uuid": "latest",
     "bcryptjs": "latest",
-    "@sentry/nextjs": "latest"
+    "fs": "latest",
+    "path": "latest",
+    "sharp": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

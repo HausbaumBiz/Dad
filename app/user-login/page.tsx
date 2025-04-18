@@ -10,16 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ChevronLeft } from "lucide-react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CheckCircle } from "lucide-react"
+import { loginUser } from "@/app/actions/user-actions"
 import { useToast } from "@/components/ui/use-toast"
-import { useUser } from "@/contexts/user-context"
 
 export default function UserLoginPage() {
   const { toast } = useToast()
-  const { login } = useUser()
-  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     email: "",
@@ -27,7 +25,6 @@ export default function UserLoginPage() {
   })
   const searchParams = useSearchParams()
   const registered = searchParams.get("registered")
-  const returnTo = searchParams.get("returnTo") || "/"
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
@@ -39,19 +36,30 @@ export default function UserLoginPage() {
     setIsSubmitting(true)
 
     try {
-      const result = await login(formData.email, formData.password)
+      // Create a FormData object from the form data
+      const formDataObj = new FormData()
+      Object.entries(formData).forEach(([key, value]) => {
+        formDataObj.append(key, value)
+      })
 
+      // Call the server action
+      const result = await loginUser(formDataObj)
+
+      // Handle the result
       if (!result.success) {
         toast({
           title: "Login failed",
           description: result.message,
           variant: "destructive",
         })
+      }
+      // If successful, the server action will redirect
+      if (result.success) {
+        // The server action will handle the redirect, but we can force a refresh
+        // to ensure the main page re-renders with the new user data
+        window.location.href = "/"
         return
       }
-
-      // Redirect to the return URL or home page
-      router.push(returnTo)
     } catch (error) {
       toast({
         title: "An error occurred",
@@ -119,7 +127,7 @@ export default function UserLoginPage() {
                 </div>
 
                 <div className="text-right">
-                  <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                  <Link href="#" className="text-sm text-primary hover:underline">
                     Forgot password?
                   </Link>
                 </div>

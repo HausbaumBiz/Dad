@@ -1,6 +1,0 @@
-[auth]
-token=your-sentry-auth-token
-
-[defaults]
-org=your-organization
-project=your-project
