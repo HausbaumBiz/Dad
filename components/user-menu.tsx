@@ -22,14 +22,9 @@ export function UserMenu({ userName }: UserMenuProps) {
   const router = useRouter()
   const [isClient, setIsClient] = useState(false)
 
-  // At the beginning of the UserMenu component:
-  console.log("UserMenu rendered with userName:", userName)
-
   useEffect(() => {
     setIsClient(true)
-    // Add debug log here too
-    console.log("UserMenu mounted with userName:", userName)
-  }, [userName])
+  }, [])
 
   if (!isClient) return null
 
