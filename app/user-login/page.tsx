@@ -23,6 +23,7 @@ export default function UserLoginPage() {
     email: "",
     password: "",
   })
+  const [error, setError] = useState("")
   const searchParams = useSearchParams()
   const registered = searchParams.get("registered")
 
@@ -34,6 +35,7 @@ export default function UserLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError("") // Clear previous errors
 
     try {
       // Create a FormData object from the form data
@@ -47,6 +49,7 @@ export default function UserLoginPage() {
 
       // Handle the result
       if (!result.success) {
+        setError(result.message || "Invalid username or password")
         toast({
           title: "Login failed",
           description: result.message,
@@ -55,6 +58,7 @@ export default function UserLoginPage() {
       }
       // If successful, the server action will redirect
     } catch (error) {
+      setError("An unexpected error occurred. Please try again.")
       toast({
         title: "An error occurred",
         description: "Please try again later",
@@ -102,14 +106,36 @@ export default function UserLoginPage() {
               <p className="text-center text-gray-600">Welcome back!</p>
             </CardHeader>
             <CardContent>
-              {registered && (
-                <Alert className="mb-4 bg-green-50 border-green-200 text-green-800">
-                  <CheckCircle className="h-4 w-4 text-green-800" />
-                  <AlertDescription>Registration successful! Please log in with your new account.</AlertDescription>
-                </Alert>
-              )}
-
               <form onSubmit={handleSubmit} className="space-y-4">
+                {registered && (
+                  <Alert className="mb-4 bg-green-50 border-green-200 text-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-800" />
+                    <AlertDescription>Registration successful! Please log in with your new account.</AlertDescription>
+                  </Alert>
+                )}
+
+                {error && (
+                  <Alert className="mb-4 bg-red-50 border-red-200 text-red-800">
+                    <AlertDescription className="flex items-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                        />
+                      </svg>
+                      {error}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" value={formData.email} onChange={handleChange} required />

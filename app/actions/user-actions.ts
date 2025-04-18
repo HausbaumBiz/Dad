@@ -54,7 +54,7 @@ export async function registerUser(formData: FormData) {
   return result
 }
 
-// Login user
+// Update the loginUser function to provide a more specific error message
 export async function loginUser(formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
@@ -81,7 +81,7 @@ export async function loginUser(formData: FormData) {
     redirect("/")
   }
 
-  return { success: false, message: "Invalid email or password" }
+  return { success: false, message: "Username or password is incorrect. Please try again." }
 }
 
 // Check if user is logged in
