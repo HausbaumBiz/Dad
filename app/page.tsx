@@ -12,19 +12,16 @@ import Image from "next/image"
 import { ZipCodeDialog } from "@/components/zip-code-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { UserMenu } from "@/components/user-menu"
-import { useRouter, usePathname } from "next/navigation"
+import { useUser } from "@/contexts/user-context"
 
 export default function HomePage() {
   const { toast } = useToast()
+  const { user } = useUser()
   const [zipCode, setZipCode] = useState("")
   const [savedZipCode, setSavedZipCode] = useState("")
   const [categoriesActive, setCategoriesActive] = useState(false)
   const [isZipDialogOpen, setIsZipDialogOpen] = useState(false)
   const [selectedCategoryHref, setSelectedCategoryHref] = useState("")
-  const [userName, setUserName] = useState<string | null>(null)
-
-  const router = useRouter()
-  const pathname = usePathname()
 
   const getCookieValue = (name: string) => {
     const value = `; ${document.cookie}`
@@ -52,27 +49,7 @@ export default function HomePage() {
       // Remove the cookie
       document.cookie = "registrationSuccess=; max-age=0; path=/;"
     }
-
-    const userId = getCookieValue("userId")
-    if (userId) {
-      // Fetch user data
-      const fetchUserData = async () => {
-        try {
-          const response = await fetch(`/api/user?id=${userId}`)
-          if (response.ok) {
-            const userData = await response.json()
-            setUserName(`${userData.firstName} ${userData.lastName}`)
-          }
-        } catch (error) {
-          console.error("Error fetching user data:", error)
-        }
-      }
-
-      fetchUserData()
-    } else {
-      setUserName(null)
-    }
-  }, [toast, pathname])
+  }, [toast])
 
   const handleZipSubmit = () => {
     if (zipCode) {
@@ -160,7 +137,7 @@ export default function HomePage() {
               Connecting you with trusted local experts and service professionals
             </h2>
             <div className="mt-2 text-sm text-gray-600">
-              {!userName && (
+              {!user && (
                 <>
                   Looking to Hire?
                   <Link href="/user-register" className="text-primary hover:text-primary/80 mx-1 font-medium">
@@ -177,7 +154,7 @@ export default function HomePage() {
           </div>
 
           <div className="mt-4 md:mt-0 flex flex-col items-end">
-            <UserMenu userName={userName || undefined} />
+            <UserMenu />
 
             <div className="text-sm text-gray-600 mt-2">
               <Button variant="outline" asChild className="text-sm">

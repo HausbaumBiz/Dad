@@ -11,30 +11,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { User, LogOut, Settings, Users } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { logoutUser } from "@/app/actions/user-actions"
+import { useUser } from "@/contexts/user-context"
 
-interface UserMenuProps {
-  userName?: string
-}
-
-export function UserMenu({ userName }: UserMenuProps) {
-  const router = useRouter()
+export function UserMenu() {
+  const { user, isLoading, logout } = useUser()
   const [isClient, setIsClient] = useState(false)
-
-  // At the beginning of the UserMenu component:
-  console.log("UserMenu rendered with userName:", userName)
 
   useEffect(() => {
     setIsClient(true)
-    // Add debug log here too
-    console.log("UserMenu mounted with userName:", userName)
-  }, [userName])
+  }, [])
 
-  if (!isClient) return null
+  if (!isClient || isLoading) {
+    return <div className="h-9 w-24 bg-gray-200 animate-pulse rounded-md"></div>
+  }
 
   // If no user is logged in, show login/register buttons
-  if (!userName) {
+  if (!user) {
     return (
       <div className="flex items-center space-x-2">
         <Button variant="outline" size="sm" asChild>
@@ -46,6 +38,8 @@ export function UserMenu({ userName }: UserMenuProps) {
       </div>
     )
   }
+
+  const userName = `${user.firstName} ${user.lastName}`
 
   // If user is logged in, show user menu
   return (
@@ -74,11 +68,7 @@ export function UserMenu({ userName }: UserMenuProps) {
           className="text-red-600 focus:text-red-600"
           onSelect={async (e) => {
             e.preventDefault()
-            const result = await logoutUser()
-            if (result.success) {
-              router.refresh()
-              router.push("/")
-            }
+            await logout()
           }}
         >
           <LogOut className="mr-2 h-4 w-4" />

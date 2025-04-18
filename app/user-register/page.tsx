@@ -10,17 +10,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ChevronLeft } from "lucide-react"
-import { registerUser } from "@/app/actions/user-actions"
 import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from "next/navigation"
 
 export default function UserRegisterPage() {
   const { toast } = useToast()
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    zipCode: "",
     email: "",
+    zipCode: "",
     password: "",
     confirmPassword: "",
   })
@@ -35,31 +36,52 @@ export default function UserRegisterPage() {
     setIsSubmitting(true)
 
     try {
+      // Validate passwords match
+      if (formData.password !== formData.confirmPassword) {
+        toast({
+          title: "Passwords do not match",
+          description: "Please make sure your passwords match",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
       // Create a FormData object from the form data
       const formDataObj = new FormData()
       Object.entries(formData).forEach(([key, value]) => {
         formDataObj.append(key, value)
       })
 
-      // Call the server action
-      const result = await registerUser(formDataObj)
+      // Call the API endpoint
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        body: formDataObj,
+      })
 
-      // Handle the result
+      const result = await response.json()
+
       if (!result.success) {
         toast({
           title: "Registration failed",
           description: result.message,
           variant: "destructive",
         })
+        setIsSubmitting(false)
+        return
       }
-      // If successful, the server action will redirect
+
+      // Trigger a storage event to notify other tabs
+      localStorage.setItem("auth_state_change", Date.now().toString())
+
+      // Redirect to login page with registered flag
+      router.push("/user-login?registered=true")
     } catch (error) {
       toast({
         title: "An error occurred",
         description: "Please try again later",
         variant: "destructive",
       })
-    } finally {
       setIsSubmitting(false)
     }
   }
@@ -89,8 +111,7 @@ export default function UserRegisterPage() {
             <Card className="w-full">
               <CardContent className="p-4">
                 <p className="text-gray-700">
-                  By registering, you'll receive the Weekly Penny Saver directly in your inbox and gain the ability to
-                  rate hires, helping them earn well-deserved recognition.
+                  Register to access exclusive features, save your favorite service providers, and leave reviews.
                 </p>
               </CardContent>
             </Card>
@@ -99,28 +120,30 @@ export default function UserRegisterPage() {
           <Card className="w-full md:w-1/3">
             <CardHeader>
               <CardTitle className="text-2xl text-center">User Registration</CardTitle>
-              <p className="text-center text-gray-600">Create an Account</p>
+              <p className="text-center text-gray-600">Create your account</p>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" value={formData.firstName} onChange={handleChange} required />
-                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input id="firstName" value={formData.firstName} onChange={handleChange} required />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" value={formData.lastName} onChange={handleChange} required />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="zipCode">Zip Code</Label>
-                  <Input id="zipCode" value={formData.zipCode} onChange={handleChange} required />
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input id="lastName" value={formData.lastName} onChange={handleChange} required />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" value={formData.email} onChange={handleChange} required />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode">Zip Code</Label>
+                  <Input id="zipCode" value={formData.zipCode} onChange={handleChange} required />
                 </div>
 
                 <div className="space-y-2">

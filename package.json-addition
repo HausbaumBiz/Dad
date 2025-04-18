@@ -1,10 +1,8 @@
 {
-  "scripts": {
-    "optimize-images": "ts-node scripts/optimize-images.ts",
-    "build": "npm run optimize-images && next build"
+  "dependencies": {
+    "@sentry/nextjs": "^7.64.0"
   },
-  "devDependencies": {
-    "sharp": "^0.32.1",
-    "ts-node": "^10.9.1"
+  "scripts": {
+    "sentry:sourcemaps": "sentry-cli sourcemaps inject --org your-org --project your-project ./next"
   }
 }

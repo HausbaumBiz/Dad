@@ -20,6 +20,12 @@ export interface UserCreateInput {
   password: string
 }
 
+export interface UserUpdateInput {
+  firstName?: string
+  lastName?: string
+  zipCode?: string
+}
+
 // Create a new user
 export async function createUser(userData: UserCreateInput) {
   try {
@@ -60,10 +66,41 @@ export async function createUser(userData: UserCreateInput) {
   }
 }
 
+// Update a user
+export async function updateUser(userId: string, userData: UserUpdateInput) {
+  try {
+    // Get existing user
+    const user = await getUserById(userId)
+
+    if (!user) {
+      return { success: false, message: "User not found" }
+    }
+
+    // Update user data
+    const updatedUser = {
+      ...user,
+      ...(userData.firstName && { firstName: userData.firstName }),
+      ...(userData.lastName && { lastName: userData.lastName }),
+      ...(userData.zipCode && { zipCode: userData.zipCode }),
+    }
+
+    // Store updated user data
+    await kv.set(`user:${userId}`, updatedUser)
+
+    return { success: true, message: "User updated successfully" }
+  } catch (error) {
+    console.error("Error updating user:", error)
+    return { success: false, message: "Failed to update user" }
+  }
+}
+
 // Get user by ID
 export async function getUserById(userId: string) {
   try {
-    const user = await kv.get<User>(`user:${userId}`)
+    // Get user data directly from KV store
+    const user = await kv.get<User | null>(`user:${userId}`)
+
+    // Return the user object or null if not found
     return user
   } catch (error) {
     console.error("Error getting user by ID:", error)
@@ -122,20 +159,19 @@ export async function getAllUsers() {
     const userIdKeys = userKeys.filter((key) => !key.startsWith("user:email:"))
 
     // Get all users
-    const users = await Promise.all(
-      userIdKeys.map(async (key) => {
-        const user = await kv.get<User>(key)
-        if (user) {
-          // Remove sensitive information
-          const { passwordHash, ...safeUser } = user
-          return safeUser
-        }
-        return null
-      }),
-    )
+    const users = []
 
-    // Filter out null values and sort by creation date
-    return users.filter(Boolean).sort((a, b) => b.createdAt - a.createdAt)
+    for (const key of userIdKeys) {
+      const user = await kv.get<User>(key)
+      if (user) {
+        // Remove sensitive information
+        const { passwordHash, ...safeUser } = user
+        users.push(safeUser)
+      }
+    }
+
+    // Sort by creation date
+    return users.sort((a, b) => b.createdAt - a.createdAt)
   } catch (error) {
     console.error("Error getting all users:", error)
     return []
