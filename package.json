@@ -62,7 +62,10 @@
     "@upstash/redis": "latest",
     "@vercel/kv": "latest",
     "uuid": "latest",
-    "bcryptjs": "latest"
+    "bcryptjs": "latest",
+    "fs": "latest",
+    "path": "latest",
+    "sharp": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
