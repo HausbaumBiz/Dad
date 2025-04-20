@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -16,6 +16,17 @@ export function LegalAgreement() {
   const [legalAgreed, setLegalAgreed] = useState(false)
   const [privacyAgreed, setPrivacyAgreed] = useState(false)
 
+  // Automatically switch to privacy tab when legal is agreed to
+  useEffect(() => {
+    if (legalAgreed) {
+      // Add a small delay for better UX - makes the checkbox change visible before tab switch
+      const timer = setTimeout(() => {
+        setActiveTab("privacy")
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [legalAgreed])
+
   const handleContinue = () => {
     if (legalAgreed && privacyAgreed) {
       router.push("/business-portal")
@@ -26,6 +37,11 @@ export function LegalAgreement() {
     setActiveTab(value)
   }
 
+  const handleLegalAgreement = (checked: boolean) => {
+    setLegalAgreed(checked)
+    // Tab switch is handled by the useEffect
+  }
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold text-center mb-6">Legal Agreements</h1>
@@ -33,12 +49,16 @@ export function LegalAgreement() {
       {isMobile && (
         <div className="flex justify-between mb-4">
           <div
-            className={`flex-1 text-center pb-2 ${activeTab === "legal" ? "border-b-2 border-primary font-medium" : ""}`}
+            className={`flex-1 text-center pb-2 ${
+              activeTab === "legal" ? "border-b-2 border-red-600 font-medium" : ""
+            }`}
           >
             Step 1: Legal Notice
           </div>
           <div
-            className={`flex-1 text-center pb-2 ${activeTab === "privacy" ? "border-b-2 border-primary font-medium" : ""}`}
+            className={`flex-1 text-center pb-2 ${
+              activeTab === "privacy" ? "border-b-2 border-red-600 font-medium" : ""
+            }`}
           >
             Step 2: Privacy Policy
           </div>
@@ -48,8 +68,26 @@ export function LegalAgreement() {
       <Tabs defaultValue="legal" value={activeTab} onValueChange={handleTabChange} className="w-full">
         {!isMobile && (
           <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="legal">Legal Notice</TabsTrigger>
-            <TabsTrigger value="privacy">Privacy Policy</TabsTrigger>
+            <TabsTrigger
+              value="legal"
+              className={
+                activeTab === "legal"
+                  ? "bg-red-600 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                  : ""
+              }
+            >
+              Legal Notice
+            </TabsTrigger>
+            <TabsTrigger
+              value="privacy"
+              className={
+                activeTab === "privacy"
+                  ? "bg-red-600 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                  : ""
+              }
+            >
+              Privacy Policy
+            </TabsTrigger>
           </TabsList>
         )}
 
@@ -62,7 +100,7 @@ export function LegalAgreement() {
             <Checkbox
               id="legal-agreement"
               checked={legalAgreed}
-              onCheckedChange={(checked) => setLegalAgreed(checked === true)}
+              onCheckedChange={(checked) => handleLegalAgreement(checked === true)}
             />
             <label
               htmlFor="legal-agreement"
@@ -77,7 +115,11 @@ export function LegalAgreement() {
               <Button variant="outline" onClick={() => router.push("/")}>
                 Cancel
               </Button>
-              <Button onClick={() => setActiveTab("privacy")} disabled={!legalAgreed}>
+              <Button
+                onClick={() => setActiveTab("privacy")}
+                disabled={!legalAgreed}
+                className={legalAgreed ? "bg-red-600 hover:bg-red-700" : ""}
+              >
                 Next
               </Button>
             </div>
@@ -108,7 +150,11 @@ export function LegalAgreement() {
               <Button variant="outline" onClick={() => setActiveTab("legal")}>
                 Back
               </Button>
-              <Button onClick={handleContinue} disabled={!privacyAgreed}>
+              <Button
+                onClick={handleContinue}
+                disabled={!privacyAgreed}
+                className={privacyAgreed ? "bg-red-600 hover:bg-red-700" : ""}
+              >
                 Continue
               </Button>
             </div>
@@ -121,7 +167,11 @@ export function LegalAgreement() {
           <Button variant="outline" onClick={() => router.push("/")}>
             Cancel
           </Button>
-          <Button onClick={handleContinue} disabled={!legalAgreed || !privacyAgreed}>
+          <Button
+            onClick={handleContinue}
+            disabled={!legalAgreed || !privacyAgreed}
+            className={legalAgreed && privacyAgreed ? "bg-red-600 hover:bg-red-700" : ""}
+          >
             Continue
           </Button>
         </div>

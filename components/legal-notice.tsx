@@ -1,79 +1,60 @@
 export function LegalNotice() {
   return (
-    <div className="space-y-4 text-sm">
-      <h2 className="text-lg font-semibold">Legal Notice</h2>
-
-      <p>
-        This Legal Notice ("Notice") governs your use of the Hausbaum platform and services. By registering as a
-        business on Hausbaum, you agree to be bound by this Notice.
-      </p>
-
-      <h3 className="font-medium mt-4">1. Acceptance of Terms</h3>
-      <p>
-        By registering and using the Hausbaum platform, you acknowledge that you have read, understood, and agree to be
-        bound by this Notice and any other applicable terms, policies, and guidelines.
-      </p>
-
-      <h3 className="font-medium mt-4">2. Business Registration</h3>
-      <p>
-        You represent and warrant that all information provided during registration is accurate, complete, and current.
-        You are responsible for maintaining the confidentiality of your account credentials and for all activities that
-        occur under your account.
-      </p>
-
-      <h3 className="font-medium mt-4">3. Service Listings</h3>
-      <p>
-        You are solely responsible for the content of your service listings, including descriptions, pricing,
-        availability, and any other information. All listings must comply with applicable laws and regulations.
-      </p>
-
-      <h3 className="font-medium mt-4">4. Prohibited Activities</h3>
-      <p>You agree not to engage in any activities that may:</p>
-      <ul className="list-disc pl-5 space-y-1">
-        <li>Violate any applicable laws or regulations</li>
-        <li>Infringe upon the rights of others</li>
-        <li>Misrepresent your identity or qualifications</li>
-        <li>Manipulate ratings or reviews</li>
-        <li>Interfere with the proper functioning of the platform</li>
+    <div className="prose prose-gray max-w-none">
+      <ul className="space-y-3 text-gray-700">
+        <li>
+          <strong className="text-gray-900">No Endorsement:</strong> Hausbaum does not endorse, recommend, or guarantee
+          any of the businesses, products, services, or content advertised on this website. The appearance of
+          advertisements and the inclusion of user reviews and star ratings do not imply endorsement or approval by
+          Hausbaum. The information provided in advertisements, reviews, and ratings is the sole responsibility of the
+          businesses and individuals who provide that information.
+        </li>
+        <li>
+          <strong className="text-gray-900">User-Generated Content:</strong> Hausbaum is not responsible for the content
+          of user-generated reviews and ratings. These reviews and ratings reflect the opinions and experiences of the
+          users who post them, and do not reflect the views or opinions of Hausbaum. Hausbaum does not verify the
+          accuracy or truthfulness of any user-generated content.
+        </li>
+        <li>
+          <strong className="text-gray-900">Accuracy of Information:</strong> Hausbaum makes no representations or
+          warranties regarding the accuracy, reliability, or completeness of the information provided by advertisers or
+          users. All information is provided "as is" without warranty of any kind, either express or implied, including
+          but not limited to, the implied warranties of merchantability, fitness for a particular purpose, or
+          non-infringement.
+        </li>
+        <li>
+          <strong className="text-gray-900">Limitation of Liability:</strong> In no event shall Hausbaum be liable for
+          any damages, including but not limited to direct, indirect, incidental, special, consequential, or punitive
+          damages, arising out of or in connection with the use or inability to use this website, including but not
+          limited to any information, content, advertisements, reviews, or ratings contained on this website.
+        </li>
+        <li>
+          <strong className="text-gray-900">Negative Reviews:</strong> Hausbaum is not liable for any negative reviews
+          or ratings posted by users about businesses or services. Any grievances or disputes arising from negative
+          reviews or ratings should be resolved directly between the business or service provider and the user. Hausbaum
+          does not intervene in such disputes and is not responsible for any outcomes resulting from them.
+        </li>
+        <li>
+          <strong className="text-gray-900">Ownership of User Data:</strong> Hausbaum retains ownership rights to all
+          user data and postings submitted to this website. Hausbaum reserves the right to sell or transfer this data to
+          outside groups, except for information specifically excluded in the privacy agreement. Users acknowledge that
+          by posting content or submitting data to this website, they grant Hausbaum a perpetual, irrevocable,
+          worldwide, royalty-free, and non-exclusive license to use, distribute, reproduce, modify, adapt, and publicly
+          display such content.
+        </li>
+        <li>
+          <strong className="text-gray-900">External Links:</strong> This website may contain links to third-party
+          websites. Hausbaum is not responsible for the content or privacy practices of any linked sites. The inclusion
+          of any link does not imply endorsement by Hausbaum of the site. Use of any such linked website is at the
+          user's own risk.
+        </li>
+        <li>
+          <strong className="text-gray-900">Changes to This Notice:</strong> Hausbaum reserves the right to modify this
+          Legal Notice of Non-Liability at any time. Any changes will be effective immediately upon posting the revised
+          notice on this website. Users are encouraged to review this notice periodically to stay informed about our
+          non-liability policies.
+        </li>
       </ul>
-
-      <h3 className="font-medium mt-4">5. Intellectual Property</h3>
-      <p>
-        Hausbaum respects intellectual property rights and expects its users to do the same. You may not use content
-        from the platform without proper authorization.
-      </p>
-
-      <h3 className="font-medium mt-4">6. Limitation of Liability</h3>
-      <p>
-        Hausbaum is not liable for any direct, indirect, incidental, special, consequential, or exemplary damages
-        resulting from your use of the platform or services.
-      </p>
-
-      <h3 className="font-medium mt-4">7. Indemnification</h3>
-      <p>
-        You agree to indemnify and hold harmless Hausbaum and its affiliates from any claims, damages, liabilities,
-        costs, or expenses arising from your use of the platform or violation of this Notice.
-      </p>
-
-      <h3 className="font-medium mt-4">8. Termination</h3>
-      <p>
-        Hausbaum reserves the right to terminate or suspend your account at any time for violation of this Notice or for
-        any other reason deemed appropriate.
-      </p>
-
-      <h3 className="font-medium mt-4">9. Changes to this Notice</h3>
-      <p>
-        Hausbaum may update this Notice from time to time. Continued use of the platform after such changes constitutes
-        acceptance of the revised Notice.
-      </p>
-
-      <h3 className="font-medium mt-4">10. Governing Law</h3>
-      <p>
-        This Notice is governed by and construed in accordance with the laws of the jurisdiction in which Hausbaum
-        operates, without regard to its conflict of law principles.
-      </p>
-
-      <p className="mt-6">Last updated: April 18, 2025</p>
     </div>
   )
 }
