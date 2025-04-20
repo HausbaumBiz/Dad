@@ -29,7 +29,7 @@ export function LegalAgreement() {
 
   const handleContinue = () => {
     if (legalAgreed && privacyAgreed) {
-      router.push("/business-portal")
+      router.push("/workbench") // Changed from /business-portal to /workbench
     }
   }
 
