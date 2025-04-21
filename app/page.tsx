@@ -262,7 +262,7 @@ export default function HomePage() {
       alt: "Tailoring Services",
     },
     {
-      src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/therapy-nSMKynSMKynSMKynSMKynSMKy.png",
+      src: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/physicalRehab-e8EXwER0X59WDGlEZ4HnTpd18NQo2U.png",
       alt: "Physical Therapy",
     },
     {
