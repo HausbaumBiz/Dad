@@ -58,7 +58,8 @@ export default function BusinessLoginPage({
       const result = await loginBusiness(formData)
 
       if (result.success) {
-        router.push(result.redirectUrl || "/business-portal")
+        // Force redirect to workbench page directly
+        router.push("/workbench")
       } else {
         setError(result.message || "Login failed. Please try again.")
       }

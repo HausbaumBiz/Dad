@@ -1,11 +1,18 @@
 import Image from "next/image"
 import Link from "next/link"
+import { getCurrentBusiness, logoutBusiness } from "@/app/actions/business-actions"
+import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { LogOut, User } from "lucide-react"
 
-export default function WorkbenchPage() {
+export default async function WorkbenchPage() {
+  // Get the current business user
+  const business = await getCurrentBusiness()
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12">
       <div className="container mx-auto px-4 max-w-7xl">
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-between mb-4">
           <Link
             href="/"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors text-gray-700"
@@ -27,6 +34,12 @@ export default function WorkbenchPage() {
             </svg>
             Home Page
           </Link>
+
+          {business && (
+            <div className="flex items-center">
+              <BusinessUserMenu businessName={business.businessName} />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -88,5 +101,29 @@ function WorkbenchButton({ href, iconSrc, label }: WorkbenchButtonProps) {
       </div>
       <span className="text-xl font-medium text-gray-800 group-hover:text-primary transition-colors">{label}</span>
     </Link>
+  )
+}
+
+// Business user menu component
+function BusinessUserMenu({ businessName }: { businessName: string }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className="flex items-center gap-2">
+          <User className="h-4 w-4" />
+          <span>{businessName}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <form action={logoutBusiness}>
+          <DropdownMenuItem asChild>
+            <button className="w-full flex items-center text-red-600 cursor-pointer">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Sign Out</span>
+            </button>
+          </DropdownMenuItem>
+        </form>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

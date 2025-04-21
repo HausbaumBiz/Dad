@@ -147,7 +147,7 @@ export async function loginBusiness(formData: FormData) {
     return {
       success: true,
       message: "Login successful",
-      redirectUrl: "/legal-notice",
+      redirectUrl: "/workbench",
     }
   } catch (error) {
     console.error("Business login failed:", error)
