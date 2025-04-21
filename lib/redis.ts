@@ -6,8 +6,4 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN || "",
 })
 
-// Export the redis client as the default export
 export default redis
-
-// Also export as a named export 'kv' to satisfy the import requirements
-export const kv = redis

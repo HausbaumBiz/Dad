@@ -100,46 +100,175 @@ export default function HomePage() {
   }
 
   const categories = [
-    { title: "Home Improvement", image: "/roofer.png", href: "/home-improvement" },
-    { title: "Automotive Services", image: "/auto.png", href: "/automotive-services" },
-    { title: "Elder Care", image: "/home health.png", href: "/elder-care" },
-    { title: "Pet Care", image: "/cat and dog.png", href: "/pet-care" },
-    { title: "Weddings & Events", image: "/bride.png", href: "/weddings-events" },
-    { title: "Fitness & Athletics", image: "/baseball.png", href: "/fitness-athletics" },
-    { title: "Education & Tutoring", image: "/tutor.png", href: "/education-tutoring" },
-    { title: "Music Lessons", image: "/music lesson.png", href: "/music-lessons" },
-    { title: "Real Estate", image: "/realitor003.png", href: "/real-estate" },
-    { title: "Food & Dining", image: "/food service.png", href: "/food-dining" },
-    { title: "Retail Stores", image: "/retail.png", href: "/retail-stores" },
-    { title: "Legal Services", image: "/lawyer.png", href: "/legal-services" },
-    { title: "Funeral Services", image: "/funeral.png", href: "/funeral-services" },
-    { title: "Personal Assistants", image: "/assistant.png", href: "/personal-assistants" },
-    { title: "Travel & Vacation", image: "/travel agent.png", href: "/travel-vacation" },
-    { title: "Tailoring & Clothing", image: "/dress maker.png", href: "/tailoring-clothing" },
-    { title: "Arts & Entertainment", image: "/clown.png", href: "/arts-entertainment" },
-    { title: "Tech & IT Services", image: "/computer.png", href: "/tech-it-services" },
-    { title: "Beauty & Wellness", image: "/haircutting.png", href: "/beauty-wellness" },
-    { title: "Physical Rehabilitation", image: "/phyical.png", href: "/physical-rehabilitation" },
-    { title: "Healthcare Specialists", image: "/healthcare-specialist.png", href: "/medical-practitioners" },
-    { title: "Mental Health", image: "/couseling.png", href: "/mental-health" },
-    { title: "Financial Services", image: "/accountant.png", href: "/financial-services" },
-    { title: "Child Care", image: "/daycare.png", href: "/child-care" },
+    {
+      title: "Home Improvement",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/roofer-mDgCeFLINbuMG9UdWRFSiCFxIBFOjc.png",
+      href: "/home-improvement",
+    },
+    {
+      title: "Automotive Services",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/auto-mQWtZXyRogQgO5qlNVcR1OYcyDqe59.png",
+      href: "/automotive-services",
+    },
+    {
+      title: "Elder Care",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/home%20health-zJyA419byhmD7tyJa0Ebmegg0XzFN3.png",
+      href: "/elder-care",
+    },
+    {
+      title: "Pet Care",
+      image:
+        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/cat%20and%20dog-UHW1HU5Xs0PMdXJLC66zBYViQu0jx9.png",
+      href: "/pet-care",
+    },
+    {
+      title: "Weddings & Events",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/bride-70qH10P5dCi9LToSGdSHJrq7uHD40e.png",
+      href: "/weddings-events",
+    },
+    {
+      title: "Fitness & Athletics",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/baseball-aixRgKdF2ejVmCFWkhcEu2wlT9pXor.png",
+      href: "/fitness-athletics",
+    },
+    {
+      title: "Education & Tutoring",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/tutor-oUQE3gdqYse3GcFicrOH9B9CAeaRVb.png",
+      href: "/education-tutoring",
+    },
+    {
+      title: "Music Lessons",
+      image:
+        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/music%20lesson-I1NMnc8dVkG1C6rIOTc5mSghexlmxd.png",
+      href: "/music-lessons",
+    },
+    {
+      title: "Real Estate",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/realitor003-xqIaDhmbEuAgatSXkskyV0Ulolsmr5.png",
+      href: "/real-estate",
+    },
+    {
+      title: "Food & Dining",
+      image:
+        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/food%20service-DMhVnw8lOLmeSJkRwocWVAaupQmOgz.png",
+      href: "/food-dining",
+    },
+    {
+      title: "Retail Stores",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/retail02-PWtKtPOE0qcIIeje2E6crDrL529eTV.png",
+      href: "/retail-stores",
+    },
+    {
+      title: "Legal Services",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/lawyer-DoIQHo7vo03r1owabcFTTLMXiPZ91v.png",
+      href: "/legal-services",
+    },
+    {
+      title: "Funeral Services",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/funeral-TnpegJLL7ue38d0l8qq9dF7O4Q8ND9.png",
+      href: "/funeral-services",
+    },
+    {
+      title: "Personal Assistants",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/assistant-i6Erbhskr6ObActF7XMV9fJslboNmi.png",
+      href: "/personal-assistants",
+    },
+    {
+      title: "Travel & Vacation",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/travel-cRSfCiJRrv8nJvyCPyYr5XlEKRKrY4.png",
+      href: "/travel-vacation",
+    },
+    {
+      title: "Tailoring & Clothing",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/dress%20maker-MISD8UfnKvitdwKhWRgpsrwR5MVZCY.png",
+      href: "/tailoring-clothing",
+    },
+    {
+      title: "Arts & Entertainment",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fineArt-g1djwriCCMnMFKsZHa0GREE7PU4be1.png",
+      href: "/arts-entertainment",
+    },
+    {
+      title: "Tech & IT Services",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/computer-lox6P5znlsextHA6c7vUkXZNkr2d3q.png",
+      href: "/tech-it-services",
+    },
+    {
+      title: "Beauty & Wellness",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/haircutting-m6QfXr3W3dUfuj4MZFT90WMNtjed8T.png",
+      href: "/beauty-wellness",
+    },
+    {
+      title: "Physical Rehabilitation",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/phyical-RZOSg66X6bkbf12ZqgYD8MRTtNgk6H.png",
+      href: "/physical-rehabilitation",
+    },
+    {
+      title: "Healthcare Specialists",
+      image:
+        "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/healthcare-specialist-E3KWl3rzJEhdz571z5VibctDC2RVOL.png",
+      href: "/medical-practitioners",
+    },
+    {
+      title: "Mental Health",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/couseling-NTdbl5SQdjHcW9cZCMlFgPSgMin6Ue.png",
+      href: "/mental-health",
+    },
+    {
+      title: "Financial Services",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/finance-fqVQ0TmI2kFehcFP7kIOji08oIBhqX.png",
+      href: "/financial-services",
+    },
+    {
+      title: "Child Care",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/daycare-tX4p6sCUHmjoNFymH3235qbTp3JM7U.png",
+      href: "/child-care",
+    },
   ]
 
   // Add a featured categories array with the new images
   const featuredCategories = [
-    { title: "Home Improvement", image: "/roofer.png", href: "/home-improvement" },
-    { title: "Automotive Services", image: "/auto.png", href: "/automotive-services" },
-    { title: "Pet Care", image: "/cat and dog.png", href: "/pet-care" },
-    { title: "Tech & IT Services", image: "/computer.png", href: "/tech-it-services" },
+    {
+      title: "Home Improvement",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/roofer-mDgCeFLINbuMG9UdWRFSiCFxIBFOjc.png",
+      href: "/home-improvement",
+    },
+    {
+      title: "Automotive Services",
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/auto-mQWtZXyRogQgO5qlNVcR1OYcyDqe59.png",
+      href: "/automotive-services",
+    },
+    {
+      title: "Pet Care",
+      image:
+        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/cat%20and%20dog-UHW1HU5Xs0PMdXJLC66zBYViQu0jx9.png",
+      href: "/pet-care",
+    },
+    {
+      title: "Tech & IT Services",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/computer-lox6P5znlsextHA6c7vUkXZNkr2d3q.png",
+      href: "/tech-it-services",
+    },
   ]
 
   // Hero section images
   const heroImages = [
-    { src: "/lawyer001.png", alt: "Legal Professional" },
-    { src: "/Tailor.png", alt: "Tailoring Services" },
-    { src: "/therapy.png", alt: "Physical Therapy" },
-    { src: "/retail2.png", alt: "Retail Business Owner" },
+    {
+      src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/lawyer-DoIQHo7vo03r1owabcFTTLMXiPZ91v.png",
+      alt: "Legal Professional",
+    },
+    {
+      src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Tailor-Ll57NPmzPURm0U8kNHxZEYqs8dPD0Y.png",
+      alt: "Tailoring Services",
+    },
+    {
+      src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/therapy-nSMKynSMKynSMKynSMKynSMKy.png",
+      alt: "Physical Therapy",
+    },
+    {
+      src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/retail02-PWtKtPOE0qcIIeje2E6crDrL529eTV.png",
+      alt: "Retail Business Owner",
+    },
   ]
 
   return (
@@ -147,7 +276,14 @@ export default function HomePage() {
       <header className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-8 flex flex-col md:flex-row items-center justify-between">
           <div className="flex items-center mb-4 md:mb-0">
-            <Image src="/hausbaumbiz03.png" alt="Hausbaum Logo" width={720} height={360} className="h-64 w-auto" />
+            <Image
+              src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png"
+              alt="Hausbaum Logo"
+              width={720}
+              height={360}
+              className="h-64 w-auto"
+              unoptimized={true}
+            />
           </div>
 
           <div className="flex flex-col items-center text-center md:mx-4">
@@ -185,14 +321,14 @@ export default function HomePage() {
           </div>
         </div>
       </header>
-
       <main className="flex-grow container mx-auto px-4 py-8">
         {/* Hero Section with Rotating Images */}
         <div className="relative overflow-hidden rounded-xl mb-10 bg-gradient-to-r from-primary to-primary/80">
           <div
             className="absolute inset-0 opacity-30"
             style={{
-              backgroundImage: "url('/texture0079.png')",
+              backgroundImage:
+                "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/texture0079-ofcVFofcVFofcVFofcVFofcVFofcVF.png')",
               backgroundRepeat: "repeat",
               mixBlendMode: "multiply",
             }}
@@ -215,7 +351,23 @@ export default function HomePage() {
                 <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-2">
                   {heroImages.map((img, i) => (
                     <div key={i} className="relative overflow-hidden rounded-lg">
-                      <Image src={img.src || "/placeholder.svg"} alt={img.alt} fill className="object-cover" />
+                      <Image
+                        src={
+                          img.src ||
+                          "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/placeholder-ob7miW3mUreePYfXdVwkpFWHthzoR5.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg"
+                        }
+                        alt={img.alt}
+                        fill
+                        className="object-cover"
+                        unoptimized={true}
+                      />
                     </div>
                   ))}
                 </div>
@@ -263,10 +415,21 @@ export default function HomePage() {
                   <a href={category.href} onClick={(e) => handleCategoryClick(category.href, e)}>
                     <div className="aspect-[4/3] relative">
                       <Image
-                        src={category.image || "/placeholder.svg"}
+                        src={
+                          category.image ||
+                          "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/placeholder-ob7miW3mUreePYfXdVwkpFWHthzoR5.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg" ||
+                          "/placeholder.svg"
+                        }
                         alt={category.title}
                         fill
                         className="object-cover"
+                        unoptimized={true}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                       <h3 className="absolute bottom-4 left-4 text-white font-bold text-xl">{category.title}</h3>
@@ -286,10 +449,21 @@ export default function HomePage() {
               <a href={category.href} onClick={(e) => handleCategoryClick(category.href, e)}>
                 <div className="aspect-square relative overflow-hidden rounded-t-lg">
                   <Image
-                    src={category.image || "/placeholder.svg"}
+                    src={
+                      category.image ||
+                      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/placeholder-ob7miW3mUreePYfXdVwkpFWHthzoR5.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg" ||
+                      "/placeholder.svg"
+                    }
                     alt={category.title}
                     fill
                     className="object-cover"
+                    unoptimized={true}
                   />
                 </div>
                 <CardContent className="p-3">
@@ -307,7 +481,13 @@ export default function HomePage() {
               <CardContent className="p-6">
                 <div className="flex flex-col items-center text-center space-y-4">
                   <div className="relative w-20 h-20 rounded-full overflow-hidden">
-                    <Image src="/whiteman-02.png" alt="Customer" fill className="object-cover" />
+                    <Image
+                      src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/whiteman-02-GHmKZGLWeXqHCikTWoVqDZ5kJhCuFy.png"
+                      alt="Customer"
+                      fill
+                      className="object-cover"
+                      unoptimized={true}
+                    />
                   </div>
                   <div>
                     <p className="text-muted-foreground italic mb-4">
@@ -325,7 +505,13 @@ export default function HomePage() {
               <CardContent className="p-6">
                 <div className="flex flex-col items-center text-center space-y-4">
                   <div className="relative w-20 h-20 rounded-full overflow-hidden">
-                    <Image src="/wedding.png" alt="Customer" fill className="object-cover" />
+                    <Image
+                      src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/bride-portrait-W9zV80cjEo3NrySBis6glFJj6EA8Dx.png"
+                      alt="Customer"
+                      fill
+                      className="object-cover"
+                      unoptimized={true}
+                    />
                   </div>
                   <div>
                     <p className="text-muted-foreground italic mb-4">
@@ -343,7 +529,13 @@ export default function HomePage() {
               <CardContent className="p-6">
                 <div className="flex flex-col items-center text-center space-y-4">
                   <div className="relative w-20 h-20 rounded-full overflow-hidden">
-                    <Image src="/hispanic-woman.png" alt="Customer" fill className="object-cover" />
+                    <Image
+                      src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hispanic-woman-AbGZTpnRm1lnHhBFROEFRr6oECdfXX.png"
+                      alt="Customer"
+                      fill
+                      className="object-cover"
+                      unoptimized={true}
+                    />
                   </div>
                   <div>
                     <p className="text-muted-foreground italic mb-4">
@@ -370,12 +562,19 @@ export default function HomePage() {
               <div
                 className="absolute inset-0 opacity-20"
                 style={{
-                  backgroundImage: "url('/texture0079.png')",
+                  backgroundImage:
+                    "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/texture0079-ofcVFofcVFofcVFofcVFofcVFofcVF.png')",
                   backgroundRepeat: "repeat",
                   mixBlendMode: "multiply",
                 }}
               ></div>
-              <Image src="/simple moneysaver.png" alt="Penny Saver" fill className="object-contain p-4 relative z-10" />
+              <Image
+                src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/simple%20moneysaver-ZitT1iEylHQVkNDQsMM4jf6eqrNHxN.png"
+                alt="Penny Saver"
+                fill
+                className="object-contain p-4 relative z-10"
+                unoptimized={true}
+              />
               <div className="absolute inset-0 bg-yellow-400/20 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
             </div>
           </Link>
@@ -391,12 +590,12 @@ export default function HomePage() {
           </Button>
         </div>
       </main>
-
       <footer className="bg-primary text-white py-8 relative">
         <div
           className="absolute inset-0 opacity-30"
           style={{
-            backgroundImage: "url('/texture0079.png')",
+            backgroundImage:
+              "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/texture0079-ofcVFofcVFofcVFofcVFofcVFofcVF.png')",
             backgroundRepeat: "repeat",
             mixBlendMode: "multiply",
           }}
@@ -422,8 +621,6 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-
-      {/* Zip Code Dialog */}
       <ZipCodeDialog
         isOpen={isZipDialogOpen}
         onClose={() => setIsZipDialogOpen(false)}

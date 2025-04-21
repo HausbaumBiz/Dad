@@ -58,14 +58,11 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
     "zod": "^3.24.1",
+    "@upstash/redis": "latest",
     "@vercel/kv": "latest",
     "uuid": "latest",
     "bcryptjs": "latest",
-    "crypto": "latest",
-    "fs": "latest",
-    "path": "latest",
-    "csv-parse": "latest",
-    "@upstash/redis": "latest"
+    "crypto": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

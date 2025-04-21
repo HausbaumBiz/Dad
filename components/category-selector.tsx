@@ -663,7 +663,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "mortuaryServices",
       title: "Mortuary Services",
-      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/lawyer-DoIQHo7vo03r1owabcFTTLMXiPZ91v.png", // funeral.png (using lawyer.png as placeholder)
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/funeral-TnpegJLL7ue38d0l8qq9dF7O4Q8ND9.png", // Updated to the new funeral director image
       subcategories: ["Funeral Homes", "Cemetaries", "Florists", "Headstones/ Monuments", "Caskets and Urns"],
     },
     {

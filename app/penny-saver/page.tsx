@@ -108,7 +108,12 @@ export default function PennySaverPage() {
             <div className="text-center">
               <div className="flex justify-center mb-6">
                 <div className="relative w-48 h-48 md:w-64 md:h-64">
-                  <Image src="/simple moneysaver.png" alt="Penny Saver" fill className="object-contain" />
+                  <Image
+                    src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/simple%20moneysaver-ZitT1iEylHQVkNDQsMM4jf6eqrNHxN.png"
+                    alt="Penny Saver"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
               <h1 className="text-4xl md:text-5xl font-bold mb-4 text-amber-800">This Week's Penny Saver</h1>
