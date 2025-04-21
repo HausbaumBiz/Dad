@@ -3,11 +3,11 @@ import Image from "next/image"
 
 export function MainHeader() {
   return (
-    <header className="bg-white border-b border-gray-200 py-4">
+    <header className="bg-white border-b border-gray-200 py-6">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <Link href="/" className="flex items-center">
-          <div className="relative w-40 h-12">
-            <Image src="/hausbaumbiz03.png" alt="Hausbaum Logo" fill style={{ objectFit: "contain" }} />
+          <div className="relative w-[500px] h-[150px]">
+            <Image src="/hausbaumbiz03.png" alt="Hausbaum Logo" fill style={{ objectFit: "contain" }} priority />
           </div>
         </Link>
         <Link

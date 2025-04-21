@@ -18,7 +18,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "homeLawnLabor",
       title: "Home, Lawn, and Manual Labor",
-      image: "/housebuilding.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/housebuilding-2Ee0Pra1CpA9xBNHU4c5g7qucnBqHE.png", // housebuilding.png
       subcategories: [
         {
           id: "lawn",
@@ -259,7 +259,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "retailStores",
       title: "Retail Stores",
-      image: "/retail.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/retail02-PWtKtPOE0qcIIeje2E6crDrL529eTV.png", // retail02.png
       subcategories: [
         "Supermarkets/ Grocery Stores",
         "Department Store",
@@ -308,7 +308,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "travelVacation",
       title: "Travel and Vacation",
-      image: "/travel.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/travel-cRSfCiJRrv8nJvyCPyYr5XlEKRKrY4.png", // travel.png
       subcategories: [
         "Tour and Travel Guides",
         "Travel Agents",
@@ -325,7 +325,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "tailors",
       title: "Tailors, Dressmakers, and Fabric and Clothes Cleaning and Repair",
-      image: "/tailor.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Tailor-Ll57NPmzPURm0U8kNHxZEYqs8dPD0Y.png", // Tailor.png
       subcategories: [
         "Tailors, Dressmakers, and Custom Sewers",
         "Laundry and Dry-Cleaning",
@@ -338,7 +338,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "artDesignEntertainment",
       title: "Art, Design and Entertainment",
-      image: "/fineArt.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fineArt-g1djwriCCMnMFKsZHa0GREE7PU4be1.png", // fineArt.png
       subcategories: [
         "Fine Artists, Including Painters, Sculptors, and Illustrators",
         "Craft Artists",
@@ -359,7 +359,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "physicalRehabilitation",
       title: "Physical Rehabilitation",
-      image: "/physicalRehab.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/physicalRehab-OP1TJbwVlpfhhevnkYpk6ZQqMVP2rd.png", // physicalRehab.png
       subcategories: [
         "Occupational Therapists",
         "Physical Therapists",
@@ -376,7 +376,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "financeInsurance",
       title: "Insurance, Finance, Debt and Sales",
-      image: "/finance.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/finance-fqVQ0TmI2kFehcFP7kIOji08oIBhqX.png", // finance.png
       subcategories: [
         "Accountants",
         "Insurance",
@@ -390,7 +390,8 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "weddingsEvents",
       title: "Weddings and Special Events",
-      image: "/wedding-events.png",
+      image:
+        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/wedding-events-MgUtHJRBQ04ooMmbX5ZuIq4L9m2KqI.png", // wedding-events.png
       subcategories: [
         "Event Halls",
         "Tent and Chair Rentals",
@@ -414,7 +415,8 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "petCare",
       title: "Pet Care",
-      image: "/pet-care.png",
+      image:
+        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/cat%20and%20dog-UHW1HU5Xs0PMdXJLC66zBYViQu0jx9.png", // cat and dog.png
       subcategories: [
         "Veterinarians",
         "Pet Hospitals",
@@ -435,7 +437,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "languageTutoring",
       title: "Language Lessons/School Subject Tutoring",
-      image: "/tutoring.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/tutoring-lks6Tjoe1sJjtXJ7OdS2uje11BUiIL.png", // tutoring.png
       subcategories: [
         "Spanish",
         "French",
@@ -453,7 +455,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "realestate",
       title: "Home Buying and Selling",
-      image: "/realestate002.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/realitor003-xqIaDhmbEuAgatSXkskyV0Ulolsmr5.png", // realitor003.png
       subcategories: [
         "Real Estate Agent",
         "Real Estate Appraising",
@@ -466,7 +468,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "athletics",
       title: "Athletics, Personal Trainers, Group Fitness Classes and Dance Instruction",
-      image: "/baseball001.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/baseball-aixRgKdF2ejVmCFWkhcEu2wlT9pXor.png", // baseball.png
       subcategories: [
         "Baseball/Softball",
         "Golf",
@@ -489,7 +491,8 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "music",
       title: "Music",
-      image: "/music001.png",
+      image:
+        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/music%20lesson-I1NMnc8dVkG1C6rIOTc5mSghexlmxd.png", // music lesson.png
       subcategories: [
         "Piano Lessons",
         "Guitar Lessons",
@@ -505,7 +508,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "homecare",
       title: "Home Care",
-      image: "/aid001.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/home%20health-TftlLaWe43Ltg5qYUWgJyVrfgSfMNd.png", // home health.png
       subcategories: [
         "Non-Medical Elder Care",
         "Non-Medical Special Needs Adult Care",
@@ -519,7 +522,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "automotive",
       title: "Automotive/Motorcycle/RV, etc",
-      image: "/automech.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/automech-7SsSfk6EEbz85wtCrG6GZJLEEut0xJ.png", // automech.png
       subcategories: [
         "General Auto Repair",
         "Engine and Transmission",
@@ -543,7 +546,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "beauty",
       title: "Hair care, Beauty, Tattoo and Piercing",
-      image: "/beauty.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/haircutting-m6QfXr3W3dUfuj4MZFT90WMNtjed8T.png", // haircutting.png
       subcategories: [
         "Barbers",
         "Hairdressers, Hairstylists, and Cosmetologists",
@@ -562,7 +565,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "medical",
       title: "Medical Practitioners - non MD/DO",
-      image: "/dentists.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/doctor-3jjcpWmjxqxLZELTMa9v1TaR1U9TgB.png", // doctor.png
       subcategories: [
         "Chiropractors",
         "Dentists",
@@ -581,7 +584,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "counseling",
       title: "Counselors, Psychologists, Addiction Specialists, Team Building",
-      image: "/counseling003.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/couseling-NTdbl5SQdjHcW9cZCMlFgPSgMin6Ue.png", // couseling.png
       subcategories: [
         "Counselors",
         "Clinical and Counseling Psychologists",
@@ -595,7 +598,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "computers",
       title: "Computers and the Web",
-      image: "/computers.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/computer-lox6P5znlsextHA6c7vUkXZNkr2d3q.png", // computer.png
       subcategories: [
         "Computer Network Specialists",
         "Database Administrators",
@@ -611,7 +614,8 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "restaurant",
       title: "Restaurant, Food and Drink",
-      image: "/chef.png",
+      image:
+        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/food%20service-DMhVnw8lOLmeSJkRwocWVAaupQmOgz.png", // food service.png
       subcategories: [
         "Asian",
         "Indian",
@@ -647,7 +651,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "personalAssistant",
       title: "Assistants",
-      image: "/assistant.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/assistant-i6Erbhskr6ObActF7XMV9fJslboNmi.png", // assistant.png
       subcategories: [
         "Personal Drivers",
         "Personal Assistants",
@@ -659,13 +663,13 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
     {
       id: "mortuaryServices",
       title: "Mortuary Services",
-      image: "/funeral.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/lawyer-DoIQHo7vo03r1owabcFTTLMXiPZ91v.png", // funeral.png (using lawyer.png as placeholder)
       subcategories: ["Funeral Homes", "Cemetaries", "Florists", "Headstones/ Monuments", "Caskets and Urns"],
     },
     {
       id: "lawyers",
       title: "Lawyers",
-      image: "/lawyer001.png",
+      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/lawyer-DoIQHo7vo03r1owabcFTTLMXiPZ91v.png", // lawyer001.png
       subcategories: [
         "Family Lawyer",
         "Criminal Defense Lawyer",
@@ -793,7 +797,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
   const getValidImageSrc = (imagePath: string | undefined | null): string => {
     // If imagePath is undefined, null, or an empty string, return a placeholder
     if (!imagePath || imagePath === "") {
-      return "/placeholder.svg?height=96&width=96"
+      return "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/placeholder-ob7miW3mUreePYfXdVwkpFWHthzoR5.svg?height=96&width=96"
     }
     return imagePath
   }
@@ -827,6 +831,7 @@ export function CategorySelector({ onCategoryChange, searchTerm = "" }: Category
                     className="hover:scale-110 transition-transform duration-300"
                     sizes="(max-width: 768px) 96px, 96px"
                     priority={index < 3}
+                    unoptimized={true}
                   />
                 </div>
                 <h3 className="text-xl font-semibold text-left">{category.title}</h3>
