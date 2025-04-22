@@ -46,7 +46,13 @@ export default function ContactUsPage() {
                     <Phone className="h-5 w-5 text-primary mr-3 mt-1" />
                     <div>
                       <p className="font-medium">Call Us</p>
-                      <p>(330) 497-2700</p>
+                      <a
+                        href="tel:+13304972700"
+                        className="text-primary hover:underline transition-colors"
+                        aria-label="Call Hausbaum at (330) 497-2700"
+                      >
+                        (330) 497-2700
+                      </a>
                     </div>
                   </div>
                 </div>
