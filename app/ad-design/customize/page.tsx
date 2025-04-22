@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Play, Pause } from "lucide-react"
 
+import { MainHeader } from "@/components/main-header"
+import { MainFooter } from "@/components/main-footer"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react"
+
 interface PhotoItem {
   id: string
   url: string
@@ -1638,17 +1644,7 @@ export default function CustomizeAdDesignPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <div className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-xl font-bold">HausBaum</h1>
-            <div className="flex items-center space-x-4">
-              <button className="text-sm text-gray-600 hover:text-gray-900">Help</button>
-              <button className="text-sm text-gray-600 hover:text-gray-900">Account</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <MainHeader />
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
@@ -1977,6 +1973,143 @@ export default function CustomizeAdDesignPage() {
                   </div>
                 </Card>
 
+                {/* Photo Album Section */}
+                <Card>
+                  <div className="p-6 space-y-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h2 className="text-xl font-semibold">Photo Album</h2>
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="hidePhotoAlbum"
+                          checked={hiddenFields.photoAlbum}
+                          onChange={() => toggleFieldVisibility("photoAlbum")}
+                          className="mr-2"
+                        />
+                        <Label htmlFor="hidePhotoAlbum" className="text-sm text-gray-500">
+                          Hide from AdBox
+                        </Label>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="imageUpload" className="block mb-2">
+                          Upload Images for Photo Album
+                        </Label>
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                          <input
+                            type="file"
+                            id="imageUpload"
+                            ref={fileInputRef}
+                            accept=".jpg,.jpeg,.png,.webp,.gif"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                          />
+                          <label
+                            htmlFor="imageUpload"
+                            className="cursor-pointer flex flex-col items-center justify-center"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="24"
+                              height="24"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="text-gray-400 mb-2"
+                            >
+                              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                              <circle cx="9" cy="9" r="2" />
+                              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                            </svg>
+                            <span className="text-sm font-medium text-gray-700">Click to upload image</span>
+                            <span className="text-xs text-gray-500 mt-1">JPG, PNG, WebP, GIF accepted</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {imagePreview && (
+                        <div className="space-y-4">
+                          <div className="relative h-40 bg-gray-100 rounded-lg overflow-hidden">
+                            <img
+                              src={imagePreview || "/placeholder.svg"}
+                              alt="Preview"
+                              className="w-full h-full object-contain"
+                            />
+                            <button
+                              type="button"
+                              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                              onClick={() => {
+                                setImageFile(null)
+                                setImagePreview(null)
+                                if (fileInputRef.current) {
+                                  fileInputRef.current.value = ""
+                                }
+                              }}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          <Button
+                            type="button"
+                            onClick={handleAddToPhotoAlbum}
+                            className="w-full"
+                            style={{ backgroundColor: colorValues.primary, color: "white" }}
+                          >
+                            Add to Photo Album
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="mt-4">
+                        <h3 className="text-md font-medium mb-2">Current Photo Album ({photos.length} photos)</h3>
+
+                        {photos.length > 0 ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {photos.map((photo) => (
+                              <div key={photo.id} className="relative group">
+                                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                                  <img
+                                    src={photo.url || "/placeholder.svg"}
+                                    alt={photo.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePhoto(photo.id)}
+                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-center py-4">
+                            No photos in album yet. Upload and add photos above.
+                          </p>
+                        )}
+
+                        {photos.length > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-4 w-full"
+                            onClick={handleOpenPhotoAlbum}
+                          >
+                            View Photo Album
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
                 <div className="flex justify-center pt-4">
                   <button
                     type="submit"
@@ -2005,13 +2138,72 @@ export default function CustomizeAdDesignPage() {
         </div>
       </main>
 
-      <div className="bg-gray-100 py-6">
-        <div className="container mx-auto px-4">
-          <p className="text-center text-gray-600 text-sm">
-            &copy; {new Date().getFullYear()} HausBaum. All rights reserved.
-          </p>
-        </div>
-      </div>
+      <MainFooter />
+
+      {/* Photo Album Modal */}
+      <Dialog open={isPhotoAlbumOpen} onOpenChange={setIsPhotoAlbumOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Photo Album</DialogTitle>
+          </DialogHeader>
+
+          <div className="relative">
+            {photos.length > 0 ? (
+              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                <img
+                  src={photos[currentPhotoIndex].url || "/placeholder.svg"}
+                  alt={`Photo ${currentPhotoIndex + 1}`}
+                  className="w-full h-full object-contain"
+                />
+
+                <div className="absolute bottom-2 left-0 right-0 text-center text-white text-sm">
+                  {currentPhotoIndex + 1} of {photos.length}
+                </div>
+
+                {photos.length > 1 && (
+                  <>
+                    <button
+                      onClick={handlePrevPhoto}
+                      className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+                    >
+                      <ChevronLeft size={24} />
+                    </button>
+                    <button
+                      onClick={handleNextPhoto}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+                    >
+                      <ChevronRight size={24} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+                <p className="text-gray-500">No photos in album</p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-24 overflow-y-auto">
+            {photos.map((photo, index) => (
+              <div
+                key={photo.id}
+                className={`aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${
+                  index === currentPhotoIndex ? "border-primary" : "border-transparent"
+                }`}
+                onClick={() => setCurrentPhotoIndex(index)}
+                style={{ borderColor: index === currentPhotoIndex ? colorValues.primary : "transparent" }}
+              >
+                <img
+                  src={photo.url || "/placeholder.svg"}
+                  alt={`Thumbnail ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
