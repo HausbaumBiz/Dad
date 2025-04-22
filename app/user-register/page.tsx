@@ -12,10 +12,15 @@ import { Label } from "@/components/ui/label"
 import { ChevronLeft } from "lucide-react"
 import { registerUser } from "@/app/actions/user-actions"
 import { useToast } from "@/components/ui/use-toast"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Eye, EyeOff } from "lucide-react"
 
 export default function UserRegisterPage() {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -40,6 +45,9 @@ export default function UserRegisterPage() {
       Object.entries(formData).forEach(([key, value]) => {
         formDataObj.append(key, value)
       })
+
+      // Add remember me value
+      formDataObj.append("rememberMe", rememberMe.toString())
 
       // Call the server action
       const result = await registerUser(formDataObj)
@@ -125,18 +133,53 @@ export default function UserRegisterPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input id="password" type="password" value={formData.password} onChange={handleChange} required />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={handleChange}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    required
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked === true)}
                   />
+                  <Label htmlFor="rememberMe" className="text-sm cursor-pointer">
+                    Remember me
+                  </Label>
                 </div>
 
                 <Button
