@@ -18,7 +18,7 @@ export function CategoryLayout({ children, title, backLink = "/", backText = "Ho
         <div className="container mx-auto px-4 py-6 flex flex-col md:flex-row items-center justify-between">
           <div className="flex items-center mb-4 md:mb-0">
             <Link href="/">
-              <Image src="/hausbaumbiz03.png" alt="Hausbaum Logo" width={600} height={300} className="h-64 w-auto" />
+              <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png" alt="Hausbaum Logo" width={600} height={300} className="h-64 w-auto" />
             </Link>
           </div>
 

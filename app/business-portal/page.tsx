@@ -10,7 +10,7 @@ export default function BusinessPortalPage() {
       <header className="bg-white shadow-sm">
         <div className="container mx-auto px-4 py-6 flex flex-col md:flex-row items-center justify-between">
           <div className="flex items-center mb-4 md:mb-0">
-            <Image src="/hausbaumbiz03.png" alt="Hausbaum Logo" width={600} height={300} className="h-64 w-auto" />
+            <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png" alt="Hausbaum Logo" width={600} height={300} className="h-64 w-auto" />
           </div>
 
           <div className="flex space-x-4">

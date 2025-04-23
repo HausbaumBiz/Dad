@@ -93,7 +93,7 @@ export default function UserLoginPage() {
         <div className="flex flex-col md:flex-row items-center justify-center gap-8">
           <div className="md:w-1/4 flex flex-col items-center">
             <Image
-              src="/hausbaumbiz03.png"
+              src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png"
               alt="Hausbaum Logo"
               width={600}
               height={300}
