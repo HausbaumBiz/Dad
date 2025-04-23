@@ -254,20 +254,20 @@ export default function HomePage() {
   // Hero section images
   const heroImages = [
     {
-      src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/lawyer-DoIQHo7vo03r1owabcFTTLMXiPZ91v.png",
-      alt: "Legal Professional",
+      src: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/woman%20right-BQOsoDawKf0zmfwDs5pzlNV4iWVbOD.png",
+      alt: "Woman Right",
     },
     {
-      src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Tailor-Ll57NPmzPURm0U8kNHxZEYqs8dPD0Y.png",
-      alt: "Tailoring Services",
+      src: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/man%20out-dmEN7MkI1Uf0LDWJJeADTC5ydiXPqQ.png",
+      alt: "Man Out",
     },
     {
-      src: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/physicalRehab-e8EXwER0X59WDGlEZ4HnTpd18NQo2U.png",
-      alt: "Physical Therapy",
+      src: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/man%20up-989PGMX55S43WeTlrTNWAWvDL8bWVm.png",
+      alt: "Man Up",
     },
     {
-      src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/retail02-PWtKtPOE0qcIIeje2E6crDrL529eTV.png",
-      alt: "Retail Business Owner",
+      src: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/woman%20left-AiqDko3XvnN4VqnSLpMC78tJPnQg9d.png",
+      alt: "Woman Left",
     },
   ]
 
