@@ -60,15 +60,15 @@ export default async function WorkbenchPage() {
                   label="Your Business Focus"
                 />
 
-                <WorkbenchButton href="/ad-design" iconSrc="/ad-workbench-icon.png" label="Ad Workbench" />
+                <WorkbenchButton href="/ad-design" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/ad-workbench-icon-scOKMCrsO5iu98jnDvZGHdJrb0TNeJ.png" label="Ad Workbench" />
 
-                <WorkbenchButton href="/coupons" iconSrc="/money-saver-icon.png" label="Penny Saver Workbench" />
+                <WorkbenchButton href="/coupons" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png" label="Penny Saver Workbench" />
 
-                <WorkbenchButton href="/job-listing" iconSrc="/jobs-icon.png" label="Create A Job Listing" />
+                <WorkbenchButton href="/job-listing" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/jobs-icon-NE5EpebSE0Zp2qBCfvaAKSpMiNJZ9n.png" label="Create A Job Listing" />
 
-                <WorkbenchButton href="/statistics" iconSrc="/statistics-icon.png" label="Statistics Dashboard" />
+                <WorkbenchButton href="/statistics" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/stats002-gW6ZaTQQkxNHACfsxA0LoZMnih5oax.png" label="Statistics Dashboard" />
 
-                <WorkbenchButton href="/user-account" iconSrc="/user-account-icon.png" label="User Account" />
+                <WorkbenchButton href="/user-account" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/user-account-icon%20sm-PZ61Ko9nsGv5oeESUWjM2pDekdeewQ.png" label="User Account" />
               </div>
             </div>
           </div>

@@ -87,19 +87,17 @@ export default function BusinessPortalPage() {
           <div
             className="flex items-center justify-center p-8 rounded-lg shadow-lg relative overflow-hidden"
             style={{
-              backgroundImage: "url('/wall.png')",
+              backgroundImage:
+                "url('https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/lowres%20wall-14wM3WxW3b7jnzmvaK9jcUsT3Ko4bV.png')",
               backgroundSize: "cover",
               backgroundPosition: "center",
             }}
           >
-            <Image
-              src="/fence-4-shoe-fix.png"
-              alt="Professional Painter"
-              width={500}
-              height={700}
-              className="max-w-full h-auto"
-              style={{ objectFit: "contain" }}
-            />
+            {/* Removed empty Image component */}
+            <div className="text-white text-center p-6 bg-black/30 rounded-lg backdrop-blur-sm">
+              <h3 className="text-2xl font-bold mb-3">Grow Your Business with Hausbaum</h3>
+              <p className="text-lg">Connect with local customers and expand your reach</p>
+            </div>
           </div>
         </div>
       </main>
