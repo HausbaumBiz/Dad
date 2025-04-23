@@ -137,7 +137,7 @@ export default function StatisticsPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <div className="relative w-16 h-16">
-              <Image src="/statistics-icon.png" alt="Statistics" fill className="object-contain" />
+              <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/stats002-gW6ZaTQQkxNHACfsxA0LoZMnih5oax.png" alt="Statistics" fill className="object-contain" />
             </div>
             <h1 className="text-3xl font-bold text-gray-800">Statistics Dashboard</h1>
           </div>

@@ -45,7 +45,7 @@ export default async function WorkbenchPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-4 flex justify-center items-start">
             <div className="relative w-full max-w-md h-64">
-              <Image src="/hausbaumbiz03.png" alt="Hausbaum Logo" fill style={{ objectFit: "contain" }} priority />
+              <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-JJedtHiDvlWtJs7irPdMNCF6JoRQfS.png" alt="Hausbaum Logo" fill style={{ objectFit: "contain" }} priority />
             </div>
           </div>
 
@@ -56,7 +56,7 @@ export default async function WorkbenchPage() {
               <div className="space-y-4">
                 <WorkbenchButton
                   href="/business-focus"
-                  iconSrc="/business-cards-icon.png"
+                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/business-cards-icon-X09H698yJZQiK1Ve9bMp9fK3NmIZBt.png"
                   label="Your Business Focus"
                 />
 
