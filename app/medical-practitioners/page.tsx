@@ -150,7 +150,7 @@ export default function MedicalPractitionersPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/home%20health-zJyA419byhmD7tyJa0Ebmegg0XzFN3.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/dentists-Yk2J0P7JAsffashXwMR6wGx202Gf6v.png"
             alt="Medical Practitioners"
             width={500}
             height={500}
