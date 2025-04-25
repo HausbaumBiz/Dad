@@ -110,7 +110,7 @@ export default function UserAccountPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <div className="relative w-16 h-16">
-              <Image src="/user-account-icon.png" alt="User Account" fill className="object-contain" />
+              <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/user-account-icon%20sm-PZ61Ko9nsGv5oeESUWjM2pDekdeewQ.png" alt="User Account" fill className="object-contain" />
             </div>
             <h1 className="text-3xl font-bold text-gray-800">User Account</h1>
           </div>
