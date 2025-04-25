@@ -171,7 +171,7 @@ export default function PetCarePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/cat and dog.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/cat%20and%20dog-7hvR8Ytt6JBV7PFG8N6uigZg80K6xP.png"
             alt="Pet Care Services"
             width={500}
             height={500}

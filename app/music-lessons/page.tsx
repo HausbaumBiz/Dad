@@ -146,7 +146,7 @@ export default function MusicLessonsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/music lesson.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/music%20lesson-VcAdpdYV65QHk4izPaeiVUsKQZwn9Q.png"
             alt="Music Lessons"
             width={500}
             height={500}

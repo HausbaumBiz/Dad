@@ -96,7 +96,7 @@ export default function AutomotiveServicesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/auto.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/auto-mQWtZXyRogQgO5qlNVcR1OYcyDqe59.png"
             alt="Automotive Services"
             width={500}
             height={500}

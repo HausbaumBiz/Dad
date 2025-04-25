@@ -152,7 +152,7 @@ export default function LegalServicesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/lawyer.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/lawyer001-5xlajuHkD91HvXOM2zWdKrtS2HONn3.png"
             alt="Legal Services"
             width={500}
             height={500}

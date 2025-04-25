@@ -145,7 +145,7 @@ export default function TravelVacationPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/travel agent.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/travel%20agent-2swsPk7s1rFb3Cehv2GXYkYhwXFXwd.png"
             alt="Travel and Vacation"
             width={500}
             height={500}

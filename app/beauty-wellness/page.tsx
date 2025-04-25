@@ -152,7 +152,7 @@ export default function BeautyWellnessPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/haircutting.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/haircutting-qs8Z2Gv5npSVzpYZ19uRHdGRK94bFP.png"
             alt="Beauty and Wellness"
             width={500}
             height={500}

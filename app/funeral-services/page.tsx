@@ -257,7 +257,7 @@ export default function FuneralServicesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/funeral.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/funeral-d3jRmRhs8rBZ2YN1inIrZFWmBn3SPi.png"
             alt="Funeral Services"
             width={500}
             height={500}

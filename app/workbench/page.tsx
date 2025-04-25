@@ -5,9 +5,16 @@ import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { LogOut, User } from "lucide-react"
 
+// Update the WorkbenchPage component to handle errors gracefully
 export default async function WorkbenchPage() {
-  // Get the current business user
-  const business = await getCurrentBusiness()
+  // Get the current business user with error handling
+  let business
+  try {
+    business = await getCurrentBusiness()
+  } catch (error) {
+    console.error("Failed to get business data:", error)
+    // Continue without business data
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12">
@@ -45,7 +52,13 @@ export default async function WorkbenchPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-4 flex justify-center items-start">
             <div className="relative w-full max-w-md h-64">
-              <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-JJedtHiDvlWtJs7irPdMNCF6JoRQfS.png" alt="Hausbaum Logo" fill style={{ objectFit: "contain" }} priority />
+              <Image
+                src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-JJedtHiDvlWtJs7irPdMNCF6JoRQfS.png"
+                alt="Hausbaum Logo"
+                fill
+                style={{ objectFit: "contain" }}
+                priority
+              />
             </div>
           </div>
 
@@ -60,15 +73,35 @@ export default async function WorkbenchPage() {
                   label="Your Business Focus"
                 />
 
-                <WorkbenchButton href="/ad-design" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/ad-workbench-icon-scOKMCrsO5iu98jnDvZGHdJrb0TNeJ.png" label="Ad Workbench" />
+                <WorkbenchButton
+                  href="/ad-design"
+                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/ad-workbench-icon-scOKMCrsO5iu98jnDvZGHdJrb0TNeJ.png"
+                  label="Ad Workbench"
+                />
 
-                <WorkbenchButton href="/coupons" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png" label="Penny Saver Workbench" />
+                <WorkbenchButton
+                  href="/coupons"
+                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png"
+                  label="Penny Saver Workbench"
+                />
 
-                <WorkbenchButton href="/job-listing" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/jobs-icon-NE5EpebSE0Zp2qBCfvaAKSpMiNJZ9n.png" label="Create A Job Listing" />
+                <WorkbenchButton
+                  href="/job-listing"
+                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/jobs-icon-NE5EpebSE0Zp2qBCfvaAKSpMiNJZ9n.png"
+                  label="Create A Job Listing"
+                />
 
-                <WorkbenchButton href="/statistics" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/stats002-gW6ZaTQQkxNHACfsxA0LoZMnih5oax.png" label="Statistics Dashboard" />
+                <WorkbenchButton
+                  href="/statistics"
+                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/stats002-gW6ZaTQQkxNHACfsxA0LoZMnih5oax.png"
+                  label="Statistics Dashboard"
+                />
 
-                <WorkbenchButton href="/user-account" iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/user-account-icon%20sm-PZ61Ko9nsGv5oeESUWjM2pDekdeewQ.png" label="User Account" />
+                <WorkbenchButton
+                  href="/user-account"
+                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/user-account-icon%20sm-PZ61Ko9nsGv5oeESUWjM2pDekdeewQ.png"
+                  label="User Account"
+                />
               </div>
             </div>
           </div>

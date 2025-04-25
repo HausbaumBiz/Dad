@@ -145,7 +145,7 @@ export default function FinancialServicesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/accountant.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/accountant-bVMbHmjmeZbti2lNIRrbCdjJnJJDKX.png"
             alt="Financial Services"
             width={500}
             height={500}

@@ -157,7 +157,7 @@ export default function RetailStoresPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/retail.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/retail-LMdA5FnQ5i2okSiyh63eZFduC47jXp.png"
             alt="Retail Stores"
             width={500}
             height={500}

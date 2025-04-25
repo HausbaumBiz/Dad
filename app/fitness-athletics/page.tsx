@@ -148,7 +148,7 @@ export default function FitnessAthleticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/baseball.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/baseball-WpgfS7MciTxGMJwNZTzlAFewS1DPX0.png"
             alt="Athletics and Fitness"
             width={500}
             height={500}

@@ -182,7 +182,7 @@ export default function TailoringClothingPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/dress maker.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/tailor-SEwFHHQBnpiw9uz98ctBDGSaj1STGZ.png"
             alt="Tailoring and Clothing"
             width={500}
             height={500}
