@@ -7,7 +7,13 @@ export function MainHeader() {
       <div className="container mx-auto px-4 flex justify-between items-center">
         <Link href="/" className="flex items-center">
           <div className="relative w-[500px] h-[150px]">
-            <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-JJedtHiDvlWtJs7irPdMNCF6JoRQfS.png" alt="Hausbaum Logo" fill style={{ objectFit: "contain" }} priority />
+            <Image
+              src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-JJedtHiDvlWtJs7irPdMNCF6JoRQfS.png"
+              alt="Hausbaum Logo"
+              fill
+              style={{ objectFit: "contain" }}
+              priority
+            />
           </div>
         </Link>
         <Link

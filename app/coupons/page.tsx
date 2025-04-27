@@ -164,7 +164,12 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <div className="relative w-16 h-16">
-              <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png" alt="Penny Saver" fill className="object-contain" />
+              <Image
+                src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png"
+                alt="Penny Saver"
+                fill
+                className="object-contain"
+              />
             </div>
             <h1 className="text-3xl font-bold text-gray-800">Penny Saver Workbench</h1>
           </div>

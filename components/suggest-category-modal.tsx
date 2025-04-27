@@ -24,7 +24,12 @@ export function SuggestCategoryModal({ isOpen, onClose }: SuggestCategoryModalPr
         <DialogHeader>
           <div className="flex justify-center mb-4">
             <div className="relative w-40 h-20">
-              <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png" alt="Hausbaum Logo" fill style={{ objectFit: "contain" }} />
+              <Image
+                src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png"
+                alt="Hausbaum Logo"
+                fill
+                style={{ objectFit: "contain" }}
+              />
             </div>
           </div>
           <DialogTitle>Suggest a New Category</DialogTitle>

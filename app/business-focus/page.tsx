@@ -1,27 +1,103 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 import { ServiceAreaSection } from "@/components/service-area-section"
 import { KeywordsSection } from "@/components/keywords-section"
-import { CategorySelector } from "@/components/category-selector"
+import { CategorySelector, type CategorySelection } from "@/components/category-selector"
 import { SuggestCategoryModal } from "@/components/suggest-category-modal"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search } from "lucide-react"
+import { Search, Loader2 } from "lucide-react"
+import { saveBusinessCategories, getBusinessCategories } from "@/app/actions/category-actions"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function BusinessFocusPage() {
+  const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedCategories, setSelectedCategories] = useState<CategorySelection[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
+  const { toast } = useToast()
 
-  const handleCategoryChange = (category: string, isChecked: boolean) => {
+  // Load saved categories on component mount
+  useEffect(() => {
+    async function loadCategories() {
+      setIsLoading(true)
+      try {
+        const result = await getBusinessCategories()
+        if (result.success && result.data) {
+          setSelectedCategories(result.data)
+
+          // Create a map of checked items for the CategorySelector
+          const checkedMap: Record<string, boolean> = {}
+          result.data.forEach((cat) => {
+            checkedMap[cat.fullPath] = true
+          })
+          setCheckedItems(checkedMap)
+        }
+      } catch (error) {
+        console.error("Error loading categories:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load your saved categories",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadCategories()
+  }, [])
+
+  const handleCategoryChange = (selection: CategorySelection, isChecked: boolean) => {
+    setCheckedItems((prev) => ({
+      ...prev,
+      [selection.fullPath]: isChecked,
+    }))
+
     if (isChecked) {
-      setSelectedCategories((prev) => [...prev, category])
+      setSelectedCategories((prev) => [...prev, selection])
     } else {
-      setSelectedCategories((prev) => prev.filter((cat) => cat !== category))
+      setSelectedCategories((prev) => prev.filter((cat) => cat.fullPath !== selection.fullPath))
+    }
+  }
+
+  // Function to save selected categories
+  const handleSubmit = async () => {
+    setIsSaving(true)
+    try {
+      // Save to server
+      const result = await saveBusinessCategories(selectedCategories)
+
+      if (result.success) {
+        // Also save to localStorage as a backup
+        localStorage.setItem("selectedCategories", JSON.stringify(selectedCategories))
+
+        toast({
+          title: "Success",
+          description: "Your category selections have been saved",
+        })
+
+        // Redirect to workbench
+        router.push("/workbench")
+      } else {
+        throw new Error(result.message || "Failed to save categories")
+      }
+    } catch (error) {
+      console.error("Error saving categories:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save your category selections",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -74,7 +150,18 @@ export default function BusinessFocusPage() {
               </div>
             </div>
 
-            <CategorySelector onCategoryChange={handleCategoryChange} searchTerm={searchTerm} />
+            {isLoading ? (
+              <div className="flex justify-center items-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2">Loading your saved categories...</span>
+              </div>
+            ) : (
+              <CategorySelector
+                onCategoryChange={handleCategoryChange}
+                searchTerm={searchTerm}
+                initialCheckedState={checkedItems}
+              />
+            )}
 
             <div className="mt-8 text-center">
               <button onClick={() => setIsModalOpen(true)} className="text-primary hover:underline font-medium">
@@ -89,9 +176,10 @@ export default function BusinessFocusPage() {
               </h2>
               {selectedCategories.length > 0 ? (
                 <ul className="space-y-2 mb-6 max-h-60 overflow-y-auto">
-                  {selectedCategories.map((category, index) => (
+                  {selectedCategories.map((selection, index) => (
                     <li key={index} className="px-3 py-2 bg-white rounded border border-gray-200">
-                      {category}
+                      <span className="font-medium">{selection.category}</span> &gt;{" "}
+                      <span className="text-gray-700">{selection.subcategory}</span>
                     </li>
                   ))}
                 </ul>
@@ -99,12 +187,20 @@ export default function BusinessFocusPage() {
                 <p className="text-gray-500 italic mb-6">No categories selected yet</p>
               )}
               <div className="flex justify-center">
-                <Link
-                  href="/workbench"
+                <Button
+                  onClick={handleSubmit}
                   className="px-6 py-3 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-colors"
+                  disabled={isSaving}
                 >
-                  Submit
-                </Link>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Submit"
+                  )}
+                </Button>
               </div>
             </div>
           </div>

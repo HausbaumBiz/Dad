@@ -87,7 +87,12 @@ export default function ContactUsPage() {
 
               <div className="md:w-1/2">
                 <div className="h-full relative">
-                  <Image src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/ContactUs-lowres-SBPMw2x3C5R3BpcumbNs0znhPj8sXF.png" alt="Contact Hausbaum" fill className="object-cover" />
+                  <Image
+                    src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/ContactUs-lowres-SBPMw2x3C5R3BpcumbNs0znhPj8sXF.png"
+                    alt="Contact Hausbaum"
+                    fill
+                    className="object-cover"
+                  />
                 </div>
               </div>
             </div>

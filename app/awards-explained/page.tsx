@@ -52,7 +52,8 @@ export default function AwardsExplainedPage() {
     },
     {
       id: 8,
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/keepinginformed02-r27QrB4vwJ2IHUtyACOfiLtxnzjnHw.png",
+      image:
+        "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/keepinginformed02-r27QrB4vwJ2IHUtyACOfiLtxnzjnHw.png",
       title: "Communication",
       description: "Five 5-Star Reviews for the question: How would you rate the communication throughout the process?",
     },
@@ -70,7 +71,8 @@ export default function AwardsExplainedPage() {
     },
     {
       id: 11,
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/CustomerServic-2-eVctv27m01myFPW9mAhgfHGtoECddh.png",
+      image:
+        "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/CustomerServic-2-eVctv27m01myFPW9mAhgfHGtoECddh.png",
       title: "Customer Service",
       description: "Five 5-Star Reviews for the question: How would you rate the quality of the service you received?",
     },

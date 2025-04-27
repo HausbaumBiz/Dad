@@ -6,3 +6,4 @@ const kv = new Redis({
 })
 
 export { kv as redis }
+export default kv
