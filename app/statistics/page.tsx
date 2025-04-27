@@ -19,12 +19,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import Link from "next/link"
-import { Loader2, PlusCircle, X, Edit, AlertCircle } from "lucide-react"
+import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2 } from "lucide-react"
 import type { CategorySelection } from "@/components/category-selector"
 import { getBusinessCategories, removeBusinessCategory } from "@/app/actions/category-actions"
 import { useToast } from "@/components/ui/use-toast"
 import { getBusinessKeywords } from "@/app/actions/keyword-actions"
 import { Badge } from "@/components/ui/badge"
+import { type JobListing, getBusinessJobs, removeJobListing } from "@/app/actions/job-actions"
 
 export default function StatisticsPage() {
   const router = useRouter()
@@ -37,6 +38,11 @@ export default function StatisticsPage() {
   const { toast } = useToast()
   const [keywords, setKeywords] = useState<string[]>([])
   const [isKeywordsLoading, setIsKeywordsLoading] = useState(true)
+  const [jobListings, setJobListings] = useState<JobListing[]>([])
+  const [isJobsLoading, setIsJobsLoading] = useState(true)
+  const [jobToRemove, setJobToRemove] = useState<string | null>(null)
+  const [showRemoveJobDialog, setShowRemoveJobDialog] = useState(false)
+  const [isRemovingJob, setIsRemovingJob] = useState(false)
 
   // Load selected categories from server on component mount
   useEffect(() => {
@@ -109,6 +115,31 @@ export default function StatisticsPage() {
     loadKeywords()
   }, [])
 
+  useEffect(() => {
+    async function loadJobListings() {
+      setIsJobsLoading(true)
+      try {
+        // For now, use a hardcoded business ID - in a real application,
+        // this would come from the authenticated user's session
+        const businessId = "demo-business"
+
+        const jobs = await getBusinessJobs(businessId)
+        setJobListings(jobs)
+      } catch (error) {
+        console.error("Error loading job listings:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load your job listings",
+          variant: "destructive",
+        })
+      } finally {
+        setIsJobsLoading(false)
+      }
+    }
+
+    loadJobListings()
+  }, [])
+
   // Group categories by main category
   const groupedCategories = selectedCategories.reduce(
     (acc, selection) => {
@@ -161,6 +192,49 @@ export default function StatisticsPage() {
       setIsRemoving(false)
       setShowRemoveDialog(false)
       setCategoryToRemove(null)
+    }
+  }
+
+  const handleRemoveJob = async (jobId: string) => {
+    setJobToRemove(jobId)
+    setShowRemoveJobDialog(true)
+  }
+
+  // Add this function to confirm job removal
+  const confirmRemoveJob = async () => {
+    if (!jobToRemove) return
+
+    setIsRemovingJob(true)
+    try {
+      // For now, use a hardcoded business ID - in a real application,
+      // this would come from the authenticated user's session
+      const businessId = "demo-business"
+
+      const result = await removeJobListing(businessId, jobToRemove)
+
+      if (result.success) {
+        // Update local state
+        const updatedJobs = jobListings.filter((job) => job.id !== jobToRemove)
+        setJobListings(updatedJobs)
+
+        toast({
+          title: "Success",
+          description: "Job listing removed successfully",
+        })
+      } else {
+        throw new Error(result.message || "Failed to remove job listing")
+      }
+    } catch (error) {
+      console.error("Error removing job listing:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove the job listing",
+        variant: "destructive",
+      })
+    } finally {
+      setIsRemovingJob(false)
+      setShowRemoveJobDialog(false)
+      setJobToRemove(null)
     }
   }
 
@@ -442,6 +516,63 @@ export default function StatisticsPage() {
             </Card>
 
             <Card>
+              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b flex flex-row items-center justify-between">
+                <CardTitle className="text-teal-700">Your Job Listings</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/job-listing")}
+                  className="flex items-center gap-1"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add Job Listing</span>
+                  <span className="sm:hidden">Add</span>
+                </Button>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {isJobsLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2">Loading your job listings...</span>
+                  </div>
+                ) : jobListings.length > 0 ? (
+                  <div className="space-y-4">
+                    {jobListings.map((job) => (
+                      <div key={job.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <h3 className="font-medium text-gray-800">{job.jobTitle}</h3>
+                          <p className="text-xs text-gray-500">
+                            Posted: {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Unknown date"}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveJob(job.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="flex justify-center mb-4">
+                      <AlertCircle className="h-12 w-12 text-amber-500" />
+                    </div>
+                    <p className="text-gray-500 mb-4">No job listings created yet.</p>
+                    <Button onClick={() => router.push("/job-listing")} className="flex items-center gap-2">
+                      <PlusCircle className="h-4 w-4" />
+                      Create Job Listing
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
               <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
                 <CardTitle className="text-teal-700">Zip Codes</CardTitle>
               </CardHeader>
@@ -587,6 +718,35 @@ export default function StatisticsPage() {
               className="bg-red-500 hover:bg-red-600"
             >
               {isRemoving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmation Dialog for Job Removal */}
+      <AlertDialog open={showRemoveJobDialog} onOpenChange={setShowRemoveJobDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Job Listing</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this job listing? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemovingJob}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemoveJob}
+              disabled={isRemovingJob}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {isRemovingJob ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Removing...

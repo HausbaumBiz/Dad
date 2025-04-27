@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Play, Pause } from "lucide-react"
 import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
+import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
 
 import { MainHeader } from "@/components/main-header"
@@ -37,6 +38,10 @@ export default function CustomizeAdDesignPage() {
   // Add state for saved coupons and loading state:
   const [savedCoupons, setSavedCoupons] = useState<Coupon[]>([])
   const [isCouponsLoading, setIsCouponsLoading] = useState(false)
+
+  // Add state for job listings and jobs dialog
+  const [jobListings, setJobListings] = useState<JobListing[]>([])
+  const [isJobsLoading, setIsJobsLoading] = useState(false)
 
   // Add state for terms and conditions dialog
   const [openDialogId, setOpenDialogId] = useState<string | null>(null)
@@ -121,25 +126,25 @@ export default function CustomizeAdDesignPage() {
     },
   ]
 
-  // Add sample jobs data
-  const sampleJobs = [
-    {
-      id: "1",
-      title: "Sales Associate",
-      description: "Looking for an energetic sales associate to join our team.",
-      requirements: "Previous retail experience preferred. Strong communication skills required.",
-      salary: "$15-18/hour",
-      location: "In-store",
-    },
-    {
-      id: "2",
-      title: "Marketing Specialist",
-      description: "Help us grow our brand with creative marketing campaigns.",
-      requirements: "Bachelor's degree in Marketing or related field. 2+ years experience.",
-      salary: "$45,000-55,000/year",
-      location: "Hybrid (Remote/Office)",
-    },
-  ]
+  // Remove or comment out the sample jobs data
+  // const sampleJobs = [
+  //   {
+  //     id: "1",
+  //     title: "Sales Associate",
+  //     description: "Looking for an energetic sales associate to join our team.",
+  //     requirements: "Previous retail experience preferred. Strong communication skills required.",
+  //     salary: "$15-18/hour",
+  //     location: "In-store",
+  //   },
+  //   {
+  //     id: "2",
+  //     title: "Marketing Specialist",
+  //     description: "Help us grow our brand with creative marketing campaigns.",
+  //     requirements: "Bachelor's degree in Marketing or related field. 2+ years experience.",
+  //     salary: "$45,000-55,000/year",
+  //     location: "Hybrid (Remote/Office)",
+  //   },
+  // ]
 
   // Photo album state
   const [photos, setPhotos] = useState<PhotoItem[]>([])
@@ -500,11 +505,53 @@ export default function CustomizeAdDesignPage() {
     }
   }
 
+  // Add the fetchJobListings function after the fetchSavedCoupons function
+  const fetchJobListings = async () => {
+    setIsJobsLoading(true)
+    try {
+      // For now, use a hardcoded business ID - in a real application,
+      // this would come from the authenticated user's session
+      const businessId = "demo-business"
+
+      const jobs = await getBusinessJobs(businessId)
+
+      // Add some validation to ensure we have valid job objects
+      const validJobs = jobs.filter((job) => {
+        // Basic validation to ensure required fields exist
+        return job && job.id && job.jobTitle && job.businessName
+      })
+
+      setJobListings(validJobs)
+
+      if (validJobs.length < jobs.length) {
+        console.warn(`Filtered out ${jobs.length - validJobs.length} invalid job listings`)
+      }
+    } catch (error) {
+      console.error("Error fetching job listings:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load job listings. Please try again.",
+        variant: "destructive",
+      })
+      // Set empty array to prevent UI issues
+      setJobListings([])
+    } finally {
+      setIsJobsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (isSavingsDialogOpen) {
       fetchSavedCoupons()
     }
   }, [isSavingsDialogOpen])
+
+  // Add this useEffect to load job listings when the dialog opens
+  useEffect(() => {
+    if (isJobsDialogOpen) {
+      fetchJobListings()
+    }
+  }, [isJobsDialogOpen])
 
   // Feature buttons component
   const FeatureButtons = () => (
@@ -2376,6 +2423,112 @@ export default function CustomizeAdDesignPage() {
                 <p>No coupons available. Create coupons on the Penny Saver Workbench page.</p>
                 <Button className="mt-4" onClick={() => (window.location.href = "/coupons")}>
                   Go to Coupons Page
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Now let's add the Jobs Dialog component */}
+
+      <Dialog open={isJobsDialogOpen} onOpenChange={setIsJobsDialogOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Job Opportunities</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {isJobsLoading ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-blue-500 border-r-transparent border-b-blue-500 border-l-transparent"></div>
+                <p className="mt-2 text-gray-600">Loading job listings...</p>
+              </div>
+            ) : jobListings.length > 0 ? (
+              <div className="space-y-6">
+                {jobListings.map((job) => (
+                  <div key={job.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                    {/* Job Header */}
+                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 border-b border-gray-200">
+                      <div className="flex items-center">
+                        {job.logoUrl ? (
+                          <div className="mr-4 flex-shrink-0">
+                            <div className="relative h-16 w-16">
+                              <img
+                                src={job.logoUrl || "/placeholder.svg"}
+                                alt={`${job.businessName} logo`}
+                                className="h-full w-full object-contain"
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-800">{job.jobTitle}</h3>
+                          <p className="text-sm text-gray-600">{job.businessName}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Job Summary */}
+                    <div className="p-4">
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {job.payType === "hourly" && job.hourlyMin && (
+                          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                            ${job.hourlyMin}
+                            {job.hourlyMax ? ` - $${job.hourlyMax}` : ""}/hour
+                          </span>
+                        )}
+                        {job.payType === "salary" && job.salaryMin && (
+                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                            ${job.salaryMin}
+                            {job.salaryMax ? ` - $${job.salaryMax}` : ""}/year
+                          </span>
+                        )}
+                        {job.payType === "other" && job.otherPay && (
+                          <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                            {job.otherPay}
+                          </span>
+                        )}
+                        <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                          {job.workHours}
+                        </span>
+                      </div>
+
+                      <div className="mb-3 line-clamp-2">
+                        <p className="text-sm text-gray-700">{job.jobDescription}</p>
+                      </div>
+
+                      {/* Categories */}
+                      <div className="mt-3">
+                        <p className="text-xs text-gray-500 mb-1">Categories:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {job.categories.map((category, index) => (
+                            <span
+                              key={index}
+                              className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded"
+                            >
+                              {category}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Show Details Button */}
+                      <button
+                        className="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        onClick={() => window.open(`/job-listings/${job.id}`, "_blank")}
+                      >
+                        View Full Details
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No job listings available. Create job listings on the Job Listing Workbench page.</p>
+                <Button className="mt-4" onClick={() => (window.location.href = "/job-listing")}>
+                  Go to Job Listing Page
                 </Button>
               </div>
             )}

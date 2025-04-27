@@ -2,13 +2,16 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Check, X, Upload, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { saveJobListing } from "@/app/actions/job-actions"
+import { toast } from "@/components/ui/use-toast"
 
 export default function JobListingPage() {
   const [payType, setPayType] = useState<string | null>(null)
@@ -18,6 +21,13 @@ export default function JobListingPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  // Add state for confirmation dialog
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
+
+  const formRef = useRef<HTMLFormElement>(null)
+  const router = useRouter()
+
   const [formValues, setFormValues] = useState({
     jobTitle: "Marketing Specialist",
     jobDescription:
@@ -100,6 +110,96 @@ export default function JobListingPage() {
       ...prev,
       [id]: value,
     }))
+  }
+
+  // Update the handleSaveJobListing function to show confirmation dialog instead of redirecting
+  const handleSaveJobListing = async () => {
+    if (selectedCategories.length === 0) {
+      toast({
+        title: "Categories Required",
+        description: "Please select at least one job category before saving.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSaving(true)
+
+    try {
+      // Create FormData object
+      const formData = new FormData()
+
+      // Format benefits for storage
+      const formattedBenefits: Record<string, { enabled: boolean; details?: string }> = {}
+      Object.keys(benefits).forEach((key) => {
+        formattedBenefits[key] = {
+          enabled: benefits[key] || false,
+          details: benefitDetails[key],
+        }
+      })
+
+      // Prepare job data
+      const jobData = {
+        // Basic job details
+        jobTitle: formValues.jobTitle,
+        jobDescription: formValues.jobDescription,
+        qualifications: formValues.qualifications,
+        businessName: formValues.businessName,
+        businessDescription: formValues.businessDescription,
+        businessAddress: formValues.businessAddress,
+        workHours: formValues.workHours,
+        contactEmail: formValues.contactEmail,
+        contactName: formValues.contactName,
+
+        // Pay details
+        payType,
+        hourlyMin: paymentValues.hourlyMin,
+        hourlyMax: paymentValues.hourlyMax,
+        salaryMin: paymentValues.salaryMin,
+        salaryMax: paymentValues.salaryMax,
+        otherPay: paymentValues.otherPay,
+
+        // Categories
+        categories: selectedCategories,
+
+        // Benefits
+        benefits: formattedBenefits,
+      }
+
+      formData.append("jobData", JSON.stringify(jobData))
+
+      // Add logo file if available
+      if (logoFile) {
+        formData.append("logo", logoFile)
+      }
+
+      // For now, use a hardcoded business ID - in a real application,
+      // this would come from the authenticated user's session
+      const businessId = "demo-business"
+
+      // Call the server action
+      const result = await saveJobListing(formData, businessId)
+
+      if (result.success) {
+        // Show confirmation dialog instead of redirecting
+        setIsConfirmationOpen(true)
+      } else {
+        toast({
+          title: "Error Saving Job Listing",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving job listing:", error)
+      toast({
+        title: "Error Saving Job Listing",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   // Job categories data
@@ -245,7 +345,7 @@ export default function JobListingPage() {
                 </div>
               </div>
 
-              <form className="space-y-6">
+              <form className="space-y-6" ref={formRef}>
                 {/* Basic Job Fields */}
                 <div>
                   <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 mb-1">
@@ -1086,10 +1186,11 @@ export default function JobListingPage() {
                 <div className="flex justify-center">
                   <Button
                     type="button"
-                    disabled={selectedCategories.length === 0}
+                    disabled={selectedCategories.length === 0 || isSaving}
                     className={`px-6 py-3 ${selectedCategories.length === 0 ? "opacity-50" : ""}`}
+                    onClick={handleSaveJobListing}
                   >
-                    Save and Add to Ad-Box
+                    {isSaving ? "Saving..." : "Save and Add to Ad-Box"}
                   </Button>
                 </div>
               </div>
@@ -1222,6 +1323,22 @@ export default function JobListingPage() {
               Close Preview
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={isConfirmationOpen} onOpenChange={setIsConfirmationOpen}>
+        <DialogContent className="sm:max-w-md">
+          <div className="flex flex-col items-center justify-center p-6 text-center">
+            <div className="mb-5 rounded-full bg-green-100 p-3">
+              <Check className="h-8 w-8 text-green-600" />
+            </div>
+            <DialogTitle className="text-xl font-semibold mb-2">Your Job Listing has been added</DialogTitle>
+            <p className="text-gray-600 mb-6">Your job listing has been successfully saved and added to your Ad-Box.</p>
+            <Button onClick={() => setIsConfirmationOpen(false)} className="min-w-[100px]">
+              OK
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

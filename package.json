@@ -64,7 +64,8 @@
     "crypto": "latest",
     "fs": "latest",
     "path": "latest",
-    "@upstash/redis": "latest"
+    "@upstash/redis": "latest",
+    "@vercel/blob": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

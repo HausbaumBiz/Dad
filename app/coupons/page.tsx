@@ -281,11 +281,12 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
               </p>
             </div>
             <DialogFooter className="sm:justify-center">
-              <Button variant="default" onClick={navigateToAdDesign} className="bg-teal-600 hover:bg-teal-700">
-                Go to Ad Design
-              </Button>
-              <Button variant="outline" onClick={() => setShowSuccessDialog(false)}>
-                Continue Editing
+              <Button
+                variant="default"
+                onClick={() => setShowSuccessDialog(false)}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                OK
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -624,7 +625,7 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                   {coupons.length > 0 && (
                     <div className="mt-6 flex justify-center">
                       <Button variant="outline" onClick={handleSaveAllCoupons}>
-                        Save All Coupons
+                        Save and Refresh All Coupons
                       </Button>
                     </div>
                   )}
