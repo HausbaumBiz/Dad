@@ -1014,12 +1014,7 @@ export default function JobListingPage() {
                     <Eye className="mr-2 h-4 w-4" />
                     Preview Job Listing
                   </button>
-                  <button
-                    type="button"
-                    className="px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    Save
-                  </button>
+                  {/* Remove the save button */}
                 </div>
               </form>
             </div>
@@ -1094,7 +1089,7 @@ export default function JobListingPage() {
                     disabled={selectedCategories.length === 0}
                     className={`px-6 py-3 ${selectedCategories.length === 0 ? "opacity-50" : ""}`}
                   >
-                    Continue with Selected Categories
+                    Save and Add to Ad-Box
                   </Button>
                 </div>
               </div>
