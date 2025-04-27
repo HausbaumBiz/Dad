@@ -23,6 +23,8 @@ import { Loader2, PlusCircle, X, Edit, AlertCircle } from "lucide-react"
 import type { CategorySelection } from "@/components/category-selector"
 import { getBusinessCategories, removeBusinessCategory } from "@/app/actions/category-actions"
 import { useToast } from "@/components/ui/use-toast"
+import { getBusinessKeywords } from "@/app/actions/keyword-actions"
+import { Badge } from "@/components/ui/badge"
 
 export default function StatisticsPage() {
   const router = useRouter()
@@ -33,6 +35,8 @@ export default function StatisticsPage() {
   const [categoryToRemove, setCategoryToRemove] = useState<string | null>(null)
   const [showRemoveDialog, setShowRemoveDialog] = useState(false)
   const { toast } = useToast()
+  const [keywords, setKeywords] = useState<string[]>([])
+  const [isKeywordsLoading, setIsKeywordsLoading] = useState(true)
 
   // Load selected categories from server on component mount
   useEffect(() => {
@@ -79,6 +83,30 @@ export default function StatisticsPage() {
     }
 
     loadCategories()
+  }, [])
+
+  // Load keywords from server on component mount
+  useEffect(() => {
+    async function loadKeywords() {
+      setIsKeywordsLoading(true)
+      try {
+        const result = await getBusinessKeywords()
+        if (result.success && result.data) {
+          setKeywords(result.data)
+        }
+      } catch (error) {
+        console.error("Error loading keywords:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load your keywords",
+          variant: "destructive",
+        })
+      } finally {
+        setIsKeywordsLoading(false)
+      }
+    }
+
+    loadKeywords()
   }, [])
 
   // Group categories by main category
@@ -364,6 +392,49 @@ export default function StatisticsPage() {
                     <Button onClick={() => router.push("/business-focus")} className="flex items-center gap-2">
                       <PlusCircle className="h-4 w-4" />
                       Select Categories
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b flex flex-row items-center justify-between">
+                <CardTitle className="text-teal-700">Your Keywords</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/business-focus")}
+                  className="flex items-center gap-1"
+                >
+                  <Edit className="h-4 w-4" />
+                  <span className="hidden sm:inline">Manage Keywords</span>
+                  <span className="sm:hidden">Manage</span>
+                </Button>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {isKeywordsLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2">Loading your keywords...</span>
+                  </div>
+                ) : keywords.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {keywords.map((keyword, index) => (
+                      <Badge key={index} variant="secondary" className="px-3 py-1.5 text-sm">
+                        {keyword}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="flex justify-center mb-4">
+                      <AlertCircle className="h-12 w-12 text-amber-500" />
+                    </div>
+                    <p className="text-gray-500 mb-4">No keywords added yet.</p>
+                    <Button onClick={() => router.push("/business-focus")} className="flex items-center gap-2">
+                      <PlusCircle className="h-4 w-4" />
+                      Add Keywords
                     </Button>
                   </div>
                 )}

@@ -1,18 +1,20 @@
 "use client"
 
+import { useState, useEffect, useRef } from "react"
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Play, Pause } from "lucide-react"
+import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react"
+import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
+import { toast } from "@/components/ui/use-toast"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
-import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react"
 
 interface PhotoItem {
   id: string
@@ -21,6 +23,7 @@ interface PhotoItem {
 }
 
 export default function CustomizeAdDesignPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const designId = searchParams.get("design")
   const colorParam = searchParams.get("color") || "blue"
@@ -30,6 +33,13 @@ export default function CustomizeAdDesignPage() {
   // Add state for the dialogs
   const [isSavingsDialogOpen, setIsSavingsDialogOpen] = useState(false)
   const [isJobsDialogOpen, setIsJobsDialogOpen] = useState(false)
+
+  // Add state for saved coupons and loading state:
+  const [savedCoupons, setSavedCoupons] = useState<Coupon[]>([])
+  const [isCouponsLoading, setIsCouponsLoading] = useState(false)
+
+  // Add state for terms and conditions dialog
+  const [openDialogId, setOpenDialogId] = useState<string | null>(null)
 
   // Color mapping
   const colorMap: Record<string, { primary: string; secondary: string }> = {
@@ -459,6 +469,42 @@ export default function CustomizeAdDesignPage() {
       </button>
     </div>
   )
+
+  // Update the fetchSavedCoupons function to properly fetch coupons
+
+  const fetchSavedCoupons = async () => {
+    setIsCouponsLoading(true)
+    try {
+      // Get coupons using the getBusinessCoupons function
+      const result = await getBusinessCoupons()
+
+      if (result.success && result.coupons) {
+        setSavedCoupons(result.coupons)
+      } else if (result.error) {
+        console.error("Failed to fetch coupons:", result.error)
+        toast({
+          title: "Error",
+          description: "Failed to load coupons. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching coupons:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while loading coupons.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCouponsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isSavingsDialogOpen) {
+      fetchSavedCoupons()
+    }
+  }, [isSavingsDialogOpen])
 
   // Feature buttons component
   const FeatureButtons = () => (
@@ -2204,6 +2250,163 @@ export default function CustomizeAdDesignPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Savings Dialog */}
+      <Dialog open={isSavingsDialogOpen} onOpenChange={setIsSavingsDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Available Coupons</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {isCouponsLoading ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-blue-500 border-r-transparent border-b-blue-500 border-l-transparent"></div>
+                <p className="mt-2 text-gray-600">Loading coupons...</p>
+              </div>
+            ) : savedCoupons.length > 0 ? (
+              <div className="space-y-6">
+                {/* Small Coupons */}
+                {savedCoupons.filter((coupon) => coupon.size === "small").length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Small Coupons</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {savedCoupons
+                        .filter((coupon) => coupon.size === "small")
+                        .map((coupon) => (
+                          <div
+                            key={coupon.id}
+                            className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-4"
+                            ref={(el) => {
+                              if (el) couponRefs.current[coupon.id] = el
+                            }}
+                          >
+                            <div className="text-center mb-2">
+                              <h4 className="font-bold text-lg text-teal-700">{coupon.businessName}</h4>
+                            </div>
+
+                            <div className="text-center mb-3">
+                              <div className="font-bold text-xl">{coupon.title}</div>
+                              <div className="text-2xl font-extrabold text-red-600">{coupon.discount}</div>
+                            </div>
+
+                            <div className="text-sm mb-3">{coupon.description}</div>
+
+                            {coupon.code && (
+                              <div className="text-center mb-2">
+                                <span className="inline-block bg-gray-100 px-2 py-1 rounded font-mono text-sm">
+                                  Code: {coupon.code}
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="text-xs text-gray-600 mt-2">
+                              Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
+                            </div>
+
+                            <div className="text-xs text-gray-500 mt-1">
+                              <button
+                                className="text-teal-600 hover:underline"
+                                onClick={() => setOpenDialogId(coupon.id)}
+                              >
+                                Terms & Conditions
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Large Coupons */}
+                {savedCoupons.filter((coupon) => coupon.size === "large").length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Large Coupons</h3>
+                    <div className="space-y-4">
+                      {savedCoupons
+                        .filter((coupon) => coupon.size === "large")
+                        .map((coupon) => (
+                          <div
+                            key={coupon.id}
+                            className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-6"
+                            ref={(el) => {
+                              if (el) couponRefs.current[coupon.id] = el
+                            }}
+                          >
+                            <div className="flex flex-col md:flex-row md:items-center">
+                              <div className="md:w-1/3 text-center mb-4 md:mb-0">
+                                <h4 className="font-bold text-xl text-teal-700 mb-2">{coupon.businessName}</h4>
+                                <div className="text-3xl font-extrabold text-red-600">{coupon.discount}</div>
+                                <div className="font-bold text-xl mt-1">{coupon.title}</div>
+                              </div>
+
+                              <div className="md:w-2/3 md:pl-6 md:border-l border-gray-200">
+                                <div className="text-lg mb-3">{coupon.description}</div>
+
+                                {coupon.code && (
+                                  <div className="mb-3">
+                                    <span className="inline-block bg-gray-100 px-3 py-1 rounded font-mono">
+                                      Code: {coupon.code}
+                                    </span>
+                                  </div>
+                                )}
+
+                                <div className="text-sm text-gray-600 mt-4">
+                                  Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
+                                </div>
+
+                                <div className="text-sm text-gray-500 mt-1">
+                                  <button
+                                    className="text-teal-600 hover:underline"
+                                    onClick={() => setOpenDialogId(coupon.id)}
+                                  >
+                                    Terms & Conditions
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No coupons available. Create coupons on the Penny Saver Workbench page.</p>
+                <Button className="mt-4" onClick={() => (window.location.href = "/coupons")}>
+                  Go to Coupons Page
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Terms and Conditions Dialog */}
+      <Dialog open={openDialogId !== null} onOpenChange={() => setOpenDialogId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Terms and Conditions</DialogTitle>
+          </DialogHeader>
+          {savedCoupons
+            .filter((coupon) => coupon.id === openDialogId)
+            .map((coupon) => (
+              <div key={coupon.id} className="text-sm">
+                {coupon.terms ? <p>{coupon.terms}</p> : <p>No terms and conditions specified for this coupon.</p>}
+              </div>
+            ))}
+        </DialogContent>
+      </Dialog>
     </div>
   )
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
 }

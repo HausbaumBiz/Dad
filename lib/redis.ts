@@ -1,9 +1,11 @@
 import { Redis } from "@upstash/redis"
 
-const kv = new Redis({
+const redis = new Redis({
   url: process.env.KV_REST_API_URL || "",
   token: process.env.KV_REST_API_TOKEN || "",
 })
 
-export { kv as redis }
-export default kv
+// Export as both 'redis' and 'kv' to maintain compatibility
+export { redis }
+export { redis as kv }
+export default redis

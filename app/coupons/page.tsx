@@ -4,7 +4,7 @@ import { DialogTrigger } from "@/components/ui/dialog"
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,20 +17,9 @@ import { Trash2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-
-// Define the Coupon interface
-interface Coupon {
-  id: string
-  title: string
-  description: string
-  code: string
-  discount: string
-  startDate: string
-  expirationDate: string
-  size: "small" | "large"
-  businessName: string
-  terms: string
-}
+import { saveBusinessCoupons, getBusinessCoupons, type Coupon } from "@/app/actions/coupon-actions"
+import { getCurrentBusiness } from "@/app/actions/business-actions"
+import { toast } from "@/components/ui/use-toast"
 
 // Function to format terms with bold headings
 const formatTermsWithBoldHeadings = (terms: string) => {
@@ -63,6 +52,9 @@ const formatTermsWithBoldHeadings = (terms: string) => {
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [openDialogId, setOpenDialogId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [businessId, setBusinessId] = useState<string | null>(null)
+  const [businessName, setBusinessName] = useState<string>("")
 
   const [formData, setFormData] = useState<Omit<Coupon, "id">>({
     title: "",
@@ -117,6 +109,52 @@ Acceptance of Terms
 By using this coupon, you acknowledge that you have read, understood, and agree to be bound by these terms and conditions.`,
   })
 
+  useEffect(() => {
+    async function loadBusinessData() {
+      try {
+        const business = await getCurrentBusiness()
+        if (business) {
+          setBusinessId(business.id)
+          setBusinessName(business.businessName || "")
+          setFormData((prev) => ({ ...prev, businessName: business.businessName || "" }))
+        } else {
+          toast({
+            title: "Not logged in",
+            description: "Please log in as a business to manage coupons",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error loading business data:", error)
+      } finally {
+        loadCoupons()
+      }
+    }
+
+    loadBusinessData()
+  }, [])
+
+  async function loadCoupons() {
+    setLoading(true)
+    try {
+      const result = await getBusinessCoupons()
+      if (result.success && result.coupons) {
+        setCoupons(result.coupons)
+      } else if (result.error) {
+        console.error("Error loading coupons:", result.error)
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error loading coupons:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
@@ -156,6 +194,51 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
   const smallCoupons = coupons.filter((coupon) => coupon.size === "small")
   const largeCoupons = coupons.filter((coupon) => coupon.size === "large")
 
+  const handleSaveAllCoupons = async () => {
+    if (!businessId) {
+      toast({
+        title: "Error",
+        description: "No business ID found. Please log in again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const result = await saveBusinessCoupons(businessId, coupons)
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: (
+            <div>
+              <p>All coupons saved successfully!</p>
+              <p className="mt-2">
+                <a href="/ad-design/customize" className="text-blue-600 hover:underline">
+                  Go to Ad Design to see your coupons in action
+                </a>
+              </p>
+            </div>
+          ),
+          duration: 5000,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to save coupons",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving coupons:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
@@ -181,340 +264,348 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Coupon Creator Section */}
-          <div className="lg:col-span-5">
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                <CardTitle className="text-teal-700">Create New Coupon</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="businessName">Business Name</Label>
-                    <Input
-                      id="businessName"
-                      name="businessName"
-                      value={formData.businessName}
-                      onChange={handleChange}
-                      placeholder="Your Business Name"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Coupon Title</Label>
-                    <Input
-                      id="title"
-                      name="title"
-                      value={formData.title}
-                      onChange={handleChange}
-                      placeholder="e.g., Summer Special"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="discount">Discount Amount</Label>
-                    <Input
-                      id="discount"
-                      name="discount"
-                      value={formData.discount}
-                      onChange={handleChange}
-                      placeholder="e.g., 20% OFF, $10 OFF, etc."
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleChange}
-                      placeholder="Describe what the coupon is for"
-                      rows={3}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="code">Coupon Code (Optional)</Label>
-                    <Input
-                      id="code"
-                      name="code"
-                      value={formData.code}
-                      onChange={handleChange}
-                      placeholder="e.g., SUMMER2023"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="startDate">Start Date</Label>
-                      <Input
-                        id="startDate"
-                        name="startDate"
-                        type="date"
-                        value={formData.startDate}
-                        onChange={handleChange}
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="expirationDate">Expiration Date</Label>
-                      <Input
-                        id="expirationDate"
-                        name="expirationDate"
-                        type="date"
-                        value={formData.expirationDate}
-                        onChange={handleChange}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="terms">Terms & Conditions</Label>
-                    <div className="text-xs text-gray-500 mb-1">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <button type="button" className="text-teal-600 hover:underline">
-                            Preview formatted terms
-                          </button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>Terms & Conditions Preview</DialogTitle>
-                          </DialogHeader>
-                          <div
-                            className="text-sm whitespace-pre-wrap"
-                            dangerouslySetInnerHTML={{
-                              __html: formatTermsWithBoldHeadings(formData.terms),
-                            }}
-                          />
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                    <Textarea
-                      id="terms"
-                      name="terms"
-                      value={formData.terms}
-                      onChange={handleChange}
-                      placeholder="Terms and conditions for the coupon"
-                      rows={4}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Coupon Size</Label>
-                    <RadioGroup
-                      value={formData.size}
-                      onValueChange={(value) => handleSizeChange(value as "small" | "large")}
-                      className="flex space-x-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="small" id="small" />
-                        <Label htmlFor="small" className="cursor-pointer">
-                          Small
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="large" id="large" />
-                        <Label htmlFor="large" className="cursor-pointer">
-                          Large
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="pt-4">
-                    <Button type="submit" className="w-full">
-                      Create Coupon
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Coupon Creator Section */}
+            <div className="lg:col-span-5">
+              <Card>
+                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
+                  <CardTitle className="text-teal-700">Create New Coupon</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="businessName">Business Name</Label>
+                      <Input
+                        id="businessName"
+                        name="businessName"
+                        value={formData.businessName}
+                        onChange={handleChange}
+                        placeholder="Your Business Name"
+                        required
+                      />
+                    </div>
 
-          {/* Coupon Display Section */}
-          <div className="lg:col-span-7">
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                <CardTitle className="text-teal-700">Your Coupons</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {coupons.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No coupons created yet. Use the form to create your first coupon.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-8">
-                    {/* Small Coupons (2 per row) */}
-                    {smallCoupons.length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-medium mb-4">Small Coupons</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {smallCoupons.map((coupon) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Coupon Title</Label>
+                      <Input
+                        id="title"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleChange}
+                        placeholder="e.g., Summer Special"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="discount">Discount Amount</Label>
+                      <Input
+                        id="discount"
+                        name="discount"
+                        value={formData.discount}
+                        onChange={handleChange}
+                        placeholder="e.g., 20% OFF, $10 OFF, etc."
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        name="description"
+                        value={formData.description}
+                        onChange={handleChange}
+                        placeholder="Describe what the coupon is for"
+                        rows={3}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="code">Coupon Code (Optional)</Label>
+                      <Input
+                        id="code"
+                        name="code"
+                        value={formData.code}
+                        onChange={handleChange}
+                        placeholder="e.g., SUMMER2023"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="startDate">Start Date</Label>
+                        <Input
+                          id="startDate"
+                          name="startDate"
+                          type="date"
+                          value={formData.startDate}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="expirationDate">Expiration Date</Label>
+                        <Input
+                          id="expirationDate"
+                          name="expirationDate"
+                          type="date"
+                          value={formData.expirationDate}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="terms">Terms & Conditions</Label>
+                      <div className="text-xs text-gray-500 mb-1">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <button type="button" className="text-teal-600 hover:underline">
+                              Preview formatted terms
+                            </button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                              <DialogTitle>Terms & Conditions Preview</DialogTitle>
+                            </DialogHeader>
                             <div
-                              key={coupon.id}
-                              className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow"
-                            >
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="absolute top-2 right-2 h-8 w-8 text-gray-500 hover:text-red-500"
-                                onClick={() => deleteCoupon(coupon.id)}
+                              className="text-sm whitespace-pre-wrap"
+                              dangerouslySetInnerHTML={{
+                                __html: formatTermsWithBoldHeadings(formData.terms),
+                              }}
+                            />
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                      <Textarea
+                        id="terms"
+                        name="terms"
+                        value={formData.terms}
+                        onChange={handleChange}
+                        placeholder="Terms and conditions for the coupon"
+                        rows={4}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Coupon Size</Label>
+                      <RadioGroup
+                        value={formData.size}
+                        onValueChange={(value) => handleSizeChange(value as "small" | "large")}
+                        className="flex space-x-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="small" id="small" />
+                          <Label htmlFor="small" className="cursor-pointer">
+                            Small
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="large" id="large" />
+                          <Label htmlFor="large" className="cursor-pointer">
+                            Large
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+
+                    <div className="pt-4">
+                      <Button type="submit" className="w-full">
+                        Create Coupon
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Coupon Display Section */}
+            <div className="lg:col-span-7">
+              <Card>
+                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
+                  <CardTitle className="text-teal-700">Your Coupons</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {coupons.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No coupons created yet. Use the form to create your first coupon.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {/* Small Coupons (2 per row) */}
+                      {smallCoupons.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-medium mb-4">Small Coupons</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {smallCoupons.map((coupon) => (
+                              <div
+                                key={coupon.id}
+                                className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow"
                               >
-                                <Trash2 size={16} />
-                              </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="absolute top-2 right-2 h-8 w-8 text-gray-500 hover:text-red-500"
+                                  onClick={() => deleteCoupon(coupon.id)}
+                                >
+                                  <Trash2 size={16} />
+                                </Button>
 
-                              <div className="text-center mb-2">
-                                <h4 className="font-bold text-lg text-teal-700">{coupon.businessName}</h4>
-                              </div>
-
-                              <div className="text-center mb-3">
-                                <div className="font-bold text-xl">{coupon.title}</div>
-                                <div className="text-2xl font-extrabold text-red-600">{coupon.discount}</div>
-                              </div>
-
-                              <div className="text-sm mb-3">{coupon.description}</div>
-
-                              {coupon.code && (
                                 <div className="text-center mb-2">
-                                  <span className="inline-block bg-gray-100 px-2 py-1 rounded font-mono text-sm">
-                                    Code: {coupon.code}
-                                  </span>
+                                  <h4 className="font-bold text-lg text-teal-700">{coupon.businessName}</h4>
                                 </div>
-                              )}
 
-                              <div className="text-xs text-gray-600 mt-2">
-                                Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
+                                <div className="text-center mb-3">
+                                  <div className="font-bold text-xl">{coupon.title}</div>
+                                  <div className="text-2xl font-extrabold text-red-600">{coupon.discount}</div>
+                                </div>
+
+                                <div className="text-sm mb-3">{coupon.description}</div>
+
+                                {coupon.code && (
+                                  <div className="text-center mb-2">
+                                    <span className="inline-block bg-gray-100 px-2 py-1 rounded font-mono text-sm">
+                                      Code: {coupon.code}
+                                    </span>
+                                  </div>
+                                )}
+
+                                <div className="text-xs text-gray-600 mt-2">
+                                  Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
+                                </div>
+
+                                <div className="text-xs text-gray-500 mt-1">
+                                  <button
+                                    className="text-teal-600 hover:underline"
+                                    onClick={() => setOpenDialogId(coupon.id)}
+                                  >
+                                    Terms & Conditions
+                                  </button>
+
+                                  <Dialog
+                                    open={openDialogId === coupon.id}
+                                    onOpenChange={(open) => {
+                                      if (!open) setOpenDialogId(null)
+                                    }}
+                                  >
+                                    <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+                                      <DialogHeader>
+                                        <DialogTitle>Terms & Conditions</DialogTitle>
+                                      </DialogHeader>
+                                      <div
+                                        className="text-sm whitespace-pre-wrap"
+                                        dangerouslySetInnerHTML={{
+                                          __html: formatTermsWithBoldHeadings(coupon.terms),
+                                        }}
+                                      />
+                                    </DialogContent>
+                                  </Dialog>
+                                </div>
                               </div>
-
-                              <div className="text-xs text-gray-500 mt-1">
-                                <button
-                                  className="text-teal-600 hover:underline"
-                                  onClick={() => setOpenDialogId(coupon.id)}
-                                >
-                                  Terms & Conditions
-                                </button>
-
-                                <Dialog
-                                  open={openDialogId === coupon.id}
-                                  onOpenChange={(open) => {
-                                    if (!open) setOpenDialogId(null)
-                                  }}
-                                >
-                                  <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-                                    <DialogHeader>
-                                      <DialogTitle>Terms & Conditions</DialogTitle>
-                                    </DialogHeader>
-                                    <div
-                                      className="text-sm whitespace-pre-wrap"
-                                      dangerouslySetInnerHTML={{
-                                        __html: formatTermsWithBoldHeadings(coupon.terms),
-                                      }}
-                                    />
-                                  </DialogContent>
-                                </Dialog>
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Large Coupons (1 per row) */}
-                    {largeCoupons.length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-medium mb-4">Large Coupons</h3>
-                        <div className="space-y-4">
-                          {largeCoupons.map((coupon) => (
-                            <div
-                              key={coupon.id}
-                              className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 hover:shadow-md transition-shadow"
-                            >
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="absolute top-2 right-2 h-8 w-8 text-gray-500 hover:text-red-500"
-                                onClick={() => deleteCoupon(coupon.id)}
+                      {/* Large Coupons (1 per row) */}
+                      {largeCoupons.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-medium mb-4">Large Coupons</h3>
+                          <div className="space-y-4">
+                            {largeCoupons.map((coupon) => (
+                              <div
+                                key={coupon.id}
+                                className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 hover:shadow-md transition-shadow"
                               >
-                                <Trash2 size={16} />
-                              </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="absolute top-2 right-2 h-8 w-8 text-gray-500 hover:text-red-500"
+                                  onClick={() => deleteCoupon(coupon.id)}
+                                >
+                                  <Trash2 size={16} />
+                                </Button>
 
-                              <div className="flex flex-col md:flex-row md:items-center">
-                                <div className="md:w-1/3 text-center mb-4 md:mb-0">
-                                  <h4 className="font-bold text-xl text-teal-700 mb-2">{coupon.businessName}</h4>
-                                  <div className="text-3xl font-extrabold text-red-600">{coupon.discount}</div>
-                                  <div className="font-bold text-xl mt-1">{coupon.title}</div>
-                                </div>
-
-                                <div className="md:w-2/3 md:pl-6 md:border-l border-gray-200">
-                                  <div className="text-lg mb-3">{coupon.description}</div>
-
-                                  {coupon.code && (
-                                    <div className="mb-3">
-                                      <span className="inline-block bg-gray-100 px-3 py-1 rounded font-mono">
-                                        Code: {coupon.code}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  <div className="text-sm text-gray-600 mt-4">
-                                    Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
+                                <div className="flex flex-col md:flex-row md:items-center">
+                                  <div className="md:w-1/3 text-center mb-4 md:mb-0">
+                                    <h4 className="font-bold text-xl text-teal-700 mb-2">{coupon.businessName}</h4>
+                                    <div className="text-3xl font-extrabold text-red-600">{coupon.discount}</div>
+                                    <div className="font-bold text-xl mt-1">{coupon.title}</div>
                                   </div>
 
-                                  <div className="text-sm text-gray-500 mt-1">
-                                    <button
-                                      className="text-teal-600 hover:underline"
-                                      onClick={() => setOpenDialogId(coupon.id)}
-                                    >
-                                      Terms & Conditions
-                                    </button>
+                                  <div className="md:w-2/3 md:pl-6 md:border-l border-gray-200">
+                                    <div className="text-lg mb-3">{coupon.description}</div>
 
-                                    <Dialog
-                                      open={openDialogId === coupon.id}
-                                      onOpenChange={(open) => {
-                                        if (!open) setOpenDialogId(null)
-                                      }}
-                                    >
-                                      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-                                        <DialogHeader>
-                                          <DialogTitle>Terms & Conditions</DialogTitle>
-                                        </DialogHeader>
-                                        <div
-                                          className="text-sm whitespace-pre-wrap"
-                                          dangerouslySetInnerHTML={{
-                                            __html: formatTermsWithBoldHeadings(coupon.terms),
-                                          }}
-                                        />
-                                      </DialogContent>
-                                    </Dialog>
+                                    {coupon.code && (
+                                      <div className="mb-3">
+                                        <span className="inline-block bg-gray-100 px-3 py-1 rounded font-mono">
+                                          Code: {coupon.code}
+                                        </span>
+                                      </div>
+                                    )}
+
+                                    <div className="text-sm text-gray-600 mt-4">
+                                      Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
+                                    </div>
+
+                                    <div className="text-sm text-gray-500 mt-1">
+                                      <button
+                                        className="text-teal-600 hover:underline"
+                                        onClick={() => setOpenDialogId(coupon.id)}
+                                      >
+                                        Terms & Conditions
+                                      </button>
+
+                                      <Dialog
+                                        open={openDialogId === coupon.id}
+                                        onOpenChange={(open) => {
+                                          if (!open) setOpenDialogId(null)
+                                        }}
+                                      >
+                                        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+                                          <DialogHeader>
+                                            <DialogTitle>Terms & Conditions</DialogTitle>
+                                          </DialogHeader>
+                                          <div
+                                            className="text-sm whitespace-pre-wrap"
+                                            dangerouslySetInnerHTML={{
+                                              __html: formatTermsWithBoldHeadings(coupon.terms),
+                                            }}
+                                          />
+                                        </DialogContent>
+                                      </Dialog>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
 
-                {coupons.length > 0 && (
-                  <div className="mt-6 flex justify-center">
-                    <Button variant="outline">Print All Coupons</Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  {coupons.length > 0 && (
+                    <div className="mt-6 flex justify-center">
+                      <Button variant="outline" onClick={handleSaveAllCoupons}>
+                        Save All Coupons
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       <MainFooter />
