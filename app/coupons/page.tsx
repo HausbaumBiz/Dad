@@ -13,13 +13,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Trash2 } from "lucide-react"
+import { Trash2, CheckCircle } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { saveBusinessCoupons, getBusinessCoupons, type Coupon } from "@/app/actions/coupon-actions"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
 import { toast } from "@/components/ui/use-toast"
+import { useRouter } from "next/navigation"
 
 // Function to format terms with bold headings
 const formatTermsWithBoldHeadings = (terms: string) => {
@@ -50,11 +51,14 @@ const formatTermsWithBoldHeadings = (terms: string) => {
 }
 
 export default function CouponsPage() {
+  const router = useRouter()
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [openDialogId, setOpenDialogId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [businessId, setBusinessId] = useState<string | null>(null)
   const [businessName, setBusinessName] = useState<string>("")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [couponCount, setCouponCount] = useState(0)
 
   const [formData, setFormData] = useState<Omit<Coupon, "id">>({
     title: "",
@@ -208,20 +212,10 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
       const result = await saveBusinessCoupons(businessId, coupons)
 
       if (result.success) {
-        toast({
-          title: "Success",
-          description: (
-            <div>
-              <p>All coupons saved successfully!</p>
-              <p className="mt-2">
-                <a href="/ad-design/customize" className="text-blue-600 hover:underline">
-                  Go to Ad Design to see your coupons in action
-                </a>
-              </p>
-            </div>
-          ),
-          duration: 5000,
-        })
+        // Set the coupon count for the success message
+        setCouponCount(coupons.length)
+        // Show the success dialog
+        setShowSuccessDialog(true)
       } else {
         toast({
           title: "Error",
@@ -237,6 +231,10 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
         variant: "destructive",
       })
     }
+  }
+
+  const navigateToAdDesign = () => {
+    router.push("/ad-design/customize")
   }
 
   return (
@@ -263,6 +261,35 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
             Back to Workbench
           </Link>
         </div>
+
+        {/* Success Dialog */}
+        <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-teal-700">
+                <CheckCircle className="h-6 w-6 text-green-500" />
+                Coupons Saved Successfully!
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-center mb-2">
+                {couponCount} {couponCount === 1 ? "coupon has" : "coupons have"} been saved and added to the Savings
+                Button on your Ad-Box.
+              </p>
+              <p className="text-center text-sm text-gray-500">
+                Your customers will be able to view and use these coupons when they visit your business page.
+              </p>
+            </div>
+            <DialogFooter className="sm:justify-center">
+              <Button variant="default" onClick={navigateToAdDesign} className="bg-teal-600 hover:bg-teal-700">
+                Go to Ad Design
+              </Button>
+              <Button variant="outline" onClick={() => setShowSuccessDialog(false)}>
+                Continue Editing
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {loading ? (
           <div className="flex justify-center items-center py-12">
