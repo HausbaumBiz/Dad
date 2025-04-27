@@ -90,6 +90,10 @@ export default function AdDesignPage() {
   // Handle color selection and navigation to customize page
   const handleContinue = () => {
     if (selectedDesign) {
+      // Save the selected design and color to localStorage
+      localStorage.setItem("hausbaum_selected_design", selectedDesign.toString())
+      localStorage.setItem("hausbaum_selected_color", selectedColor)
+
       router.push(`/ad-design/customize?design=${selectedDesign}&color=${selectedColor}`)
     }
   }

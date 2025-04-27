@@ -1,3 +1,5 @@
+"use client"
+
 import Image from "next/image"
 import Link from "next/link"
 import { getCurrentBusiness, logoutBusiness } from "@/app/actions/business-actions"
@@ -118,6 +120,41 @@ interface WorkbenchButtonProps {
 }
 
 function WorkbenchButton({ href, iconSrc, label }: WorkbenchButtonProps) {
+  // Special handling for Ad Workbench button
+  if (href === "/ad-design") {
+    return (
+      <Link
+        href="/ad-design"
+        className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-all group"
+        onClick={(e) => {
+          // For Ad Workbench, check if we have a saved design
+          if (label === "Ad Workbench") {
+            const savedDesign = localStorage.getItem("hausbaum_selected_design")
+            const savedColor = localStorage.getItem("hausbaum_selected_color")
+
+            if (savedDesign) {
+              e.preventDefault()
+              // Redirect to customize page with the saved design and color
+              window.location.href = `/ad-design/customize?design=${savedDesign}&color=${savedColor || "blue"}`
+            }
+          }
+        }}
+      >
+        <div className="flex items-center justify-center w-16 h-16 mr-6 flex-shrink-0">
+          <Image
+            src={iconSrc || "/placeholder.svg"}
+            alt={label}
+            width={64}
+            height={64}
+            className="object-contain max-h-full"
+          />
+        </div>
+        <span className="text-xl font-medium text-gray-800 group-hover:text-primary transition-colors">{label}</span>
+      </Link>
+    )
+  }
+
+  // Default behavior for other buttons
   return (
     <Link
       href={href}

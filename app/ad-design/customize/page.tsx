@@ -17,6 +17,9 @@ import { toast } from "@/components/ui/use-toast"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 
+// Add imports for Link component if not already present
+import Link from "next/link"
+
 interface PhotoItem {
   id: string
   url: string
@@ -874,7 +877,7 @@ export default function CustomizeAdDesignPage() {
                 {/* Video Player - Positioned absolutely on larger screens (LEFT SIDE) */}
                 {!hiddenFields.video && (
                   <div
-                    className="hidden lg:block absolute top-1/2 left-4 transform -translate-y-1/2 w-[220px] h-[392px] bg-white rounded-lg border-2 shadow-lg overflow-hidden"
+                    className="hidden lg:block absolute top-[40%] left-4 transform -translate-y-1/2 w-[220px] h-[392px] bg-white rounded-lg border-2 shadow-lg overflow-hidden"
                     style={{ borderColor: colorValues.primary }}
                   >
                     <div className="relative w-full h-full">
@@ -933,7 +936,7 @@ export default function CustomizeAdDesignPage() {
 
                 {/* Custom video controls for desktop - positioned below video */}
                 {!hiddenFields.video && videoPreview && (
-                  <div className="hidden lg:block absolute left-4 top-[calc(50%+205px)] w-[220px]">
+                  <div className="hidden lg:block absolute left-4 top-[calc(40%+205px)] w-[220px]">
                     <VideoControls />
                   </div>
                 )}
@@ -1589,7 +1592,7 @@ export default function CustomizeAdDesignPage() {
               {/* Video Player - Positioned absolutely on larger screens */}
               {!hiddenFields.video && (
                 <div
-                  className="hidden lg:block absolute top-1/2 right-4 transform -translate-y-1/2 w-[220px] h-[392px] bg-white rounded-lg border-2 shadow-lg overflow-hidden"
+                  className="hidden lg:block absolute top-[40%] right-4 transform -translate-y-1/2 w-[220px] h-[392px] bg-white rounded-lg border-2 shadow-lg overflow-hidden"
                   style={{ borderColor: colorValues.primary }}
                 >
                   <div className="relative w-full h-full">
@@ -1648,7 +1651,7 @@ export default function CustomizeAdDesignPage() {
 
               {/* Custom video controls for desktop - positioned below video */}
               {!hiddenFields.video && videoPreview && (
-                <div className="hidden lg:block absolute right-4 top-[calc(50%+205px)] w-[220px]">
+                <div className="hidden lg:block absolute right-4 top-[calc(40%+205px)] w-[220px]">
                   <VideoControls />
                 </div>
               )}
@@ -1746,6 +1749,15 @@ export default function CustomizeAdDesignPage() {
             <p className="text-gray-600">
               Enter your business information and upload media files to complete your AdBox design.
             </p>
+            <div className="mt-4">
+              <Link
+                href="/ad-design"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                style={{ backgroundColor: colorValues.primary }}
+              >
+                Select Another Design
+              </Link>
+            </div>
           </div>
 
           {selectedDesign ? (
