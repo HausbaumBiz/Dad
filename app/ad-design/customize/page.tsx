@@ -184,6 +184,8 @@ export default function CustomizeAdDesignPage() {
   const [queuedPhotos, setQueuedPhotos] = useState<File[]>([])
   const [queuedPhotosPreviews, setQueuedPhotosPreviews] = useState<string[]>([])
   const [isMobile, setIsMobile] = useState(false)
+  const [queuedThumbnailFile, setQueuedThumbnailFile] = useState<File | null>(null)
+  const [queuedThumbnailPreview, setQueuedThumbnailPreview] = useState<string | null>(null)
 
   // Set the color based on URL parameter
   useEffect(() => {
@@ -373,18 +375,37 @@ export default function CustomizeAdDesignPage() {
   const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
-      setThumbnailFile(file)
-      setFormData((prev) => ({ ...prev, thumbnailFile: file }))
 
       // Create preview URL
       const reader = new FileReader()
       reader.onload = (event) => {
-        setThumbnailPreview(event.target?.result as string)
+        const previewUrl = event.target?.result as string
+
+        // For mobile, queue the thumbnail instead of immediate upload
+        if (isMobile) {
+          setQueuedThumbnailFile(file)
+          setQueuedThumbnailPreview(previewUrl)
+
+          // Reset the file input to allow selecting the same file again
+          if (thumbnailInputRef.current) {
+            thumbnailInputRef.current.value = ""
+          }
+
+          toast({
+            title: "Thumbnail queued",
+            description: "Thumbnail will be uploaded when you save",
+          })
+        } else {
+          // For desktop, keep the existing behavior
+          setThumbnailFile(file)
+          setThumbnailPreview(previewUrl)
+          setFormData((prev) => ({ ...prev, thumbnailFile: file }))
+
+          // Ensure thumbnail is shown
+          setShowThumbnail(true)
+        }
       }
       reader.readAsDataURL(file)
-
-      // Ensure thumbnail is shown
-      setShowThumbnail(true)
     }
   }
 
@@ -550,6 +571,11 @@ export default function CustomizeAdDesignPage() {
   const handleRemoveQueuedPhoto = (index: number) => {
     setQueuedPhotos((prev) => prev.filter((_, i) => i !== index))
     setQueuedPhotosPreviews((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleRemoveQueuedThumbnail = () => {
+    setQueuedThumbnailFile(null)
+    setQueuedThumbnailPreview(null)
   }
 
   const handleAddToPhotoAlbum = async () => {
@@ -787,6 +813,55 @@ export default function CustomizeAdDesignPage() {
           })
           setIsLoading(false)
           return
+        }
+      }
+
+      // Upload queued thumbnail if any (for mobile)
+      if (queuedThumbnailFile) {
+        try {
+          // Check file size before attempting upload
+          const fileSizeMB = queuedThumbnailFile.size / (1024 * 1024)
+          if (fileSizeMB > 10) {
+            // 10MB limit
+            toast({
+              title: "Error",
+              description: `Thumbnail file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 10MB.`,
+              variant: "destructive",
+            })
+          } else {
+            const thumbnailFormData = new FormData()
+            thumbnailFormData.append("businessId", businessId)
+            thumbnailFormData.append("thumbnail", queuedThumbnailFile)
+
+            const thumbnailResult = await uploadThumbnail(thumbnailFormData)
+
+            if (thumbnailResult.success) {
+              // Update the UI with the new thumbnail
+              setThumbnailPreview(thumbnailResult.url)
+
+              toast({
+                title: "Success",
+                description: "Thumbnail uploaded successfully!",
+              })
+            } else {
+              toast({
+                title: "Error",
+                description: thumbnailResult.error || "Failed to upload thumbnail. Please try again.",
+                variant: "destructive",
+              })
+            }
+          }
+        } catch (error: any) {
+          console.error("Error uploading queued thumbnail:", error)
+          toast({
+            title: "Error",
+            description: error.message || "Failed to upload thumbnail. Please try again.",
+            variant: "destructive",
+          })
+        } finally {
+          // Clear the queued thumbnail
+          setQueuedThumbnailFile(null)
+          setQueuedThumbnailPreview(null)
         }
       }
 
@@ -2377,6 +2452,27 @@ export default function CustomizeAdDesignPage() {
                           </div>
                         </div>
                       )}
+                      {isMobile && queuedThumbnailPreview && (
+                        <div className="mt-4">
+                          <div className="flex items-center mb-2">
+                            <p className="text-sm text-amber-600">Thumbnail queued for upload</p>
+                            <button
+                              type="button"
+                              onClick={handleRemoveQueuedThumbnail}
+                              className="ml-2 text-xs text-red-500 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <div className="relative h-40 bg-gray-100 rounded-lg overflow-hidden">
+                            <img
+                              src={queuedThumbnailPreview || "/placeholder.svg"}
+                              alt="Queued thumbnail preview"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {/* After the thumbnail file input: */}
                     <FileSizeWarning fileType="image" maxSize={5} />
@@ -2801,8 +2897,15 @@ export default function CustomizeAdDesignPage() {
                   >
                     {isLoading
                       ? "Saving..."
-                      : queuedPhotos.length > 0
-                        ? `Save and Upload ${queuedPhotos.length} Photo${queuedPhotos.length > 1 ? "s" : ""}`
+                      : queuedPhotos.length > 0 || queuedThumbnailFile
+                        ? `Save and Upload ${[
+                            queuedThumbnailFile ? "Thumbnail" : "",
+                            queuedPhotos.length > 0
+                              ? `${queuedPhotos.length} Photo${queuedPhotos.length > 1 ? "s" : ""}`
+                              : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" & ")}`
                         : "Save and Continue"}
                   </button>
                 </div>
