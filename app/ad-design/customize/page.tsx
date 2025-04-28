@@ -386,15 +386,24 @@ export default function CustomizeAdDesignPage() {
           setQueuedThumbnailFile(file)
           setQueuedThumbnailPreview(previewUrl)
 
+          // If there's a previous thumbnail, mark it for replacement
+          if (thumbnailPreview) {
+            // We don't actually remove it yet, just show the user it will be replaced
+            toast({
+              title: "Thumbnail queued",
+              description: "This will replace your current thumbnail when you save",
+            })
+          } else {
+            toast({
+              title: "Thumbnail queued",
+              description: "Thumbnail will be uploaded when you save",
+            })
+          }
+
           // Reset the file input to allow selecting the same file again
           if (thumbnailInputRef.current) {
             thumbnailInputRef.current.value = ""
           }
-
-          toast({
-            title: "Thumbnail queued",
-            description: "Thumbnail will be uploaded when you save",
-          })
         } else {
           // For desktop, keep the existing behavior
           setThumbnailFile(file)
@@ -829,6 +838,18 @@ export default function CustomizeAdDesignPage() {
               variant: "destructive",
             })
           } else {
+            // First, delete the existing thumbnail if there is one
+            try {
+              const existingMedia = await getBusinessMedia(businessId)
+              if (existingMedia?.thumbnailId) {
+                await del(existingMedia.thumbnailId)
+                // We don't need to update KV here as the new upload will overwrite the references
+              }
+            } catch (error) {
+              console.error("Error removing existing thumbnail:", error)
+              // Continue with upload even if deletion fails
+            }
+
             const thumbnailFormData = new FormData()
             thumbnailFormData.append("businessId", businessId)
             thumbnailFormData.append("thumbnail", queuedThumbnailFile)
@@ -838,6 +859,7 @@ export default function CustomizeAdDesignPage() {
             if (thumbnailResult.success) {
               // Update the UI with the new thumbnail
               setThumbnailPreview(thumbnailResult.url)
+              setThumbnailRemoved(false) // Reset the removed flag since we've added a new one
 
               toast({
                 title: "Success",
@@ -2455,7 +2477,9 @@ export default function CustomizeAdDesignPage() {
                       {isMobile && queuedThumbnailPreview && (
                         <div className="mt-4">
                           <div className="flex items-center mb-2">
-                            <p className="text-sm text-amber-600">Thumbnail queued for upload</p>
+                            <p className="text-sm text-amber-600">
+                              {thumbnailPreview ? "Will replace current thumbnail" : "Thumbnail queued for upload"}
+                            </p>
                             <button
                               type="button"
                               onClick={handleRemoveQueuedThumbnail}
