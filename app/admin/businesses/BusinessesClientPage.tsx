@@ -1,15 +1,27 @@
+"use client"
+
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { getBusinesses } from "@/app/actions/business-actions"
-import { CopyToClipboard } from "@/components/copy-to-clipboard"
+import { useState, useEffect } from "react"
 
-export const metadata = {
-  title: "Admin - Businesses",
-  description: "Manage businesses in the Hausbaum platform",
-}
+export default function BusinessesClientPage() {
+  const [businesses, setBusinesses] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-export default async function BusinessesPage() {
-  const businesses = await getBusinesses()
+  useEffect(() => {
+    const fetchBusinesses = async () => {
+      const data = await getBusinesses()
+      setBusinesses(data)
+      setLoading(false)
+    }
+
+    fetchBusinesses()
+  }, [])
+
+  if (loading) {
+    return <div className="container mx-auto py-8">Loading...</div>
+  }
 
   return (
     <div className="container mx-auto py-8">
@@ -63,10 +75,30 @@ export default async function BusinessesPage() {
                       </Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <span className="text-sm font-mono">{business.id}</span>
-                        <CopyToClipboard text={business.id} className="ml-2 text-gray-400 hover:text-gray-600" />
-                      </div>
+                      <span className="text-sm text-gray-500 font-mono">{business.id}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(business.id)
+                          // You could add a toast notification here
+                        }}
+                        className="ml-2 text-gray-400 hover:text-gray-600"
+                        title="Copy ID"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {business.firstName} {business.lastName}

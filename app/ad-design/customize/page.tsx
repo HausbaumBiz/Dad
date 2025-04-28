@@ -13,12 +13,25 @@ import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
+import {
+  getBusinessMedia,
+  uploadVideo,
+  uploadThumbnail,
+  uploadPhoto,
+  deletePhoto,
+  saveMediaSettings,
+  type MediaItem,
+} from "@/app/actions/media-actions"
+import { saveBusinessAdDesign } from "@/app/actions/business-actions"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 
 // Add imports for Link component if not already present
 import Link from "next/link"
+
+// First, add the import for the FileSizeWarning component
+import { FileSizeWarning } from "@/components/file-size-warning"
 
 interface PhotoItem {
   id: string
@@ -33,6 +46,8 @@ export default function CustomizeAdDesignPage() {
   const colorParam = searchParams.get("color") || "blue"
   const [selectedDesign, setSelectedDesign] = useState<number | null>(designId ? Number.parseInt(designId) : 6)
   const [selectedColor, setSelectedColor] = useState(colorParam)
+  const [businessId, setBusinessId] = useState<string>("")
+  const [isLoading, setIsLoading] = useState(true)
 
   // Add state for the dialogs
   const [isSavingsDialogOpen, setIsSavingsDialogOpen] = useState(false)
@@ -72,6 +87,8 @@ export default function CustomizeAdDesignPage() {
     hours: "Mon-Fri: 9AM-5PM\nSat: 10AM-3PM",
     website: "www.businessname.com",
     freeText: "We offer professional services with 10+ years of experience in the industry.",
+    videoFile: null,
+    thumbnailFile: null,
   })
 
   // Add state variables for field visibility
@@ -129,26 +146,6 @@ export default function CustomizeAdDesignPage() {
     },
   ]
 
-  // Remove or comment out the sample jobs data
-  // const sampleJobs = [
-  //   {
-  //     id: "1",
-  //     title: "Sales Associate",
-  //     description: "Looking for an energetic sales associate to join our team.",
-  //     requirements: "Previous retail experience preferred. Strong communication skills required.",
-  //     salary: "$15-18/hour",
-  //     location: "In-store",
-  //   },
-  //   {
-  //     id: "2",
-  //     title: "Marketing Specialist",
-  //     description: "Help us grow our brand with creative marketing campaigns.",
-  //     requirements: "Bachelor's degree in Marketing or related field. 2+ years experience.",
-  //     salary: "$45,000-55,000/year",
-  //     location: "Hybrid (Remote/Office)",
-  //   },
-  // ]
-
   // Photo album state
   const [photos, setPhotos] = useState<PhotoItem[]>([])
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
@@ -183,6 +180,104 @@ export default function CustomizeAdDesignPage() {
     }
   }, [colorParam])
 
+  // Fetch business ID and load saved data
+  useEffect(() => {
+    const fetchBusinessData = async () => {
+      try {
+        // In a real app, you would get this from the user session
+        // For now, we'll use a demo business ID
+        const id = "demo-business"
+        setBusinessId(id)
+
+        // Load saved media
+        await loadSavedMedia(id)
+
+        // Load business data
+        await loadBusinessData(id)
+
+        setIsLoading(false)
+      } catch (error) {
+        console.error("Error loading business data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load your business data. Please try again.",
+          variant: "destructive",
+        })
+        setIsLoading(false)
+      }
+    }
+
+    fetchBusinessData()
+  }, [])
+
+  // Load saved media for the business
+  const loadSavedMedia = async (id: string) => {
+    try {
+      const media = await getBusinessMedia(id)
+
+      if (media) {
+        // Set video if available
+        if (media.videoUrl) {
+          setVideoPreview(media.videoUrl)
+        }
+
+        // Set thumbnail if available
+        if (media.thumbnailUrl) {
+          setThumbnailPreview(media.thumbnailUrl)
+        }
+
+        // Set photo album if available
+        if (media.photoAlbum && Array.isArray(media.photoAlbum) && media.photoAlbum.length > 0) {
+          const loadedPhotos = media.photoAlbum.map((photo: MediaItem) => ({
+            id: photo.id,
+            url: photo.url,
+            name: photo.filename || "Unnamed photo",
+          }))
+          setPhotos(loadedPhotos)
+        } else {
+          // Initialize with empty array if no photos or invalid data
+          setPhotos([])
+        }
+      }
+    } catch (error) {
+      console.error("Error loading saved media:", error)
+      // Initialize with empty values on error
+      setVideoPreview(null)
+      setThumbnailPreview(null)
+      setPhotos([])
+
+      toast({
+        title: "Warning",
+        description: "There was an issue loading your saved media. Starting with empty state.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Load business data
+  const loadBusinessData = async (id: string) => {
+    try {
+      // In a real app, you would fetch the business data from your API
+      // For now, we'll use mock data
+
+      // You could fetch business details here
+      // const businessDetails = await getBusinessDetails(id)
+
+      // For now, we'll just set some default values if none are loaded
+      setFormData((prev) => ({
+        ...prev,
+        businessName: "Your Business Name", // Replace with actual data
+        address: "Your Business Address", // Replace with actual data
+        phone: "Your Business Phone", // Replace with actual data
+        hours: "Your Business Hours", // Replace with actual data
+        website: "Your Business Website", // Replace with actual data
+        freeText: "Your Business Description", // Replace with actual data
+      }))
+    } catch (error) {
+      console.error("Error loading business data:", error)
+    }
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({
@@ -209,6 +304,7 @@ export default function CustomizeAdDesignPage() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
       setVideoFile(file)
+      setFormData((prev) => ({ ...prev, videoFile: file }))
 
       // Create preview URL
       const url = URL.createObjectURL(file)
@@ -224,6 +320,7 @@ export default function CustomizeAdDesignPage() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
       setThumbnailFile(file)
+      setFormData((prev) => ({ ...prev, thumbnailFile: file }))
 
       // Create preview URL
       const reader = new FileReader()
@@ -395,38 +492,92 @@ export default function CustomizeAdDesignPage() {
     }
   }, [videoRef.current, verticalVideoRef.current, mobileVideoRef.current])
 
-  const handleAddToPhotoAlbum = () => {
-    if (imageFile && imagePreview) {
-      const newPhoto: PhotoItem = {
-        id: Date.now().toString(),
-        url: imagePreview,
-        name: imageFile.name,
+  const handleAddToPhotoAlbum = async () => {
+    if (imageFile && imagePreview && businessId) {
+      try {
+        // Create FormData for upload
+        const formData = new FormData()
+        formData.append("businessId", businessId)
+        formData.append("photo", imageFile)
+
+        // Upload the photo
+        const result = await uploadPhoto(formData)
+
+        if (result.success && result.photo) {
+          // Add the new photo to the album
+          const newPhoto: PhotoItem = {
+            id: result.photo.id,
+            url: result.photo.url,
+            name: result.photo.filename,
+          }
+
+          setPhotos((prev) => [...prev, newPhoto])
+
+          // Reset the current upload
+          setImageFile(null)
+          setImagePreview(null)
+
+          // Reset the file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = ""
+          }
+
+          toast({
+            title: "Success",
+            description: "Photo added to album successfully!",
+          })
+        } else {
+          toast({
+            title: "Error",
+            description: result.error || "Failed to upload photo. Please try again.",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error uploading photo:", error)
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        })
       }
-
-      setPhotos((prev) => [...prev, newPhoto])
-
-      // Reset the current upload
-      setImageFile(null)
-      setImagePreview(null)
-
-      // Reset the file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ""
-      }
-
-      // Show success message
-      alert("Photo added to album successfully!")
     }
   }
 
-  const handleRemovePhoto = (id: string) => {
-    setPhotos((prev) => prev.filter((photo) => photo.id !== id))
+  const handleRemovePhoto = async (id: string) => {
+    if (!businessId) return
 
-    // If we're removing the current photo and it's the last one, adjust the index
-    if (photos.length > 0) {
-      if (currentPhotoIndex >= photos.length - 1) {
-        setCurrentPhotoIndex(Math.max(0, photos.length - 2))
+    try {
+      const result = await deletePhoto(businessId, id)
+
+      if (result.success) {
+        setPhotos((prev) => prev.filter((photo) => photo.id !== id))
+
+        // If we're removing the current photo and it's the last one, adjust the index
+        if (photos.length > 0) {
+          if (currentPhotoIndex >= photos.length - 1) {
+            setCurrentPhotoIndex(Math.max(0, photos.length - 2))
+          }
+        }
+
+        toast({
+          title: "Success",
+          description: "Photo removed from album.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to remove photo. Please try again.",
+          variant: "destructive",
+        })
       }
+    } catch (error) {
+      console.error("Error removing photo:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -450,10 +601,128 @@ export default function CustomizeAdDesignPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real implementation, this would save the data and proceed to the next step
-    alert("Ad design customized! Your information has been saved.")
+
+    if (!businessId) {
+      toast({
+        title: "Error",
+        description: "Business ID is missing. Please try again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+
+      // Upload video if selected
+      // Upload video if selected
+      const videoUrl = null
+      const thumbnailUrl = null
+
+      // Upload video if selected
+      if (formData.videoFile) {
+        try {
+          // Check file size before attempting upload
+          const fileSizeMB = formData.videoFile.size / (1024 * 1024)
+          if (fileSizeMB > 100) {
+            // 100MB limit
+            toast({
+              title: "Error",
+              description: `Video file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 100MB.`,
+              variant: "destructive",
+            })
+            setIsLoading(false)
+            return
+          }
+
+          const videoFormData = new FormData()
+          videoFormData.append("businessId", businessId)
+          videoFormData.append("video", formData.videoFile)
+          videoFormData.append("designId", selectedDesign?.toString() || "1")
+
+          const videoResult = await uploadVideo(videoFormData)
+
+          if (!videoResult.success) {
+            throw new Error(videoResult.error || "Failed to upload video")
+          }
+        } catch (error: any) {
+          console.error("Error uploading video:", error)
+          toast({
+            title: "Error",
+            description: error.message || "Failed to upload video. Please try a smaller file or different format.",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // Upload thumbnail if selected
+      if (formData.thumbnailFile) {
+        try {
+          // Check file size before attempting upload
+          const fileSizeMB = formData.thumbnailFile.size / (1024 * 1024)
+          if (fileSizeMB > 10) {
+            // 10MB limit
+            toast({
+              title: "Error",
+              description: `Thumbnail file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 10MB.`,
+              variant: "destructive",
+            })
+            setIsLoading(false)
+            return
+          }
+
+          const thumbnailFormData = new FormData()
+          thumbnailFormData.append("businessId", businessId)
+          thumbnailFormData.append("thumbnail", formData.thumbnailFile)
+
+          const thumbnailResult = await uploadThumbnail(thumbnailFormData)
+
+          if (!thumbnailResult.success) {
+            throw new Error(thumbnailResult.error || "Failed to upload thumbnail")
+          }
+        } catch (error: any) {
+          console.error("Error uploading thumbnail:", error)
+          toast({
+            title: "Error",
+            description: error.message || "Failed to upload thumbnail. Please try a smaller file or different format.",
+            variant: "destructive",
+          })
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // Save hidden fields settings
+      await saveMediaSettings(businessId, { hiddenFields })
+
+      // Save business ad design data
+      await saveBusinessAdDesign(businessId, {
+        designId: selectedDesign,
+        colorScheme: selectedColor,
+        businessInfo: formData,
+      })
+
+      toast({
+        title: "Success",
+        description: "Your ad design has been saved successfully!",
+      })
+
+      // Redirect to the workbench or another page
+      // router.push("/workbench")
+    } catch (error) {
+      console.error("Error saving ad design:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save your ad design. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Custom video control buttons component
@@ -1832,7 +2101,12 @@ export default function CustomizeAdDesignPage() {
                           Video uploaded: {videoFile.name} ({Math.round(videoFile.size / 1024)} KB)
                         </p>
                       )}
+                      {videoPreview && !videoFile && (
+                        <p className="mt-2 text-sm text-blue-600">Using previously saved video</p>
+                      )}
                     </div>
+                    {/* After the video file input: */}
+                    <FileSizeWarning fileType="video" maxSize={50} />
                   </div>
                 </Card>
 
@@ -1911,7 +2185,21 @@ export default function CustomizeAdDesignPage() {
                           )}
                         </div>
                       )}
+                      {thumbnailPreview && !thumbnailFile && (
+                        <div className="mt-4">
+                          <p className="text-sm text-blue-600 mb-2">Using previously saved thumbnail</p>
+                          <div className="relative h-40 bg-gray-100 rounded-lg overflow-hidden">
+                            <img
+                              src={thumbnailPreview || "/placeholder.svg"}
+                              alt="Thumbnail preview"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
+                    {/* After the thumbnail file input: */}
+                    <FileSizeWarning fileType="image" maxSize={5} />
                   </div>
                 </Card>
 
@@ -2220,8 +2508,9 @@ export default function CustomizeAdDesignPage() {
                     type="submit"
                     className="px-8 py-2 bg-blue-600 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     style={{ backgroundColor: colorValues.primary }}
+                    disabled={isLoading}
                   >
-                    Save and Continue
+                    {isLoading ? "Saving..." : "Save and Continue"}
                   </button>
                 </div>
               </form>

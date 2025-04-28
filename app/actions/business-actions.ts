@@ -2,7 +2,8 @@
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { kv } from "@vercel/kv"
+import { kv } from "@/lib/redis"
+import { revalidatePath } from "next/cache"
 import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
@@ -257,6 +258,53 @@ export async function getBusinessById(id: string) {
     return business ? { ...business, id } : null
   } catch (error) {
     console.error(`Error fetching business with ID ${id}:`, error)
+    return null
+  }
+}
+
+// Add this function to save the business ad design
+export async function saveBusinessAdDesign(businessId: string, designData: any) {
+  try {
+    if (!businessId) {
+      return { success: false, error: "Missing business ID" }
+    }
+
+    // Store design data in KV
+    await kv.hset(`business:${businessId}:adDesign`, {
+      ...designData,
+      updatedAt: new Date().toISOString(),
+    })
+
+    revalidatePath(`/ad-design/customize`)
+    revalidatePath(`/workbench`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error saving business ad design:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to save ad design",
+    }
+  }
+}
+
+// Add this function to get the business ad design
+export async function getBusinessAdDesign(businessId: string) {
+  try {
+    if (!businessId) {
+      return null
+    }
+
+    // Get the design data from KV
+    const designData = await kv.hgetall(`business:${businessId}:adDesign`)
+
+    if (!designData) {
+      return null
+    }
+
+    return designData
+  } catch (error) {
+    console.error("Error getting business ad design:", error)
     return null
   }
 }

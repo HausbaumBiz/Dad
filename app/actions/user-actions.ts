@@ -91,7 +91,7 @@ export async function loginUser(formData: FormData) {
 }
 
 // Check if user is logged in
-export async function getLoggedInUser() {
+export async function getUserSession() {
   const userId = cookies().get("userId")?.value
 
   if (!userId) {
@@ -100,7 +100,7 @@ export async function getLoggedInUser() {
 
   // Get user from database
   const user = await getUserById(userId)
-  return user
+  return { user }
 }
 
 // Logout user

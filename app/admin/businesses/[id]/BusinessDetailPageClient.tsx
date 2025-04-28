@@ -1,21 +1,10 @@
-import { notFound } from "next/navigation"
+"use client"
+
 import Link from "next/link"
-import { getBusinessById } from "@/app/actions/business-actions"
 import { formatDistanceToNow } from "date-fns"
-import { CopyToClipboard } from "@/components/copy-to-clipboard"
+import type { Business } from "@/app/lib/definitions"
 
-export const metadata = {
-  title: "Business Details",
-  description: "View and manage business details",
-}
-
-export default async function BusinessDetailPage({ params }: { params: { id: string } }) {
-  const business = await getBusinessById(params.id)
-
-  if (!business) {
-    notFound()
-  }
-
+export default function BusinessDetailPageClient({ business }: { business: Business }) {
   return (
     <div className="container mx-auto py-8">
       <div className="flex items-center mb-6">
@@ -39,7 +28,29 @@ export default async function BusinessDetailPage({ params }: { params: { id: str
                   <p className="text-sm text-gray-500">Business ID</p>
                   <div className="flex items-center">
                     <p className="font-mono bg-gray-100 px-2 py-1 rounded">{business.id}</p>
-                    <CopyToClipboard text={business.id} className="ml-2 text-gray-400 hover:text-gray-600" />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(business.id)
+                        // You could add a toast notification here
+                      }}
+                      className="ml-2 text-gray-400 hover:text-gray-600"
+                      title="Copy ID"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </button>
                   </div>
                 </div>
                 <div>
