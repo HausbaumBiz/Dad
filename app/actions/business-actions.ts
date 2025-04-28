@@ -21,6 +21,25 @@ export type Business = {
   phone?: string
 }
 
+// Media types
+export type MediaItem = {
+  id: string
+  url: string
+  filename: string
+  contentType: string
+  size: number
+  createdAt: string
+}
+
+export type BusinessMedia = {
+  videoUrl?: string
+  videoContentType?: string
+  videoId?: string
+  thumbnailUrl?: string
+  thumbnailId?: string
+  photoAlbum: MediaItem[]
+}
+
 // Register a new business
 export async function registerBusiness(formData: FormData) {
   try {
@@ -391,5 +410,78 @@ export async function updateBusinessPassword(businessId: string, currentPassword
       success: false,
       message: "Failed to update password. Please try again.",
     }
+  }
+}
+
+// Get business media
+export async function getBusinessMedia(businessId: string): Promise<BusinessMedia | null> {
+  try {
+    if (!businessId) {
+      return null
+    }
+
+    // Get the media data from KV
+    const mediaData = await kv.hgetall(`business:${businessId}:media`)
+
+    if (!mediaData) {
+      return { photoAlbum: [] }
+    }
+
+    // Parse the photo album if it exists
+    let photoAlbum: MediaItem[] = []
+    if (mediaData.photoAlbum) {
+      try {
+        photoAlbum = JSON.parse(mediaData.photoAlbum as string)
+      } catch (e) {
+        console.error("Error parsing photo album:", e)
+      }
+    }
+
+    return {
+      videoUrl: mediaData.videoUrl as string,
+      videoContentType: mediaData.videoContentType as string,
+      videoId: mediaData.videoId as string,
+      thumbnailUrl: mediaData.thumbnailUrl as string,
+      thumbnailId: mediaData.thumbnailId as string,
+      photoAlbum,
+    }
+  } catch (error) {
+    console.error("Error getting business media:", error)
+    return null
+  }
+}
+
+export async function uploadVideo(formData: FormData) {
+  return {
+    success: false,
+    message: "uploadVideo function not implemented",
+  }
+}
+
+export async function uploadThumbnail(formData: FormData) {
+  return {
+    success: false,
+    message: "uploadThumbnail function not implemented",
+  }
+}
+
+export async function uploadPhoto(formData: FormData) {
+  return {
+    success: false,
+    message: "uploadPhoto function not implemented",
+  }
+}
+
+export async function deletePhoto(businessId: string, photoId: string) {
+  return {
+    success: false,
+    message: "deletePhoto function not implemented",
+  }
+}
+
+export async function saveMediaSettings(businessId: string, settings: any) {
+  return {
+    success: false,
+    message: "saveMediaSettings function not implemented",
   }
 }

@@ -21,8 +21,8 @@ import {
   saveMediaSettings,
   type MediaItem,
   uploadPhoto,
-} from "@/app/actions/media-actions"
-import { saveBusinessAdDesign } from "@/app/actions/business-actions"
+  saveBusinessAdDesign,
+} from "@/app/actions/business-actions"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -242,17 +242,26 @@ export default function CustomizeAdDesignPage() {
   // Load saved media for the business
   const loadSavedMedia = async (id: string) => {
     try {
+      console.log("Loading saved media for business:", id)
       const media = await getBusinessMedia(id)
 
       if (media) {
         // Set video if available
         if (media.videoUrl) {
+          console.log("Setting video preview:", media.videoUrl)
           setVideoPreview(media.videoUrl)
         }
 
         // Set thumbnail if available
         if (media.thumbnailUrl) {
-          setThumbnailPreview(media.thumbnailUrl)
+          console.log("Setting thumbnail preview:", media.thumbnailUrl)
+          // Add a cache-busting parameter to prevent browser caching
+          const cacheBuster = `?t=${Date.now()}`
+          setThumbnailPreview(`${media.thumbnailUrl}${cacheBuster}`)
+          setShowThumbnail(true) // Ensure thumbnail is shown
+        } else {
+          console.log("No thumbnail URL found")
+          setThumbnailPreview(null)
         }
 
         // Set photo album if available
@@ -388,10 +397,10 @@ export default function CustomizeAdDesignPage() {
 
           // If there's a previous thumbnail, mark it for replacement
           if (thumbnailPreview) {
-            // We don't actually remove it yet, just show the user it will be replaced
             toast({
               title: "Thumbnail queued",
               description: "This will replace your current thumbnail when you save",
+              variant: "info",
             })
           } else {
             toast({
@@ -839,11 +848,23 @@ export default function CustomizeAdDesignPage() {
             })
           } else {
             // First, delete the existing thumbnail if there is one
+            let existingThumbnailDeleted = false
             try {
               const existingMedia = await getBusinessMedia(businessId)
               if (existingMedia?.thumbnailId) {
+                console.log("Deleting existing thumbnail:", existingMedia.thumbnailId)
                 await del(existingMedia.thumbnailId)
-                // We don't need to update KV here as the new upload will overwrite the references
+                // Clear the existing thumbnail references in KV
+                await kv.hset(`business:${businessId}:media`, {
+                  thumbnailUrl: null,
+                  thumbnailId: null,
+                  thumbnailWidth: null,
+                  thumbnailHeight: null,
+                  thumbnailOriginalSize: null,
+                  thumbnailCompressionSavings: null,
+                })
+                existingThumbnailDeleted = true
+                console.log("Existing thumbnail deleted successfully")
               }
             } catch (error) {
               console.error("Error removing existing thumbnail:", error)
@@ -854,16 +875,24 @@ export default function CustomizeAdDesignPage() {
             thumbnailFormData.append("businessId", businessId)
             thumbnailFormData.append("thumbnail", queuedThumbnailFile)
 
+            console.log("Uploading new thumbnail...")
             const thumbnailResult = await uploadThumbnail(thumbnailFormData)
 
             if (thumbnailResult.success) {
               // Update the UI with the new thumbnail
+              console.log("New thumbnail uploaded successfully:", thumbnailResult.url)
               setThumbnailPreview(thumbnailResult.url)
+              setShowThumbnail(true) // Ensure thumbnail is shown
               setThumbnailRemoved(false) // Reset the removed flag since we've added a new one
+
+              // Force reload the media to ensure we have the latest data
+              await loadSavedMedia(businessId)
 
               toast({
                 title: "Success",
-                description: "Thumbnail uploaded successfully!",
+                description: existingThumbnailDeleted
+                  ? "Thumbnail replaced successfully!"
+                  : "Thumbnail uploaded successfully!",
               })
             } else {
               toast({
@@ -1294,6 +1323,7 @@ export default function CustomizeAdDesignPage() {
                       {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                         <div className="absolute inset-0 z-20">
                           <img
+                            key={`thumbnail-${thumbnailPreview}`}
                             src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
                             alt="Video thumbnail"
                             className="w-full h-full object-cover"
@@ -1384,6 +1414,7 @@ export default function CustomizeAdDesignPage() {
                       {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                         <div className="absolute inset-0 z-20">
                           <img
+                            key={`thumbnail-${thumbnailPreview}`}
                             src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
                             alt="Video thumbnail"
                             className="w-full h-full object-cover"
@@ -1617,6 +1648,7 @@ export default function CustomizeAdDesignPage() {
                         {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                           <div className="absolute inset-0 z-20">
                             <img
+                              key={`thumbnail-${thumbnailPreview}`}
                               src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
                               alt="Video thumbnail"
                               className="w-full h-full object-cover"
@@ -1702,6 +1734,7 @@ export default function CustomizeAdDesignPage() {
                       {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                         <div className="absolute inset-0 z-20">
                           <img
+                            key={`thumbnail-${thumbnailPreview}`}
                             src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
                             alt="Video thumbnail"
                             className="w-full h-full object-cover"
@@ -2099,6 +2132,7 @@ export default function CustomizeAdDesignPage() {
                     {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                       <div className="absolute inset-0 z-20">
                         <img
+                          key={`thumbnail-${thumbnailPreview}`}
                           src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
                           alt="Video thumbnail"
                           className="w-full h-full object-cover"
@@ -2177,6 +2211,7 @@ export default function CustomizeAdDesignPage() {
                         {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                           <div className="absolute inset-0 z-20">
                             <img
+                              key={`thumbnail-${thumbnailPreview}`}
                               src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
                               alt="Video thumbnail"
                               className="w-full h-full object-cover"
