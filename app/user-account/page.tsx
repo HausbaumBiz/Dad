@@ -20,8 +20,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, CheckCircle, CreditCard, Key, Trash2, User } from "lucide-react"
-import { getCurrentBusiness } from "@/app/actions/business-actions"
+import { AlertCircle, CheckCircle, CreditCard, Key, Trash2, User, Loader2 } from "lucide-react"
+import { getCurrentBusiness, updateBusinessPassword } from "@/app/actions/business-actions"
 
 // Business type definition (simplified version from business-actions.ts)
 type Business = {
@@ -49,6 +49,8 @@ export default function UserAccountPage() {
     newPassword: "",
     confirmPassword: "",
   })
+  const [passwordLoading, setPasswordLoading] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   // State for delete account dialog
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -96,29 +98,59 @@ export default function UserAccountPage() {
       ...prev,
       [name]: value,
     }))
+    // Clear any previous error when user starts typing
+    if (passwordError) {
+      setPasswordError(null)
+    }
   }
 
   // Handle password form submission
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Reset states
+    setPasswordError(null)
+    setShowPasswordSuccess(false)
+
     // Validate passwords
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert("New passwords don't match!")
+      setPasswordError("New passwords don't match!")
       return
     }
 
-    // In a real app, this would call an API to update the password
-    console.log("Password updated:", passwordForm)
+    if (!businessData?.id) {
+      setPasswordError("Business ID not found. Please try logging in again.")
+      return
+    }
 
-    // Reset form and show success message
-    setPasswordForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    })
+    try {
+      setPasswordLoading(true)
 
-    setShowPasswordSuccess(true)
-    setTimeout(() => setShowPasswordSuccess(false), 3000)
+      // Call the server action to update the password
+      const result = await updateBusinessPassword(
+        businessData.id,
+        passwordForm.currentPassword,
+        passwordForm.newPassword,
+      )
+
+      if (result.success) {
+        // Reset form and show success message
+        setPasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        })
+        setShowPasswordSuccess(true)
+        setTimeout(() => setShowPasswordSuccess(false), 5000)
+      } else {
+        setPasswordError(result.message || "Failed to update password")
+      }
+    } catch (err) {
+      console.error("Error updating password:", err)
+      setPasswordError("An unexpected error occurred. Please try again.")
+    } finally {
+      setPasswordLoading(false)
+    }
   }
 
   // Handle upgrade to Gold plan
@@ -382,6 +414,13 @@ export default function UserAccountPage() {
                         </div>
                       )}
 
+                      {passwordError && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded flex items-center gap-2 mb-4">
+                          <AlertCircle className="h-5 w-5" />
+                          <span>{passwordError}</span>
+                        </div>
+                      )}
+
                       <form onSubmit={handlePasswordSubmit} className="space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="currentPassword">Current Password</Label>
@@ -419,9 +458,18 @@ export default function UserAccountPage() {
                           />
                         </div>
 
-                        <Button type="submit" className="w-full">
-                          <Key className="mr-2 h-4 w-4" />
-                          Update Password
+                        <Button type="submit" className="w-full" disabled={passwordLoading}>
+                          {passwordLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <Key className="mr-2 h-4 w-4" />
+                              Update Password
+                            </>
+                          )}
                         </Button>
                       </form>
                     </div>

@@ -2424,6 +2424,77 @@ export default function CustomizeAdDesignPage() {
                   </div>
                 </Card>
 
+                {/* Color Selection Section */}
+                <Card>
+                  <div className="p-6 space-y-6">
+                    <h2 className="text-xl font-semibold">Color Theme</h2>
+                    <div className="space-y-4">
+                      <p className="text-sm text-gray-600">
+                        Choose a color theme for your AdBox. This will affect headers, buttons, and accents.
+                      </p>
+
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                        {Object.entries(colorMap).map(([colorKey, colorValue]) => (
+                          <button
+                            key={colorKey}
+                            type="button"
+                            className={`relative p-1 rounded-md transition-all ${
+                              selectedColor === colorKey ? "ring-2 ring-offset-2" : "hover:opacity-80"
+                            }`}
+                            style={{
+                              backgroundColor: colorValue.primary,
+                              ringColor: colorValue.primary,
+                            }}
+                            onClick={() => setSelectedColor(colorKey)}
+                            aria-label={`Select ${colorKey} theme`}
+                          >
+                            <div className="h-12 w-full rounded flex items-center justify-center">
+                              <span className="capitalize text-white font-medium text-sm shadow-sm">{colorKey}</span>
+                            </div>
+                            {selectedColor === colorKey && (
+                              <div className="absolute -top-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  style={{ color: colorValue.primary }}
+                                >
+                                  <path d="M20 6L9 17l-5-5" />
+                                </svg>
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                        <p className="text-sm text-gray-600">
+                          Selected theme: <span className="font-medium capitalize">{selectedColor}</span>
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <div
+                            className="w-6 h-6 rounded-full"
+                            style={{ backgroundColor: colorValues.primary }}
+                            title="Primary color"
+                          ></div>
+                          <div
+                            className="w-6 h-6 rounded-full"
+                            style={{ backgroundColor: colorValues.secondary }}
+                            title="Secondary color"
+                          ></div>
+                          <span className="text-xs text-gray-500">Primary and secondary colors</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
                 {/* Free Text Section */}
                 <Card>
                   <div className="p-6 space-y-6">

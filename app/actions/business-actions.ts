@@ -346,3 +346,50 @@ export async function deleteBusiness(id: string) {
     }
   }
 }
+
+// Update business password
+export async function updateBusinessPassword(businessId: string, currentPassword: string, newPassword: string) {
+  try {
+    // Validate inputs
+    if (!businessId || !currentPassword || !newPassword) {
+      return { success: false, message: "Missing required information" }
+    }
+
+    // Get the business
+    const business = await getBusinessById(businessId)
+    if (!business) {
+      return { success: false, message: "Business not found" }
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, business.passwordHash)
+    if (!isPasswordValid) {
+      return { success: false, message: "Current password is incorrect" }
+    }
+
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10)
+    const newPasswordHash = await bcrypt.hash(newPassword, salt)
+
+    // Update the business with the new password hash
+    const updatedBusiness = {
+      ...business,
+      passwordHash: newPasswordHash,
+      updatedAt: new Date().toISOString(),
+    }
+
+    // Save the updated business
+    await kv.set(`business:${businessId}`, updatedBusiness)
+
+    return {
+      success: true,
+      message: "Password updated successfully",
+    }
+  } catch (error) {
+    console.error("Error updating business password:", error)
+    return {
+      success: false,
+      message: "Failed to update password. Please try again.",
+    }
+  }
+}
