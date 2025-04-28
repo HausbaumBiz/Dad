@@ -82,9 +82,13 @@ export default function AdDesignPage() {
   ]
 
   // Handle design selection
-  const handleDesignSelect = (designId: number) => {
-    setSelectedDesign(designId)
-    setIsColorModalOpen(true)
+  const handleDesignSelect = (designId: number, color = "blue") => {
+    // Save to localStorage for client-side persistence
+    localStorage.setItem("hausbaum_selected_design", designId.toString())
+    localStorage.setItem("hausbaum_selected_color", color)
+
+    // Redirect to customize page
+    router.push(`/ad-design/customize?design=${designId}&color=${color}`)
   }
 
   // Handle color selection and navigation to customize page

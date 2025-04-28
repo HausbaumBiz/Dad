@@ -17,10 +17,10 @@ import {
   getBusinessMedia,
   uploadVideo,
   uploadThumbnail,
-  uploadPhoto,
   deletePhoto,
   saveMediaSettings,
   type MediaItem,
+  uploadPhoto,
 } from "@/app/actions/media-actions"
 import { saveBusinessAdDesign } from "@/app/actions/business-actions"
 
@@ -32,6 +32,9 @@ import Link from "next/link"
 
 // First, add the import for the FileSizeWarning component
 import { FileSizeWarning } from "@/components/file-size-warning"
+
+import { del } from "@vercel/blob"
+import { kv } from "@vercel/kv"
 
 interface PhotoItem {
   id: string
@@ -172,6 +175,10 @@ export default function CustomizeAdDesignPage() {
 
   // Refs for coupons
   const couponRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
+
+  // Add these state variables after the other state declarations
+  const [videoRemoved, setVideoRemoved] = useState(false)
+  const [thumbnailRemoved, setThumbnailRemoved] = useState(false)
 
   // Set the color based on URL parameter
   useEffect(() => {
@@ -616,7 +623,41 @@ export default function CustomizeAdDesignPage() {
     try {
       setIsLoading(true)
 
-      // Upload video if selected
+      // Handle video removal if requested
+      if (videoRemoved) {
+        try {
+          const existingMedia = await getBusinessMedia(businessId)
+          if (existingMedia?.videoId) {
+            await del(existingMedia.videoId)
+            // Update KV to remove video references
+            await kv.hset(`business:${businessId}:media`, {
+              videoUrl: null,
+              videoContentType: null,
+              videoId: null,
+            })
+          }
+        } catch (error) {
+          console.error("Error removing video:", error)
+        }
+      }
+
+      // Handle thumbnail removal if requested
+      if (thumbnailRemoved) {
+        try {
+          const existingMedia = await getBusinessMedia(businessId)
+          if (existingMedia?.thumbnailId) {
+            await del(existingMedia.thumbnailId)
+            // Update KV to remove thumbnail references
+            await kv.hset(`business:${businessId}:media`, {
+              thumbnailUrl: null,
+              thumbnailId: null,
+            })
+          }
+        } catch (error) {
+          console.error("Error removing thumbnail:", error)
+        }
+      }
+
       // Upload video if selected
       const videoUrl = null
       const thumbnailUrl = null
@@ -705,6 +746,12 @@ export default function CustomizeAdDesignPage() {
         colorScheme: selectedColor,
         businessInfo: formData,
       })
+
+      // Save to localStorage for client-side persistence
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hausbaum_selected_design", selectedDesign?.toString() || "")
+        localStorage.setItem("hausbaum_selected_color", selectedColor)
+      }
 
       toast({
         title: "Success",
@@ -2094,6 +2141,11 @@ export default function CustomizeAdDesignPage() {
                               ? "Landscape format (16:9) recommended for this design"
                               : "Portrait format (9:16) recommended for this design"}
                           </span>
+                          {videoPreview && (
+                            <span className="text-xs text-amber-600 mt-1 font-medium">
+                              Note: Uploading a new video will replace your current video
+                            </span>
+                          )}
                         </label>
                       </div>
                       {videoFile && (
@@ -2102,7 +2154,26 @@ export default function CustomizeAdDesignPage() {
                         </p>
                       )}
                       {videoPreview && !videoFile && (
-                        <p className="mt-2 text-sm text-blue-600">Using previously saved video</p>
+                        <div className="mt-2 flex items-center">
+                          <p className="text-sm text-blue-600">Using previously saved video</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVideoPreview(null)
+                              setVideoFile(null)
+                              setIsPlaying(false)
+                              setShowThumbnail(true)
+                              setVideoRemoved(true)
+                              toast({
+                                title: "Video removed",
+                                description: "Your video has been removed. Save to confirm changes.",
+                              })
+                            }}
+                            className="ml-2 text-xs text-red-500 hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       )}
                     </div>
                     {/* After the video file input: */}
@@ -2167,6 +2238,11 @@ export default function CustomizeAdDesignPage() {
                             This image will be shown before the video plays and after it ends. Use the controls below
                             the video to play/pause.
                           </span>
+                          {thumbnailPreview && (
+                            <span className="text-xs text-amber-600 mt-1 font-medium">
+                              Note: Uploading a new thumbnail will replace your current thumbnail
+                            </span>
+                          )}
                         </label>
                       </div>
                       {thumbnailFile && (
@@ -2187,7 +2263,25 @@ export default function CustomizeAdDesignPage() {
                       )}
                       {thumbnailPreview && !thumbnailFile && (
                         <div className="mt-4">
-                          <p className="text-sm text-blue-600 mb-2">Using previously saved thumbnail</p>
+                          <div className="flex items-center mb-2">
+                            <p className="text-sm text-blue-600">Using previously saved thumbnail</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setThumbnailPreview(null)
+                                setThumbnailFile(null)
+                                setShowThumbnail(false)
+                                setThumbnailRemoved(true)
+                                toast({
+                                  title: "Thumbnail removed",
+                                  description: "Your thumbnail has been removed. Save to confirm changes.",
+                                })
+                              }}
+                              className="ml-2 text-xs text-red-500 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          </div>
                           <div className="relative h-40 bg-gray-100 rounded-lg overflow-hidden">
                             <img
                               src={thumbnailPreview || "/placeholder.svg"}
