@@ -21,8 +21,8 @@ import {
   saveMediaSettings,
   type MediaItem,
   uploadPhoto,
-} from "@/app/actions/media-actions"
-import { saveBusinessAdDesign } from "@/app/actions/business-actions"
+  saveBusinessAdDesign,
+} from "@/app/actions/business-actions"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -623,7 +623,8 @@ export default function CustomizeAdDesignPage() {
     try {
       setIsLoading(true)
 
-      // Handle video removal if requested
+      // 1. Handle media (video, thumbnail, photo album)
+      // Video removal if requested
       if (videoRemoved) {
         try {
           const existingMedia = await getBusinessMedia(businessId)
@@ -641,7 +642,7 @@ export default function CustomizeAdDesignPage() {
         }
       }
 
-      // Handle thumbnail removal if requested
+      // Thumbnail removal if requested
       if (thumbnailRemoved) {
         try {
           const existingMedia = await getBusinessMedia(businessId)
@@ -657,10 +658,6 @@ export default function CustomizeAdDesignPage() {
           console.error("Error removing thumbnail:", error)
         }
       }
-
-      // Upload video if selected
-      const videoUrl = null
-      const thumbnailUrl = null
 
       // Upload video if selected
       if (formData.videoFile) {
@@ -737,17 +734,37 @@ export default function CustomizeAdDesignPage() {
         }
       }
 
-      // Save hidden fields settings
+      // 2. Save hidden fields settings
       await saveMediaSettings(businessId, { hiddenFields })
 
-      // Save business ad design data
-      await saveBusinessAdDesign(businessId, {
+      // 3. Save business ad design data
+      // Get current media data to include in the design
+      const mediaData = await getBusinessMedia(businessId)
+
+      // Create a comprehensive design object that includes all necessary data
+      const designData = {
         designId: selectedDesign,
         colorScheme: selectedColor,
         businessInfo: formData,
-      })
+        hiddenFields,
+        media: {
+          videoUrl: mediaData?.videoUrl || null,
+          videoId: mediaData?.videoId || null,
+          thumbnailUrl: mediaData?.thumbnailUrl || null,
+          thumbnailId: mediaData?.thumbnailId || null,
+          photoAlbum: mediaData?.photoAlbum || [],
+        },
+        updatedAt: new Date().toISOString(),
+      }
 
-      // Save to localStorage for client-side persistence
+      // Save the complete design data
+      const saveResult = await saveBusinessAdDesign(businessId, designData)
+
+      if (!saveResult.success) {
+        throw new Error(saveResult.error || "Failed to save design data")
+      }
+
+      // 4. Save to localStorage for client-side persistence
       if (typeof window !== "undefined") {
         localStorage.setItem("hausbaum_selected_design", selectedDesign?.toString() || "")
         localStorage.setItem("hausbaum_selected_color", selectedColor)
@@ -758,7 +775,7 @@ export default function CustomizeAdDesignPage() {
         description: "Your ad design has been saved successfully!",
       })
 
-      // Redirect to the workbench or another page
+      // Optional: Redirect to the workbench or another page
       // router.push("/workbench")
     } catch (error) {
       console.error("Error saving ad design:", error)

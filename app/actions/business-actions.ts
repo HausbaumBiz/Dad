@@ -21,6 +21,25 @@ export type Business = {
   phone?: string
 }
 
+// Media type definitions
+export type MediaItem = {
+  id: string
+  url: string
+  filename: string
+  contentType: string
+  size: number
+  createdAt: string
+}
+
+export type BusinessMedia = {
+  videoUrl?: string
+  videoContentType?: string
+  videoId?: string
+  thumbnailUrl?: string
+  thumbnailId?: string
+  photoAlbum: MediaItem[]
+}
+
 // Register a new business
 export async function registerBusiness(formData: FormData) {
   try {
@@ -413,5 +432,161 @@ export async function updateBusinessPassword(businessId: string, currentPassword
       success: false,
       message: "Failed to update password. Please try again.",
     }
+  }
+}
+
+// Media functions
+export async function getBusinessMedia(businessId: string): Promise<BusinessMedia | null> {
+  try {
+    if (!businessId) {
+      return null
+    }
+
+    // Get the media data from KV
+    const mediaData = await kv.hgetall(`business:${businessId}:media`)
+
+    if (!mediaData) {
+      return { photoAlbum: [] }
+    }
+
+    // Parse the photo album JSON
+    let photoAlbum: MediaItem[] = []
+    if (mediaData.photoAlbum) {
+      try {
+        photoAlbum = JSON.parse(mediaData.photoAlbum as string)
+      } catch (error) {
+        console.error("Error parsing photo album:", error)
+        photoAlbum = []
+      }
+    }
+
+    // Construct the business media object
+    const businessMedia: BusinessMedia = {
+      videoUrl: mediaData.videoUrl as string,
+      videoContentType: mediaData.videoContentType as string,
+      videoId: mediaData.videoId as string,
+      thumbnailUrl: mediaData.thumbnailUrl as string,
+      thumbnailId: mediaData.thumbnailId as string,
+      photoAlbum,
+    }
+
+    return businessMedia
+  } catch (error) {
+    console.error("Error getting business media:", error)
+    return { photoAlbum: [] }
+  }
+}
+
+export async function uploadVideo(
+  formData: FormData,
+): Promise<{ success: boolean; error?: string; url?: string; contentType?: string; size?: number; id?: string }> {
+  return { success: false, error: "Upload video is not implemented yet" }
+}
+
+export async function uploadThumbnail(formData: FormData): Promise<{
+  success: boolean
+  error?: string
+  url?: string
+  contentType?: string
+  size?: number
+  originalSize?: number
+  compressionSavings?: number
+  width?: number
+  height?: number
+  id?: string
+}> {
+  return { success: false, error: "Upload thumbnail is not implemented yet" }
+}
+
+export async function uploadPhoto(
+  formData: FormData,
+): Promise<{ success: boolean; error?: string; photo?: any; photoAlbum?: any[] }> {
+  return { success: false, error: "Upload photo is not implemented yet" }
+}
+
+export async function deletePhoto(
+  businessId: string,
+  photoId: string,
+): Promise<{ success: boolean; error?: string; photoAlbum?: any[] }> {
+  return { success: false, error: "Delete photo is not implemented yet" }
+}
+
+export async function getMediaSettings(businessId: string) {
+  try {
+    if (!businessId) {
+      return null
+    }
+
+    // Get the media data from KV
+    const mediaData = await kv.hgetall(`business:${businessId}:media`)
+
+    if (!mediaData || !mediaData.settings) {
+      return null
+    }
+
+    // Parse the settings JSON
+    try {
+      // Check if settings is already an object (not a string)
+      if (typeof mediaData.settings === "object" && mediaData.settings !== null) {
+        // If it's already an object, use it directly
+        return mediaData.settings
+      } else if (typeof mediaData.settings === "string") {
+        // Normal case - parse the JSON string
+        return JSON.parse(mediaData.settings as string)
+      }
+      return null
+    } catch (error) {
+      console.error("Error parsing media settings:", error)
+      return null
+    }
+  } catch (error) {
+    console.error("Error getting media settings:", error)
+    return null
+  }
+}
+
+export async function saveMediaSettings(businessId: string, settings: any) {
+  try {
+    if (!businessId) {
+      return { success: false, error: "Missing business ID" }
+    }
+
+    // Store settings in KV - ENSURE we stringify the settings object
+    await kv.hset(`business:${businessId}:media`, {
+      settings: JSON.stringify(settings),
+    })
+
+    revalidatePath(`/ad-design/customize`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error saving media settings:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to save media settings",
+    }
+  }
+}
+
+// Add this function to ensure we can get the complete media data in one call
+export async function getCompleteBusinessMedia(businessId: string) {
+  try {
+    if (!businessId) {
+      return null
+    }
+
+    // Get the media data
+    const mediaData = await getBusinessMedia(businessId)
+
+    // Get the settings
+    const settings = await getMediaSettings(businessId)
+
+    return {
+      ...mediaData,
+      settings,
+    }
+  } catch (error) {
+    console.error("Error getting complete business media:", error)
+    return { photoAlbum: [], settings: null }
   }
 }

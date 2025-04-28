@@ -821,3 +821,31 @@ export async function getMediaSettings(businessId: string) {
     return null
   }
 }
+
+// Add this function to ensure we can get the complete media data in one call
+// Add this near the end of the file, before the last closing brace
+
+/**
+ * Get complete business media data including settings
+ */
+export async function getCompleteBusinessMedia(businessId: string) {
+  try {
+    if (!businessId) {
+      return null
+    }
+
+    // Get the media data
+    const mediaData = await getBusinessMedia(businessId)
+
+    // Get the settings
+    const settings = await getMediaSettings(businessId)
+
+    return {
+      ...mediaData,
+      settings,
+    }
+  } catch (error) {
+    console.error("Error getting complete business media:", error)
+    return { photoAlbum: [], settings: null }
+  }
+}
