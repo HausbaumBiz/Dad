@@ -1,21 +1,56 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { getCurrentBusiness, logoutBusiness } from "@/app/actions/business-actions"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { LogOut, User } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 
-// Update the WorkbenchPage component to handle errors gracefully
-export default async function WorkbenchPage() {
-  // Get the current business user with error handling
-  let business
-  try {
-    business = await getCurrentBusiness()
-  } catch (error) {
-    console.error("Failed to get business data:", error)
-    // Continue without business data
+export default function WorkbenchPage() {
+  const [business, setBusiness] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    async function fetchBusinessData() {
+      try {
+        setLoading(true)
+        const businessData = await getCurrentBusiness()
+
+        if (!businessData) {
+          // If no business data is found, redirect to login
+          router.push("/business-login")
+          return
+        }
+
+        setBusiness(businessData)
+      } catch (err) {
+        console.error("Failed to get business data:", err)
+        setError("Failed to load business data. Please try logging in again.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBusinessData()
+  }, [router])
+
+  // If there's an error, show an error message with a login link
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Error Loading Workbench</h2>
+          <p className="mb-6 text-gray-700">{error}</p>
+          <Button onClick={() => router.push("/business-login")}>Return to Login</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -44,11 +79,13 @@ export default async function WorkbenchPage() {
             Home Page
           </Link>
 
-          {business && (
+          {loading ? (
+            <Skeleton className="h-10 w-40" />
+          ) : business ? (
             <div className="flex items-center">
               <BusinessUserMenu businessName={business.businessName} />
             </div>
-          )}
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -68,43 +105,51 @@ export default async function WorkbenchPage() {
             <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-100">
               <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">Workbenches</h2>
 
-              <div className="space-y-4">
-                <WorkbenchButton
-                  href="/business-focus"
-                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/business-cards-icon-X09H698yJZQiK1Ve9bMp9fK3NmIZBt.png"
-                  label="Your Business Focus"
-                />
+              {loading ? (
+                <div className="space-y-4">
+                  {[...Array(6)].map((_, i) => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <WorkbenchButton
+                    href="/business-focus"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/business-cards-icon-X09H698yJZQiK1Ve9bMp9fK3NmIZBt.png"
+                    label="Your Business Focus"
+                  />
 
-                <WorkbenchButton
-                  href="/ad-design"
-                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/ad-workbench-icon-scOKMCrsO5iu98jnDvZGHdJrb0TNeJ.png"
-                  label="Ad Workbench"
-                />
+                  <WorkbenchButton
+                    href="/ad-design"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/ad-workbench-icon-scOKMCrsO5iu98jnDvZGHdJrb0TNeJ.png"
+                    label="Ad Workbench"
+                  />
 
-                <WorkbenchButton
-                  href="/coupons"
-                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png"
-                  label="Penny Saver Workbench"
-                />
+                  <WorkbenchButton
+                    href="/coupons"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png"
+                    label="Penny Saver Workbench"
+                  />
 
-                <WorkbenchButton
-                  href="/job-listing"
-                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/jobs-icon-NE5EpebSE0Zp2qBCfvaAKSpMiNJZ9n.png"
-                  label="Create A Job Listing"
-                />
+                  <WorkbenchButton
+                    href="/job-listing"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/jobs-icon-NE5EpebSE0Zp2qBCfvaAKSpMiNJZ9n.png"
+                    label="Create A Job Listing"
+                  />
 
-                <WorkbenchButton
-                  href="/statistics"
-                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/stats002-gW6ZaTQQkxNHACfsxA0LoZMnih5oax.png"
-                  label="Statistics Dashboard"
-                />
+                  <WorkbenchButton
+                    href="/statistics"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/stats002-gW6ZaTQQkxNHACfsxA0LoZMnih5oax.png"
+                    label="Statistics Dashboard"
+                  />
 
-                <WorkbenchButton
-                  href="/user-account"
-                  iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/user-account-icon%20sm-PZ61Ko9nsGv5oeESUWjM2pDekdeewQ.png"
-                  label="User Account"
-                />
-              </div>
+                  <WorkbenchButton
+                    href="/user-account"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/user-account-icon%20sm-PZ61Ko9nsGv5oeESUWjM2pDekdeewQ.png"
+                    label="User Account"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -176,6 +221,19 @@ function WorkbenchButton({ href, iconSrc, label }: WorkbenchButtonProps) {
 
 // Business user menu component
 function BusinessUserMenu({ businessName }: { businessName: string }) {
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      await logoutBusiness()
+      router.push("/")
+    } catch (error) {
+      console.error("Logout failed:", error)
+      // Force redirect even if the server action fails
+      router.push("/")
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -185,14 +243,12 @@ function BusinessUserMenu({ businessName }: { businessName: string }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <form action={logoutBusiness}>
-          <DropdownMenuItem asChild>
-            <button className="w-full flex items-center text-red-600 cursor-pointer">
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Sign Out</span>
-            </button>
-          </DropdownMenuItem>
-        </form>
+        <DropdownMenuItem asChild>
+          <button className="w-full flex items-center text-red-600 cursor-pointer" onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Sign Out</span>
+          </button>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

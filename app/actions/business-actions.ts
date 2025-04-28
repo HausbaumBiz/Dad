@@ -1,7 +1,6 @@
 "use server"
 
 import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
 import { kv } from "@/lib/redis"
 import { revalidatePath } from "next/cache"
 import bcrypt from "bcryptjs"
@@ -177,36 +176,37 @@ export async function getCurrentBusiness() {
     }
 
     const businessId = cookies().get("businessId")?.value
-    if (!businessId) return null
-
-    const business = (await kv.get(`business:${businessId}`)) as Business
-    if (!business) {
-      cookies().delete("businessId")
+    if (!businessId) {
+      console.log("No businessId cookie found")
       return null
     }
 
-    return business
+    console.log(`Fetching business with ID: ${businessId}`)
+    const business = await kv.get(`business:${businessId}`)
+
+    if (!business) {
+      console.log(`No business found with ID: ${businessId}`)
+      // Don't delete the cookie here, let the client handle redirection
+      return null
+    }
+
+    return business as Business
   } catch (error) {
     console.error("Error getting current business:", error)
-    // Return mock data in case of error
-    return {
-      id: "mock-id",
-      firstName: "Demo",
-      lastName: "User",
-      businessName: "Demo Business",
-      zipCode: "12345",
-      email: "demo@example.com",
-      isEmailVerified: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
+    // In case of error, return null instead of mock data to trigger proper error handling
+    return null
   }
 }
 
 // Logout the current business
 export async function logoutBusiness() {
-  cookies().delete("businessId")
-  redirect("/")
+  try {
+    cookies().delete("businessId")
+    return { success: true }
+  } catch (error) {
+    console.error("Error during logout:", error)
+    return { success: false, error: "Failed to logout" }
+  }
 }
 
 // Check if a business email exists
