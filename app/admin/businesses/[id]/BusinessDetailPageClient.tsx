@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import type { Business } from "@/app/lib/definitions"
+import DeleteBusinessButton from "./delete-business-button"
 
 export default function BusinessDetailPageClient({ business }: { business: Business }) {
   return (
@@ -106,17 +107,12 @@ export default function BusinessDetailPageClient({ business }: { business: Busin
           <div className="mt-8 pt-6 border-t border-gray-200">
             <h2 className="text-xl font-semibold mb-4">Actions</h2>
             <div className="flex flex-wrap gap-3">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                Edit Business
-              </button>
               {!business.isEmailVerified && (
                 <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
                   Verify Email
                 </button>
               )}
-              <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
-                Delete Business
-              </button>
+              <DeleteBusinessButton id={business.id} businessName={business.businessName} />
             </div>
           </div>
         </div>

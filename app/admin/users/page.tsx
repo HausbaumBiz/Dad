@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
+import { DeleteUserButton } from "./delete-user-button"
 
 export default async function AdminUsersPage() {
   const users = await getAllUsers()
@@ -20,7 +21,7 @@ export default async function AdminUsersPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Registered Users</CardTitle>
         </CardHeader>
         <CardContent>
@@ -35,6 +36,7 @@ export default async function AdminUsersPage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Zip Code</TableHead>
                   <TableHead>Registration Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -45,6 +47,13 @@ export default async function AdminUsersPage() {
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.zipCode}</TableCell>
                     <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <DeleteUserButton
+                        userId={user.id}
+                        email={user.email}
+                        userName={`${user.firstName} ${user.lastName}`}
+                      />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

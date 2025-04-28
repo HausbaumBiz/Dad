@@ -308,3 +308,41 @@ export async function getBusinessAdDesign(businessId: string) {
     return null
   }
 }
+
+// Delete a business by ID
+export async function deleteBusiness(id: string) {
+  try {
+    // Get the business first to retrieve the email
+    const business = await getBusinessById(id)
+
+    if (!business) {
+      return { success: false, message: "Business not found" }
+    }
+
+    // Delete business data
+    await kv.del(`business:${id}`)
+
+    // Delete email index
+    await kv.del(`business:email:${business.email}`)
+
+    // Remove from the set of all businesses
+    await kv.srem("businesses", id)
+
+    // Delete any associated data
+    await kv.del(`business:${id}:adDesign`)
+
+    // Revalidate the businesses page
+    revalidatePath("/admin/businesses")
+
+    return {
+      success: true,
+      message: `Business "${business.businessName}" has been deleted successfully`,
+    }
+  } catch (error) {
+    console.error(`Error deleting business with ID ${id}:`, error)
+    return {
+      success: false,
+      message: "Failed to delete business. Please try again.",
+    }
+  }
+}
