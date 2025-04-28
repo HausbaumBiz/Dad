@@ -6,17 +6,23 @@ import type React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Play, Pause } from "lucide-react"
+import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
 import {
   getBusinessMedia,
+  uploadVideo,
+  uploadThumbnail,
   deletePhoto,
   saveMediaSettings,
   type MediaItem,
-  saveBusinessAdDesign,
-} from "@/app/actions/business-actions"
+  uploadPhoto,
+} from "@/app/actions/media-actions"
+import { saveBusinessAdDesign } from "@/app/actions/business-actions"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -29,10 +35,6 @@ import { FileSizeWarning } from "@/components/file-size-warning"
 
 import { del } from "@vercel/blob"
 import { kv } from "@vercel/kv"
-
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-
-import { ChevronLeft, ChevronRight, Trash2, X } from "lucide-react"
 
 interface PhotoItem {
   id: string
@@ -178,13 +180,6 @@ export default function CustomizeAdDesignPage() {
   const [videoRemoved, setVideoRemoved] = useState(false)
   const [thumbnailRemoved, setThumbnailRemoved] = useState(false)
 
-  // Add these new state variables after the other state declarations
-  const [queuedPhotos, setQueuedPhotos] = useState<File[]>([])
-  const [queuedPhotosPreviews, setQueuedPhotosPreviews] = useState<string[]>([])
-  const [isMobile, setIsMobile] = useState(false)
-  const [queuedThumbnailFile, setQueuedThumbnailFile] = useState<File | null>(null)
-  const [queuedThumbnailPreview, setQueuedThumbnailPreview] = useState<string | null>(null)
-
   // Set the color based on URL parameter
   useEffect(() => {
     if (colorParam && colorMap[colorParam]) {
@@ -222,44 +217,20 @@ export default function CustomizeAdDesignPage() {
     fetchBusinessData()
   }, [])
 
-  // Add this useEffect after the other useEffect hooks:
-  // Detect mobile devices
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-
-    return () => {
-      window.removeEventListener("resize", checkMobile)
-    }
-  }, [])
-
   // Load saved media for the business
   const loadSavedMedia = async (id: string) => {
     try {
-      console.log("Loading saved media for business:", id)
       const media = await getBusinessMedia(id)
 
       if (media) {
         // Set video if available
         if (media.videoUrl) {
-          console.log("Setting video preview:", media.videoUrl)
           setVideoPreview(media.videoUrl)
         }
 
         // Set thumbnail if available
         if (media.thumbnailUrl) {
-          console.log("Setting thumbnail preview:", media.thumbnailUrl)
-          // Add a cache-busting parameter to prevent browser caching
-          const cacheBuster = `?t=${Date.now()}`
-          setThumbnailPreview(`${media.thumbnailUrl}${cacheBuster}`)
-          setShowThumbnail(true) // Ensure thumbnail is shown
-        } else {
-          console.log("No thumbnail URL found")
-          setThumbnailPreview(null)
+          setThumbnailPreview(media.thumbnailUrl)
         }
 
         // Set photo album if available
@@ -314,53 +285,26 @@ export default function CustomizeAdDesignPage() {
     }
   }
 
-  // Modify the handleImageUpload function to handle mobile differently
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0]
-
-      // For desktop, keep the existing behavior
-      if (!isMobile) {
-        setImageFile(file)
-
-        // Create preview URL
-        const reader = new FileReader()
-        reader.onload = (event) => {
-          setImagePreview(event.target?.result as string)
-        }
-        reader.readAsDataURL(file)
-      }
-      // For mobile, add to queue instead of immediate upload
-      else {
-        // Create preview URL
-        const reader = new FileReader()
-        reader.onload = (event) => {
-          setQueuedPhotosPreviews((prev) => [...prev, event.target?.result as string])
-        }
-        reader.readAsDataURL(file)
-
-        // Add to queue
-        setQueuedPhotos((prev) => [...prev, file])
-
-        // Reset the file input to allow selecting the same file again
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ""
-        }
-
-        toast({
-          title: "Photo queued",
-          description: "Photo will be uploaded when you save",
-        })
-      }
-    }
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      setImageFile(file)
+
+      // Create preview URL
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        setImagePreview(event.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
   }
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -382,46 +326,18 @@ export default function CustomizeAdDesignPage() {
   const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
+      setThumbnailFile(file)
+      setFormData((prev) => ({ ...prev, thumbnailFile: file }))
 
       // Create preview URL
       const reader = new FileReader()
       reader.onload = (event) => {
-        const previewUrl = event.target?.result as string
-
-        // For mobile, queue the thumbnail instead of immediate upload
-        if (isMobile) {
-          setQueuedThumbnailFile(file)
-          setQueuedThumbnailPreview(previewUrl)
-
-          // If there's a previous thumbnail, mark it for replacement
-          if (thumbnailPreview) {
-            toast({
-              title: "Thumbnail queued",
-              description: "This will replace your current thumbnail when you save",
-              variant: "info",
-            })
-          } else {
-            toast({
-              title: "Thumbnail queued",
-              description: "Thumbnail will be uploaded when you save",
-            })
-          }
-
-          // Reset the file input to allow selecting the same file again
-          if (thumbnailInputRef.current) {
-            thumbnailInputRef.current.value = ""
-          }
-        } else {
-          // For desktop, keep the existing behavior
-          setThumbnailFile(file)
-          setThumbnailPreview(previewUrl)
-          setFormData((prev) => ({ ...prev, thumbnailFile: file }))
-
-          // Ensure thumbnail is shown
-          setShowThumbnail(true)
-        }
+        setThumbnailPreview(event.target?.result as string)
       }
       reader.readAsDataURL(file)
+
+      // Ensure thumbnail is shown
+      setShowThumbnail(true)
     }
   }
 
@@ -583,33 +499,13 @@ export default function CustomizeAdDesignPage() {
     }
   }, [videoRef.current, verticalVideoRef.current, mobileVideoRef.current])
 
-  // Add a function to handle removing queued photos
-  const handleRemoveQueuedPhoto = (index: number) => {
-    setQueuedPhotos((prev) => prev.filter((_, i) => i !== index))
-    setQueuedPhotosPreviews((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const handleRemoveQueuedThumbnail = () => {
-    setQueuedThumbnailFile(null)
-    setQueuedThumbnailPreview(null)
-  }
-
   const handleAddToPhotoAlbum = async () => {
     if (imageFile && imagePreview && businessId) {
       try {
-        // Show loading state
-        toast({
-          title: "Uploading...",
-          description: "Adding photo to your album",
-        })
-
         // Create FormData for upload
         const formData = new FormData()
         formData.append("businessId", businessId)
         formData.append("photo", imageFile)
-
-        // Import the uploadPhoto function directly from media-actions
-        const { uploadPhoto } = await import("@/app/actions/media-actions")
 
         // Upload the photo
         const result = await uploadPhoto(formData)
@@ -652,13 +548,6 @@ export default function CustomizeAdDesignPage() {
           variant: "destructive",
         })
       }
-    } else {
-      // Show error if no image is selected
-      toast({
-        title: "Error",
-        description: "Please select an image to add to your album.",
-        variant: "destructive",
-      })
     }
   }
 
@@ -778,41 +667,26 @@ export default function CustomizeAdDesignPage() {
         try {
           // Check file size before attempting upload
           const fileSizeMB = formData.videoFile.size / (1024 * 1024)
-          if (fileSizeMB > 50) {
-            // 50MB limit
+          if (fileSizeMB > 100) {
+            // 100MB limit
             toast({
               title: "Error",
-              description: `Video file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 50MB.`,
+              description: `Video file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 100MB.`,
               variant: "destructive",
             })
             setIsLoading(false)
             return
           }
 
-          // Show loading toast
-          toast({
-            title: "Uploading video...",
-            description: "Please wait while your video is being uploaded",
-          })
-
           const videoFormData = new FormData()
           videoFormData.append("businessId", businessId)
           videoFormData.append("video", formData.videoFile)
           videoFormData.append("designId", selectedDesign?.toString() || "1")
 
-          // Import the uploadVideo function directly from media-actions
-          const { uploadVideo } = await import("@/app/actions/media-actions")
-
-          // Call the server action directly
           const videoResult = await uploadVideo(videoFormData)
 
           if (!videoResult.success) {
             throw new Error(videoResult.error || "Failed to upload video")
-          } else {
-            toast({
-              title: "Success",
-              description: "Video uploaded successfully!",
-            })
           }
         } catch (error: any) {
           console.error("Error uploading video:", error)
@@ -842,28 +716,14 @@ export default function CustomizeAdDesignPage() {
             return
           }
 
-          // Show loading toast
-          toast({
-            title: "Uploading thumbnail...",
-            description: "Please wait while your thumbnail is being uploaded",
-          })
-
           const thumbnailFormData = new FormData()
           thumbnailFormData.append("businessId", businessId)
           thumbnailFormData.append("thumbnail", formData.thumbnailFile)
-
-          // Import the uploadThumbnail function directly from media-actions
-          const { uploadThumbnail } = await import("@/app/actions/media-actions")
 
           const thumbnailResult = await uploadThumbnail(thumbnailFormData)
 
           if (!thumbnailResult.success) {
             throw new Error(thumbnailResult.error || "Failed to upload thumbnail")
-          } else {
-            toast({
-              title: "Success",
-              description: "Thumbnail uploaded successfully!",
-            })
           }
         } catch (error: any) {
           console.error("Error uploading thumbnail:", error)
@@ -874,90 +734,6 @@ export default function CustomizeAdDesignPage() {
           })
           setIsLoading(false)
           return
-        }
-      }
-
-      // Upload queued thumbnail if any (for mobile)
-      if (queuedThumbnailFile) {
-        try {
-          // Check file size before attempting upload
-          const fileSizeMB = queuedThumbnailFile.size / (1024 * 1024)
-          if (fileSizeMB > 10) {
-            // 10MB limit
-            toast({
-              title: "Error",
-              description: `Thumbnail file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 10MB.`,
-            })
-          } else {
-            // First, delete the existing thumbnail if there is one
-            let existingThumbnailDeleted = false
-            try {
-              const existingMedia = await getBusinessMedia(businessId)
-              if (existingMedia?.thumbnailId) {
-                console.log("Deleting existing thumbnail:", existingMedia.thumbnailId)
-                await del(existingMedia.thumbnailId)
-                // Clear the existing thumbnail references in KV
-                await kv.hset(`business:${businessId}:media`, {
-                  thumbnailUrl: null,
-                  thumbnailId: null,
-                  thumbnailWidth: null,
-                  thumbnailHeight: null,
-                  thumbnailOriginalSize: null,
-                  thumbnailCompressionSavings: null,
-                })
-                existingThumbnailDeleted = true
-                console.log("Existing thumbnail deleted successfully")
-              }
-            } catch (error) {
-              console.error("Error removing existing thumbnail:", error)
-              // Continue with upload even if deletion fails
-            }
-
-            const thumbnailFormData = new FormData()
-            thumbnailFormData.append("businessId", businessId)
-            thumbnailFormData.append("thumbnail", queuedThumbnailFile)
-
-            // Import the uploadThumbnail function directly from media-actions
-            const { uploadThumbnail } = await import("@/app/actions/media-actions")
-
-            console.log("Uploading new thumbnail...")
-            const thumbnailResult = await uploadThumbnail(thumbnailFormData)
-
-            if (thumbnailResult.success) {
-              // Update the UI with the new thumbnail
-              console.log("New thumbnail uploaded successfully:", thumbnailResult.url)
-              setThumbnailPreview(thumbnailResult.url)
-              setShowThumbnail(true) // Ensure thumbnail is shown
-              setThumbnailRemoved(false) // Reset the removed flag since we've added a new one
-
-              // Force reload the media to ensure we have the latest data
-              await loadSavedMedia(businessId)
-
-              toast({
-                title: "Success",
-                description: existingThumbnailDeleted
-                  ? "Thumbnail replaced successfully!"
-                  : "Thumbnail uploaded successfully!",
-              })
-            } else {
-              toast({
-                title: "Error",
-                description: thumbnailResult.error || "Failed to upload thumbnail. Please try again.",
-                variant: "destructive",
-              })
-            }
-          }
-        } catch (error: any) {
-          console.error("Error uploading queued thumbnail:", error)
-          toast({
-            title: "Error",
-            description: error.message || "Failed to upload thumbnail. Please try again.",
-            variant: "destructive",
-          })
-        } finally {
-          // Clear the queued thumbnail
-          setQueuedThumbnailFile(null)
-          setQueuedThumbnailPreview(null)
         }
       }
 
@@ -975,42 +751,6 @@ export default function CustomizeAdDesignPage() {
       if (typeof window !== "undefined") {
         localStorage.setItem("hausbaum_selected_design", selectedDesign?.toString() || "")
         localStorage.setItem("hausbaum_selected_color", selectedColor)
-      }
-
-      // Upload queued photos if any
-      if (queuedPhotos.length > 0) {
-        setIsLoading(true)
-
-        // Import the uploadPhoto function directly from media-actions
-        const { uploadPhoto } = await import("@/app/actions/media-actions")
-
-        // Upload each queued photo
-        for (const file of queuedPhotos) {
-          try {
-            const formData = new FormData()
-            formData.append("businessId", businessId)
-            formData.append("photo", file)
-
-            const result = await uploadPhoto(formData)
-
-            if (result.success && result.photo) {
-              // Add the new photo to the album
-              const newPhoto: PhotoItem = {
-                id: result.photo.id,
-                url: result.photo.url,
-                name: result.photo.filename,
-              }
-
-              setPhotos((prev) => [...prev, newPhoto])
-            }
-          } catch (error) {
-            console.error("Error uploading queued photo:", error)
-          }
-        }
-
-        // Clear the queue after uploading
-        setQueuedPhotos([])
-        setQueuedPhotosPreviews([])
       }
 
       toast({
@@ -1371,7 +1111,6 @@ export default function CustomizeAdDesignPage() {
                       {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                         <div className="absolute inset-0 z-20">
                           <img
-                            key={`thumbnail-${thumbnailPreview}`}
                             src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
                             alt="Video thumbnail"
                             className="w-full h-full object-cover"
@@ -1462,7 +1201,6 @@ export default function CustomizeAdDesignPage() {
                       {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                         <div className="absolute inset-0 z-20">
                           <img
-                            key={`thumbnail-${thumbnailPreview}`}
                             src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
                             alt="Video thumbnail"
                             className="w-full h-full object-cover"
@@ -1696,7 +1434,6 @@ export default function CustomizeAdDesignPage() {
                         {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                           <div className="absolute inset-0 z-20">
                             <img
-                              key={`thumbnail-${thumbnailPreview}`}
                               src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
                               alt="Video thumbnail"
                               className="w-full h-full object-cover"
@@ -1782,7 +1519,6 @@ export default function CustomizeAdDesignPage() {
                       {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                         <div className="absolute inset-0 z-20">
                           <img
-                            key={`thumbnail-${thumbnailPreview}`}
                             src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
                             alt="Video thumbnail"
                             className="w-full h-full object-cover"
@@ -2180,7 +1916,6 @@ export default function CustomizeAdDesignPage() {
                     {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                       <div className="absolute inset-0 z-20">
                         <img
-                          key={`thumbnail-${thumbnailPreview}`}
                           src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
                           alt="Video thumbnail"
                           className="w-full h-full object-cover"
@@ -2259,7 +1994,6 @@ export default function CustomizeAdDesignPage() {
                         {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
                           <div className="absolute inset-0 z-20">
                             <img
-                              key={`thumbnail-${thumbnailPreview}`}
                               src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
                               alt="Video thumbnail"
                               className="w-full h-full object-cover"
@@ -2527,15 +2261,22 @@ export default function CustomizeAdDesignPage() {
                           )}
                         </div>
                       )}
-                      {isMobile && queuedThumbnailPreview && (
+                      {thumbnailPreview && !thumbnailFile && (
                         <div className="mt-4">
                           <div className="flex items-center mb-2">
-                            <p className="text-sm text-amber-600">
-                              {thumbnailPreview ? "Will replace current thumbnail" : "Thumbnail queued for upload"}
-                            </p>
+                            <p className="text-sm text-blue-600">Using previously saved thumbnail</p>
                             <button
                               type="button"
-                              onClick={handleRemoveQueuedThumbnail}
+                              onClick={() => {
+                                setThumbnailPreview(null)
+                                setThumbnailFile(null)
+                                setShowThumbnail(false)
+                                setThumbnailRemoved(true)
+                                toast({
+                                  title: "Thumbnail removed",
+                                  description: "Your thumbnail has been removed. Save to confirm changes.",
+                                })
+                              }}
                               className="ml-2 text-xs text-red-500 hover:text-red-700"
                             >
                               Remove
@@ -2543,8 +2284,8 @@ export default function CustomizeAdDesignPage() {
                           </div>
                           <div className="relative h-40 bg-gray-100 rounded-lg overflow-hidden">
                             <img
-                              src={queuedThumbnailPreview || "/placeholder.svg"}
-                              alt="Queued thumbnail preview"
+                              src={thumbnailPreview || "/placeholder.svg"}
+                              alt="Thumbnail preview"
                               className="w-full h-full object-contain"
                             />
                           </div>
@@ -2683,77 +2424,6 @@ export default function CustomizeAdDesignPage() {
                   </div>
                 </Card>
 
-                {/* Color Selection Section */}
-                <Card>
-                  <div className="p-6 space-y-6">
-                    <h2 className="text-xl font-semibold">Color Theme</h2>
-                    <div className="space-y-4">
-                      <p className="text-sm text-gray-600">
-                        Choose a color theme for your AdBox. This will affect headers, buttons, and accents.
-                      </p>
-
-                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                        {Object.entries(colorMap).map(([colorKey, colorValue]) => (
-                          <button
-                            key={colorKey}
-                            type="button"
-                            className={`relative p-1 rounded-md transition-all ${
-                              selectedColor === colorKey ? "ring-2 ring-offset-2" : "hover:opacity-80"
-                            }`}
-                            style={{
-                              backgroundColor: colorValue.primary,
-                              ringColor: colorValue.primary,
-                            }}
-                            onClick={() => setSelectedColor(colorKey)}
-                            aria-label={`Select ${colorKey} theme`}
-                          >
-                            <div className="h-12 w-full rounded flex items-center justify-center">
-                              <span className="capitalize text-white font-medium text-sm shadow-sm">{colorKey}</span>
-                            </div>
-                            {selectedColor === colorKey && (
-                              <div className="absolute -top-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="16"
-                                  height="16"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  style={{ color: colorValue.primary }}
-                                >
-                                  <path d="M20 6L9 17l-5-5" />
-                                </svg>
-                              </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                        <p className="text-sm text-gray-600">
-                          Selected theme: <span className="font-medium capitalize">{selectedColor}</span>
-                        </p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <div
-                            className="w-6 h-6 rounded-full"
-                            style={{ backgroundColor: colorValues.primary }}
-                            title="Primary color"
-                          ></div>
-                          <div
-                            className="w-6 h-6 rounded-full"
-                            style={{ backgroundColor: colorValues.secondary }}
-                            title="Secondary color"
-                          ></div>
-                          <span className="text-xs text-gray-500">Primary and secondary colors</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
                 {/* Free Text Section */}
                 <Card>
                   <div className="p-6 space-y-6">
@@ -2803,18 +2473,16 @@ export default function CustomizeAdDesignPage() {
                           onChange={() => toggleFieldVisibility("photoAlbum")}
                           className="mr-2"
                         />
-                        <label htmlFor="hidePhotoAlbum" className="text-sm text-gray-500">
+                        <Label htmlFor="hidePhotoAlbum" className="text-sm text-gray-500">
                           Hide from AdBox
-                        </label>
+                        </Label>
                       </div>
                     </div>
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="imageUpload" className="block mb-2">
-                          {isMobile
-                            ? "Upload Images for Photo Album (Queue for batch upload)"
-                            : "Upload Images for Photo Album"}
-                        </label>
+                        <Label htmlFor="imageUpload" className="block mb-2">
+                          Upload Images for Photo Album
+                        </Label>
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                           <input
                             type="file"
@@ -2846,11 +2514,6 @@ export default function CustomizeAdDesignPage() {
                             </svg>
                             <span className="text-sm font-medium text-gray-700">Click to upload image</span>
                             <span className="text-xs text-gray-500 mt-1">JPG, PNG, WebP, GIF accepted</span>
-                            {isMobile && (
-                              <span className="text-xs text-amber-600 mt-1">
-                                On mobile, photos are queued and uploaded when you save
-                              </span>
-                            )}
                           </label>
                         </div>
                       </div>
@@ -2886,37 +2549,6 @@ export default function CustomizeAdDesignPage() {
                           >
                             Add to Photo Album
                           </Button>
-                        </div>
-                      )}
-
-                      {/* Queued Photos Section (Mobile Only) */}
-                      {isMobile && queuedPhotos.length > 0 && (
-                        <div className="mt-6">
-                          <h3 className="text-md font-medium mb-2">Queued Photos ({queuedPhotos.length})</h3>
-                          <p className="text-sm text-amber-600 mb-3">
-                            These photos will be uploaded when you press "Save and Continue"
-                          </p>
-
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {queuedPhotosPreviews.map((preview, index) => (
-                              <div key={index} className="relative group">
-                                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                                  <img
-                                    src={preview || "/placeholder.svg"}
-                                    alt={`Queued photo ${index + 1}`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveQueuedPhoto(index)}
-                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-70 hover:opacity-100"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
                         </div>
                       )}
 
@@ -2972,18 +2604,7 @@ export default function CustomizeAdDesignPage() {
                     style={{ backgroundColor: colorValues.primary }}
                     disabled={isLoading}
                   >
-                    {isLoading
-                      ? "Saving..."
-                      : queuedPhotos.length > 0 || queuedThumbnailFile
-                        ? `Save and Upload ${[
-                            queuedThumbnailFile ? "Thumbnail" : "",
-                            queuedPhotos.length > 0
-                              ? `${queuedPhotos.length} Photo${queuedPhotos.length > 1 ? "s" : ""}`
-                              : "",
-                          ]
-                            .filter(Boolean)
-                            .join(" & ")}`
-                        : "Save and Continue"}
+                    {isLoading ? "Saving..." : "Save and Continue"}
                   </button>
                 </div>
               </form>

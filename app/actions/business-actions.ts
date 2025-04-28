@@ -21,25 +21,6 @@ export type Business = {
   phone?: string
 }
 
-// Media types
-export type MediaItem = {
-  id: string
-  url: string
-  filename: string
-  contentType: string
-  size: number
-  createdAt: string
-}
-
-export type BusinessMedia = {
-  videoUrl?: string
-  videoContentType?: string
-  videoId?: string
-  thumbnailUrl?: string
-  thumbnailId?: string
-  photoAlbum: MediaItem[]
-}
-
 // Register a new business
 export async function registerBusiness(formData: FormData) {
   try {
@@ -288,11 +269,26 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
       return { success: false, error: "Missing business ID" }
     }
 
-    // Store design data in KV
-    await kv.hset(`business:${businessId}:adDesign`, {
-      ...designData,
-      updatedAt: new Date().toISOString(),
-    })
+    const key = `business:${businessId}:adDesign`
+
+    // First, check if the key exists and delete it to avoid WRONGTYPE errors
+    try {
+      const exists = await kv.exists(key)
+      if (exists) {
+        await kv.del(key)
+      }
+    } catch (error) {
+      console.error("Error checking/deleting existing key:", error)
+    }
+
+    // Store design data in KV as a JSON string instead of using hset
+    await kv.set(
+      key,
+      JSON.stringify({
+        ...designData,
+        updatedAt: new Date().toISOString(),
+      }),
+    )
 
     revalidatePath(`/ad-design/customize`)
     revalidatePath(`/workbench`)
@@ -307,7 +303,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
   }
 }
 
-// Add this function to get the business ad design
+// Also update the getBusinessAdDesign function to match the new storage format
 export async function getBusinessAdDesign(businessId: string) {
   try {
     if (!businessId) {
@@ -315,13 +311,20 @@ export async function getBusinessAdDesign(businessId: string) {
     }
 
     // Get the design data from KV
-    const designData = await kv.hgetall(`business:${businessId}:adDesign`)
+    const key = `business:${businessId}:adDesign`
+    const designDataStr = await kv.get(key)
 
-    if (!designData) {
+    if (!designDataStr) {
       return null
     }
 
-    return designData
+    // Parse the JSON string back to an object
+    try {
+      return typeof designDataStr === "string" ? JSON.parse(designDataStr) : designDataStr
+    } catch (error) {
+      console.error("Error parsing design data:", error)
+      return null
+    }
   } catch (error) {
     console.error("Error getting business ad design:", error)
     return null
@@ -410,93 +413,5 @@ export async function updateBusinessPassword(businessId: string, currentPassword
       success: false,
       message: "Failed to update password. Please try again.",
     }
-  }
-}
-
-// Replace the getBusinessMedia function with this updated version that properly handles the photoAlbum data
-
-// Get business media
-export async function getBusinessMedia(businessId: string): Promise<BusinessMedia | null> {
-  try {
-    if (!businessId) {
-      return null
-    }
-
-    // Get the media data from KV
-    const mediaData = await kv.hgetall(`business:${businessId}:media`)
-
-    if (!mediaData) {
-      return { photoAlbum: [] }
-    }
-
-    // Parse the photo album if it exists
-    let photoAlbum: MediaItem[] = []
-    if (mediaData.photoAlbum) {
-      try {
-        // Check if photoAlbum is already an object or an array
-        if (Array.isArray(mediaData.photoAlbum)) {
-          photoAlbum = mediaData.photoAlbum as MediaItem[]
-        } else if (typeof mediaData.photoAlbum === "string") {
-          // Try to parse it as JSON string
-          photoAlbum = JSON.parse(mediaData.photoAlbum)
-        } else if (typeof mediaData.photoAlbum === "object") {
-          // If it's already an object but not an array, wrap it in an array
-          // This handles the case where a single item might be stored as an object
-          photoAlbum = [mediaData.photoAlbum as unknown as MediaItem]
-        }
-      } catch (e) {
-        console.error("Error parsing photo album:", e)
-        console.log("Raw photoAlbum data:", typeof mediaData.photoAlbum, mediaData.photoAlbum)
-        // Continue with empty array on error
-        photoAlbum = []
-      }
-    }
-
-    return {
-      videoUrl: mediaData.videoUrl as string,
-      videoContentType: mediaData.videoContentType as string,
-      videoId: mediaData.videoId as string,
-      thumbnailUrl: mediaData.thumbnailUrl as string,
-      thumbnailId: mediaData.thumbnailId as string,
-      photoAlbum,
-    }
-  } catch (error) {
-    console.error("Error getting business media:", error)
-    return null
-  }
-}
-
-export async function uploadVideo(formData: FormData) {
-  return {
-    success: false,
-    message: "uploadVideo function not implemented",
-  }
-}
-
-export async function uploadThumbnail(formData: FormData) {
-  return {
-    success: false,
-    message: "uploadThumbnail function not implemented",
-  }
-}
-
-export async function uploadPhoto(formData: FormData) {
-  return {
-    success: false,
-    message: "uploadPhoto function not implemented",
-  }
-}
-
-export async function deletePhoto(businessId: string, photoId: string) {
-  return {
-    success: false,
-    message: "deletePhoto function not implemented",
-  }
-}
-
-export async function saveMediaSettings(businessId: string, settings: any) {
-  return {
-    success: false,
-    message: "saveMediaSettings function not implemented",
   }
 }
