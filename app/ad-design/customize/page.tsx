@@ -6,21 +6,15 @@ import type React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Play, Pause } from "lucide-react"
-import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
 import {
   getBusinessMedia,
-  uploadVideo,
-  uploadThumbnail,
   deletePhoto,
   saveMediaSettings,
   type MediaItem,
-  uploadPhoto,
   saveBusinessAdDesign,
 } from "@/app/actions/business-actions"
 
@@ -35,6 +29,10 @@ import { FileSizeWarning } from "@/components/file-size-warning"
 
 import { del } from "@vercel/blob"
 import { kv } from "@vercel/kv"
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+
+import { ChevronLeft, ChevronRight, Trash2, X } from "lucide-react"
 
 interface PhotoItem {
   id: string
@@ -599,10 +597,19 @@ export default function CustomizeAdDesignPage() {
   const handleAddToPhotoAlbum = async () => {
     if (imageFile && imagePreview && businessId) {
       try {
+        // Show loading state
+        toast({
+          title: "Uploading...",
+          description: "Adding photo to your album",
+        })
+
         // Create FormData for upload
         const formData = new FormData()
         formData.append("businessId", businessId)
         formData.append("photo", imageFile)
+
+        // Import the uploadPhoto function directly from media-actions
+        const { uploadPhoto } = await import("@/app/actions/media-actions")
 
         // Upload the photo
         const result = await uploadPhoto(formData)
@@ -645,6 +652,13 @@ export default function CustomizeAdDesignPage() {
           variant: "destructive",
         })
       }
+    } else {
+      // Show error if no image is selected
+      toast({
+        title: "Error",
+        description: "Please select an image to add to your album.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -764,26 +778,41 @@ export default function CustomizeAdDesignPage() {
         try {
           // Check file size before attempting upload
           const fileSizeMB = formData.videoFile.size / (1024 * 1024)
-          if (fileSizeMB > 100) {
-            // 100MB limit
+          if (fileSizeMB > 50) {
+            // 50MB limit
             toast({
               title: "Error",
-              description: `Video file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 100MB.`,
+              description: `Video file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 50MB.`,
               variant: "destructive",
             })
             setIsLoading(false)
             return
           }
 
+          // Show loading toast
+          toast({
+            title: "Uploading video...",
+            description: "Please wait while your video is being uploaded",
+          })
+
           const videoFormData = new FormData()
           videoFormData.append("businessId", businessId)
           videoFormData.append("video", formData.videoFile)
           videoFormData.append("designId", selectedDesign?.toString() || "1")
 
+          // Import the uploadVideo function directly from media-actions
+          const { uploadVideo } = await import("@/app/actions/media-actions")
+
+          // Call the server action directly
           const videoResult = await uploadVideo(videoFormData)
 
           if (!videoResult.success) {
             throw new Error(videoResult.error || "Failed to upload video")
+          } else {
+            toast({
+              title: "Success",
+              description: "Video uploaded successfully!",
+            })
           }
         } catch (error: any) {
           console.error("Error uploading video:", error)
@@ -813,14 +842,28 @@ export default function CustomizeAdDesignPage() {
             return
           }
 
+          // Show loading toast
+          toast({
+            title: "Uploading thumbnail...",
+            description: "Please wait while your thumbnail is being uploaded",
+          })
+
           const thumbnailFormData = new FormData()
           thumbnailFormData.append("businessId", businessId)
           thumbnailFormData.append("thumbnail", formData.thumbnailFile)
+
+          // Import the uploadThumbnail function directly from media-actions
+          const { uploadThumbnail } = await import("@/app/actions/media-actions")
 
           const thumbnailResult = await uploadThumbnail(thumbnailFormData)
 
           if (!thumbnailResult.success) {
             throw new Error(thumbnailResult.error || "Failed to upload thumbnail")
+          } else {
+            toast({
+              title: "Success",
+              description: "Thumbnail uploaded successfully!",
+            })
           }
         } catch (error: any) {
           console.error("Error uploading thumbnail:", error)
@@ -844,7 +887,6 @@ export default function CustomizeAdDesignPage() {
             toast({
               title: "Error",
               description: `Thumbnail file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 10MB.`,
-              variant: "destructive",
             })
           } else {
             // First, delete the existing thumbnail if there is one
@@ -874,6 +916,9 @@ export default function CustomizeAdDesignPage() {
             const thumbnailFormData = new FormData()
             thumbnailFormData.append("businessId", businessId)
             thumbnailFormData.append("thumbnail", queuedThumbnailFile)
+
+            // Import the uploadThumbnail function directly from media-actions
+            const { uploadThumbnail } = await import("@/app/actions/media-actions")
 
             console.log("Uploading new thumbnail...")
             const thumbnailResult = await uploadThumbnail(thumbnailFormData)
@@ -935,6 +980,9 @@ export default function CustomizeAdDesignPage() {
       // Upload queued photos if any
       if (queuedPhotos.length > 0) {
         setIsLoading(true)
+
+        // Import the uploadPhoto function directly from media-actions
+        const { uploadPhoto } = await import("@/app/actions/media-actions")
 
         // Upload each queued photo
         for (const file of queuedPhotos) {
@@ -2479,36 +2527,6 @@ export default function CustomizeAdDesignPage() {
                           )}
                         </div>
                       )}
-                      {thumbnailPreview && !thumbnailFile && (
-                        <div className="mt-4">
-                          <div className="flex items-center mb-2">
-                            <p className="text-sm text-blue-600">Using previously saved thumbnail</p>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setThumbnailPreview(null)
-                                setThumbnailFile(null)
-                                setShowThumbnail(false)
-                                setThumbnailRemoved(true)
-                                toast({
-                                  title: "Thumbnail removed",
-                                  description: "Your thumbnail has been removed. Save to confirm changes.",
-                                })
-                              }}
-                              className="ml-2 text-xs text-red-500 hover:text-red-700"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                          <div className="relative h-40 bg-gray-100 rounded-lg overflow-hidden">
-                            <img
-                              src={thumbnailPreview || "/placeholder.svg"}
-                              alt="Thumbnail preview"
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                        </div>
-                      )}
                       {isMobile && queuedThumbnailPreview && (
                         <div className="mt-4">
                           <div className="flex items-center mb-2">
@@ -2785,18 +2803,18 @@ export default function CustomizeAdDesignPage() {
                           onChange={() => toggleFieldVisibility("photoAlbum")}
                           className="mr-2"
                         />
-                        <Label htmlFor="hidePhotoAlbum" className="text-sm text-gray-500">
+                        <label htmlFor="hidePhotoAlbum" className="text-sm text-gray-500">
                           Hide from AdBox
-                        </Label>
+                        </label>
                       </div>
                     </div>
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="imageUpload" className="block mb-2">
+                        <label htmlFor="imageUpload" className="block mb-2">
                           {isMobile
                             ? "Upload Images for Photo Album (Queue for batch upload)"
                             : "Upload Images for Photo Album"}
-                        </Label>
+                        </label>
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                           <input
                             type="file"

@@ -73,7 +73,7 @@ async function compressImageBuffer(
   return processImageData(buffer, contentType, options)
 }
 
-// Replace the uploadVideo function with this improved version:
+// Replace the uploadVideo function with this completely rewritten version:
 
 export async function uploadVideo(formData: FormData) {
   try {

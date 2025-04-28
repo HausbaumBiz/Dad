@@ -413,6 +413,8 @@ export async function updateBusinessPassword(businessId: string, currentPassword
   }
 }
 
+// Replace the getBusinessMedia function with this updated version that properly handles the photoAlbum data
+
 // Get business media
 export async function getBusinessMedia(businessId: string): Promise<BusinessMedia | null> {
   try {
@@ -431,9 +433,22 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
     let photoAlbum: MediaItem[] = []
     if (mediaData.photoAlbum) {
       try {
-        photoAlbum = JSON.parse(mediaData.photoAlbum as string)
+        // Check if photoAlbum is already an object or an array
+        if (Array.isArray(mediaData.photoAlbum)) {
+          photoAlbum = mediaData.photoAlbum as MediaItem[]
+        } else if (typeof mediaData.photoAlbum === "string") {
+          // Try to parse it as JSON string
+          photoAlbum = JSON.parse(mediaData.photoAlbum)
+        } else if (typeof mediaData.photoAlbum === "object") {
+          // If it's already an object but not an array, wrap it in an array
+          // This handles the case where a single item might be stored as an object
+          photoAlbum = [mediaData.photoAlbum as unknown as MediaItem]
+        }
       } catch (e) {
         console.error("Error parsing photo album:", e)
+        console.log("Raw photoAlbum data:", typeof mediaData.photoAlbum, mediaData.photoAlbum)
+        // Continue with empty array on error
+        photoAlbum = []
       }
     }
 
