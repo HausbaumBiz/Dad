@@ -73,8 +73,9 @@ async function compressImageBuffer(
   return processImageData(buffer, contentType, options)
 }
 
-// Replace the uploadVideo function with this improved version:
-
+/**
+ * Upload a video to Vercel Blob and store the reference in Redis
+ */
 export async function uploadVideo(formData: FormData) {
   try {
     const businessId = formData.get("businessId") as string
@@ -85,7 +86,7 @@ export async function uploadVideo(formData: FormData) {
       return { success: false, error: "Missing required fields" }
     }
 
-    // Check file size
+    // Check file size before attempting upload
     const fileSizeMB = file.size / MB_IN_BYTES
     if (fileSizeMB > MAX_VIDEO_SIZE_MB) {
       return {
@@ -101,47 +102,61 @@ export async function uploadVideo(formData: FormData) {
     // Upload to Vercel Blob with proper error handling
     let blob
     try {
+      console.log(`Uploading video to Vercel Blob: ${filename}, size: ${fileSizeMB.toFixed(2)}MB`)
+
+      // Create a new AbortController to set a timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+
       blob = await put(filename, file, {
         access: "public",
         addRandomSuffix: false,
         contentType: file.type,
         maxSize: MAX_VIDEO_SIZE_MB * MB_IN_BYTES,
+        signal: controller.signal,
       })
+
+      // Clear the timeout if upload succeeds
+      clearTimeout(timeoutId)
+
+      console.log(`Video uploaded successfully: ${blob.url}`)
     } catch (blobError) {
       console.error("Blob upload error:", blobError)
 
-      // Simple error handling without trying to parse anything
-      let errorMessage = "Failed to upload video"
-
-      if (blobError instanceof Error) {
-        errorMessage = blobError.message
-      } else if (typeof blobError === "string") {
-        errorMessage = blobError
-      } else if (blobError && typeof blobError === "object") {
-        // Safely convert object to string without parsing
-        try {
-          errorMessage = String(blobError)
-        } catch (e) {
-          errorMessage = "Unknown upload error"
-        }
-      }
-
-      // Check for common error patterns
-      if (
-        errorMessage.includes("too large") ||
-        errorMessage.includes("exceeds") ||
-        errorMessage.includes("Request Entity Too Large") ||
-        errorMessage.includes("413")
-      ) {
+      // Handle AbortController timeout
+      if (blobError instanceof DOMException && blobError.name === "AbortError") {
         return {
           success: false,
-          error: `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB.`,
+          error: "Upload timed out. Please try again with a smaller file or check your network connection.",
         }
       }
 
+      // Handle HTTP errors (413 Request Entity Too Large, etc.)
+      if (blobError instanceof Error) {
+        const errorMessage = blobError.message || "Unknown error"
+
+        if (
+          errorMessage.includes("413") ||
+          errorMessage.includes("Request Entity Too Large") ||
+          errorMessage.includes("too large") ||
+          errorMessage.includes("exceeds")
+        ) {
+          return {
+            success: false,
+            error: `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB.`,
+          }
+        }
+
+        return {
+          success: false,
+          error: `Upload failed: ${errorMessage.substring(0, 100)}`,
+        }
+      }
+
+      // Generic error handling
       return {
         success: false,
-        error: `Upload failed: ${errorMessage.substring(0, 100)}`,
+        error: "Failed to upload video. Please try again with a smaller file.",
       }
     }
 
@@ -160,13 +175,52 @@ export async function uploadVideo(formData: FormData) {
       }
     }
 
-    // Store reference in KV - explicitly set all video-related fields
-    await kv.hset(`business:${businessId}:media`, {
-      videoUrl: blob.url,
-      videoContentType: blob.contentType,
-      videoId: filename,
-      designId: designId || existingMedia.designId,
-    })
+    // Create a Redis key for the business media
+    const mediaKey = `business:${businessId}:media`
+
+    // Store video metadata in Redis - filter out null/undefined values
+    const videoData: Record<string, any> = {}
+
+    // Only add non-null values
+    if (blob.url) videoData.videoUrl = blob.url
+    if (blob.contentType) videoData.videoContentType = blob.contentType
+    if (filename) videoData.videoId = filename
+    if (blob.size) videoData.videoSize = blob.size
+    videoData.videoUploadedAt = new Date().toISOString()
+
+    // Only add designId if it exists and is not null
+    if (designId && designId !== "null" && designId !== "undefined") {
+      videoData.designId = designId
+    } else if (existingMedia.designId) {
+      videoData.designId = existingMedia.designId
+    }
+
+    // Use hset to store the video data in Redis
+    try {
+      console.log(`Storing video metadata in Redis: ${mediaKey}`)
+
+      // Make sure we have at least one valid field to store
+      if (Object.keys(videoData).length > 0) {
+        await kv.hset(mediaKey, videoData)
+        console.log(`Video metadata stored successfully`)
+      } else {
+        console.warn("No valid video metadata to store in Redis")
+      }
+    } catch (redisError) {
+      console.error(`Error storing video metadata in Redis:`, redisError)
+
+      // If Redis storage fails, try to delete the uploaded blob to avoid orphaned files
+      try {
+        await del(filename)
+      } catch (deleteError) {
+        console.error(`Error deleting orphaned video after Redis failure:`, deleteError)
+      }
+
+      return {
+        success: false,
+        error: `Failed to store video metadata: ${redisError instanceof Error ? redisError.message : "Unknown error"}`,
+      }
+    }
 
     revalidatePath(`/ad-design/customize`)
 
@@ -179,15 +233,28 @@ export async function uploadVideo(formData: FormData) {
     }
   } catch (error) {
     console.error("Error in uploadVideo function:", error)
+
+    // Provide a user-friendly error message
+    let errorMessage = "Failed to upload video"
+    if (error instanceof Error) {
+      errorMessage = error.message
+
+      // Check for JSON parsing errors
+      if (errorMessage.includes("Unexpected token") && errorMessage.includes("not valid JSON")) {
+        errorMessage = "The server returned an invalid response. This may be due to the file being too large."
+      }
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to upload video",
+      error: errorMessage,
     }
   }
 }
 
-// Also replace the uploadThumbnail function with this simplified version:
-
+/**
+ * Upload a thumbnail image to Vercel Blob and store the reference in Redis
+ */
 export async function uploadThumbnail(formData: FormData) {
   try {
     const businessId = formData.get("businessId") as string
@@ -210,53 +277,67 @@ export async function uploadThumbnail(formData: FormData) {
     const originalSize = file.size
 
     // Generate a unique filename
-    const format = "jpeg" // Default format
-    const filename = `${businessId}/thumbnails/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${format}`
+    const extension = file.name.split(".").pop() || "jpeg"
+    const filename = `${businessId}/thumbnails/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${extension}`
 
     // Upload to Vercel Blob directly without compression
     let blob
     try {
+      console.log(`Uploading thumbnail to Vercel Blob: ${filename}, size: ${fileSizeMB.toFixed(2)}MB`)
+
+      // Create a new AbortController to set a timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
       blob = await put(filename, file, {
         access: "public",
         addRandomSuffix: false,
         contentType: file.type,
         maxSize: MAX_IMAGE_SIZE_MB * MB_IN_BYTES,
+        signal: controller.signal,
       })
+
+      // Clear the timeout if upload succeeds
+      clearTimeout(timeoutId)
+
+      console.log(`Thumbnail uploaded successfully: ${blob.url}`)
     } catch (blobError) {
       console.error("Blob upload error:", blobError)
 
-      // Simple error handling without trying to parse anything
-      let errorMessage = "Failed to upload thumbnail"
-
-      if (blobError instanceof Error) {
-        errorMessage = blobError.message
-      } else if (typeof blobError === "string") {
-        errorMessage = blobError
-      } else if (blobError && typeof blobError === "object") {
-        // Safely convert object to string without parsing
-        try {
-          errorMessage = String(blobError)
-        } catch (e) {
-          errorMessage = "Unknown upload error"
-        }
-      }
-
-      // Check for common error patterns
-      if (
-        errorMessage.includes("too large") ||
-        errorMessage.includes("exceeds") ||
-        errorMessage.includes("Request Entity Too Large") ||
-        errorMessage.includes("413")
-      ) {
+      // Handle AbortController timeout
+      if (blobError instanceof DOMException && blobError.name === "AbortError") {
         return {
           success: false,
-          error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
+          error: "Upload timed out. Please try again with a smaller file or check your network connection.",
         }
       }
 
+      // Handle HTTP errors
+      if (blobError instanceof Error) {
+        const errorMessage = blobError.message || "Unknown error"
+
+        if (
+          errorMessage.includes("413") ||
+          errorMessage.includes("Request Entity Too Large") ||
+          errorMessage.includes("too large") ||
+          errorMessage.includes("exceeds")
+        ) {
+          return {
+            success: false,
+            error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
+          }
+        }
+
+        return {
+          success: false,
+          error: `Upload failed: ${errorMessage.substring(0, 100)}`,
+        }
+      }
+
+      // Generic error handling
       return {
         success: false,
-        error: `Upload failed: ${errorMessage.substring(0, 100)}`,
+        error: "Failed to upload thumbnail. Please try again with a smaller file.",
       }
     }
 
@@ -275,16 +356,48 @@ export async function uploadThumbnail(formData: FormData) {
       }
     }
 
-    // Store reference in KV - explicitly set all thumbnail-related fields
-    const compressionSavings = 0 // No compression is done, so savings is 0
-    await kv.hset(`business:${businessId}:media`, {
-      thumbnailUrl: blob.url,
-      thumbnailId: filename,
-      thumbnailWidth: 800, // Estimated width
-      thumbnailHeight: 600, // Estimated height
-      thumbnailOriginalSize: originalSize,
-      thumbnailCompressionSavings: compressionSavings,
-    })
+    // Create a Redis key for the business media
+    const mediaKey = `business:${businessId}:media`
+
+    // Store thumbnail metadata in Redis - filter out null/undefined values
+    const thumbnailData: Record<string, any> = {}
+
+    // Only add non-null values
+    if (blob.url) thumbnailData.thumbnailUrl = blob.url
+    if (filename) thumbnailData.thumbnailId = filename
+    if (blob.contentType) thumbnailData.thumbnailContentType = blob.contentType
+    if (blob.size) thumbnailData.thumbnailSize = blob.size
+    if (originalSize) thumbnailData.thumbnailOriginalSize = originalSize
+    thumbnailData.thumbnailUploadedAt = new Date().toISOString()
+    thumbnailData.thumbnailWidth = 800 // Estimated width
+    thumbnailData.thumbnailHeight = 600 // Estimated height
+
+    // Use hset to store the thumbnail data in Redis
+    try {
+      console.log(`Storing thumbnail metadata in Redis: ${mediaKey}`)
+
+      // Make sure we have at least one valid field to store
+      if (Object.keys(thumbnailData).length > 0) {
+        await kv.hset(mediaKey, thumbnailData)
+        console.log(`Thumbnail metadata stored successfully`)
+      } else {
+        console.warn("No valid thumbnail metadata to store in Redis")
+      }
+    } catch (redisError) {
+      console.error(`Error storing thumbnail metadata in Redis:`, redisError)
+
+      // If Redis storage fails, try to delete the uploaded blob to avoid orphaned files
+      try {
+        await del(filename)
+      } catch (deleteError) {
+        console.error(`Error deleting orphaned thumbnail after Redis failure:`, deleteError)
+      }
+
+      return {
+        success: false,
+        error: `Failed to store thumbnail metadata: ${redisError instanceof Error ? redisError.message : "Unknown error"}`,
+      }
+    }
 
     revalidatePath(`/ad-design/customize`)
 
@@ -294,22 +407,34 @@ export async function uploadThumbnail(formData: FormData) {
       contentType: blob.contentType,
       size: blob.size,
       originalSize,
-      compressionSavings,
       width: 800, // Estimated width
       height: 600, // Estimated height
       id: filename,
     }
   } catch (error) {
     console.error("Error uploading thumbnail:", error)
+
+    // Provide a user-friendly error message
+    let errorMessage = "Failed to upload thumbnail"
+    if (error instanceof Error) {
+      errorMessage = error.message
+
+      // Check for JSON parsing errors
+      if (errorMessage.includes("Unexpected token") && errorMessage.includes("not valid JSON")) {
+        errorMessage = "The server returned an invalid response. This may be due to the file being too large."
+      }
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to upload thumbnail",
+      error: errorMessage,
     }
   }
 }
 
-// And replace the uploadPhoto function with this simplified version:
-
+/**
+ * Upload a photo to Vercel Blob and add it to the business's photo album in Redis
+ */
 export async function uploadPhoto(formData: FormData) {
   try {
     const businessId = formData.get("businessId") as string
@@ -332,58 +457,69 @@ export async function uploadPhoto(formData: FormData) {
     const originalSize = file.size
 
     // Generate a unique filename
-    const format = "jpeg" // Default format
-    const filename = `${businessId}/photos/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${format}`
+    const extension = file.name.split(".").pop() || "jpeg"
+    const filename = `${businessId}/photos/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${extension}`
 
     // Upload to Vercel Blob directly without compression
     let blob
     try {
+      console.log(`Uploading photo to Vercel Blob: ${filename}, size: ${fileSizeMB.toFixed(2)}MB`)
+
+      // Create a new AbortController to set a timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
       blob = await put(filename, file, {
         access: "public",
         addRandomSuffix: false,
         contentType: file.type,
         maxSize: MAX_IMAGE_SIZE_MB * MB_IN_BYTES,
+        signal: controller.signal,
       })
+
+      // Clear the timeout if upload succeeds
+      clearTimeout(timeoutId)
+
+      console.log(`Photo uploaded successfully: ${blob.url}`)
     } catch (blobError) {
       console.error("Blob upload error:", blobError)
 
-      // Simple error handling without trying to parse anything
-      let errorMessage = "Failed to upload photo"
-
-      if (blobError instanceof Error) {
-        errorMessage = blobError.message
-      } else if (typeof blobError === "string") {
-        errorMessage = blobError
-      } else if (blobError && typeof blobError === "object") {
-        // Safely convert object to string without parsing
-        try {
-          errorMessage = String(blobError)
-        } catch (e) {
-          errorMessage = "Unknown upload error"
-        }
-      }
-
-      // Check for common error patterns
-      if (
-        errorMessage.includes("too large") ||
-        errorMessage.includes("exceeds") ||
-        errorMessage.includes("Request Entity Too Large") ||
-        errorMessage.includes("413")
-      ) {
+      // Handle AbortController timeout
+      if (blobError instanceof DOMException && blobError.name === "AbortError") {
         return {
           success: false,
-          error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
+          error: "Upload timed out. Please try again with a smaller file or check your network connection.",
         }
       }
 
+      // Handle HTTP errors
+      if (blobError instanceof Error) {
+        const errorMessage = blobError.message || "Unknown error"
+
+        if (
+          errorMessage.includes("413") ||
+          errorMessage.includes("Request Entity Too Large") ||
+          errorMessage.includes("too large") ||
+          errorMessage.includes("exceeds")
+        ) {
+          return {
+            success: false,
+            error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
+          }
+        }
+
+        return {
+          success: false,
+          error: `Upload failed: ${errorMessage.substring(0, 100)}`,
+        }
+      }
+
+      // Generic error handling
       return {
         success: false,
-        error: `Upload failed: ${errorMessage.substring(0, 100)}`,
+        error: "Failed to upload photo. Please try again with a smaller file.",
       }
     }
-
-    // Calculate compression savings (in this case, none)
-    const compressionSavings = 0
 
     // Create a media item
     const newPhoto: MediaItem = {
@@ -393,7 +529,6 @@ export async function uploadPhoto(formData: FormData) {
       contentType: blob.contentType,
       size: blob.size,
       originalSize,
-      compressionSavings,
       width: 1200, // Estimated width
       height: 800, // Estimated height
       createdAt: new Date().toISOString(),
@@ -405,10 +540,37 @@ export async function uploadPhoto(formData: FormData) {
     // Add the new photo to the album
     const updatedPhotoAlbum = [...(existingMedia.photoAlbum || []), newPhoto]
 
-    // Store reference in KV - ENSURE we stringify the photoAlbum array
-    await kv.hset(`business:${businessId}:media`, {
-      photoAlbum: JSON.stringify(updatedPhotoAlbum),
-    })
+    // Create a Redis key for the business media
+    const mediaKey = `business:${businessId}:media`
+
+    // Store the updated photo album in Redis
+    try {
+      console.log(`Storing updated photo album in Redis: ${mediaKey}`)
+
+      // Make sure the photo album is not null before stringifying
+      if (updatedPhotoAlbum && updatedPhotoAlbum.length >= 0) {
+        await kv.hset(mediaKey, {
+          photoAlbum: JSON.stringify(updatedPhotoAlbum),
+        })
+        console.log(`Photo album updated successfully with ${updatedPhotoAlbum.length} photos`)
+      } else {
+        console.warn("No valid photo album to store in Redis")
+      }
+    } catch (redisError) {
+      console.error(`Error storing photo album in Redis:`, redisError)
+
+      // If Redis storage fails, try to delete the uploaded blob to avoid orphaned files
+      try {
+        await del(filename)
+      } catch (deleteError) {
+        console.error(`Error deleting orphaned photo after Redis failure:`, deleteError)
+      }
+
+      return {
+        success: false,
+        error: `Failed to update photo album: ${redisError instanceof Error ? redisError.message : "Unknown error"}`,
+      }
+    }
 
     revalidatePath(`/ad-design/customize`)
 
@@ -419,9 +581,21 @@ export async function uploadPhoto(formData: FormData) {
     }
   } catch (error) {
     console.error("Error uploading photo:", error)
+
+    // Provide a user-friendly error message
+    let errorMessage = "Failed to upload photo"
+    if (error instanceof Error) {
+      errorMessage = error.message
+
+      // Check for JSON parsing errors
+      if (errorMessage.includes("Unexpected token") && errorMessage.includes("not valid JSON")) {
+        errorMessage = "The server returned an invalid response. This may be due to the file being too large."
+      }
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to upload photo",
+      error: errorMessage,
     }
   }
 }
@@ -451,7 +625,9 @@ export async function deletePhoto(businessId: string, photoId: string) {
 
     try {
       // Delete from Vercel Blob
+      console.log(`Deleting photo from Vercel Blob: ${photoId}`)
       await del(photoId)
+      console.log(`Photo deleted successfully from Blob storage`)
     } catch (deleteError) {
       console.error("Error deleting photo from Blob storage:", deleteError)
       // Continue with removing from the album even if blob deletion fails
@@ -460,10 +636,23 @@ export async function deletePhoto(businessId: string, photoId: string) {
     // Remove from the photo album
     const updatedPhotoAlbum = existingMedia.photoAlbum.filter((photo) => photo.id !== photoId)
 
-    // Update the KV store - ENSURE we stringify the photoAlbum array
-    await kv.hset(`business:${businessId}:media`, {
-      photoAlbum: JSON.stringify(updatedPhotoAlbum),
-    })
+    // Create a Redis key for the business media
+    const mediaKey = `business:${businessId}:media`
+
+    // Update the photo album in Redis
+    try {
+      console.log(`Updating photo album in Redis after deletion: ${mediaKey}`)
+      await kv.hset(mediaKey, {
+        photoAlbum: JSON.stringify(updatedPhotoAlbum),
+      })
+      console.log(`Photo album updated successfully with ${updatedPhotoAlbum.length} photos remaining`)
+    } catch (redisError) {
+      console.error(`Error updating photo album in Redis after deletion:`, redisError)
+      return {
+        success: false,
+        error: `Failed to update photo album after deletion: ${redisError instanceof Error ? redisError.message : "Unknown error"}`,
+      }
+    }
 
     revalidatePath(`/ad-design/customize`)
 
@@ -489,10 +678,15 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
       return null
     }
 
-    // Get the media data from KV
-    const mediaData = await kv.hgetall(`business:${businessId}:media`)
+    // Create a Redis key for the business media
+    const mediaKey = `business:${businessId}:media`
+
+    // Get the media data from Redis
+    console.log(`Fetching media data from Redis: ${mediaKey}`)
+    const mediaData = await kv.hgetall(mediaKey)
 
     if (!mediaData) {
+      console.log(`No media data found for business: ${businessId}`)
       return { photoAlbum: [] }
     }
 
@@ -507,7 +701,7 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
           photoAlbum = []
 
           // Fix the data in Redis by storing an empty array
-          await kv.hset(`business:${businessId}:media`, {
+          await kv.hset(mediaKey, {
             photoAlbum: JSON.stringify([]),
           })
         } else if (typeof mediaData.photoAlbum === "string") {
@@ -518,7 +712,7 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
           photoAlbum = mediaData.photoAlbum
 
           // Fix the data in Redis by storing it properly
-          await kv.hset(`business:${businessId}:media`, {
+          await kv.hset(mediaKey, {
             photoAlbum: JSON.stringify(mediaData.photoAlbum),
           })
         }
@@ -527,7 +721,7 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
         photoAlbum = []
 
         // Fix the data in Redis by storing an empty array
-        await kv.hset(`business:${businessId}:media`, {
+        await kv.hset(mediaKey, {
           photoAlbum: JSON.stringify([]),
         })
       }
@@ -543,6 +737,9 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
       photoAlbum,
     }
 
+    console.log(
+      `Retrieved media data for business ${businessId}: video: ${businessMedia.videoUrl ? "yes" : "no"}, thumbnail: ${businessMedia.thumbnailUrl ? "yes" : "no"}, photos: ${photoAlbum.length}`,
+    )
     return businessMedia
   } catch (error) {
     console.error("Error getting business media:", error)
@@ -566,41 +763,69 @@ export async function removeMediaItem(businessId: string, itemType: "video" | "t
       return { success: false, error: "No media found for this business" }
     }
 
+    // Create a Redis key for the business media
+    const mediaKey = `business:${businessId}:media`
+
     // Handle based on item type
     if (itemType === "video") {
       if (existingMedia.videoId) {
         try {
+          console.log(`Deleting video from Vercel Blob: ${existingMedia.videoId}`)
           await del(existingMedia.videoId)
+          console.log(`Video deleted successfully from Blob storage`)
         } catch (error) {
           console.error(`Error deleting video ${existingMedia.videoId}:`, error)
           // Continue even if deletion fails
         }
 
-        // Update KV to remove video references
-        await kv.hset(`business:${businessId}:media`, {
-          videoUrl: null,
-          videoContentType: null,
-          videoId: null,
-        })
+        // Update Redis to remove video references
+        try {
+          console.log(`Removing video references from Redis: ${mediaKey}`)
+          // Instead of setting to null, we'll use hdel to delete the fields
+          await kv.hdel(mediaKey, "videoUrl", "videoContentType", "videoId", "videoSize", "videoUploadedAt")
+          console.log(`Video references removed successfully from Redis`)
+        } catch (redisError) {
+          console.error(`Error removing video references from Redis:`, redisError)
+          return {
+            success: false,
+            error: `Failed to remove video references: ${redisError instanceof Error ? redisError.message : "Unknown error"}`,
+          }
+        }
       }
     } else if (itemType === "thumbnail") {
       if (existingMedia.thumbnailId) {
         try {
+          console.log(`Deleting thumbnail from Vercel Blob: ${existingMedia.thumbnailId}`)
           await del(existingMedia.thumbnailId)
+          console.log(`Thumbnail deleted successfully from Blob storage`)
         } catch (error) {
           console.error(`Error deleting thumbnail ${existingMedia.thumbnailId}:`, error)
           // Continue even if deletion fails
         }
 
-        // Update KV to remove thumbnail references
-        await kv.hset(`business:${businessId}:media`, {
-          thumbnailUrl: null,
-          thumbnailId: null,
-          thumbnailWidth: null,
-          thumbnailHeight: null,
-          thumbnailOriginalSize: null,
-          thumbnailCompressionSavings: null,
-        })
+        // Update Redis to remove thumbnail references
+        try {
+          console.log(`Removing thumbnail references from Redis: ${mediaKey}`)
+          // Instead of setting to null, we'll use hdel to delete the fields
+          await kv.hdel(
+            mediaKey,
+            "thumbnailUrl",
+            "thumbnailId",
+            "thumbnailContentType",
+            "thumbnailSize",
+            "thumbnailWidth",
+            "thumbnailHeight",
+            "thumbnailOriginalSize",
+            "thumbnailUploadedAt",
+          )
+          console.log(`Thumbnail references removed successfully from Redis`)
+        } catch (redisError) {
+          console.error(`Error removing thumbnail references from Redis:`, redisError)
+          return {
+            success: false,
+            error: `Failed to remove thumbnail references: ${redisError instanceof Error ? redisError.message : "Unknown error"}`,
+          }
+        }
       }
     }
 
@@ -635,7 +860,9 @@ export async function deleteAllBusinessMedia(businessId: string) {
     // Delete video if exists
     if (existingMedia.videoId) {
       try {
+        console.log(`Deleting video from Vercel Blob: ${existingMedia.videoId}`)
         await del(existingMedia.videoId)
+        console.log(`Video deleted successfully from Blob storage`)
       } catch (error) {
         console.error("Error deleting video:", error)
       }
@@ -644,7 +871,9 @@ export async function deleteAllBusinessMedia(businessId: string) {
     // Delete thumbnail if exists
     if (existingMedia.thumbnailId) {
       try {
+        console.log(`Deleting thumbnail from Vercel Blob: ${existingMedia.thumbnailId}`)
         await del(existingMedia.thumbnailId)
+        console.log(`Thumbnail deleted successfully from Blob storage`)
       } catch (error) {
         console.error("Error deleting thumbnail:", error)
       }
@@ -652,6 +881,7 @@ export async function deleteAllBusinessMedia(businessId: string) {
 
     // Delete all photos
     if (existingMedia.photoAlbum && existingMedia.photoAlbum.length > 0) {
+      console.log(`Deleting ${existingMedia.photoAlbum.length} photos from Blob storage`)
       for (const photo of existingMedia.photoAlbum) {
         try {
           await del(photo.id)
@@ -659,10 +889,22 @@ export async function deleteAllBusinessMedia(businessId: string) {
           console.error(`Error deleting photo ${photo.id}:`, error)
         }
       }
+      console.log(`All photos deleted from Blob storage`)
     }
 
-    // Delete the media record from KV
-    await kv.del(`business:${businessId}:media`)
+    // Delete the media record from Redis
+    try {
+      const mediaKey = `business:${businessId}:media`
+      console.log(`Deleting all media references from Redis: ${mediaKey}`)
+      await kv.del(mediaKey)
+      console.log(`All media references deleted successfully from Redis`)
+    } catch (redisError) {
+      console.error(`Error deleting media references from Redis:`, redisError)
+      return {
+        success: false,
+        error: `Failed to delete media references: ${redisError instanceof Error ? redisError.message : "Unknown error"}`,
+      }
+    }
 
     revalidatePath(`/ad-design/customize`)
 
@@ -691,13 +933,13 @@ export async function listBusinessBlobs(businessId: string) {
     const result = await list({ prefix: `${businessId}/` })
     console.log(`Found ${result.blobs.length} blobs`)
 
-    // If no blobs found via direct listing, try to get media from KV
+    // If no blobs found via direct listing, try to get media from Redis
     if (result.blobs.length === 0) {
-      console.log("No blobs found via direct listing, checking KV store")
+      console.log("No blobs found via direct listing, checking Redis store")
       const mediaData = await getBusinessMedia(businessId)
 
       if (mediaData) {
-        console.log("Found media data in KV store:", mediaData)
+        console.log("Found media data in Redis store:", mediaData)
         const allBlobs = []
 
         // Add video if exists
@@ -736,7 +978,7 @@ export async function listBusinessBlobs(businessId: string) {
         }
 
         if (allBlobs.length > 0) {
-          console.log(`Found ${allBlobs.length} media items in KV store`)
+          console.log(`Found ${allBlobs.length} media items in Redis store`)
           return {
             success: true,
             blobs: allBlobs,
@@ -768,10 +1010,15 @@ export async function saveMediaSettings(businessId: string, settings: any) {
       return { success: false, error: "Missing business ID" }
     }
 
-    // Store settings in KV - ENSURE we stringify the settings object
-    await kv.hset(`business:${businessId}:media`, {
+    // Create a Redis key for the business media
+    const mediaKey = `business:${businessId}:media`
+
+    // Store settings in Redis - ENSURE we stringify the settings object
+    console.log(`Saving media settings to Redis: ${mediaKey}`)
+    await kv.hset(mediaKey, {
       settings: JSON.stringify(settings),
     })
+    console.log(`Media settings saved successfully to Redis`)
 
     revalidatePath(`/ad-design/customize`)
 
@@ -794,10 +1041,15 @@ export async function getMediaSettings(businessId: string) {
       return null
     }
 
-    // Get the media data from KV
-    const mediaData = await kv.hgetall(`business:${businessId}:media`)
+    // Create a Redis key for the business media
+    const mediaKey = `business:${businessId}:media`
+
+    // Get the media data from Redis
+    console.log(`Fetching media settings from Redis: ${mediaKey}`)
+    const mediaData = await kv.hgetall(mediaKey)
 
     if (!mediaData || !mediaData.settings) {
+      console.log(`No media settings found for business: ${businessId}`)
       return null
     }
 
@@ -819,33 +1071,5 @@ export async function getMediaSettings(businessId: string) {
   } catch (error) {
     console.error("Error getting media settings:", error)
     return null
-  }
-}
-
-// Add this function to ensure we can get the complete media data in one call
-// Add this near the end of the file, before the last closing brace
-
-/**
- * Get complete business media data including settings
- */
-export async function getCompleteBusinessMedia(businessId: string) {
-  try {
-    if (!businessId) {
-      return null
-    }
-
-    // Get the media data
-    const mediaData = await getBusinessMedia(businessId)
-
-    // Get the settings
-    const settings = await getMediaSettings(businessId)
-
-    return {
-      ...mediaData,
-      settings,
-    }
-  } catch (error) {
-    console.error("Error getting complete business media:", error)
-    return { photoAlbum: [], settings: null }
   }
 }
