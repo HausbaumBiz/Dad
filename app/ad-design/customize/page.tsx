@@ -180,6 +180,11 @@ export default function CustomizeAdDesignPage() {
   const [videoRemoved, setVideoRemoved] = useState(false)
   const [thumbnailRemoved, setThumbnailRemoved] = useState(false)
 
+  // Add these new state variables after the other state declarations
+  const [queuedPhotos, setQueuedPhotos] = useState<File[]>([])
+  const [queuedPhotosPreviews, setQueuedPhotosPreviews] = useState<string[]>([])
+  const [isMobile, setIsMobile] = useState(false)
+
   // Set the color based on URL parameter
   useEffect(() => {
     if (colorParam && colorMap[colorParam]) {
@@ -215,6 +220,21 @@ export default function CustomizeAdDesignPage() {
     }
 
     fetchBusinessData()
+  }, [])
+
+  // Add this useEffect after the other useEffect hooks:
+  // Detect mobile devices
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+
+    return () => {
+      window.removeEventListener("resize", checkMobile)
+    }
   }, [])
 
   // Load saved media for the business
@@ -285,26 +305,53 @@ export default function CustomizeAdDesignPage() {
     }
   }
 
+  // Modify the handleImageUpload function to handle mobile differently
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0]
+
+      // For desktop, keep the existing behavior
+      if (!isMobile) {
+        setImageFile(file)
+
+        // Create preview URL
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          setImagePreview(event.target?.result as string)
+        }
+        reader.readAsDataURL(file)
+      }
+      // For mobile, add to queue instead of immediate upload
+      else {
+        // Create preview URL
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          setQueuedPhotosPreviews((prev) => [...prev, event.target?.result as string])
+        }
+        reader.readAsDataURL(file)
+
+        // Add to queue
+        setQueuedPhotos((prev) => [...prev, file])
+
+        // Reset the file input to allow selecting the same file again
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ""
+        }
+
+        toast({
+          title: "Photo queued",
+          description: "Photo will be uploaded when you save",
+        })
+      }
+    }
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
-  }
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setImageFile(file)
-
-      // Create preview URL
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        setImagePreview(event.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
   }
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -498,6 +545,12 @@ export default function CustomizeAdDesignPage() {
       })
     }
   }, [videoRef.current, verticalVideoRef.current, mobileVideoRef.current])
+
+  // Add a function to handle removing queued photos
+  const handleRemoveQueuedPhoto = (index: number) => {
+    setQueuedPhotos((prev) => prev.filter((_, i) => i !== index))
+    setQueuedPhotosPreviews((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const handleAddToPhotoAlbum = async () => {
     if (imageFile && imagePreview && businessId) {
@@ -751,6 +804,39 @@ export default function CustomizeAdDesignPage() {
       if (typeof window !== "undefined") {
         localStorage.setItem("hausbaum_selected_design", selectedDesign?.toString() || "")
         localStorage.setItem("hausbaum_selected_color", selectedColor)
+      }
+
+      // Upload queued photos if any
+      if (queuedPhotos.length > 0) {
+        setIsLoading(true)
+
+        // Upload each queued photo
+        for (const file of queuedPhotos) {
+          try {
+            const formData = new FormData()
+            formData.append("businessId", businessId)
+            formData.append("photo", file)
+
+            const result = await uploadPhoto(formData)
+
+            if (result.success && result.photo) {
+              // Add the new photo to the album
+              const newPhoto: PhotoItem = {
+                id: result.photo.id,
+                url: result.photo.url,
+                name: result.photo.filename,
+              }
+
+              setPhotos((prev) => [...prev, newPhoto])
+            }
+          } catch (error) {
+            console.error("Error uploading queued photo:", error)
+          }
+        }
+
+        // Clear the queue after uploading
+        setQueuedPhotos([])
+        setQueuedPhotosPreviews([])
       }
 
       toast({
@@ -2552,7 +2638,9 @@ export default function CustomizeAdDesignPage() {
                     <div className="space-y-4">
                       <div>
                         <Label htmlFor="imageUpload" className="block mb-2">
-                          Upload Images for Photo Album
+                          {isMobile
+                            ? "Upload Images for Photo Album (Queue for batch upload)"
+                            : "Upload Images for Photo Album"}
                         </Label>
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                           <input
@@ -2585,6 +2673,11 @@ export default function CustomizeAdDesignPage() {
                             </svg>
                             <span className="text-sm font-medium text-gray-700">Click to upload image</span>
                             <span className="text-xs text-gray-500 mt-1">JPG, PNG, WebP, GIF accepted</span>
+                            {isMobile && (
+                              <span className="text-xs text-amber-600 mt-1">
+                                On mobile, photos are queued and uploaded when you save
+                              </span>
+                            )}
                           </label>
                         </div>
                       </div>
@@ -2620,6 +2713,37 @@ export default function CustomizeAdDesignPage() {
                           >
                             Add to Photo Album
                           </Button>
+                        </div>
+                      )}
+
+                      {/* Queued Photos Section (Mobile Only) */}
+                      {isMobile && queuedPhotos.length > 0 && (
+                        <div className="mt-6">
+                          <h3 className="text-md font-medium mb-2">Queued Photos ({queuedPhotos.length})</h3>
+                          <p className="text-sm text-amber-600 mb-3">
+                            These photos will be uploaded when you press "Save and Continue"
+                          </p>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {queuedPhotosPreviews.map((preview, index) => (
+                              <div key={index} className="relative group">
+                                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                                  <img
+                                    src={preview || "/placeholder.svg"}
+                                    alt={`Queued photo ${index + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveQueuedPhoto(index)}
+                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-70 hover:opacity-100"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
 
@@ -2675,7 +2799,11 @@ export default function CustomizeAdDesignPage() {
                     style={{ backgroundColor: colorValues.primary }}
                     disabled={isLoading}
                   >
-                    {isLoading ? "Saving..." : "Save and Continue"}
+                    {isLoading
+                      ? "Saving..."
+                      : queuedPhotos.length > 0
+                        ? `Save and Upload ${queuedPhotos.length} Photo${queuedPhotos.length > 1 ? "s" : ""}`
+                        : "Save and Continue"}
                   </button>
                 </div>
               </form>
