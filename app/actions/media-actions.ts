@@ -691,6 +691,60 @@ export async function listBusinessBlobs(businessId: string) {
     const result = await list({ prefix: `${businessId}/` })
     console.log(`Found ${result.blobs.length} blobs`)
 
+    // If no blobs found via direct listing, try to get media from KV
+    if (result.blobs.length === 0) {
+      console.log("No blobs found via direct listing, checking KV store")
+      const mediaData = await getBusinessMedia(businessId)
+
+      if (mediaData) {
+        console.log("Found media data in KV store:", mediaData)
+        const allBlobs = []
+
+        // Add video if exists
+        if (mediaData.videoUrl && mediaData.videoId) {
+          allBlobs.push({
+            url: mediaData.videoUrl,
+            pathname: mediaData.videoId,
+            contentType: mediaData.videoContentType || "video/mp4",
+            size: 0, // Size unknown
+            uploadedAt: new Date().toISOString(),
+          })
+        }
+
+        // Add thumbnail if exists
+        if (mediaData.thumbnailUrl && mediaData.thumbnailId) {
+          allBlobs.push({
+            url: mediaData.thumbnailUrl,
+            pathname: mediaData.thumbnailId,
+            contentType: "image/jpeg", // Assuming JPEG
+            size: 0, // Size unknown
+            uploadedAt: new Date().toISOString(),
+          })
+        }
+
+        // Add photos from album
+        if (mediaData.photoAlbum && mediaData.photoAlbum.length > 0) {
+          mediaData.photoAlbum.forEach((photo) => {
+            allBlobs.push({
+              url: photo.url,
+              pathname: photo.id,
+              contentType: photo.contentType,
+              size: photo.size,
+              uploadedAt: photo.createdAt,
+            })
+          })
+        }
+
+        if (allBlobs.length > 0) {
+          console.log(`Found ${allBlobs.length} media items in KV store`)
+          return {
+            success: true,
+            blobs: allBlobs,
+          }
+        }
+      }
+    }
+
     return {
       success: true,
       blobs: result.blobs || [], // Ensure we always return an array

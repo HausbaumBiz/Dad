@@ -87,28 +87,47 @@ export async function getUserByEmail(email: string) {
 // Verify user credentials
 export async function verifyCredentials(email: string, password: string) {
   try {
+    console.log(`Verifying credentials for email: ${email}`)
+
     // Get user by email
     const userId = await kv.get<string>(`user:email:${email}`)
+    console.log(`User ID lookup result: ${userId || "not found"}`)
+
     if (!userId) {
       return { success: false, message: "Invalid email or password" }
     }
 
     // Get user data
     const user = await getUserById(userId)
+    console.log(`User data lookup result: ${user ? "found" : "not found"}`)
+
     if (!user) {
       return { success: false, message: "User not found" }
     }
 
     // Verify password
-    const isMatch = await bcrypt.compare(password, user.passwordHash)
-    if (!isMatch) {
-      return { success: false, message: "Invalid email or password" }
-    }
+    try {
+      const isMatch = await bcrypt.compare(password, user.passwordHash)
+      console.log(`Password verification result: ${isMatch ? "match" : "no match"}`)
 
-    return { success: true, userId, message: "Login successful" }
+      if (!isMatch) {
+        return { success: false, message: "Invalid email or password" }
+      }
+
+      return { success: true, userId, message: "Login successful" }
+    } catch (bcryptError) {
+      console.error("Error comparing passwords:", bcryptError)
+      return { success: false, message: "Error verifying password" }
+    }
   } catch (error) {
-    console.error("Error verifying credentials:", error)
-    return { success: false, message: "Authentication failed" }
+    console.error("Error in verifyCredentials:", error)
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? `Authentication error: ${error.message}`
+          : "Authentication failed due to an unexpected error",
+    }
   }
 }
 

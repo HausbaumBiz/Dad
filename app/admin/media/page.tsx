@@ -36,6 +36,7 @@ export default function AdminMediaPage() {
 
     setIsLoading(true)
     try {
+      console.log(`Searching for media with business ID: ${businessId}`)
       const result = await listBusinessBlobs(businessId)
       console.log("Search result:", result) // Add debugging
 
@@ -204,7 +205,7 @@ export default function AdminMediaPage() {
                             {isImage(blob.contentType) ? (
                               <LazyImage
                                 src={blob.url}
-                                alt={blob.pathname.split("/").pop()}
+                                alt={blob.pathname ? blob.pathname.split("/").pop() : "Image"}
                                 className="w-full h-full object-cover"
                               />
                             ) : isVideo(blob.contentType) ? (
@@ -223,8 +224,12 @@ export default function AdminMediaPage() {
                             </div>
                           </div>
                           <CardContent className="p-2">
-                            <div className="truncate text-sm font-medium">{blob.pathname.split("/").pop()}</div>
-                            <div className="text-xs text-gray-500">{formatSize(blob.size)}</div>
+                            <div className="truncate text-sm font-medium">
+                              {blob.pathname ? blob.pathname.split("/").pop() : "Unknown file"}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {blob.size ? formatSize(blob.size) : "Unknown size"}
+                            </div>
                           </CardContent>
                         </Card>
                       ) : (
@@ -233,9 +238,12 @@ export default function AdminMediaPage() {
                             {getMediaIcon(blob.contentType)}
                           </div>
                           <div className="flex-grow min-w-0">
-                            <div className="truncate text-sm font-medium">{blob.pathname.split("/").pop()}</div>
+                            <div className="truncate text-sm font-medium">
+                              {blob.pathname ? blob.pathname.split("/").pop() : "Unknown file"}
+                            </div>
                             <div className="text-xs text-gray-500">
-                              {blob.contentType} • {formatSize(blob.size)}
+                              {blob.contentType || "Unknown type"} •{" "}
+                              {blob.size ? formatSize(blob.size) : "Unknown size"}
                             </div>
                           </div>
                           <Button variant="ghost" size="icon" onClick={() => openPreview(blob)}>
@@ -279,15 +287,17 @@ export default function AdminMediaPage() {
                                 rel="noopener noreferrer"
                                 className="text-blue-500 hover:underline"
                               >
-                                {blob.pathname.split("/").pop()}
+                                {blob.pathname ? blob.pathname.split("/").pop() : "Unknown file"}
                               </a>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatSize(blob.size)}
+                              {blob.size ? formatSize(blob.size) : "Unknown"}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{blob.contentType}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {new Date(blob.uploadedAt).toLocaleString()}
+                              {blob.contentType || "Unknown"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {blob.uploadedAt ? new Date(blob.uploadedAt).toLocaleString() : "Unknown"}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <Button variant="ghost" size="sm" onClick={() => openPreview(blob)}>
@@ -319,7 +329,7 @@ export default function AdminMediaPage() {
                 {isImage(selectedMedia.contentType) ? (
                   <LazyImage
                     src={selectedMedia.url}
-                    alt={selectedMedia.pathname.split("/").pop()}
+                    alt={selectedMedia.pathname ? selectedMedia.pathname.split("/").pop() : "Image"}
                     className="max-w-full max-h-[500px] object-contain"
                   />
                 ) : isVideo(selectedMedia.contentType) ? (
@@ -333,16 +343,20 @@ export default function AdminMediaPage() {
               </div>
 
               <div className="space-y-2">
-                <h3 className="font-medium">{selectedMedia.pathname.split("/").pop()}</h3>
+                <h3 className="font-medium">
+                  {selectedMedia.pathname ? selectedMedia.pathname.split("/").pop() : "Unknown filename"}
+                </h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="text-gray-500">Type:</div>
-                  <div>{selectedMedia.contentType}</div>
+                  <div>{selectedMedia.contentType || "Unknown"}</div>
 
                   <div className="text-gray-500">Size:</div>
-                  <div>{formatSize(selectedMedia.size)}</div>
+                  <div>{selectedMedia.size ? formatSize(selectedMedia.size) : "Unknown"}</div>
 
                   <div className="text-gray-500">Uploaded:</div>
-                  <div>{new Date(selectedMedia.uploadedAt).toLocaleString()}</div>
+                  <div>
+                    {selectedMedia.uploadedAt ? new Date(selectedMedia.uploadedAt).toLocaleString() : "Unknown"}
+                  </div>
 
                   <div className="text-gray-500">URL:</div>
                   <div className="truncate">{selectedMedia.url}</div>

@@ -58,16 +58,16 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
     "zod": "^3.24.1",
-    "@vercel/kv": "latest",
-    "uuid": "latest",
-    "bcryptjs": "latest",
     "crypto": "latest",
     "fs": "latest",
     "path": "latest",
+    "@vercel/kv": "latest",
     "@upstash/redis": "latest",
     "@vercel/blob": "latest",
+    "uuid": "latest",
     "browser-image-compression": "latest",
-    "sharp": "latest"
+    "sharp": "latest",
+    "bcryptjs": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
