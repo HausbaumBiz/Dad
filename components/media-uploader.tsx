@@ -62,34 +62,47 @@ export function MediaUploader({ businessId, type, designId, onUploadComplete }: 
     } else if (type === "thumbnail" || type === "photo") {
       // For images, we'll process them first if needed
       if (type === "thumbnail" && compressionSettings.enabled) {
-        // Process the image on the server
-        const processResult = await processImage(selectedFile, {
-          quality: compressionSettings.quality,
-          maxWidth: compressionSettings.maxWidth,
-          maxHeight: compressionSettings.maxHeight,
-          format: compressionSettings.format,
-        })
-
-        if (processResult.success && processResult.data) {
-          // Convert base64 to File
-          const base64Data = processResult.data
-          const byteCharacters = atob(base64Data)
-          const byteArrays = []
-
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteArrays.push(byteCharacters.charCodeAt(i))
-          }
-
-          const byteArray = new Uint8Array(byteArrays)
-          const processedFile = new File([byteArray], selectedFile.name, {
-            type: processResult.contentType || selectedFile.type,
+        try {
+          // Process the image on the server
+          const processResult = await processImage(selectedFile, {
+            quality: compressionSettings.quality,
+            maxWidth: compressionSettings.maxWidth,
+            maxHeight: compressionSettings.maxHeight,
+            format: compressionSettings.format,
           })
 
-          // Upload the processed file
-          result =
-            type === "thumbnail" ? await handleThumbnailUpload(processedFile) : await handlePhotoUpload(processedFile)
-        } else {
-          // Fall back to original file if processing failed
+          if (processResult.success && processResult.data) {
+            // If there was a warning but processing succeeded with fallback
+            if (processResult.warning) {
+              console.warn("Image processing warning:", processResult.warning)
+            }
+
+            // Convert base64 to File
+            const base64Data = processResult.data
+            const byteCharacters = atob(base64Data)
+            const byteArrays = []
+
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteArrays.push(byteCharacters.charCodeAt(i))
+            }
+
+            const byteArray = new Uint8Array(byteArrays)
+            const processedFile = new File([byteArray], selectedFile.name, {
+              type: processResult.contentType || selectedFile.type,
+            })
+
+            // Upload the processed file
+            result =
+              type === "thumbnail" ? await handleThumbnailUpload(processedFile) : await handlePhotoUpload(processedFile)
+          } else {
+            // Fall back to original file if processing failed
+            console.warn("Image processing failed, using original file")
+            result =
+              type === "thumbnail" ? await handleThumbnailUpload(selectedFile) : await handlePhotoUpload(selectedFile)
+          }
+        } catch (processingError) {
+          console.error("Error during image processing:", processingError)
+          // Fall back to original file if any exception occurs
           result =
             type === "thumbnail" ? await handleThumbnailUpload(selectedFile) : await handlePhotoUpload(selectedFile)
         }

@@ -108,20 +108,77 @@ export async function uploadVideo(formData: FormData) {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
 
-      blob = await put(filename, file, {
-        access: "public",
-        addRandomSuffix: false,
-        contentType: file.type,
-        maxSize: MAX_VIDEO_SIZE_MB * MB_IN_BYTES,
-        signal: controller.signal,
-      })
+      // Use a try-catch block specifically for the put operation
+      try {
+        blob = await put(filename, file, {
+          access: "public",
+          addRandomSuffix: false,
+          contentType: file.type,
+          maxSize: MAX_VIDEO_SIZE_MB * MB_IN_BYTES,
+          signal: controller.signal,
+        })
+      } catch (putError) {
+        // Handle specific error cases from the put operation
+        console.error("Error during Vercel Blob put operation:", putError)
 
-      // Clear the timeout if upload succeeds
-      clearTimeout(timeoutId)
+        // Check if it's a Response object (from fetch)
+        if (putError instanceof Response) {
+          const status = putError.status
+          const text = await putError.text() // Get the response text instead of trying to parse JSON
+
+          if (status === 413) {
+            return {
+              success: false,
+              error: `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB.`,
+            }
+          }
+
+          return {
+            success: false,
+            error: `Upload failed with status ${status}: ${text.substring(0, 100)}`,
+          }
+        }
+
+        // If it's a DOMException from the AbortController
+        if (putError instanceof DOMException && putError.name === "AbortError") {
+          return {
+            success: false,
+            error: "Upload timed out. Please try again with a smaller file or check your network connection.",
+          }
+        }
+
+        // For any other error type
+        return {
+          success: false,
+          error: putError instanceof Error ? putError.message : "Unknown upload error",
+        }
+      } finally {
+        // Clear the timeout regardless of success or failure
+        clearTimeout(timeoutId)
+      }
 
       console.log(`Video uploaded successfully: ${blob.url}`)
     } catch (blobError) {
       console.error("Blob upload error:", blobError)
+
+      // Handle non-JSON responses
+      if (blobError instanceof Error && blobError.message.includes("is not valid JSON")) {
+        // Extract the actual error message from the error
+        const errorMatch = blobError.message.match(/'([^']*)/)
+        const actualError = errorMatch ? errorMatch[1] : "Request Entity Too Large"
+
+        if (actualError.includes("Request Entity Too Large") || actualError.includes("413")) {
+          return {
+            success: false,
+            error: `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB.`,
+          }
+        }
+
+        return {
+          success: false,
+          error: `Upload failed: ${actualError}`,
+        }
+      }
 
       // Handle AbortController timeout
       if (blobError instanceof DOMException && blobError.name === "AbortError") {
@@ -157,6 +214,14 @@ export async function uploadVideo(formData: FormData) {
       return {
         success: false,
         error: "Failed to upload video. Please try again with a smaller file.",
+      }
+    }
+
+    // If blob is undefined, return an error
+    if (!blob) {
+      return {
+        success: false,
+        error: "Upload failed. No response from storage service.",
       }
     }
 
@@ -241,7 +306,10 @@ export async function uploadVideo(formData: FormData) {
 
       // Check for JSON parsing errors
       if (errorMessage.includes("Unexpected token") && errorMessage.includes("not valid JSON")) {
-        errorMessage = "The server returned an invalid response. This may be due to the file being too large."
+        const errorMatch = errorMessage.match(/'([^']*)/)
+        errorMessage = errorMatch
+          ? `Server error: ${errorMatch[1]}`
+          : "The server returned an invalid response. This may be due to the file being too large."
       }
     }
 
@@ -304,20 +372,76 @@ export async function uploadThumbnail(formData: FormData) {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
-      blob = await put(filename, file, {
-        access: "public",
-        addRandomSuffix: false,
-        contentType: file.type,
-        maxSize: MAX_IMAGE_SIZE_MB * MB_IN_BYTES,
-        signal: controller.signal,
-      })
+      try {
+        blob = await put(filename, file, {
+          access: "public",
+          addRandomSuffix: false,
+          contentType: file.type,
+          maxSize: MAX_IMAGE_SIZE_MB * MB_IN_BYTES,
+          signal: controller.signal,
+        })
+      } catch (putError) {
+        // Handle specific error cases from the put operation
+        console.error("Error during Vercel Blob put operation:", putError)
 
-      // Clear the timeout if upload succeeds
-      clearTimeout(timeoutId)
+        // Check if it's a Response object (from fetch)
+        if (putError instanceof Response) {
+          const status = putError.status
+          const text = await putError.text() // Get the response text instead of trying to parse JSON
+
+          if (status === 413) {
+            return {
+              success: false,
+              error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
+            }
+          }
+
+          return {
+            success: false,
+            error: `Upload failed with status ${status}: ${text.substring(0, 100)}`,
+          }
+        }
+
+        // If it's a DOMException from the AbortController
+        if (putError instanceof DOMException && putError.name === "AbortError") {
+          return {
+            success: false,
+            error: "Upload timed out. Please try again with a smaller file or check your network connection.",
+          }
+        }
+
+        // For any other error type
+        return {
+          success: false,
+          error: putError instanceof Error ? putError.message : "Unknown upload error",
+        }
+      } finally {
+        // Clear the timeout regardless of success or failure
+        clearTimeout(timeoutId)
+      }
 
       console.log(`Thumbnail uploaded successfully: ${blob.url}`)
     } catch (blobError) {
       console.error("Blob upload error:", blobError)
+
+      // Handle non-JSON responses
+      if (blobError instanceof Error && blobError.message.includes("is not valid JSON")) {
+        // Extract the actual error message from the error
+        const errorMatch = blobError.message.match(/'([^']*)/)
+        const actualError = errorMatch ? errorMatch[1] : "Request Entity Too Large"
+
+        if (actualError.includes("Request Entity Too Large") || actualError.includes("413")) {
+          return {
+            success: false,
+            error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
+          }
+        }
+
+        return {
+          success: false,
+          error: `Upload failed: ${actualError}`,
+        }
+      }
 
       // Handle AbortController timeout
       if (blobError instanceof DOMException && blobError.name === "AbortError") {
@@ -353,6 +477,14 @@ export async function uploadThumbnail(formData: FormData) {
       return {
         success: false,
         error: "Failed to upload thumbnail. Please try again with a smaller file.",
+      }
+    }
+
+    // If blob is undefined, return an error
+    if (!blob) {
+      return {
+        success: false,
+        error: "Upload failed. No response from storage service.",
       }
     }
 
@@ -421,7 +553,10 @@ export async function uploadThumbnail(formData: FormData) {
 
       // Check for JSON parsing errors
       if (errorMessage.includes("Unexpected token") && errorMessage.includes("not valid JSON")) {
-        errorMessage = "The server returned an invalid response. This may be due to the file being too large."
+        const errorMatch = errorMessage.match(/'([^']*)/)
+        errorMessage = errorMatch
+          ? `Server error: ${errorMatch[1]}`
+          : "The server returned an invalid response. This may be due to the file being too large."
       }
     }
 
@@ -469,20 +604,76 @@ export async function uploadPhoto(formData: FormData) {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
-      blob = await put(filename, file, {
-        access: "public",
-        addRandomSuffix: false,
-        contentType: file.type,
-        maxSize: MAX_IMAGE_SIZE_MB * MB_IN_BYTES,
-        signal: controller.signal,
-      })
+      try {
+        blob = await put(filename, file, {
+          access: "public",
+          addRandomSuffix: false,
+          contentType: file.type,
+          maxSize: MAX_IMAGE_SIZE_MB * MB_IN_BYTES,
+          signal: controller.signal,
+        })
+      } catch (putError) {
+        // Handle specific error cases from the put operation
+        console.error("Error during Vercel Blob put operation:", putError)
 
-      // Clear the timeout if upload succeeds
-      clearTimeout(timeoutId)
+        // Check if it's a Response object (from fetch)
+        if (putError instanceof Response) {
+          const status = putError.status
+          const text = await putError.text() // Get the response text instead of trying to parse JSON
+
+          if (status === 413) {
+            return {
+              success: false,
+              error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
+            }
+          }
+
+          return {
+            success: false,
+            error: `Upload failed with status ${status}: ${text.substring(0, 100)}`,
+          }
+        }
+
+        // If it's a DOMException from the AbortController
+        if (putError instanceof DOMException && putError.name === "AbortError") {
+          return {
+            success: false,
+            error: "Upload timed out. Please try again with a smaller file or check your network connection.",
+          }
+        }
+
+        // For any other error type
+        return {
+          success: false,
+          error: putError instanceof Error ? putError.message : "Unknown upload error",
+        }
+      } finally {
+        // Clear the timeout regardless of success or failure
+        clearTimeout(timeoutId)
+      }
 
       console.log(`Photo uploaded successfully: ${blob.url}`)
     } catch (blobError) {
       console.error("Blob upload error:", blobError)
+
+      // Handle non-JSON responses
+      if (blobError instanceof Error && blobError.message.includes("is not valid JSON")) {
+        // Extract the actual error message from the error
+        const errorMatch = blobError.message.match(/'([^']*)/)
+        const actualError = errorMatch ? errorMatch[1] : "Request Entity Too Large"
+
+        if (actualError.includes("Request Entity Too Large") || actualError.includes("413")) {
+          return {
+            success: false,
+            error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
+          }
+        }
+
+        return {
+          success: false,
+          error: `Upload failed: ${actualError}`,
+        }
+      }
 
       // Handle AbortController timeout
       if (blobError instanceof DOMException && blobError.name === "AbortError") {
@@ -518,6 +709,14 @@ export async function uploadPhoto(formData: FormData) {
       return {
         success: false,
         error: "Failed to upload photo. Please try again with a smaller file.",
+      }
+    }
+
+    // If blob is undefined, return an error
+    if (!blob) {
+      return {
+        success: false,
+        error: "Upload failed. No response from storage service.",
       }
     }
 
@@ -589,7 +788,10 @@ export async function uploadPhoto(formData: FormData) {
 
       // Check for JSON parsing errors
       if (errorMessage.includes("Unexpected token") && errorMessage.includes("not valid JSON")) {
-        errorMessage = "The server returned an invalid response. This may be due to the file being too large."
+        const errorMatch = errorMessage.match(/'([^']*)/)
+        errorMessage = errorMatch
+          ? `Server error: ${errorMatch[1]}`
+          : "The server returned an invalid response. This may be due to the file being too large."
       }
     }
 

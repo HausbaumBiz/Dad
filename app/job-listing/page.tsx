@@ -181,9 +181,13 @@ export default function JobListingPage() {
       const result = await saveJobListing(formData, businessId)
 
       if (result.success) {
-        // Show confirmation dialog instead of redirecting
-        setIsConfirmationOpen(true)
+        // Brief timeout for better UX
+        setTimeout(() => {
+          setIsSaving(false)
+          setIsConfirmationOpen(true)
+        }, 300)
       } else {
+        setIsSaving(false)
         toast({
           title: "Error Saving Job Listing",
           description: result.message,
@@ -192,13 +196,12 @@ export default function JobListingPage() {
       }
     } catch (error) {
       console.error("Error saving job listing:", error)
+      setIsSaving(false)
       toast({
         title: "Error Saving Job Listing",
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       })
-    } finally {
-      setIsSaving(false)
     }
   }
 
@@ -1330,14 +1333,32 @@ export default function JobListingPage() {
       <Dialog open={isConfirmationOpen} onOpenChange={setIsConfirmationOpen}>
         <DialogContent className="sm:max-w-md">
           <div className="flex flex-col items-center justify-center p-6 text-center">
-            <div className="mb-5 rounded-full bg-green-100 p-3">
+            <div className="mb-5 rounded-full bg-green-100 p-3 animate-pulse">
               <Check className="h-8 w-8 text-green-600" />
             </div>
             <DialogTitle className="text-xl font-semibold mb-2">Your Job Listing has been added</DialogTitle>
             <p className="text-gray-600 mb-6">Your job listing has been successfully saved and added to your Ad-Box.</p>
-            <Button onClick={() => setIsConfirmationOpen(false)} className="min-w-[100px]">
-              OK
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsConfirmationOpen(false)
+                  // Optional: Reset form or other state if needed
+                }}
+                className="min-w-[100px]"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsConfirmationOpen(false)
+                  router.push("/ad-workbench")
+                }}
+                className="min-w-[100px]"
+              >
+                View Ad-Box
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
