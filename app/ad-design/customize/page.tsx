@@ -338,7 +338,35 @@ export default function CustomizeAdDesignPage() {
         const compressedSize = compressedFile.size
         const percentSaved = Math.round(((originalSize - compressedSize) / originalSize) * 100)
 
-        if (percentSaved > 10) {
+        // Upload the compressed thumbnail immediately
+        if (businessId) {
+          const formData = new FormData()
+          formData.append("businessId", businessId)
+          formData.append("thumbnail", compressedFile)
+
+          const result = await uploadThumbnail(formData)
+
+          if (result.success) {
+            toast({
+              title: "Thumbnail uploaded",
+              description:
+                percentSaved > 10
+                  ? `Thumbnail uploaded successfully! (Reduced by ${percentSaved}%)`
+                  : "Thumbnail uploaded successfully!",
+            })
+
+            // Update the preview with the URL from the server
+            if (result.url) {
+              setThumbnailPreview(result.url)
+            }
+          } else {
+            toast({
+              title: "Error",
+              description: result.error || "Failed to upload thumbnail. Please try again.",
+              variant: "destructive",
+            })
+          }
+        } else if (percentSaved > 10) {
           toast({
             title: "Thumbnail compressed",
             description: `Reduced from ${formatFileSize(originalSize)} to ${formatFileSize(compressedSize)} (${percentSaved}% smaller)`,
@@ -360,6 +388,12 @@ export default function CustomizeAdDesignPage() {
 
         // Ensure thumbnail is shown
         setShowThumbnail(true)
+
+        toast({
+          title: "Warning",
+          description: "Could not compress the image. Using original size.",
+          variant: "destructive",
+        })
       } finally {
         setIsCompressing(false)
       }
@@ -643,7 +677,8 @@ export default function CustomizeAdDesignPage() {
         }
       }
 
-      // Handle thumbnail removal if requested
+      // In the handleSubmit function, replace the thumbnail upload section with:
+      // We don't need to upload the thumbnail again since we already uploaded it when selected
       if (thumbnailRemoved) {
         try {
           const existingMedia = await getBusinessMedia(businessId)
@@ -695,43 +730,6 @@ export default function CustomizeAdDesignPage() {
           toast({
             title: "Error",
             description: error.message || "Failed to upload video. Please try a smaller file or different format.",
-            variant: "destructive",
-          })
-          setIsLoading(false)
-          return
-        }
-      }
-
-      // Upload thumbnail if selected
-      if (formData.thumbnailFile) {
-        try {
-          // Check file size before attempting upload
-          const fileSizeMB = formData.thumbnailFile.size / (1024 * 1024)
-          if (fileSizeMB > 10) {
-            // 10MB limit
-            toast({
-              title: "Error",
-              description: `Thumbnail file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 10MB.`,
-              variant: "destructive",
-            })
-            setIsLoading(false)
-            return
-          }
-
-          const thumbnailFormData = new FormData()
-          thumbnailFormData.append("businessId", businessId)
-          thumbnailFormData.append("thumbnail", formData.thumbnailFile)
-
-          const thumbnailResult = await uploadThumbnail(thumbnailFormData)
-
-          if (!thumbnailResult.success) {
-            throw new Error(thumbnailResult.error || "Failed to upload thumbnail")
-          }
-        } catch (error: any) {
-          console.error("Error uploading thumbnail:", error)
-          toast({
-            title: "Error",
-            description: error.message || "Failed to upload thumbnail. Please try a smaller file or different format.",
             variant: "destructive",
           })
           setIsLoading(false)

@@ -280,7 +280,22 @@ export async function uploadThumbnail(formData: FormData) {
     const extension = file.name.split(".").pop() || "jpeg"
     const filename = `${businessId}/thumbnails/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${extension}`
 
-    // Upload to Vercel Blob directly without compression
+    // Get existing media data to check for previous thumbnail
+    const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [] }
+
+    // If there's an existing thumbnail, delete it
+    if (existingMedia.thumbnailId) {
+      try {
+        console.log(`Deleting previous thumbnail: ${existingMedia.thumbnailId}`)
+        await del(existingMedia.thumbnailId)
+        console.log(`Successfully deleted previous thumbnail: ${existingMedia.thumbnailId}`)
+      } catch (deleteError) {
+        console.error(`Error deleting previous thumbnail ${existingMedia.thumbnailId}:`, deleteError)
+        // Continue even if deletion fails - we'll overwrite the reference anyway
+      }
+    }
+
+    // Upload to Vercel Blob directly
     let blob
     try {
       console.log(`Uploading thumbnail to Vercel Blob: ${filename}, size: ${fileSizeMB.toFixed(2)}MB`)
@@ -338,21 +353,6 @@ export async function uploadThumbnail(formData: FormData) {
       return {
         success: false,
         error: "Failed to upload thumbnail. Please try again with a smaller file.",
-      }
-    }
-
-    // Get existing media data
-    const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [] }
-
-    // If there's an existing thumbnail, delete it
-    if (existingMedia.thumbnailId) {
-      try {
-        console.log(`Deleting previous thumbnail: ${existingMedia.thumbnailId}`)
-        await del(existingMedia.thumbnailId)
-        console.log(`Successfully deleted previous thumbnail: ${existingMedia.thumbnailId}`)
-      } catch (deleteError) {
-        console.error(`Error deleting previous thumbnail ${existingMedia.thumbnailId}:`, deleteError)
-        // Continue even if deletion fails - we'll overwrite the reference anyway
       }
     }
 
