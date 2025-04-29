@@ -1,4 +1,6 @@
 import Link from "next/link"
+import Image from "next/image"
+
 export function MainHeader() {
   return (
     <header className="bg-white border-b border-gray-200 py-4 md:py-6">

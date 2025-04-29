@@ -1,6 +1,6 @@
 "use server"
 
-import { kv } from '@vercel/kv'
+import { kv } from "@vercel/kv"
 import { getUser } from "@/lib/user"
 import { revalidatePath } from "next/cache"
 
@@ -64,11 +64,11 @@ export async function getAdDesignData() {
 export async function loadBusinessAdDesign(businessId: string) {
   try {
     // const kv = getKv(); // Assuming getKv() is defined elsewhere or not needed
-    const key = `business:${businessId}:ad-design`;
-    const savedDesign = await kv.get(key);
-    return savedDesign;
+    const key = `business:${businessId}:ad-design`
+    const savedDesign = await kv.get(key)
+    return savedDesign
   } catch (error) {
-    console.error("Error loading business ad design:", error);
-    return null;
+    console.error("Error loading business ad design:", error)
+    return null
   }
 }
