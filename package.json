@@ -65,9 +65,9 @@
     "@upstash/redis": "latest",
     "@vercel/blob": "latest",
     "uuid": "latest",
-    "browser-image-compression": "latest",
     "sharp": "latest",
-    "bcryptjs": "latest"
+    "bcryptjs": "latest",
+    "browser-image-compression": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

@@ -7,9 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Play, Pause } from "lucide-react"
-import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react"
+import { X, Trash2 } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
@@ -32,6 +31,7 @@ import Link from "next/link"
 
 // First, add the import for the FileSizeWarning component
 import { FileSizeWarning } from "@/components/file-size-warning"
+import { compressImage, formatFileSize } from "@/lib/media-utils"
 
 import { del } from "@vercel/blob"
 import { kv } from "@vercel/kv"
@@ -123,32 +123,6 @@ export default function CustomizeAdDesignPage() {
     }))
   }
 
-  // Add sample coupons data
-  const sampleCoupons = [
-    {
-      id: "1",
-      businessName: formData.businessName,
-      title: "Summer Special",
-      discount: "20% OFF",
-      description: "Get 20% off on all summer products",
-      code: "SUMMER20",
-      startDate: "2025-06-01",
-      expirationDate: "2025-08-31",
-      terms: "No cash value. Cannot be combined with other offers.",
-    },
-    {
-      id: "2",
-      businessName: formData.businessName,
-      title: "New Customer",
-      discount: "$10 OFF",
-      description: "First-time customers get $10 off their purchase",
-      code: "NEWCUST10",
-      startDate: "2025-01-01",
-      expirationDate: "2025-12-31",
-      terms: "Valid for first-time customers only.",
-    },
-  ]
-
   // Photo album state
   const [photos, setPhotos] = useState<PhotoItem[]>([])
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
@@ -179,6 +153,13 @@ export default function CustomizeAdDesignPage() {
   // Add these state variables after the other state declarations
   const [videoRemoved, setVideoRemoved] = useState(false)
   const [thumbnailRemoved, setThumbnailRemoved] = useState(false)
+  // Add state for compression stats
+  const [compressionStats, setCompressionStats] = useState<{
+    originalSize: number
+    compressedSize: number
+    percentSaved: number
+  } | null>(null)
+  const [isCompressing, setIsCompressing] = useState(false)
 
   // Set the color based on URL parameter
   useEffect(() => {
@@ -323,72 +304,66 @@ export default function CustomizeAdDesignPage() {
     }
   }
 
-  const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
-      setThumbnailFile(file)
-      setFormData((prev) => ({ ...prev, thumbnailFile: file }))
 
-      // Create preview URL
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        setThumbnailPreview(event.target?.result as string)
+      try {
+        // Show loading state
+        setIsCompressing(true)
+        toast({
+          title: "Processing thumbnail",
+          description: "Compressing thumbnail for upload...",
+        })
+
+        // Compress the thumbnail
+        const compressedFile = await compressImage(file, 0.8, 1200)
+
+        // Set the compressed file
+        setThumbnailFile(compressedFile)
+        setFormData((prev) => ({ ...prev, thumbnailFile: compressedFile }))
+
+        // Create preview URL
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          setThumbnailPreview(event.target?.result as string)
+        }
+        reader.readAsDataURL(compressedFile)
+
+        // Ensure thumbnail is shown
+        setShowThumbnail(true)
+
+        // Show compression stats in toast
+        const originalSize = file.size
+        const compressedSize = compressedFile.size
+        const percentSaved = Math.round(((originalSize - compressedSize) / originalSize) * 100)
+
+        if (percentSaved > 10) {
+          toast({
+            title: "Thumbnail compressed",
+            description: `Reduced from ${formatFileSize(originalSize)} to ${formatFileSize(compressedSize)} (${percentSaved}% smaller)`,
+          })
+        }
+      } catch (error) {
+        console.error("Error compressing thumbnail:", error)
+
+        // Fallback to original file if compression fails
+        setThumbnailFile(file)
+        setFormData((prev) => ({ ...prev, thumbnailFile: file }))
+
+        // Create preview URL for original file
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          setThumbnailPreview(event.target?.result as string)
+        }
+        reader.readAsDataURL(file)
+
+        // Ensure thumbnail is shown
+        setShowThumbnail(true)
+      } finally {
+        setIsCompressing(false)
       }
-      reader.readAsDataURL(file)
-
-      // Ensure thumbnail is shown
-      setShowThumbnail(true)
     }
-  }
-
-  // Function to handle saving coupon as image
-  const handleSaveCoupon = (couponId: string) => {
-    const couponElement = couponRefs.current[couponId]
-    if (!couponElement) return
-
-    // Show saving message
-    alert("Saving coupon to your device...")
-
-    // In a real implementation, you would use html2canvas to capture the coupon as an image
-    // and then create a download link or use the Web Share API for mobile
-
-    // Example implementation (commented out as it requires html2canvas library):
-    /*
-    import html2canvas from 'html2canvas';
-    
-    html2canvas(couponElement).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      
-      // For mobile devices, try to use the Web Share API
-      if (navigator.share && navigator.canShare) {
-        fetch(imgData)
-          .then(res => res.blob())
-          .then(blob => {
-            const file = new File([blob], "coupon.png", { type: "image/png" });
-            navigator.share({
-              files: [file],
-              title: 'Your Coupon',
-              text: 'Here is your saved coupon',
-            }).catch(err => {
-              // Fallback to download if sharing fails
-              downloadImage(imgData);
-            });
-          });
-      } else {
-        // For desktop, create a download link
-        downloadImage(imgData);
-      }
-    });
-    
-    function downloadImage(imgData) {
-      const link = document.createElement('a');
-      link.href = imgData;
-      link.download = `coupon-${couponId}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-    */
   }
 
   // Video control functions
@@ -502,12 +477,32 @@ export default function CustomizeAdDesignPage() {
   const handleAddToPhotoAlbum = async () => {
     if (imageFile && imagePreview && businessId) {
       try {
-        // Create FormData for upload
+        // Show loading state
+        setIsCompressing(true)
+        toast({
+          title: "Processing image",
+          description: "Compressing image for upload...",
+        })
+
+        // Compress the image
+        const originalSize = imageFile.size
+        const compressedFile = await compressImage(imageFile, 0.8, 1920)
+        const compressedSize = compressedFile.size
+        const percentSaved = Math.round(((originalSize - compressedSize) / originalSize) * 100)
+
+        // Update compression stats for display
+        setCompressionStats({
+          originalSize,
+          compressedSize,
+          percentSaved,
+        })
+
+        // Create FormData for upload with the compressed file
         const formData = new FormData()
         formData.append("businessId", businessId)
-        formData.append("photo", imageFile)
+        formData.append("photo", compressedFile)
 
-        // Upload the photo
+        // Upload the compressed photo
         const result = await uploadPhoto(formData)
 
         if (result.success && result.photo) {
@@ -531,7 +526,10 @@ export default function CustomizeAdDesignPage() {
 
           toast({
             title: "Success",
-            description: "Photo added to album successfully!",
+            description:
+              percentSaved > 5
+                ? `Photo added to album successfully! (Reduced by ${percentSaved}%)`
+                : "Photo added to album successfully!",
           })
         } else {
           toast({
@@ -547,6 +545,10 @@ export default function CustomizeAdDesignPage() {
           description: "An unexpected error occurred. Please try again.",
           variant: "destructive",
         })
+      } finally {
+        setIsCompressing(false)
+        // Clear compression stats after a delay
+        setTimeout(() => setCompressionStats(null), 5000)
       }
     }
   }
@@ -795,7 +797,6 @@ export default function CustomizeAdDesignPage() {
   )
 
   // Update the fetchSavedCoupons function to properly fetch coupons
-
   const fetchSavedCoupons = async () => {
     setIsCouponsLoading(true)
     try {
@@ -2059,6 +2060,7 @@ export default function CustomizeAdDesignPage() {
       <MainHeader />
 
       <main className="flex-1 container mx-auto px-4 py-8">
+        {/* Main content */}
         <div className="max-w-4xl mx-auto">
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Customize Your AdBox</h1>
@@ -2076,7 +2078,12 @@ export default function CustomizeAdDesignPage() {
             </div>
           </div>
 
-          {selectedDesign ? (
+          {/* Loading state */}
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : (
             <>
               {renderDesignPreview()}
 
@@ -2540,14 +2547,23 @@ export default function CustomizeAdDesignPage() {
                               <X size={16} />
                             </button>
                           </div>
-
+                          {compressionStats && (
+                            <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                              <p>Original: {formatFileSize(compressionStats.originalSize)}</p>
+                              <p>Compressed: {formatFileSize(compressionStats.compressedSize)}</p>
+                              {compressionStats.percentSaved > 5 && (
+                                <p className="text-green-600">Reduced by {compressionStats.percentSaved}%</p>
+                              )}
+                            </div>
+                          )}
                           <Button
                             type="button"
                             onClick={handleAddToPhotoAlbum}
                             className="w-full"
                             style={{ backgroundColor: colorValues.primary, color: "white" }}
+                            disabled={isCompressing}
                           >
-                            Add to Photo Album
+                            {isCompressing ? "Compressing & Uploading..." : "Add to Photo Album"}
                           </Button>
                         </div>
                       )}
@@ -2609,343 +2625,11 @@ export default function CustomizeAdDesignPage() {
                 </div>
               </form>
             </>
-          ) : (
-            <div className="text-center p-12 bg-white rounded-lg shadow">
-              <h2 className="text-xl font-semibold text-red-500">No design selected</h2>
-              <p className="mt-2 text-gray-600">Please go back to the design page.</p>
-              <button
-                className="mt-4 px-4 py-2 bg-blue-600 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                onClick={() => {
-                  window.location.href = "/ad-design"
-                }}
-              >
-                Back to Design Page
-              </button>
-            </div>
           )}
         </div>
       </main>
 
       <MainFooter />
-
-      {/* Photo Album Modal */}
-      <Dialog open={isPhotoAlbumOpen} onOpenChange={setIsPhotoAlbumOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Photo Album</DialogTitle>
-          </DialogHeader>
-
-          <div className="relative">
-            {photos.length > 0 ? (
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                <img
-                  src={photos[currentPhotoIndex].url || "/placeholder.svg"}
-                  alt={`Photo ${currentPhotoIndex + 1}`}
-                  className="w-full h-full object-contain"
-                />
-
-                <div className="absolute bottom-2 left-0 right-0 text-center text-white text-sm">
-                  {currentPhotoIndex + 1} of {photos.length}
-                </div>
-
-                {photos.length > 1 && (
-                  <>
-                    <button
-                      onClick={handlePrevPhoto}
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
-                    >
-                      <ChevronLeft size={24} />
-                    </button>
-                    <button
-                      onClick={handleNextPhoto}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
-                    >
-                      <ChevronRight size={24} />
-                    </button>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                <p className="text-gray-500">No photos in album</p>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-4 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-24 overflow-y-auto">
-            {photos.map((photo, index) => (
-              <div
-                key={photo.id}
-                className={`aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${
-                  index === currentPhotoIndex ? "border-primary" : "border-transparent"
-                }`}
-                onClick={() => setCurrentPhotoIndex(index)}
-                style={{ borderColor: index === currentPhotoIndex ? colorValues.primary : "transparent" }}
-              >
-                <img
-                  src={photo.url || "/placeholder.svg"}
-                  alt={`Thumbnail ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Savings Dialog */}
-      <Dialog open={isSavingsDialogOpen} onOpenChange={setIsSavingsDialogOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Available Coupons</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {isCouponsLoading ? (
-              <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-blue-500 border-r-transparent border-b-blue-500 border-l-transparent"></div>
-                <p className="mt-2 text-gray-600">Loading coupons...</p>
-              </div>
-            ) : savedCoupons.length > 0 ? (
-              <div className="space-y-6">
-                {/* Small Coupons */}
-                {savedCoupons.filter((coupon) => coupon.size === "small").length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Small Coupons</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {savedCoupons
-                        .filter((coupon) => coupon.size === "small")
-                        .map((coupon) => (
-                          <div
-                            key={coupon.id}
-                            className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-4"
-                            ref={(el) => {
-                              if (el) couponRefs.current[coupon.id] = el
-                            }}
-                          >
-                            <div className="text-center mb-2">
-                              <h4 className="font-bold text-lg text-teal-700">{coupon.businessName}</h4>
-                            </div>
-
-                            <div className="text-center mb-3">
-                              <div className="font-bold text-xl">{coupon.title}</div>
-                              <div className="text-2xl font-extrabold text-red-600">{coupon.discount}</div>
-                            </div>
-
-                            <div className="text-sm mb-3">{coupon.description}</div>
-
-                            {coupon.code && (
-                              <div className="text-center mb-2">
-                                <span className="inline-block bg-gray-100 px-2 py-1 rounded font-mono text-sm">
-                                  Code: {coupon.code}
-                                </span>
-                              </div>
-                            )}
-
-                            <div className="text-xs text-gray-600 mt-2">
-                              Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
-                            </div>
-
-                            <div className="text-xs text-gray-500 mt-1">
-                              <button
-                                className="text-teal-600 hover:underline"
-                                onClick={() => setOpenDialogId(coupon.id)}
-                              >
-                                Terms & Conditions
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Large Coupons */}
-                {savedCoupons.filter((coupon) => coupon.size === "large").length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Large Coupons</h3>
-                    <div className="space-y-4">
-                      {savedCoupons
-                        .filter((coupon) => coupon.size === "large")
-                        .map((coupon) => (
-                          <div
-                            key={coupon.id}
-                            className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-6"
-                            ref={(el) => {
-                              if (el) couponRefs.current[coupon.id] = el
-                            }}
-                          >
-                            <div className="flex flex-col md:flex-row md:items-center">
-                              <div className="md:w-1/3 text-center mb-4 md:mb-0">
-                                <h4 className="font-bold text-xl text-teal-700 mb-2">{coupon.businessName}</h4>
-                                <div className="text-3xl font-extrabold text-red-600">{coupon.discount}</div>
-                                <div className="font-bold text-xl mt-1">{coupon.title}</div>
-                              </div>
-
-                              <div className="md:w-2/3 md:pl-6 md:border-l border-gray-200">
-                                <div className="text-lg mb-3">{coupon.description}</div>
-
-                                {coupon.code && (
-                                  <div className="mb-3">
-                                    <span className="inline-block bg-gray-100 px-3 py-1 rounded font-mono">
-                                      Code: {coupon.code}
-                                    </span>
-                                  </div>
-                                )}
-
-                                <div className="text-sm text-gray-600 mt-4">
-                                  Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
-                                </div>
-
-                                <div className="text-sm text-gray-500 mt-1">
-                                  <button
-                                    className="text-teal-600 hover:underline"
-                                    onClick={() => setOpenDialogId(coupon.id)}
-                                  >
-                                    Terms & Conditions
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No coupons available. Create coupons on the Penny Saver Workbench page.</p>
-                <Button className="mt-4" onClick={() => (window.location.href = "/coupons")}>
-                  Go to Coupons Page
-                </Button>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Now let's add the Jobs Dialog component */}
-
-      <Dialog open={isJobsDialogOpen} onOpenChange={setIsJobsDialogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Job Opportunities</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {isJobsLoading ? (
-              <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-blue-500 border-r-transparent border-b-blue-500 border-l-transparent"></div>
-                <p className="mt-2 text-gray-600">Loading job listings...</p>
-              </div>
-            ) : jobListings.length > 0 ? (
-              <div className="space-y-6">
-                {jobListings.map((job) => (
-                  <div key={job.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-                    {/* Job Header */}
-                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 border-b border-gray-200">
-                      <div className="flex items-center">
-                        {job.logoUrl ? (
-                          <div className="mr-4 flex-shrink-0">
-                            <div className="relative h-16 w-16">
-                              <img
-                                src={job.logoUrl || "/placeholder.svg"}
-                                alt={`${job.businessName} logo`}
-                                className="h-full w-full object-contain"
-                              />
-                            </div>
-                          </div>
-                        ) : null}
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-800">{job.jobTitle}</h3>
-                          <p className="text-sm text-gray-600">{job.businessName}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Job Summary */}
-                    <div className="p-4">
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {job.payType === "hourly" && job.hourlyMin && (
-                          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                            ${job.hourlyMin}
-                            {job.hourlyMax ? ` - $${job.hourlyMax}` : ""}/hour
-                          </span>
-                        )}
-                        {job.payType === "salary" && job.salaryMin && (
-                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                            ${job.salaryMin}
-                            {job.salaryMax ? ` - $${job.salaryMax}` : ""}/year
-                          </span>
-                        )}
-                        {job.payType === "other" && job.otherPay && (
-                          <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                            {job.otherPay}
-                          </span>
-                        )}
-                        <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                          {job.workHours}
-                        </span>
-                      </div>
-
-                      <div className="mb-3 line-clamp-2">
-                        <p className="text-sm text-gray-700">{job.jobDescription}</p>
-                      </div>
-
-                      {/* Categories */}
-                      <div className="mt-3">
-                        <p className="text-xs text-gray-500 mb-1">Categories:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {job.categories.map((category, index) => (
-                            <span
-                              key={index}
-                              className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded"
-                            >
-                              {category}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Show Details Button */}
-                      <button
-                        className="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                        onClick={() => window.open(`/job-listings/${job.id}`, "_blank")}
-                      >
-                        View Full Details
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No job listings available. Create job listings on the Job Listing Workbench page.</p>
-                <Button className="mt-4" onClick={() => (window.location.href = "/job-listing")}>
-                  Go to Job Listing Page
-                </Button>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Terms and Conditions Dialog */}
-      <Dialog open={openDialogId !== null} onOpenChange={() => setOpenDialogId(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Terms and Conditions</DialogTitle>
-          </DialogHeader>
-          {savedCoupons
-            .filter((coupon) => coupon.id === openDialogId)
-            .map((coupon) => (
-              <div key={coupon.id} className="text-sm">
-                {coupon.terms ? <p>{coupon.terms}</p> : <p>No terms and conditions specified for this coupon.</p>}
-              </div>
-            ))}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
