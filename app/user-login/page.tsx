@@ -5,7 +5,6 @@ import type React from "react"
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,7 +17,6 @@ import { loginUser } from "@/app/actions/user-actions"
 import { useToast } from "@/components/ui/use-toast"
 
 export default function UserLoginPage() {
-  const router = useRouter()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -59,19 +57,7 @@ export default function UserLoginPage() {
       const result = await loginUser(formDataObj)
 
       // Handle the result
-      if (result.success) {
-        toast({
-          title: "Login successful",
-          description: "You are now logged in",
-          variant: "default",
-        })
-
-        // Handle client-side redirect
-        if (result.redirectUrl) {
-          router.push(result.redirectUrl)
-        }
-      } else {
-        console.error("Login failed:", result.message)
+      if (!result.success) {
         setError(result.message || "Invalid username or password")
         toast({
           title: "Login failed",
@@ -79,13 +65,9 @@ export default function UserLoginPage() {
           variant: "destructive",
         })
       }
+      // If successful, the server action will redirect
     } catch (error) {
-      console.error("Login error:", error)
-      setError(
-        typeof error === "object" && error !== null && "message" in error
-          ? `Error: ${(error as Error).message}`
-          : "An unexpected error occurred. Please try again.",
-      )
+      setError("An unexpected error occurred. Please try again.")
       toast({
         title: "An error occurred",
         description: "Please try again later",

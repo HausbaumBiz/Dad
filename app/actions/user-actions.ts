@@ -54,60 +54,40 @@ export async function registerUser(formData: FormData) {
   return result
 }
 
-// Fix the loginUser function to handle the redirect properly
+// Update the loginUser function to handle the "Remember me" preference
 export async function loginUser(formData: FormData) {
-  try {
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
-    const rememberMe = formData.get("rememberMe") === "true"
+  const email = formData.get("email") as string
+  const password = formData.get("password") as string
+  const rememberMe = formData.get("rememberMe") === "true"
 
-    // Validate form data
-    if (!email || !password) {
-      return { success: false, message: "Email and password are required" }
-    }
-
-    console.log(`Attempting login for email: ${email}`)
-
-    // Verify credentials
-    const result = await verifyCredentials(email, password)
-    console.log("Verification result:", JSON.stringify(result))
-
-    if (result.success && result.userId) {
-      // Set cookie expiration based on "Remember me" preference
-      const maxAge = rememberMe
-        ? 60 * 60 * 24 * 30 // 30 days if "Remember me" is checked
-        : 60 * 60 * 24 * 7 // 1 week if not checked
-
-      console.log(`Setting cookie for userId: ${result.userId}, remember me: ${rememberMe}`)
-
-      // Set a session cookie
-      cookies().set("userId", result.userId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: maxAge,
-        path: "/",
-        sameSite: "lax", // Add this for better security
-      })
-
-      // Return success with redirectUrl instead of calling redirect()
-      return {
-        success: true,
-        redirectUrl: "/",
-        message: "Login successful",
-      }
-    }
-
-    return {
-      success: false,
-      message: result.message || "Username or password is incorrect. Please try again.",
-    }
-  } catch (error) {
-    console.error("Login error in server action:", error)
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "An unexpected error occurred during login",
-    }
+  // Validate form data
+  if (!email || !password) {
+    return { success: false, message: "Email and password are required" }
   }
+
+  // Verify credentials
+  const result = await verifyCredentials(email, password)
+
+  if (result.success && result.userId) {
+    // Set cookie expiration based on "Remember me" preference
+    const maxAge = rememberMe
+      ? 60 * 60 * 24 * 30 // 30 days if "Remember me" is checked
+      : 60 * 60 * 24 * 7 // 1 week if not checked
+
+    // Set a session cookie
+    cookies().set("userId", result.userId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: maxAge,
+      path: "/",
+      sameSite: "lax", // Add this for better security
+    })
+
+    // Redirect to home page
+    redirect("/")
+  }
+
+  return { success: false, message: "Username or password is incorrect. Please try again." }
 }
 
 // Check if user is logged in

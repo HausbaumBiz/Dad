@@ -1,7 +1,7 @@
 /**
  * Utility functions for client-side media operations
  */
-import imageCompression from "browser-image-compression"
+import { compress as browserImageCompress } from "browser-image-compression"
 
 /**
  * Convert a File object to a FormData object for upload
@@ -73,100 +73,48 @@ export function createPreviewUrl(file: File): Promise<string> {
   })
 }
 
-/**
- * Compress an image file in the browser before upload
- * @param imageFile The original image file
- * @param quality Quality level (0-1) where 1 is highest quality
- * @param maxWidthOrHeight Maximum width or height in pixels
- */
+// Update the compressImage function to ensure images are under 600 KB
 export async function compressImage(imageFile: File, quality = 0.8, maxWidthOrHeight = 1920): Promise<File> {
   try {
+    // Target size in MB (600 KB = 0.6 MB)
+    const targetSizeMB = 0.6
+
     const options = {
-      maxSizeMB: 0.6, // Target 600KB
+      maxSizeMB: targetSizeMB,
       maxWidthOrHeight,
       useWebWorker: true,
       fileType: imageFile.type,
       quality,
     }
 
-    const compressedFile = await imageCompression(imageFile, options)
+    // First compression attempt
+    let compressedFile = await browserImageCompress(imageFile, options)
+
+    // If still over 600 KB, try more aggressive compression
+    if (compressedFile.size > targetSizeMB * 1024 * 1024) {
+      const moreAggressiveOptions = {
+        ...options,
+        quality: quality * 0.8, // Reduce quality further
+        maxWidthOrHeight: Math.min(1200, maxWidthOrHeight), // Reduce dimensions if they're larger
+      }
+      compressedFile = await browserImageCompress(compressedFile, moreAggressiveOptions)
+
+      // If still over limit, try one final aggressive compression
+      if (compressedFile.size > targetSizeMB * 1024 * 1024) {
+        const finalOptions = {
+          ...options,
+          quality: 0.6,
+          maxWidthOrHeight: 1000,
+        }
+        compressedFile = await browserImageCompress(compressedFile, finalOptions)
+      }
+    }
 
     // Create a new file with the original name but compressed data
     return new File([compressedFile], imageFile.name, { type: imageFile.type })
   } catch (error) {
     console.error("Error compressing image:", error)
     return imageFile // Return original if compression fails
-  }
-}
-
-/**
- * Compress any image to ensure it's under 600KB for blob storage
- */
-export async function compressForBlobStorage(imageFile: File): Promise<{
-  file: File
-  originalSize: number
-  compressedSize: number
-  percentSaved: number
-}> {
-  try {
-    const originalSize = imageFile.size
-
-    // Skip compression if already under target size
-    if (originalSize <= 600 * 1024) {
-      return {
-        file: imageFile,
-        originalSize,
-        compressedSize: originalSize,
-        percentSaved: 0,
-      }
-    }
-
-    // First compression attempt with reasonable quality
-    const options = {
-      maxSizeMB: 0.6, // 600KB
-      maxWidthOrHeight: 1920,
-      useWebWorker: true,
-      fileType: imageFile.type,
-      quality: 0.8,
-    }
-
-    let compressedFile = await imageCompression(imageFile, options)
-
-    // If still too large, try more aggressive compression
-    if (compressedFile.size > 600 * 1024) {
-      options.quality = 0.6
-      options.maxWidthOrHeight = 1600
-      compressedFile = await imageCompression(imageFile, options)
-
-      // If still too large, try one more time
-      if (compressedFile.size > 600 * 1024) {
-        options.quality = 0.4
-        options.maxWidthOrHeight = 1200
-        compressedFile = await imageCompression(imageFile, options)
-      }
-    }
-
-    // Create a new file with the original name but compressed data
-    const finalFile = new File([compressedFile], imageFile.name, { type: imageFile.type })
-
-    // Calculate percentage saved
-    const percentSaved = Math.round(((originalSize - finalFile.size) / originalSize) * 100)
-
-    return {
-      file: finalFile,
-      originalSize,
-      compressedSize: finalFile.size,
-      percentSaved,
-    }
-  } catch (error) {
-    console.error("Error compressing image for blob storage:", error)
-    // Return original if compression fails
-    return {
-      file: imageFile,
-      originalSize: imageFile.size,
-      compressedSize: imageFile.size,
-      percentSaved: 0,
-    }
   }
 }
 

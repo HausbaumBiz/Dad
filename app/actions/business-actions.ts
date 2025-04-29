@@ -262,172 +262,49 @@ export async function getBusinessById(id: string) {
   }
 }
 
-// Add the saveBusinessAdDesign and getBusinessAdDesign functions to fix the Redis WRONGTYPE error:
-
-/**
- * Save business ad design data
- */
+// Add this function to save the business ad design
 export async function saveBusinessAdDesign(businessId: string, designData: any) {
   try {
     if (!businessId) {
-      throw new Error("Business ID is required")
+      return { success: false, error: "Missing business ID" }
     }
 
-    const key = `business:${businessId}:adDesign`
-
-    // Check if key exists and delete it to avoid type conflicts
-    const exists = await kv.exists(key)
-    if (exists) {
-      await kv.del(key)
-    }
-
-    // Ensure hiddenFields exists
-    if (!designData.hiddenFields) {
-      designData.hiddenFields = {
-        address: false,
-        phone: false,
-        hours: false,
-        website: false,
-        video: false,
-        thumbnail: false,
-        photoAlbum: false,
-        freeText: false,
-      }
-    }
-
-    // Store the entire design data as a JSON string
-    await kv.set(key, JSON.stringify(designData))
+    // Store design data in KV
+    await kv.hset(`business:${businessId}:adDesign`, {
+      ...designData,
+      updatedAt: new Date().toISOString(),
+    })
 
     revalidatePath(`/ad-design/customize`)
+    revalidatePath(`/workbench`)
 
     return { success: true }
   } catch (error) {
     console.error("Error saving business ad design:", error)
-    throw error
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to save ad design",
+    }
   }
 }
 
-/**
- * Get business ad design data
- */
+// Add this function to get the business ad design
 export async function getBusinessAdDesign(businessId: string) {
   try {
     if (!businessId) {
       return null
     }
 
-    const key = `business:${businessId}:adDesign`
-    const designDataStr = await kv.get(key)
+    // Get the design data from KV
+    const designData = await kv.hgetall(`business:${businessId}:adDesign`)
 
-    if (!designDataStr) {
+    if (!designData) {
       return null
-    }
-
-    // Parse the JSON string back to an object
-    const designData = typeof designDataStr === "string" ? JSON.parse(designDataStr) : designDataStr
-
-    // Ensure hiddenFields exists
-    if (!designData.hiddenFields) {
-      designData.hiddenFields = {
-        address: false,
-        phone: false,
-        hours: false,
-        website: false,
-        video: false,
-        thumbnail: false,
-        photoAlbum: false,
-        freeText: false,
-      }
     }
 
     return designData
   } catch (error) {
     console.error("Error getting business ad design:", error)
     return null
-  }
-}
-
-// Delete a business by ID
-export async function deleteBusiness(id: string) {
-  try {
-    // Get the business first to retrieve the email
-    const business = await getBusinessById(id)
-
-    if (!business) {
-      return { success: false, message: "Business not found" }
-    }
-
-    // Delete business data
-    await kv.del(`business:${id}`)
-
-    // Delete email index
-    await kv.del(`business:email:${business.email}`)
-
-    // Remove from the set of all businesses
-    await kv.srem("businesses", id)
-
-    // Delete any associated data
-    await kv.del(`business:${id}:adDesign`)
-
-    // Revalidate the businesses page
-    revalidatePath("/admin/businesses")
-
-    return {
-      success: true,
-      message: `Business "${business.businessName}" has been deleted successfully`,
-    }
-  } catch (error) {
-    console.error(`Error deleting business with ID ${id}:`, error)
-    return {
-      success: false,
-      message: "Failed to delete business. Please try again.",
-    }
-  }
-}
-
-// Update business password
-export async function updateBusinessPassword(businessId: string, currentPassword: string, newPassword: string) {
-  try {
-    // Validate inputs
-    if (!businessId || !currentPassword || !newPassword) {
-      return { success: false, message: "Missing required information" }
-    }
-
-    // Get the business
-    const business = await getBusinessById(businessId)
-    if (!business) {
-      return { success: false, message: "Business not found" }
-    }
-
-    // Verify current password
-    const isPasswordValid = await bcrypt.compare(currentPassword, business.passwordHash)
-    if (!isPasswordValid) {
-      return { success: false, message: "Current password is incorrect" }
-    }
-
-    // Hash the new password
-    const salt = await bcrypt.genSalt(10)
-    const newPasswordHash = await bcrypt.hash(newPassword, salt)
-
-    // Update the business with the new password hash
-    const updatedBusiness = {
-      ...business,
-      passwordHash: newPasswordHash,
-      updatedAt: new Date().toISOString(),
-    }
-
-    // Save the updated business
-    await kv.set(`business:${businessId}`, updatedBusiness)
-
-    return {
-      success: true,
-      message: "Password updated successfully",
-    }
-  } catch (error) {
-    console.error("Error updating business password:", error)
-    return {
-      success: false,
-      message: "Failed to update password. Please try again.",
-    }
   }
 }

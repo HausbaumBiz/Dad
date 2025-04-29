@@ -1,5 +1,3 @@
-"use server"
-
 import { kv } from "@vercel/kv"
 import { v4 as uuidv4 } from "uuid"
 import bcrypt from "bcryptjs"
@@ -89,78 +87,28 @@ export async function getUserByEmail(email: string) {
 // Verify user credentials
 export async function verifyCredentials(email: string, password: string) {
   try {
-    console.log(`Verifying credentials for email: ${email}`)
-
     // Get user by email
     const userId = await kv.get<string>(`user:email:${email}`)
-    console.log(`User ID lookup result: ${userId || "not found"}`)
-
     if (!userId) {
       return { success: false, message: "Invalid email or password" }
     }
 
     // Get user data
     const user = await getUserById(userId)
-    console.log(`User data lookup result: ${user ? "found" : "not found"}`)
-
     if (!user) {
       return { success: false, message: "User not found" }
     }
 
     // Verify password
-    try {
-      const isMatch = await bcrypt.compare(password, user.passwordHash)
-      console.log(`Password verification result: ${isMatch ? "match" : "no match"}`)
-
-      if (!isMatch) {
-        return { success: false, message: "Invalid email or password" }
-      }
-
-      return { success: true, userId, message: "Login successful" }
-    } catch (bcryptError) {
-      console.error("Error comparing passwords:", bcryptError)
-      return { success: false, message: "Error verifying password" }
+    const isMatch = await bcrypt.compare(password, user.passwordHash)
+    if (!isMatch) {
+      return { success: false, message: "Invalid email or password" }
     }
+
+    return { success: true, userId, message: "Login successful" }
   } catch (error) {
-    console.error("Error in verifyCredentials:", error)
-    return {
-      success: false,
-      message:
-        error instanceof Error
-          ? `Authentication error: ${error.message}`
-          : "Authentication failed due to an unexpected error",
-    }
-  }
-}
-
-// Get current user from session
-export async function getUser(request: Request) {
-  try {
-    const cookieHeader = request.headers.get("cookie")
-    if (!cookieHeader) return null
-
-    // Parse cookies
-    const cookies = Object.fromEntries(
-      cookieHeader.split("; ").map((cookie) => {
-        const [name, value] = cookie.split("=")
-        return [name, decodeURIComponent(value)]
-      }),
-    )
-
-    // Get user ID from session cookie
-    const userId = cookies["userId"]
-    if (!userId) return null
-
-    // Get user data
-    const user = await getUserById(userId)
-    if (!user) return null
-
-    // Return user without sensitive data
-    const { passwordHash, ...safeUser } = user
-    return safeUser
-  } catch (error) {
-    console.error("Error getting current user:", error)
-    return null
+    console.error("Error verifying credentials:", error)
+    return { success: false, message: "Authentication failed" }
   }
 }
 

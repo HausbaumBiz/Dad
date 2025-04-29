@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { getCurrentBusiness, logoutBusiness, getBusinessAdDesign } from "@/app/actions/business-actions"
+import { getCurrentBusiness, logoutBusiness } from "@/app/actions/business-actions"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { LogOut, User } from "lucide-react"
@@ -14,7 +14,6 @@ export default function WorkbenchPage() {
   const [business, setBusiness] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [savedDesign, setSavedDesign] = useState<{ designId?: string; colorScheme?: string } | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -30,15 +29,6 @@ export default function WorkbenchPage() {
         }
 
         setBusiness(businessData)
-
-        // Fetch saved design data
-        const designData = await getBusinessAdDesign(businessData.id)
-        if (designData && designData.designId) {
-          setSavedDesign({
-            designId: designData.designId.toString(),
-            colorScheme: designData.colorScheme || "blue",
-          })
-        }
       } catch (err) {
         console.error("Failed to get business data:", err)
         setError("Failed to load business data. Please try logging in again.")
@@ -133,7 +123,6 @@ export default function WorkbenchPage() {
                     href="/ad-design"
                     iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/ad-workbench-icon-scOKMCrsO5iu98jnDvZGHdJrb0TNeJ.png"
                     label="Ad Workbench"
-                    savedDesign={savedDesign}
                   />
 
                   <WorkbenchButton
@@ -173,38 +162,28 @@ interface WorkbenchButtonProps {
   href: string
   iconSrc: string
   label: string
-  savedDesign?: { designId?: string; colorScheme?: string } | null
 }
 
-function WorkbenchButton({ href, iconSrc, label, savedDesign }: WorkbenchButtonProps) {
-  const [localSavedDesign, setLocalSavedDesign] = useState<{ designId?: string; colorScheme?: string } | null>(null)
-
-  // Check localStorage on component mount (client-side only)
-  useEffect(() => {
-    if (href === "/ad-design") {
-      const designId = localStorage.getItem("hausbaum_selected_design")
-      const colorScheme = localStorage.getItem("hausbaum_selected_color") || "blue"
-
-      if (designId) {
-        setLocalSavedDesign({ designId, colorScheme })
-      }
-    }
-  }, [href])
-
-  // Determine the final design data, prioritizing server data over localStorage
-  const finalSavedDesign = savedDesign || localSavedDesign
-
+function WorkbenchButton({ href, iconSrc, label }: WorkbenchButtonProps) {
   // Special handling for Ad Workbench button
   if (href === "/ad-design") {
-    // If we have a saved design (from server or localStorage), go directly to customize page
-    const targetHref = finalSavedDesign?.designId
-      ? `/ad-design/customize?design=${finalSavedDesign.designId}&color=${finalSavedDesign.colorScheme || "blue"}`
-      : "/ad-design"
-
     return (
       <Link
-        href={targetHref}
+        href="/ad-design"
         className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-all group"
+        onClick={(e) => {
+          // For Ad Workbench, check if we have a saved design
+          if (label === "Ad Workbench") {
+            const savedDesign = localStorage.getItem("hausbaum_selected_design")
+            const savedColor = localStorage.getItem("hausbaum_selected_color")
+
+            if (savedDesign) {
+              e.preventDefault()
+              // Redirect to customize page with the saved design and color
+              window.location.href = `/ad-design/customize?design=${savedDesign}&color=${savedColor || "blue"}`
+            }
+          }
+        }}
       >
         <div className="flex items-center justify-center w-16 h-16 mr-6 flex-shrink-0">
           <Image
@@ -215,10 +194,7 @@ function WorkbenchButton({ href, iconSrc, label, savedDesign }: WorkbenchButtonP
             className="object-contain max-h-full"
           />
         </div>
-        <div>
-          <span className="text-xl font-medium text-gray-800 group-hover:text-primary transition-colors">{label}</span>
-          {finalSavedDesign?.designId && <p className="text-sm text-green-600">Continue with your saved design</p>}
-        </div>
+        <span className="text-xl font-medium text-gray-800 group-hover:text-primary transition-colors">{label}</span>
       </Link>
     )
   }

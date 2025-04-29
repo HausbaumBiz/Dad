@@ -1,35 +1,31 @@
-import { AlertCircle, CheckCircle } from "lucide-react"
-
 interface FileSizeInfoProps {
   file: File | null
   maxSizeMB: number
   type: "video" | "image"
 }
 
-export function FileSizeInfo({ file, maxSizeMB, type }: FileSizeInfoProps) {
-  if (!file) return null
+function formatFileSize(bytes: number) {
+  if (bytes === 0) return "0 Bytes"
+  const k = 1024
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+}
 
-  const fileSizeMB = file.size / (1024 * 1024)
-  const isOverLimit = fileSizeMB > maxSizeMB
-
+// Add a note about compression to 600 KB
+export function FileSizeInfo({ file, compressedSize }: { file: File; compressedSize?: number }) {
   return (
-    <div className={`mt-2 text-sm flex items-center ${isOverLimit ? "text-red-600" : "text-green-600"}`}>
-      {isOverLimit ? (
-        <>
-          <AlertCircle className="mr-1 h-4 w-4" />
-          <span>
-            Warning: {file.name} ({fileSizeMB.toFixed(2)}MB) exceeds the {maxSizeMB}MB limit.
-            {type === "video" ? " Try using a shorter or lower quality video." : " Try using a smaller image."}
-          </span>
-        </>
-      ) : (
-        <>
-          <CheckCircle className="mr-1 h-4 w-4" />
-          <span>
-            {file.name} ({fileSizeMB.toFixed(2)}MB)
-          </span>
-        </>
+    <div className="text-sm text-muted-foreground mt-2">
+      <p>Original size: {formatFileSize(file.size)}</p>
+      {compressedSize && (
+        <p>
+          Compressed size: {formatFileSize(compressedSize)} (
+          {Math.round(((file.size - compressedSize) / file.size) * 100)}% smaller)
+        </p>
       )}
+      <p className="text-xs mt-1">
+        All images are automatically compressed to less than 600 KB for optimal performance.
+      </p>
     </div>
   )
 }

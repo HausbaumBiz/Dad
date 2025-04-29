@@ -31,6 +31,7 @@ export type CompressionSettings = {
   autoOptimize: boolean
 }
 
+// Update the default compression settings to always be enabled
 const defaultCompressionSettings: CompressionSettings = {
   enabled: true,
   quality: 80,
@@ -160,6 +161,7 @@ export function useMediaUpload(businessId: string) {
   /**
    * Upload a thumbnail image with compression
    */
+  // Modify the handleThumbnailUpload function to always compress
   const handleThumbnailUpload = async (file: File) => {
     // Validate the file
     if (!isValidImage(file)) {
@@ -190,51 +192,39 @@ export function useMediaUpload(businessId: string) {
     })
 
     try {
-      let fileToUpload = file
-      let compressionApplied = false
+      // Always compress the image regardless of compressionSettings.enabled
+      setThumbnailUploadState((prev) => ({
+        ...prev,
+        progress: 10,
+      }))
 
-      // Apply client-side compression if enabled
-      if (compressionSettings.enabled) {
-        // Determine quality and dimensions
-        const quality = compressionSettings.autoOptimize
-          ? getRecommendedQuality(file.size)
-          : compressionSettings.quality / 100
+      // Determine quality and dimensions
+      const quality = compressionSettings.autoOptimize
+        ? getRecommendedQuality(file.size)
+        : compressionSettings.quality / 100
 
-        const maxDimension = compressionSettings.autoOptimize
-          ? getRecommendedMaxDimension("thumbnail")
-          : compressionSettings.maxDimension
+      const maxDimension = compressionSettings.autoOptimize
+        ? getRecommendedMaxDimension("thumbnail")
+        : compressionSettings.maxDimension
 
-        // Compress the image
-        setThumbnailUploadState((prev) => ({
-          ...prev,
-          progress: 10,
-        }))
+      // Compress the image to ensure it's under 600 KB
+      const compressedFile = await compressImage(file, quality, maxDimension)
 
-        const compressedFile = await compressImage(file, quality, maxDimension)
-
-        if (compressedFile.size < file.size) {
-          fileToUpload = compressedFile
-          compressionApplied = true
-
-          setThumbnailUploadState((prev) => ({
-            ...prev,
-            progress: 30,
-            compressedSize: compressedFile.size,
-            compressionSavings: calculateCompressionSavings(file.size, compressedFile.size).percentage,
-          }))
-        }
-      }
+      setThumbnailUploadState((prev) => ({
+        ...prev,
+        progress: 30,
+        compressedSize: compressedFile.size,
+        compressionSavings: calculateCompressionSavings(file.size, compressedFile.size).percentage,
+      }))
 
       // Create form data
-      const formData = createMediaFormData(fileToUpload, businessId, "thumbnail")
+      const formData = createMediaFormData(compressedFile, businessId, "thumbnail")
 
       // Add compression options
-      if (compressionSettings.enabled) {
-        formData.append("quality", compressionSettings.quality.toString())
-        formData.append("maxWidth", compressionSettings.maxDimension.toString())
-        formData.append("maxHeight", compressionSettings.maxDimension.toString())
-        formData.append("format", compressionSettings.format)
-      }
+      formData.append("quality", compressionSettings.quality.toString())
+      formData.append("maxWidth", compressionSettings.maxDimension.toString())
+      formData.append("maxHeight", compressionSettings.maxDimension.toString())
+      formData.append("format", compressionSettings.format)
 
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -303,6 +293,7 @@ export function useMediaUpload(businessId: string) {
   /**
    * Upload a photo to the album with compression
    */
+  // Similarly update the handlePhotoUpload function to always compress
   const handlePhotoUpload = async (file: File) => {
     // Validate the file
     if (!isValidImage(file)) {
@@ -333,51 +324,39 @@ export function useMediaUpload(businessId: string) {
     })
 
     try {
-      let fileToUpload = file
-      let compressionApplied = false
+      // Always compress the image regardless of compressionSettings.enabled
+      setPhotoUploadState((prev) => ({
+        ...prev,
+        progress: 10,
+      }))
 
-      // Apply client-side compression if enabled
-      if (compressionSettings.enabled) {
-        // Determine quality and dimensions
-        const quality = compressionSettings.autoOptimize
-          ? getRecommendedQuality(file.size)
-          : compressionSettings.quality / 100
+      // Determine quality and dimensions
+      const quality = compressionSettings.autoOptimize
+        ? getRecommendedQuality(file.size)
+        : compressionSettings.quality / 100
 
-        const maxDimension = compressionSettings.autoOptimize
-          ? getRecommendedMaxDimension("photo")
-          : compressionSettings.maxDimension
+      const maxDimension = compressionSettings.autoOptimize
+        ? getRecommendedMaxDimension("photo")
+        : compressionSettings.maxDimension
 
-        // Compress the image
-        setPhotoUploadState((prev) => ({
-          ...prev,
-          progress: 10,
-        }))
+      // Compress the image to ensure it's under 600 KB
+      const compressedFile = await compressImage(file, quality, maxDimension)
 
-        const compressedFile = await compressImage(file, quality, maxDimension)
-
-        if (compressedFile.size < file.size) {
-          fileToUpload = compressedFile
-          compressionApplied = true
-
-          setPhotoUploadState((prev) => ({
-            ...prev,
-            progress: 30,
-            compressedSize: compressedFile.size,
-            compressionSavings: calculateCompressionSavings(file.size, compressedFile.size).percentage,
-          }))
-        }
-      }
+      setPhotoUploadState((prev) => ({
+        ...prev,
+        progress: 30,
+        compressedSize: compressedFile.size,
+        compressionSavings: calculateCompressionSavings(file.size, compressedFile.size).percentage,
+      }))
 
       // Create form data
-      const formData = createMediaFormData(fileToUpload, businessId, "photo")
+      const formData = createMediaFormData(compressedFile, businessId, "photo")
 
       // Add compression options
-      if (compressionSettings.enabled) {
-        formData.append("quality", compressionSettings.quality.toString())
-        formData.append("maxWidth", compressionSettings.maxDimension.toString())
-        formData.append("maxHeight", compressionSettings.maxDimension.toString())
-        formData.append("format", compressionSettings.format)
-      }
+      formData.append("quality", compressionSettings.quality.toString())
+      formData.append("maxWidth", compressionSettings.maxDimension.toString())
+      formData.append("maxHeight", compressionSettings.maxDimension.toString())
+      formData.append("format", compressionSettings.format)
 
       // Simulate progress
       const progressInterval = setInterval(() => {

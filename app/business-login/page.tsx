@@ -6,7 +6,6 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -29,7 +28,6 @@ export default function BusinessLoginPage({
   const [showVerifiedMessage, setShowVerifiedMessage] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const searchParamsHook = useSearchParams()
 
   useEffect(() => {
     if (searchParams?.verified === "true") {
@@ -60,20 +58,8 @@ export default function BusinessLoginPage({
       const result = await loginBusiness(formData)
 
       if (result.success) {
-        // Check if there's a redirect URL in the query parameters
-        const redirectUrl = searchParamsHook.get("redirect")
-
-        if (result.success && result.redirectUrl) {
-          // If there's a redirect URL in the query parameters, use that instead
-          if (redirectUrl) {
-            router.push(redirectUrl)
-          } else {
-            router.push(result.redirectUrl)
-          }
-        } else {
-          // Force redirect to workbench page directly
-          router.push("/workbench")
-        }
+        // Force redirect to workbench page directly
+        router.push("/workbench")
       } else {
         setError(result.message || "Login failed. Please try again.")
       }

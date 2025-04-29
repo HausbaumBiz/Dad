@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Building2, ChevronLeft } from "lucide-react"
+import { Building2, ChevronLeft, Users } from "lucide-react"
 
 export default function AdminDashboardPage() {
   return (
@@ -20,14 +20,29 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Business and User Management</CardTitle>
-            <CardDescription>View and manage registered businesses and users</CardDescription>
+            <CardTitle>User Management</CardTitle>
+            <CardDescription>View and manage registered users</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link href="/admin/users" className="flex items-center justify-center gap-2">
+                <Users className="h-4 w-4" />
+                <span>View Users</span>
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Business Management</CardTitle>
+            <CardDescription>View and manage registered businesses</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
               <Link href="/admin/businesses" className="flex items-center justify-center gap-2">
                 <Building2 className="h-4 w-4" />
-                <span>Manage Businesses & Users</span>
+                <span>View Businesses</span>
               </Link>
             </Button>
           </CardContent>
