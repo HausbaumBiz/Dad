@@ -1,3 +1,5 @@
+"use server"
+
 import { kv } from "@vercel/kv"
 import { v4 as uuidv4 } from "uuid"
 import bcrypt from "bcryptjs"
@@ -128,6 +130,37 @@ export async function verifyCredentials(email: string, password: string) {
           ? `Authentication error: ${error.message}`
           : "Authentication failed due to an unexpected error",
     }
+  }
+}
+
+// Get current user from session
+export async function getUser(request: Request) {
+  try {
+    const cookieHeader = request.headers.get("cookie")
+    if (!cookieHeader) return null
+
+    // Parse cookies
+    const cookies = Object.fromEntries(
+      cookieHeader.split("; ").map((cookie) => {
+        const [name, value] = cookie.split("=")
+        return [name, decodeURIComponent(value)]
+      }),
+    )
+
+    // Get user ID from session cookie
+    const userId = cookies["userId"]
+    if (!userId) return null
+
+    // Get user data
+    const user = await getUserById(userId)
+    if (!user) return null
+
+    // Return user without sensitive data
+    const { passwordHash, ...safeUser } = user
+    return safeUser
+  } catch (error) {
+    console.error("Error getting current user:", error)
+    return null
   }
 }
 

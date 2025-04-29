@@ -281,6 +281,20 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
       await kv.del(key)
     }
 
+    // Ensure hiddenFields exists
+    if (!designData.hiddenFields) {
+      designData.hiddenFields = {
+        address: false,
+        phone: false,
+        hours: false,
+        website: false,
+        video: false,
+        thumbnail: false,
+        photoAlbum: false,
+        freeText: false,
+      }
+    }
+
     // Store the entire design data as a JSON string
     await kv.set(key, JSON.stringify(designData))
 
@@ -310,7 +324,23 @@ export async function getBusinessAdDesign(businessId: string) {
     }
 
     // Parse the JSON string back to an object
-    return typeof designDataStr === "string" ? JSON.parse(designDataStr) : designDataStr
+    const designData = typeof designDataStr === "string" ? JSON.parse(designDataStr) : designDataStr
+
+    // Ensure hiddenFields exists
+    if (!designData.hiddenFields) {
+      designData.hiddenFields = {
+        address: false,
+        phone: false,
+        hours: false,
+        website: false,
+        video: false,
+        thumbnail: false,
+        photoAlbum: false,
+        freeText: false,
+      }
+    }
+
+    return designData
   } catch (error) {
     console.error("Error getting business ad design:", error)
     return null

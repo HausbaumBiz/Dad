@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Play, Pause } from "lucide-react"
+import { Play, Pause, Save } from "lucide-react"
 import { X, Trash2 } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
@@ -21,7 +21,8 @@ import {
   type MediaItem,
   uploadPhoto,
 } from "@/app/actions/media-actions"
-import { saveBusinessAdDesign } from "@/app/actions/business-actions"
+import { saveBusinessAdDesign as saveBusinessAdDesignOriginal } from "@/app/actions/business-actions"
+import { getCurrentBusiness, getBusinessAdDesign } from "@/app/actions/business-actions"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -35,6 +36,7 @@ import { compressImage, formatFileSize } from "@/lib/media-utils"
 
 import { del } from "@vercel/blob"
 import { kv } from "@vercel/kv"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface PhotoItem {
   id: string
@@ -42,15 +44,21 @@ interface PhotoItem {
   name: string
 }
 
+// Mock business ID for demonstration - in a real app, this would come from authentication
+const MOCK_BUSINESS_ID = "business-123"
+
 export default function CustomizeAdDesignPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const designId = searchParams.get("design")
   const colorParam = searchParams.get("color") || "blue"
-  const [selectedDesign, setSelectedDesign] = useState<number | null>(designId ? Number.parseInt(designId) : 6)
-  const [selectedColor, setSelectedColor] = useState(colorParam)
+  const [selectedDesignOriginal, setSelectedDesignOriginal] = useState<number | null>(
+    designId ? Number.parseInt(designId) : 6,
+  )
+  const [selectedColorOriginal, setSelectedColorOriginal] = useState(colorParam)
   const [businessId, setBusinessId] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
+  const [isSavingInfo, setIsSavingInfo] = useState(false)
 
   // Add state for the dialogs
   const [isSavingsDialogOpen, setIsSavingsDialogOpen] = useState(false)
@@ -81,7 +89,7 @@ export default function CustomizeAdDesignPage() {
   }
 
   // Get the selected color values
-  const colorValues = colorMap[selectedColor] || colorMap.blue
+  const colorValues = colorMap[selectedColorOriginal] || colorMap.blue
 
   const [formData, setFormData] = useState({
     businessName: "Business Name",
@@ -130,7 +138,7 @@ export default function CustomizeAdDesignPage() {
 
   // Current upload state
   const [imageFile, setImageFile] = useState<File | null>(null)
-  const [videoFile, setVideoFile] = useState<File | null>(null)
+  const [videoFileOriginal, setVideoFileOriginal] = useState<File | null>(null)
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
@@ -164,7 +172,7 @@ export default function CustomizeAdDesignPage() {
   // Set the color based on URL parameter
   useEffect(() => {
     if (colorParam && colorMap[colorParam]) {
-      setSelectedColor(colorParam)
+      setSelectedColorOriginal(colorParam)
     }
   }, [colorParam])
 
@@ -172,9 +180,21 @@ export default function CustomizeAdDesignPage() {
   useEffect(() => {
     const fetchBusinessData = async () => {
       try {
-        // In a real app, you would get this from the user session
-        // For now, we'll use a demo business ID
-        const id = "demo-business"
+        // Get the current business from the session
+        const business = await getCurrentBusiness()
+
+        if (!business) {
+          // Redirect to login if no business is logged in
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to customize your ad design.",
+            variant: "destructive",
+          })
+          router.push("/business-login?redirect=/ad-design/customize")
+          return
+        }
+
+        const id = business.id
         setBusinessId(id)
 
         // Load saved media
@@ -245,24 +265,63 @@ export default function CustomizeAdDesignPage() {
   // Load business data
   const loadBusinessData = async (id: string) => {
     try {
-      // In a real app, you would fetch the business data from your API
-      // For now, we'll use mock data
+      // Get the current business
+      const business = await getCurrentBusiness()
 
-      // You could fetch business details here
-      // const businessDetails = await getBusinessDetails(id)
+      if (!business) {
+        console.error("No business found")
+        return
+      }
 
-      // For now, we'll just set some default values if none are loaded
-      setFormData((prev) => ({
-        ...prev,
-        businessName: "Your Business Name", // Replace with actual data
-        address: "Your Business Address", // Replace with actual data
-        phone: "Your Business Phone", // Replace with actual data
-        hours: "Your Business Hours", // Replace with actual data
-        website: "Your Business Website", // Replace with actual data
-        freeText: "Your Business Description", // Replace with actual data
-      }))
+      // Get saved ad design data
+      const savedDesign = await getBusinessAdDesign(id)
+
+      if (savedDesign && savedDesign.businessInfo) {
+        // Set form data from saved design
+        setFormData((prev) => ({
+          ...prev,
+          businessName: savedDesign.businessInfo.businessName || business.businessName || "Business Name",
+          address: savedDesign.businessInfo.address || "123 Business St, City, ST 12345",
+          phone: savedDesign.businessInfo.phone || business.phone || "(555) 123-4567",
+          hours: savedDesign.businessInfo.hours || "Mon-Fri: 9AM-5PM\nSat: 10AM-3PM",
+          website: savedDesign.businessInfo.website || "www.businessname.com",
+          freeText:
+            savedDesign.businessInfo.freeText ||
+            "We offer professional services with 10+ years of experience in the industry.",
+        }))
+
+        // Set design options if available
+        if (savedDesign.designId) {
+          setSelectedDesignOriginal(savedDesign.designId)
+        }
+
+        if (savedDesign.colorScheme) {
+          setSelectedColorOriginal(savedDesign.colorScheme)
+        }
+
+        // Set hidden fields if available
+        if (savedDesign.hiddenFields) {
+          setHiddenFields(savedDesign.hiddenFields)
+        }
+      } else {
+        // If no saved design, use business data from the account
+        setFormData((prev) => ({
+          ...prev,
+          businessName: business.businessName || "Business Name",
+          address: "123 Business St, City, ST 12345", // You might want to add address to your business model
+          phone: business.phone || "(555) 123-4567",
+          hours: "Mon-Fri: 9AM-5PM\nSat: 10AM-3PM",
+          website: "www.businessname.com",
+          freeText: "We offer professional services with 10+ years of experience in the industry.",
+        }))
+      }
     } catch (error) {
       console.error("Error loading business data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load your business data. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -291,7 +350,7 @@ export default function CustomizeAdDesignPage() {
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
-      setVideoFile(file)
+      setVideoFileOriginal(file)
       setFormData((prev) => ({ ...prev, videoFile: file }))
 
       // Create preview URL
@@ -397,6 +456,58 @@ export default function CustomizeAdDesignPage() {
       } finally {
         setIsCompressing(false)
       }
+    }
+  }
+
+  // Add a function to save just the business info and custom message
+  const handleSaveBusinessInfoOriginal = async () => {
+    if (!businessId) {
+      toast({
+        title: "Error",
+        description: "Business ID is missing. Please try again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setIsSavingInfo(true)
+
+      // Extract just the business info and custom message
+      const businessInfo = {
+        businessName: formData.businessName,
+        address: formData.address,
+        phone: formData.phone,
+        hours: formData.hours,
+        website: formData.website,
+        freeText: formData.freeText,
+      }
+
+      // Save to Redis using the existing saveBusinessAdDesign function
+      const result = await saveBusinessAdDesignOriginal(businessId, {
+        designId: selectedDesignOriginal,
+        colorScheme: selectedColorOriginal,
+        businessInfo: businessInfo,
+      })
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Your business information has been saved successfully!",
+        })
+      } else {
+        throw new Error("Failed to save business information")
+      }
+    } catch (error) {
+      console.error("Error saving business info:", error)
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to save your business information. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingInfo(false)
     }
   }
 
@@ -718,7 +829,7 @@ export default function CustomizeAdDesignPage() {
           const videoFormData = new FormData()
           videoFormData.append("businessId", businessId)
           videoFormData.append("video", formData.videoFile)
-          videoFormData.append("designId", selectedDesign?.toString() || "1")
+          videoFormData.append("designId", selectedDesignOriginal?.toString() || "1")
 
           const videoResult = await uploadVideo(videoFormData)
 
@@ -741,16 +852,16 @@ export default function CustomizeAdDesignPage() {
       await saveMediaSettings(businessId, { hiddenFields })
 
       // Save business ad design data
-      await saveBusinessAdDesign(businessId, {
-        designId: selectedDesign,
-        colorScheme: selectedColor,
+      await saveBusinessAdDesignOriginal(businessId, {
+        designId: selectedDesignOriginal,
+        colorScheme: selectedColorOriginal,
         businessInfo: formData,
       })
 
       // Save to localStorage for client-side persistence
       if (typeof window !== "undefined") {
-        localStorage.setItem("hausbaum_selected_design", selectedDesign?.toString() || "")
-        localStorage.setItem("hausbaum_selected_color", selectedColor)
+        localStorage.setItem("hausbaum_selected_design", selectedDesignOriginal?.toString() || "")
+        localStorage.setItem("hausbaum_selected_color", selectedColorOriginal)
       }
 
       toast({
@@ -926,7 +1037,7 @@ export default function CustomizeAdDesignPage() {
   // Update the renderDesignPreview function to handle all designs with the selected color
   const renderDesignPreview = () => {
     // Render the selected design based on the designId
-    if (selectedDesign === 3) {
+    if (selectedDesignOriginal === 3) {
       // Emerald Valley design (mirror of Purple Horizon)
       return (
         <div className="mb-8">
@@ -1173,7 +1284,7 @@ export default function CustomizeAdDesignPage() {
           </div>
         </div>
       )
-    } else if (selectedDesign === 4) {
+    } else if (selectedDesignOriginal === 4) {
       // Amber Sunrise design (mirror of Teal Waves)
       return (
         <div className="mb-8">
@@ -1490,7 +1601,7 @@ export default function CustomizeAdDesignPage() {
           </div>
         </div>
       )
-    } else if (selectedDesign === 2) {
+    } else if (selectedDesignOriginal === 2) {
       // Purple Horizon design with landscape video (16:9)
       return (
         <div className="mb-8">
@@ -1725,6 +1836,72 @@ export default function CustomizeAdDesignPage() {
                   <p className="text-lg font-medium" style={{ color: colorValues.primary }}>
                     {formData.freeText}
                   </p>
+                </div>
+              )}
+
+              {/* Landscape Video Player - Bottom section */}
+              {!hiddenFields.video && (
+                <div className="w-full bg-gradient-to-b from-gray-50 to-gray-100 p-4">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className="relative mx-auto w-full max-w-[392px] h-auto aspect-video bg-white rounded-lg border-2 shadow-lg overflow-hidden"
+                      style={{ borderColor: colorValues.primary }}
+                    >
+                      {/* Thumbnail overlay */}
+                      {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
+                        <div className="absolute inset-0 z-20">
+                          <img
+                            src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
+                            alt="Video thumbnail"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+
+                      {videoPreview ? (
+                        <video
+                          ref={videoRef}
+                          src={videoPreview}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
+                          muted
+                        />
+                      ) : (
+                        <div
+                          className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                          onClick={handlePlayVideo}
+                        >
+                          <div
+                            className="rounded-full p-3 shadow-lg"
+                            style={{
+                              background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
+                            }}
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="32"
+                              height="32"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="text-white"
+                            >
+                              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                          </div>
+                        </div>
+                      )}
+                      <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                        16:9 ratio
+                      </div>
+                    </div>
+
+                    {/* Custom video controls */}
+                    {videoPreview && <VideoControls />}
+                  </div>
                 </div>
               )}
 
@@ -2107,7 +2284,7 @@ export default function CustomizeAdDesignPage() {
                     <div>
                       <label htmlFor="videoUpload" className="block mb-2">
                         Upload Video (
-                        {selectedDesign === 2 || selectedDesign === 3
+                        {selectedDesignOriginal === 2 || selectedDesignOriginal === 3
                           ? "16:9 ratio recommended"
                           : "9:16 ratio recommended"}
                         )
@@ -2142,7 +2319,7 @@ export default function CustomizeAdDesignPage() {
                           <span className="text-sm font-medium text-gray-700">Click to upload video</span>
                           <span className="text-xs text-gray-500 mt-1">MP4, MOV, M4V, 3GP accepted</span>
                           <span className="text-xs text-gray-500 mt-1">
-                            {selectedDesign === 2 || selectedDesign === 3
+                            {selectedDesignOriginal === 2 || selectedDesignOriginal === 3
                               ? "Landscape format (16:9) recommended for this design"
                               : "Portrait format (9:16) recommended for this design"}
                           </span>
@@ -2153,19 +2330,19 @@ export default function CustomizeAdDesignPage() {
                           )}
                         </label>
                       </div>
-                      {videoFile && (
+                      {videoFileOriginal && (
                         <p className="mt-2 text-sm text-green-600">
-                          Video uploaded: {videoFile.name} ({Math.round(videoFile.size / 1024)} KB)
+                          Video uploaded: {videoFileOriginal.name} ({Math.round(videoFileOriginal.size / 1024)} KB)
                         </p>
                       )}
-                      {videoPreview && !videoFile && (
+                      {videoPreview && !videoFileOriginal && (
                         <div className="mt-2 flex items-center">
                           <p className="text-sm text-blue-600">Using previously saved video</p>
                           <button
                             type="button"
                             onClick={() => {
                               setVideoPreview(null)
-                              setVideoFile(null)
+                              setVideoFileOriginal(null)
                               setIsPlaying(false)
                               setShowThumbnail(true)
                               setVideoRemoved(true)
@@ -2611,7 +2788,22 @@ export default function CustomizeAdDesignPage() {
                   </div>
                 </Card>
 
-                <div className="flex justify-center pt-4">
+                <div className="flex justify-center pt-4 space-x-4">
+                  <button
+                    type="button"
+                    className="px-8 py-2 bg-gray-500 text-white font-medium rounded-md shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                    onClick={handleSaveBusinessInfoOriginal}
+                    disabled={isSavingInfo}
+                  >
+                    {isSavingInfo ? (
+                      <div className="flex items-center">
+                        <Save size={16} className="mr-2 animate-spin" />
+                        Saving Info...
+                      </div>
+                    ) : (
+                      "Save Info"
+                    )}
+                  </button>
                   <button
                     type="submit"
                     className="px-8 py-2 bg-blue-600 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -2622,6 +2814,94 @@ export default function CustomizeAdDesignPage() {
                   </button>
                 </div>
               </form>
+
+              {/* Photo Album Dialog */}
+              <Dialog open={isPhotoAlbumOpen} onOpenChange={setIsPhotoAlbumOpen}>
+                <DialogContent className="sm:max-w-3xl">
+                  <DialogHeader>
+                    <DialogTitle>Photo Album</DialogTitle>
+                  </DialogHeader>
+
+                  <div className="relative">
+                    {photos.length > 0 ? (
+                      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                        <img
+                          src={photos[currentPhotoIndex]?.url || "/placeholder.svg"}
+                          alt={`Photo ${currentPhotoIndex + 1}`}
+                          className="w-full h-full object-contain"
+                        />
+
+                        <div className="absolute bottom-2 left-0 right-0 text-center text-white text-sm">
+                          {currentPhotoIndex + 1} of {photos.length}
+                        </div>
+
+                        {photos.length > 1 && (
+                          <>
+                            <button
+                              onClick={handlePrevPhoto}
+                              className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="m15 18-6-6 6-6" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={handleNextPhoto}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="m9 18 6-6-6-6" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+                        <p className="text-gray-500">No photos in album</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-24 overflow-y-auto">
+                    {photos.map((photo, index) => (
+                      <div
+                        key={photo.id}
+                        className={`aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${
+                          index === currentPhotoIndex ? "border-blue-500" : "border-transparent"
+                        }`}
+                        onClick={() => setCurrentPhotoIndex(index)}
+                      >
+                        <img
+                          src={photo.url || "/placeholder.svg"}
+                          alt={`Thumbnail ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </DialogContent>
+              </Dialog>
             </>
           )}
         </div>
