@@ -13,39 +13,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { compressImage, formatFileSize, isValidImage, calculateCompressionSavings } from "@/lib/media-utils"
 import { useToast } from "@/components/ui/use-toast"
-import { ChevronLeft, ChevronRight, Upload, ImageIcon, X, Loader2, FolderIcon, Tag } from "lucide-react"
-import {
-  uploadPhoto,
-  getBusinessMedia,
-  deletePhoto,
-  movePhotoToFolder,
-  type MediaItem,
-  type MediaFolder,
-} from "@/app/actions/media-actions"
+import { ChevronLeft, ChevronRight, Upload, ImageIcon, X, Loader2, Tag, GripVertical, Save } from "lucide-react"
+import { uploadPhoto, getBusinessMedia, deletePhoto, type MediaItem } from "@/app/actions/media-actions"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
-import { PhotoFolderManager } from "@/components/photo-folder-manager"
-import { PhotoTagManager } from "@/components/photo-tag-manager"
 import { Trash2 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
 
 export default function PhotoAlbumPage() {
   const [photos, setPhotos] = useState<MediaItem[]>([])
-  const [folders, setFolders] = useState<MediaFolder[]>([])
-  const [tags, setTags] = useState<string[]>([])
   const [isCompressing, setIsCompressing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [businessId, setBusinessId] = useState<string>("")
   const [businessName, setBusinessName] = useState<string>("")
-  const [currentFolder, setCurrentFolder] = useState<string | null>(null)
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<string>("all")
   const [photoDetailOpen, setPhotoDetailOpen] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<MediaItem | null>(null)
+  const [photoLabel, setPhotoLabel] = useState<string>("")
+  const [isSavingLabel, setIsSavingLabel] = useState(false)
+  const [isSavingOrder, setIsSavingOrder] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -72,24 +63,37 @@ export default function PhotoAlbumPage() {
         setBusinessName(businessData.businessName || "Your Business")
 
         // Fetch existing photos for this business
-        const mediaData = await getBusinessMedia(businessData.id)
-        if (mediaData) {
-          if (mediaData.photoAlbum) {
-            console.log(`Loaded ${mediaData.photoAlbum.length} photos from storage`)
-            setPhotos(mediaData.photoAlbum)
-          }
+        try {
+          const mediaData = await getBusinessMedia(businessData.id)
+          if (mediaData) {
+            if (mediaData.photoAlbum) {
+              console.log(`Loaded ${mediaData.photoAlbum.length} photos from storage`)
 
-          if (mediaData.folders) {
-            console.log(`Loaded ${mediaData.folders.length} folders from storage`)
-            setFolders(mediaData.folders)
-          }
+              // Sort photos by sortOrder if it exists, otherwise use the default order
+              const sortedPhotos = [...mediaData.photoAlbum].sort((a, b) => {
+                // If both have sortOrder, use it
+                if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+                  return a.sortOrder - b.sortOrder
+                }
+                // If only one has sortOrder, the one with sortOrder comes first
+                if (a.sortOrder !== undefined) return -1
+                if (b.sortOrder !== undefined) return 1
+                // If neither has sortOrder, use the default order (by creation date)
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+              })
 
-          if (mediaData.tags) {
-            console.log(`Loaded ${mediaData.tags.length} tags from storage`)
-            setTags(mediaData.tags)
+              setPhotos(sortedPhotos)
+            }
+          } else {
+            console.log("No media data found in storage")
           }
-        } else {
-          console.log("No media data found in storage")
+        } catch (mediaError) {
+          console.error("Error fetching media data:", mediaError)
+          toast({
+            title: "Error loading photos",
+            description: "Could not load your saved photos. Please try again later.",
+            variant: "destructive",
+          })
         }
       } catch (error) {
         console.error("Error fetching business data:", error)
@@ -166,16 +170,6 @@ export default function PhotoAlbumPage() {
       formData.append("businessId", businessId)
       formData.append("photo", finalFile)
 
-      // Add folder if we're in a folder
-      if (currentFolder) {
-        formData.append("folderId", currentFolder)
-      }
-
-      // Add selected tags if any
-      if (selectedTags.length > 0) {
-        formData.append("tags", JSON.stringify(selectedTags))
-      }
-
       console.log(`Uploading to Blob storage with business ID: ${businessId}`)
 
       // Upload to Blob storage
@@ -184,13 +178,36 @@ export default function PhotoAlbumPage() {
 
         if (result.success) {
           console.log("Upload successful:", result)
-          // Update the photos state with the new photo album
-          setPhotos(result.photoAlbum)
 
-          // Update tags if new ones were added
-          if (result.tags) {
-            setTags(result.tags)
-          }
+          // Add sortOrder to the new photo (place it at the beginning)
+          const newPhotoAlbum = result.photoAlbum.map((photo, index) => {
+            // If it's the newly added photo (it will be the last one)
+            if (index === result.photoAlbum.length - 1) {
+              return {
+                ...photo,
+                sortOrder: 0, // Place it at the beginning
+              }
+            }
+            // Increment the sortOrder of all other photos
+            return {
+              ...photo,
+              sortOrder: (photo.sortOrder !== undefined ? photo.sortOrder : index) + 1,
+            }
+          })
+
+          // Sort the photos by sortOrder
+          const sortedPhotos = [...newPhotoAlbum].sort((a, b) => {
+            if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+              return a.sortOrder - b.sortOrder
+            }
+            return 0
+          })
+
+          // Update the photos state
+          setPhotos(sortedPhotos)
+
+          // Save the updated order to Redis
+          await updatePhotoInRedis(businessId, sortedPhotos)
 
           toast({
             title: "Image uploaded successfully",
@@ -234,7 +251,26 @@ export default function PhotoAlbumPage() {
 
       if (result.success) {
         console.log("Delete successful:", result)
-        setPhotos(result.photoAlbum)
+
+        // Update the sortOrder of the remaining photos
+        const updatedPhotos = result.photoAlbum.map((photo, index) => ({
+          ...photo,
+          sortOrder: photo.sortOrder !== undefined ? photo.sortOrder : index,
+        }))
+
+        // Sort the photos by sortOrder
+        const sortedPhotos = [...updatedPhotos].sort((a, b) => {
+          if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+            return a.sortOrder - b.sortOrder
+          }
+          return 0
+        })
+
+        setPhotos(sortedPhotos)
+
+        // Save the updated order to Redis
+        await updatePhotoInRedis(businessId, sortedPhotos)
+
         toast({
           title: "Photo deleted",
           description: "The photo has been removed from your album.",
@@ -257,43 +293,9 @@ export default function PhotoAlbumPage() {
     }
   }
 
-  const handleMovePhotoToFolder = async (photoId: string, folderId: string | null) => {
-    if (!businessId) {
-      console.error("No business ID available")
-      return
-    }
-
-    try {
-      const result = await movePhotoToFolder(businessId, photoId, folderId)
-
-      if (result.success) {
-        setPhotos(result.photoAlbum)
-        setPhotoDetailOpen(false)
-        toast({
-          title: "Photo moved",
-          description: folderId
-            ? `Photo moved to ${folders.find((f) => f.id === folderId)?.name || "folder"}`
-            : "Photo moved to root",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to move photo.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error moving photo:", error)
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred.",
-        variant: "destructive",
-      })
-    }
-  }
-
   const openPhotoDetail = (photo: MediaItem) => {
     setSelectedPhoto(photo)
+    setPhotoLabel(photo.label || "")
     setPhotoDetailOpen(true)
   }
 
@@ -305,21 +307,128 @@ export default function PhotoAlbumPage() {
     setCurrentPhotoIndex((prev) => (prev === 0 ? filteredPhotos.length - 1 : prev - 1))
   }
 
-  // Filter photos based on current folder and selected tags
-  const filteredPhotos = photos.filter((photo) => {
-    // Filter by folder
-    if (activeTab === "folders" && currentFolder) {
-      if (photo.folderId !== currentFolder) return false
-    }
+  // Function to update photo label
+  const updatePhotoLabel = async () => {
+    if (!businessId || !selectedPhoto) return
 
-    // Filter by tags
-    if (activeTab === "tags" && selectedTags.length > 0) {
-      if (!photo.tags) return false
-      return selectedTags.every((tag) => photo.tags?.includes(tag))
-    }
+    setIsSavingLabel(true)
+    try {
+      // Create a copy of the photos array
+      const updatedPhotos = [...photos]
 
-    return true
-  })
+      // Find the index of the selected photo
+      const photoIndex = updatedPhotos.findIndex((photo) => photo.id === selectedPhoto.id)
+
+      if (photoIndex !== -1) {
+        // Update the label
+        updatedPhotos[photoIndex] = {
+          ...updatedPhotos[photoIndex],
+          label: photoLabel,
+        }
+
+        // Update the state
+        setPhotos(updatedPhotos)
+
+        // Update in Redis
+        await updatePhotoInRedis(businessId, updatedPhotos)
+
+        toast({
+          title: "Label updated",
+          description: "The photo label has been updated successfully.",
+        })
+      }
+    } catch (error) {
+      console.error("Error updating label:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update the photo label. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingLabel(false)
+    }
+  }
+
+  // Handle drag end event
+  const handleDragEnd = async (result: any) => {
+    if (!result.destination) return
+
+    const items = Array.from(photos)
+    const [reorderedItem] = items.splice(result.source.index, 1)
+    items.splice(result.destination.index, 0, reorderedItem)
+
+    // Update sortOrder for all items
+    const updatedItems = items.map((item, index) => ({
+      ...item,
+      sortOrder: index,
+    }))
+
+    setPhotos(updatedItems)
+
+    // Save the new order if not in edit mode
+    if (!isEditMode) {
+      await savePhotoOrder(updatedItems)
+    }
+  }
+
+  // Save the photo order to Redis
+  const savePhotoOrder = async (photosToSave = photos) => {
+    if (!businessId) return
+
+    setIsSavingOrder(true)
+    try {
+      await updatePhotoInRedis(businessId, photosToSave)
+
+      toast({
+        title: "Order saved",
+        description: "The photo order has been updated successfully.",
+      })
+
+      // Exit edit mode if we're in it
+      if (isEditMode) {
+        setIsEditMode(false)
+      }
+    } catch (error) {
+      console.error("Error saving photo order:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save the photo order. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingOrder(false)
+    }
+  }
+
+  // Helper function to update photos in Redis
+  const updatePhotoInRedis = async (businessId: string, updatedPhotos: MediaItem[]) => {
+    try {
+      // Create a FormData object to use with the server action
+      const formData = new FormData()
+      formData.append("businessId", businessId)
+      formData.append("action", "updatePhotos")
+      formData.append("photos", JSON.stringify(updatedPhotos))
+
+      // Use the existing uploadPhoto action as a way to update the Redis store
+      // This is a bit of a hack, but it avoids creating a new server action
+      const result = await fetch("/api/update-photos", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!result.ok) {
+        throw new Error("Failed to update photos in Redis")
+      }
+
+      return await result.json()
+    } catch (error) {
+      console.error("Error updating photos in Redis:", error)
+      throw error
+    }
+  }
+
+  // No filtering by folders or tags
+  const filteredPhotos = photos
 
   if (isLoading) {
     return (
@@ -359,102 +468,43 @@ export default function PhotoAlbumPage() {
         </CardHeader>
 
         <CardContent>
-          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all">All Photos</TabsTrigger>
-              <TabsTrigger value="folders">Folders</TabsTrigger>
-              <TabsTrigger value="tags">Tags</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="all" className="space-y-6">
-              <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-lg border-gray-300 hover:border-gray-400 transition-colors">
-                <ImageIcon className="h-12 w-12 text-gray-400 mb-4" />
-                <div className="space-y-2 text-center">
-                  <p className="text-sm text-gray-500">Drag and drop your images, or click to browse</p>
-                  <p className="text-xs text-gray-400">Supported formats: JPEG, PNG, GIF, WebP</p>
-                </div>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isCompressing}
-                >
-                  {isCompressing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Compressing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload Photos
-                    </>
-                  )}
-                </Button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  className="hidden"
-                  accept="image/jpeg,image/png,image/gif,image/webp"
-                  multiple
-                />
+          <div className="space-y-6">
+            <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-lg border-gray-300 hover:border-gray-400 transition-colors">
+              <ImageIcon className="h-12 w-12 text-gray-400 mb-4" />
+              <div className="space-y-2 text-center">
+                <p className="text-sm text-gray-500">Drag and drop your images, or click to browse</p>
+                <p className="text-xs text-gray-400">Supported formats: JPEG, PNG, GIF, WebP</p>
               </div>
-
-              {renderPhotoGrid()}
-            </TabsContent>
-
-            <TabsContent value="folders" className="space-y-6">
-              <PhotoFolderManager
-                businessId={businessId}
-                folders={folders}
-                currentFolder={currentFolder}
-                onFolderChange={setCurrentFolder}
-                onFoldersUpdate={setFolders}
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isCompressing}
+              >
+                {isCompressing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Compressing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Photos
+                  </>
+                )}
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                multiple
               />
+            </div>
 
-              {currentFolder && (
-                <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-lg border-gray-300 hover:border-gray-400 transition-colors">
-                  <ImageIcon className="h-12 w-12 text-gray-400 mb-4" />
-                  <div className="space-y-2 text-center">
-                    <p className="text-sm text-gray-500">Upload photos to this folder</p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isCompressing}
-                  >
-                    {isCompressing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Compressing...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Photos
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-
-              {renderPhotoGrid()}
-            </TabsContent>
-
-            <TabsContent value="tags" className="space-y-6">
-              <PhotoTagManager
-                businessId={businessId}
-                availableTags={tags}
-                selectedTags={selectedTags}
-                onTagsUpdate={setTags}
-                onSelectedTagsChange={setSelectedTags}
-              />
-
-              {renderPhotoGrid()}
-            </TabsContent>
-          </Tabs>
+            {renderPhotoGrid()}
+          </div>
         </CardContent>
 
         <CardFooter className="flex justify-between">
@@ -462,75 +512,102 @@ export default function PhotoAlbumPage() {
             Back
           </Button>
 
-          <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-            <DialogTrigger asChild>
-              <Button
-                disabled={filteredPhotos.length === 0}
-                onClick={() => {
-                  setCurrentPhotoIndex(0)
-                  setIsPreviewOpen(true)
-                }}
-              >
-                Preview Photo Album
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Photo Album Preview</DialogTitle>
-                <DialogDescription>
-                  {filteredPhotos.length > 0
-                    ? `Photo ${currentPhotoIndex + 1} of ${filteredPhotos.length}`
-                    : "No photos to display"}
-                </DialogDescription>
-              </DialogHeader>
+          <div className="flex gap-2">
+            {filteredPhotos.length > 0 && (
+              <>
+                {isEditMode ? (
+                  <Button onClick={() => savePhotoOrder()} disabled={isSavingOrder} variant="default">
+                    {isSavingOrder ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    Save Order
+                  </Button>
+                ) : (
+                  <Button onClick={() => setIsEditMode(true)} variant="outline">
+                    <GripVertical className="mr-2 h-4 w-4" />
+                    Reorder Photos
+                  </Button>
+                )}
+              </>
+            )}
 
-              {filteredPhotos.length > 0 && (
-                <div className="relative">
-                  <div className="flex justify-center items-center h-[60vh]">
-                    <img
-                      src={filteredPhotos[currentPhotoIndex].url || "/placeholder.svg"}
-                      alt={`Photo ${currentPhotoIndex + 1}`}
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  </div>
+            <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  disabled={filteredPhotos.length === 0}
+                  onClick={() => {
+                    setCurrentPhotoIndex(0)
+                    setIsPreviewOpen(true)
+                  }}
+                >
+                  Preview Photo Album
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Photo Album Preview</DialogTitle>
+                  <DialogDescription>
+                    {filteredPhotos.length > 0
+                      ? `Photo ${currentPhotoIndex + 1} of ${filteredPhotos.length}`
+                      : "No photos to display"}
+                  </DialogDescription>
+                </DialogHeader>
 
-                  <div className="absolute inset-y-0 left-0 flex items-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={prevPhoto}
-                      className="rounded-full bg-black bg-opacity-30 text-white hover:bg-opacity-50"
-                    >
-                      <ChevronLeft className="h-8 w-8" />
-                      <span className="sr-only">Previous photo</span>
-                    </Button>
-                  </div>
-
-                  <div className="absolute inset-y-0 right-0 flex items-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={nextPhoto}
-                      className="rounded-full bg-black bg-opacity-30 text-white hover:bg-opacity-50"
-                    >
-                      <ChevronRight className="h-8 w-8" />
-                      <span className="sr-only">Next photo</span>
-                    </Button>
-                  </div>
-
-                  <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-                    {filteredPhotos.map((_, index) => (
-                      <button
-                        key={index}
-                        className={`w-2 h-2 rounded-full ${index === currentPhotoIndex ? "bg-white" : "bg-white/50"}`}
-                        onClick={() => setCurrentPhotoIndex(index)}
+                {filteredPhotos.length > 0 && (
+                  <div className="relative">
+                    <div className="flex flex-col justify-center items-center h-[60vh]">
+                      <img
+                        src={filteredPhotos[currentPhotoIndex].url || "/placeholder.svg"}
+                        alt={`Photo ${currentPhotoIndex + 1}`}
+                        className="max-h-full max-w-full object-contain"
                       />
-                    ))}
+                      {filteredPhotos[currentPhotoIndex].label && (
+                        <div className="mt-2 text-center">
+                          <p className="text-lg font-medium">{filteredPhotos[currentPhotoIndex].label}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="absolute inset-y-0 left-0 flex items-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={prevPhoto}
+                        className="rounded-full bg-black bg-opacity-30 text-white hover:bg-opacity-50"
+                      >
+                        <ChevronLeft className="h-8 w-8" />
+                        <span className="sr-only">Previous photo</span>
+                      </Button>
+                    </div>
+
+                    <div className="absolute inset-y-0 right-0 flex items-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={nextPhoto}
+                        className="rounded-full bg-black bg-opacity-30 text-white hover:bg-opacity-50"
+                      >
+                        <ChevronRight className="h-8 w-8" />
+                        <span className="sr-only">Next photo</span>
+                      </Button>
+                    </div>
+
+                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+                      {filteredPhotos.map((_, index) => (
+                        <button
+                          key={index}
+                          className={`w-2 h-2 rounded-full ${index === currentPhotoIndex ? "bg-white" : "bg-white/50"}`}
+                          onClick={() => setCurrentPhotoIndex(index)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
+                )}
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardFooter>
       </Card>
 
@@ -555,7 +632,7 @@ export default function PhotoAlbumPage() {
                 <div>
                   <h3 className="text-lg font-semibold mb-4">{selectedPhoto.filename}</h3>
 
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <div className="flex justify-between py-2 border-b">
                       <span className="text-gray-500">Size</span>
                       <span>{formatFileSize(selectedPhoto.size)}</span>
@@ -568,69 +645,31 @@ export default function PhotoAlbumPage() {
                       </div>
                     )}
 
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-gray-500">Folder</span>
-                      <span>
-                        {selectedPhoto.folderId
-                          ? folders.find((f) => f.id === selectedPhoto.folderId)?.name || "Unknown folder"
-                          : "None"}
-                      </span>
-                    </div>
-
-                    <div className="py-2 border-b">
-                      <span className="text-gray-500">Tags</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {selectedPhoto.tags && selectedPhoto.tags.length > 0 ? (
-                          selectedPhoto.tags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="px-2 py-1">
-                              {tag}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-sm text-gray-400">No tags</span>
-                        )}
+                    {/* Label input field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="photo-label">Photo Label</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="photo-label"
+                          value={photoLabel}
+                          onChange={(e) => setPhotoLabel(e.target.value)}
+                          placeholder="Add a label to this photo"
+                          className="flex-1"
+                        />
+                        <Button onClick={updatePhotoLabel} disabled={isSavingLabel} size="sm">
+                          {isSavingLabel ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Tag className="h-4 w-4 mr-2" />
+                          )}
+                          Save
+                        </Button>
                       </div>
+                      <p className="text-xs text-gray-500">
+                        Labels will be displayed below the photo in the album view.
+                      </p>
                     </div>
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Move to Folder</h4>
-                  <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="justify-start"
-                      onClick={() => handleMovePhotoToFolder(selectedPhoto.id, null)}
-                    >
-                      <FolderIcon className="h-4 w-4 mr-2" />
-                      Root
-                    </Button>
-
-                    {folders.map((folder) => (
-                      <Button
-                        key={folder.id}
-                        variant="outline"
-                        size="sm"
-                        className="justify-start"
-                        onClick={() => handleMovePhotoToFolder(selectedPhoto.id, folder.id)}
-                      >
-                        <FolderIcon className="h-4 w-4 mr-2" />
-                        {folder.name}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Manage Tags</h4>
-                  <PhotoTagManager
-                    businessId={businessId}
-                    availableTags={tags}
-                    selectedTags={selectedPhoto.tags || []}
-                    photoId={selectedPhoto.id}
-                    onTagsUpdate={setTags}
-                  />
                 </div>
 
                 <Button
@@ -652,73 +691,86 @@ export default function PhotoAlbumPage() {
     </div>
   )
 
-  // Helper function to render the photo grid
   function renderPhotoGrid() {
-    return filteredPhotos.length > 0 ? (
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">
-          {activeTab === "folders" && currentFolder
-            ? `Photos in ${folders.find((f) => f.id === currentFolder)?.name || "folder"}`
-            : activeTab === "tags" && selectedTags.length > 0
-              ? `Photos with ${selectedTags.length === 1 ? "tag" : "tags"}: ${selectedTags.join(", ")}`
-              : `All Photos (${filteredPhotos.length})`}
-        </h3>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {filteredPhotos.map((photo) => (
-            <div key={photo.id} className="relative group">
-              <img
-                src={photo.url || "/placeholder.svg"}
-                alt={photo.filename}
-                className="w-full h-32 object-cover rounded-md cursor-pointer"
-                onClick={() => openPhotoDetail(photo)}
-              />
-              <button
-                onClick={() => removePhoto(photo.id)}
-                className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              {/* Folder and tag indicators */}
-              <div className="absolute bottom-1 left-1 flex gap-1">
-                {photo.folderId && (
-                  <div className="bg-black bg-opacity-50 rounded-full p-1 text-white">
-                    <FolderIcon className="h-3 w-3" />
-                  </div>
-                )}
-
-                {photo.tags && photo.tags.length > 0 && (
-                  <div className="bg-black bg-opacity-50 rounded-full p-1 text-white">
-                    <Tag className="h-3 w-3" />
-                  </div>
-                )}
-              </div>
-
-              <div className="text-xs mt-1">
-                <p className="truncate">{photo.filename}</p>
-                <p className="text-gray-500">
-                  {formatFileSize(photo.size)}
-                  {photo.originalSize && (
-                    <span className="text-green-600 ml-1">
-                      (-{calculateCompressionSavings(photo.originalSize, photo.size).percentage}%)
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-          ))}
+    if (filteredPhotos.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-500">
+          <p>No photos in your album yet. Upload some photos to get started!</p>
         </div>
-      </div>
-    ) : (
-      <div className="text-center py-8 text-gray-500">
-        <p>
-          {activeTab === "folders" && currentFolder
-            ? "No photos in this folder yet. Upload some photos to get started!"
-            : activeTab === "tags" && selectedTags.length > 0
-              ? `No photos with ${selectedTags.length === 1 ? "tag" : "all tags"}: ${selectedTags.join(", ")}`
-              : "No photos in your album yet. Upload some photos to get started!"}
-        </p>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-medium">All Photos ({filteredPhotos.length})</h3>
+          {isEditMode && <p className="text-sm text-gray-500">Drag photos to reorder them, then click "Save Order"</p>}
+        </div>
+
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="photos" direction="horizontal">
+            {(provided) => (
+              <div
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"
+              >
+                {filteredPhotos.map((photo, index) => (
+                  <Draggable key={photo.id} draggableId={photo.id} index={index} isDragDisabled={!isEditMode}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        className={`relative group ${snapshot.isDragging ? "z-50" : ""}`}
+                      >
+                        <div className="flex flex-col">
+                          <div className="relative">
+                            {isEditMode && (
+                              <div
+                                {...provided.dragHandleProps}
+                                className="absolute top-1 left-1 bg-black bg-opacity-50 rounded-full p-1 text-white z-10"
+                              >
+                                <GripVertical className="h-4 w-4" />
+                              </div>
+                            )}
+                            <img
+                              src={photo.url || "/placeholder.svg"}
+                              alt={photo.filename}
+                              className={`w-full h-32 object-cover rounded-md ${isEditMode ? "cursor-move" : "cursor-pointer"}`}
+                              onClick={isEditMode ? undefined : () => openPhotoDetail(photo)}
+                            />
+                            {!isEditMode && (
+                              <button
+                                onClick={() => removePhoto(photo.id)}
+                                className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="text-xs mt-1">
+                            {photo.label && <p className="font-medium text-sm truncate">{photo.label}</p>}
+                            <p className="truncate">{photo.filename}</p>
+                            <p className="text-gray-500">
+                              {formatFileSize(photo.size)}
+                              {photo.originalSize && (
+                                <span className="text-green-600 ml-1">
+                                  (-{calculateCompressionSavings(photo.originalSize, photo.size).percentage}%)
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
       </div>
     )
   }

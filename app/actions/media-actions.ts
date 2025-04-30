@@ -19,6 +19,8 @@ export type MediaItem = {
   createdAt: string
   folderId?: string
   tags?: string[]
+  label?: string
+  sortOrder?: number // Added sortOrder field
 }
 
 export type MediaFolder = {
@@ -794,7 +796,28 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
     let folders: MediaFolder[] = []
     if (mediaData.folders) {
       try {
-        folders = JSON.parse(mediaData.folders as string)
+        // Check if folders is already an object (not a string)
+        if (typeof mediaData.folders === "object" && !Array.isArray(mediaData.folders)) {
+          // If it's an object but not an array, convert it to an empty array
+          console.warn("Folders is an object but not an array, initializing empty array")
+          folders = []
+
+          // Fix the data in Redis by storing an empty array
+          await kv.hset(`business:${businessId}:media`, {
+            folders: JSON.stringify([]),
+          })
+        } else if (typeof mediaData.folders === "string") {
+          // Normal case - parse the JSON string
+          folders = JSON.parse(mediaData.folders as string)
+        } else if (Array.isArray(mediaData.folders)) {
+          // If it's already an array, use it directly
+          folders = mediaData.folders
+
+          // Fix the data in Redis by storing it properly
+          await kv.hset(`business:${businessId}:media`, {
+            folders: JSON.stringify(mediaData.folders),
+          })
+        }
       } catch (error) {
         console.error("Error parsing folders:", error)
         folders = []
@@ -810,9 +833,51 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
     let tags: string[] = []
     if (mediaData.tags) {
       try {
-        tags = JSON.parse(mediaData.tags as string)
+        // Check if tags is already an object (not a string)
+        if (typeof mediaData.tags === "object" && !Array.isArray(mediaData.tags)) {
+          // If it's an object but not an array, convert it to an empty array
+          console.warn("Tags is an object but not an array, initializing empty array")
+          tags = []
+
+          // Fix the data in Redis by storing an empty array
+          await kv.hset(`business:${businessId}:media`, {
+            tags: JSON.stringify([]),
+          })
+        } else if (typeof mediaData.tags === "string") {
+          // Check if the string is empty or just whitespace
+          if (!mediaData.tags.trim()) {
+            console.warn("Tags string is empty, initializing empty array")
+            tags = []
+
+            // Fix the data in Redis by storing an empty array
+            await kv.hset(`business:${businessId}:media`, {
+              tags: JSON.stringify([]),
+            })
+          } else {
+            // Normal case - parse the JSON string
+            try {
+              tags = JSON.parse(mediaData.tags as string)
+            } catch (parseError) {
+              console.error("Error parsing tags JSON:", parseError, "Raw value:", mediaData.tags)
+              tags = []
+
+              // Fix the data in Redis by storing an empty array
+              await kv.hset(`business:${businessId}:media`, {
+                tags: JSON.stringify([]),
+              })
+            }
+          }
+        } else if (Array.isArray(mediaData.tags)) {
+          // If it's already an array, use it directly
+          tags = mediaData.tags
+
+          // Fix the data in Redis by storing it properly
+          await kv.hset(`business:${businessId}:media`, {
+            tags: JSON.stringify(mediaData.tags),
+          })
+        }
       } catch (error) {
-        console.error("Error parsing tags:", error)
+        console.error("Error processing tags:", error)
         tags = []
 
         // Fix the data in Redis by storing an empty array
@@ -868,7 +933,7 @@ export async function createFolder(businessId: string, folderName: string, paren
     // Add the new folder to the list
     const updatedFolders = [...(existingMedia.folders || []), newFolder]
 
-    // Store in KV
+    // Ensure we're storing the folders as a JSON string
     await kv.hset(`business:${businessId}:media`, {
       folders: JSON.stringify(updatedFolders),
     })
@@ -1004,10 +1069,13 @@ export async function movePhotoToFolder(businessId: string, photoId: string, fol
       return { success: false, error: "Missing required fields" }
     }
 
+    console.log(`Moving photo ${photoId} to folder ${folderId || "root"} for business ${businessId}`)
+
     // Get existing media data
     const existingMedia = await getBusinessMedia(businessId)
 
     if (!existingMedia || !existingMedia.photoAlbum) {
+      console.error("No photo album found for business", businessId)
       return { success: false, error: "No photo album found" }
     }
 
@@ -1015,6 +1083,7 @@ export async function movePhotoToFolder(businessId: string, photoId: string, fol
     const photoIndex = existingMedia.photoAlbum.findIndex((photo) => photo.id === photoId)
 
     if (photoIndex === -1) {
+      console.error(`Photo ${photoId} not found in album`)
       return { success: false, error: "Photo not found" }
     }
 
@@ -1024,6 +1093,8 @@ export async function movePhotoToFolder(businessId: string, photoId: string, fol
       ...updatedPhotoAlbum[photoIndex],
       folderId: folderId || undefined,
     }
+
+    console.log(`Updating photo album in Redis for business ${businessId}`)
 
     // Store in KV
     await kv.hset(`business:${businessId}:media`, {

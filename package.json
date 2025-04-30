@@ -67,7 +67,8 @@
     "@upstash/redis": "latest",
     "@vercel/blob": "latest",
     "sharp": "latest",
-    "browser-image-compression": "latest"
+    "browser-image-compression": "latest",
+    "react-beautiful-dnd": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
