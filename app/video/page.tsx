@@ -15,6 +15,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { uploadThumbnail, uploadVideo, getBusinessMedia, deleteThumbnail } from "@/app/actions/media-actions"
 
+// Add these constants
+const MAX_VIDEO_SIZE_MB = 50
+const MB_IN_BYTES = 1024 * 1024
+
 interface VideoItem {
   id: string
   file: File
@@ -238,14 +242,44 @@ export default function VideoPage() {
       return
     }
 
+    // Check file size again just to be safe
+    const fileSizeMB = selectedVideo.size / MB_IN_BYTES
+    console.log(`Uploading video: ${selectedVideo.name}, Size: ${fileSizeMB.toFixed(2)}MB, Type: ${selectedVideo.type}`)
+
+    if (fileSizeMB > MAX_VIDEO_SIZE_MB) {
+      toast({
+        title: "File too large",
+        description: `Video file size (${fileSizeMB.toFixed(2)}MB) exceeds the ${MAX_VIDEO_SIZE_MB}MB limit.`,
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsUploading(true)
     setUploadProgress(10) // Start progress
 
     try {
+      // Create a simple blob from the file to test if it's valid
+      const testBlob = new Blob([selectedVideo], { type: selectedVideo.type })
+      console.log("Test blob created:", testBlob.size, testBlob.type)
+
       // Create form data for upload
       const formData = new FormData()
       formData.append("businessId", BUSINESS_ID)
-      formData.append("video", selectedVideo)
+
+      // Use a new blob to ensure the file is properly serialized
+      const videoBlob = new Blob([await selectedVideo.arrayBuffer()], { type: selectedVideo.type })
+      formData.append("video", videoBlob, selectedVideo.name)
+
+      // Add design ID if needed
+      formData.append("designId", "default-design")
+
+      // Log the form data contents
+      console.log("Form data created with keys:", [...formData.keys()])
+      console.log(
+        "Video blob size in form:",
+        formData.get("video") instanceof Blob ? (formData.get("video") as Blob).size : "Not a blob",
+      )
 
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -256,7 +290,9 @@ export default function VideoPage() {
       }, 500)
 
       // Upload the video
+      console.log("Starting video upload in page component...")
       const result = await uploadVideo(formData)
+      console.log("Upload result from page:", result)
       clearInterval(progressInterval)
 
       if (result.success) {
@@ -282,6 +318,7 @@ export default function VideoPage() {
         // Switch to library tab
         setActiveTab("library")
       } else {
+        console.error("Video upload error result:", result)
         toast({
           title: "Upload failed",
           description: result.error || "There was an error uploading your video",
@@ -290,10 +327,19 @@ export default function VideoPage() {
         setUploadProgress(0)
       }
     } catch (error) {
-      console.error("Error uploading video:", error)
+      console.error("Error in video upload:", error)
+      let errorMessage = "There was an error uploading your video"
+
+      if (error instanceof Error) {
+        console.error("Error name:", error.name)
+        console.error("Error message:", error.message)
+        console.error("Error stack:", error.stack)
+        errorMessage = `Error: ${error.message}`
+      }
+
       toast({
         title: "Upload failed",
-        description: "There was an error uploading your video",
+        description: errorMessage,
         variant: "destructive",
       })
       setUploadProgress(0)

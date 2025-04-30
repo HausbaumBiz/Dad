@@ -89,16 +89,34 @@ async function compressImageBuffer(
  */
 export async function uploadVideo(formData: FormData) {
   try {
-    const businessId = formData.get("businessId") as string
-    const file = formData.get("video") as File
-    const designId = formData.get("designId") as string
+    console.log("Starting uploadVideo server action")
+    console.log("FormData keys:", [...formData.keys()])
 
-    if (!file || !businessId) {
-      return { success: false, error: "Missing required fields" }
+    const businessId = formData.get("businessId")
+    if (!businessId || typeof businessId !== "string") {
+      console.error("Missing or invalid businessId:", businessId)
+      return { success: false, error: "Missing or invalid businessId" }
     }
 
+    const videoFile = formData.get("video")
+    if (!videoFile) {
+      console.error("Missing video file in formData")
+      return { success: false, error: "Missing video file" }
+    }
+
+    // Check if the video is a File or Blob
+    if (!(videoFile instanceof Blob)) {
+      console.error("Video is not a Blob:", typeof videoFile)
+      return { success: false, error: "Invalid video format" }
+    }
+
+    const designId = formData.get("designId") || "default-design"
+
+    // Log file details
+    console.log(`Video file details - Size: ${videoFile.size} bytes, Type: ${videoFile.type}`)
+
     // Check file size
-    const fileSizeMB = file.size / MB_IN_BYTES
+    const fileSizeMB = videoFile.size / MB_IN_BYTES
     if (fileSizeMB > MAX_VIDEO_SIZE_MB) {
       return {
         success: false,
@@ -106,31 +124,61 @@ export async function uploadVideo(formData: FormData) {
       }
     }
 
-    // Generate a unique filename with timestamp and original extension
-    const extension = file.name.split(".").pop() || "mp4"
-    const filename = `${businessId}/videos/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${extension}`
+    // Generate a unique filename with timestamp
+    const timestamp = Date.now()
+    const randomString = Math.random().toString(36).substring(2, 10)
+    const extension = "mp4" // Default to mp4 if we can't determine the extension
+    const filename = `${businessId}/videos/${timestamp}-${randomString}.${extension}`
+
+    // Ensure we have a valid content type
+    const contentType = videoFile.type || `video/${extension}`
+
+    console.log(`Generated filename: ${filename}`)
 
     try {
       // Upload to Vercel Blob with proper error handling
       let blob
       try {
-        blob = await put(filename, file, {
+        console.log(`Attempting to upload video: ${filename}, size: ${videoFile.size} bytes, type: ${contentType}`)
+
+        // Convert the Blob to an ArrayBuffer and then to a Buffer
+        const arrayBuffer = await videoFile.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+
+        console.log(`Successfully converted video to buffer, size: ${buffer.length} bytes`)
+
+        // Create a blob options object with no null values
+        const blobOptions = {
           access: "public",
-          addRandomSuffix: false, // We already added randomness to the filename
-          contentType: file.type, // Explicitly set content type
-          maxSize: MAX_VIDEO_SIZE_MB * MB_IN_BYTES, // Set max size explicitly
-        })
+          addRandomSuffix: false,
+          contentType: contentType,
+        }
+
+        console.log("Blob upload options:", blobOptions)
+
+        // Use the buffer for upload instead of the file directly
+        blob = await put(filename, buffer, blobOptions)
+        console.log("Video upload successful:", blob)
       } catch (blobError) {
         console.error("Blob upload error details:", blobError)
 
-        // Handle Response object error (Request Entity Too Large)
-        if (
-          blobError instanceof Response ||
-          (typeof blobError === "object" && blobError !== null && "text" in blobError)
-        ) {
+        // Try to get more details about the error
+        if (blobError instanceof Error) {
+          console.error("Error name:", blobError.name)
+          console.error("Error message:", blobError.message)
+          console.error("Error stack:", blobError.stack)
+        }
+
+        // Check if the error is a Response object
+        if (blobError instanceof Response) {
+          const status = blobError.status
+          const statusText = blobError.statusText
+          console.error(`Response status: ${status} ${statusText}`)
+
           try {
-            // Try to get the response text
-            const errorText = await (blobError as Response).text()
+            // Try to get the response text without parsing as JSON
+            const errorText = await blobError.text()
+            console.error("Response error text:", errorText)
 
             // Check if it contains "Request Entity Too Large"
             if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
@@ -145,11 +193,20 @@ export async function uploadVideo(formData: FormData) {
               error: `Blob upload failed: ${errorText.substring(0, 100)}...`,
             }
           } catch (textError) {
-            // If we can't get the text, return a generic error
+            console.error("Error getting response text:", textError)
             return {
               success: false,
-              error: "File upload failed. The file may be too large or in an unsupported format.",
+              error: `Upload failed with status ${status}: ${statusText}`,
             }
+          }
+        }
+
+        // Check for null args error
+        if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
+          return {
+            success: false,
+            error:
+              "Upload failed: One or more required parameters were missing. Please try again with a different file.",
           }
         }
 
@@ -181,10 +238,11 @@ export async function uploadVideo(formData: FormData) {
         videoUrl: blob.url,
         videoContentType: blob.contentType,
         videoId: filename,
-        designId: designId || existingMedia.designId,
+        designId: designId,
       })
 
       revalidatePath(`/ad-design/customize`)
+      revalidatePath(`/video`)
 
       return {
         success: true,
@@ -212,6 +270,14 @@ export async function uploadVideo(formData: FormData) {
     }
   } catch (error) {
     console.error("Error in uploadVideo function:", error)
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error("Error name:", error.name)
+      console.error("Error message:", error.message)
+      console.error("Error stack:", error.stack)
+    } else {
+      console.error("Non-Error object thrown:", error)
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to upload video",
@@ -247,16 +313,25 @@ export async function uploadThumbnail(formData: FormData) {
     const format = "jpeg" // Default format
     const filename = `${businessId}/thumbnails/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${format}`
 
+    // Ensure we have a valid content type
+    const contentType = file.type || "image/jpeg"
+
     try {
       // Upload to Vercel Blob directly without compression
       let blob
       try {
-        blob = await put(filename, file, {
+        // Convert the File to a Buffer
+        const arrayBuffer = await file.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+
+        // Create a blob options object with no null values
+        const blobOptions = {
           access: "public",
           addRandomSuffix: false,
-          contentType: file.type, // Explicitly set content type
-          maxSize: MAX_IMAGE_SIZE_MB * MB_IN_BYTES, // Set max size explicitly
-        })
+          contentType: contentType,
+        }
+
+        blob = await put(filename, buffer, blobOptions)
       } catch (blobError) {
         console.error("Blob upload error details:", blobError)
 
@@ -287,6 +362,15 @@ export async function uploadThumbnail(formData: FormData) {
               success: false,
               error: "File upload failed. The file may be too large or in an unsupported format.",
             }
+          }
+        }
+
+        // Check for null args error
+        if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
+          return {
+            success: false,
+            error:
+              "Upload failed: One or more required parameters were missing. Please try again with a different file.",
           }
         }
 
@@ -326,6 +410,7 @@ export async function uploadThumbnail(formData: FormData) {
       })
 
       revalidatePath(`/ad-design/customize`)
+      revalidatePath(`/video`)
 
       return {
         success: true,
@@ -441,16 +526,25 @@ export async function uploadPhoto(formData: FormData) {
     const format = "jpeg" // Default format
     const filename = `${businessId}/photos/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${format}`
 
+    // Ensure we have a valid content type
+    const contentType = file.type || "image/jpeg"
+
     try {
       // Upload to Vercel Blob directly without compression
       let blob
       try {
-        blob = await put(filename, file, {
+        // Convert the File to a Buffer
+        const arrayBuffer = await file.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+
+        // Create a blob options object with no null values
+        const blobOptions = {
           access: "public",
           addRandomSuffix: false,
-          contentType: file.type, // Explicitly set content type
-          maxSize: MAX_IMAGE_SIZE_MB * MB_IN_BYTES, // Set max size explicitly
-        })
+          contentType: contentType,
+        }
+
+        blob = await put(filename, buffer, blobOptions)
       } catch (blobError) {
         console.error("Blob upload error details:", blobError)
 
@@ -481,6 +575,15 @@ export async function uploadPhoto(formData: FormData) {
               success: false,
               error: "File upload failed. The file may be too large or in an unsupported format.",
             }
+          }
+        }
+
+        // Check for null args error
+        if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
+          return {
+            success: false,
+            error:
+              "Upload failed: One or more required parameters were missing. Please try again with a different file.",
           }
         }
 

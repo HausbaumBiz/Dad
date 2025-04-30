@@ -6,12 +6,14 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Upload, ImageIcon, Video, X } from "lucide-react"
+import { Upload, ImageIcon, Video, X } from 'lucide-react'
 import { useMediaUpload } from "@/hooks/use-media-upload"
 import { useImageProcessing } from "@/hooks/use-image-processing"
 import { formatFileSize, createPreviewUrl } from "@/lib/media-utils"
 import { CompressionSettingsDialog } from "./compression-settings"
 import { CompressionStats } from "./compression-stats"
+import { toast } from "@/components/ui/use-toast"
+import { isValidVideo, isWithinSizeLimit, createMediaFormData, uploadVideo } from "@/lib/video-utils"
 
 interface MediaUploaderProps {
   businessId: string
@@ -32,9 +34,9 @@ export function MediaUploader({ businessId, type, designId, onUploadComplete }: 
     photoUploadState,
     compressionSettings,
     setCompressionSettings,
-    handleVideoUpload,
     handleThumbnailUpload,
     handlePhotoUpload,
+    setVideoUploadState,
   } = useMediaUpload(businessId)
 
   // Get the appropriate upload state based on type
@@ -58,6 +60,115 @@ export function MediaUploader({ businessId, type, designId, onUploadComplete }: 
     let result
 
     if (type === "video") {
+      /**
+       * Upload a video file
+       */
+      const handleVideoUpload = async (file: File, designId?: string) => {
+        // Validate the file
+        if (!isValidVideo(file)) {
+          toast({
+            title: "Invalid file type",
+            description: "Please upload a valid video file (MP4, MOV, M4V, 3GP).",
+            variant: "destructive",
+          })
+          return null
+        }
+
+        console.log(`Validating video size: ${file.size} bytes (${file.size / (1024 * 1024).toFixed(2)}MB)`)
+        if (!isWithinSizeLimit(file, 50)) {
+          // 50MB limit
+          toast({
+            title: "File too large",
+            description: `Video files must be under 50MB. Current file: ${(file.size / (1024 * 1024)).toFixed(2)}MB`,
+            variant: "destructive",
+          })
+          return null
+        }
+
+        // Start upload
+        setVideoUploadState({
+          isUploading: true,
+          progress: 0,
+          error: null,
+          originalSize: file.size,
+        })
+
+        try {
+          // Create form data
+          const formData = createMediaFormData(file, businessId, "video", designId)
+
+          // Log formData details (excluding the actual file)
+          console.log("FormData created for video upload:", {
+            businessId,
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+            designId,
+          })
+
+          // Simulate progress (since we don't have real progress events)
+          const progressInterval = setInterval(() => {
+            setVideoUploadState((prev) => ({
+              ...prev,
+              progress: Math.min(prev.progress + 10, 90),
+            }))
+          }, 500)
+
+          // Upload the file
+          console.log("Starting video upload to server...")
+          const result = await uploadVideo(formData)
+          console.log("Upload result:", result)
+
+          // Clear the progress interval
+          clearInterval(progressInterval)
+
+          if (result.success) {
+            setVideoUploadState({
+              isUploading: false,
+              progress: 100,
+              error: null,
+              originalSize: file.size,
+              compressedSize: result.size,
+            })
+
+            toast({
+              title: "Video uploaded",
+              description: "Your video has been uploaded successfully.",
+            })
+
+            return result
+          } else {
+            setVideoUploadState({
+              isUploading: false,
+              progress: 0,
+              error: result.error || "Failed to upload video",
+            })
+
+            toast({
+              title: "Upload failed",
+              description: result.error || "Failed to upload video. Please try again.",
+              variant: "destructive",
+            })
+
+            return null
+          }
+        } catch (error) {
+          console.error("Error in video upload:", error)
+          setVideoUploadState({
+            isUploading: false,
+            progress: 0,
+            error: "An unexpected error occurred",
+          })
+
+          toast({
+            title: "Upload failed",
+            description: "An unexpected error occurred. Please try again.",
+            variant: "destructive",
+          })
+
+          return null
+        }
+      }
       result = await handleVideoUpload(selectedFile, designId)
     } else if (type === "thumbnail" || type === "photo") {
       // For images, we'll process them first if needed
