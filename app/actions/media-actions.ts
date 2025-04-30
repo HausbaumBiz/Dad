@@ -17,6 +17,15 @@ export type MediaItem = {
   width?: number
   height?: number
   createdAt: string
+  folderId?: string
+  tags?: string[]
+}
+
+export type MediaFolder = {
+  id: string
+  name: string
+  createdAt: string
+  parentId?: string
 }
 
 export type BusinessMedia = {
@@ -26,6 +35,8 @@ export type BusinessMedia = {
   thumbnailUrl?: string
   thumbnailId?: string
   photoAlbum: MediaItem[]
+  folders?: MediaFolder[]
+  tags?: string[]
 }
 
 export type CompressionOptions = {
@@ -354,12 +365,61 @@ export async function uploadThumbnail(formData: FormData) {
 }
 
 /**
+ * Delete a thumbnail for a business
+ */
+export async function deleteThumbnail(businessId: string) {
+  try {
+    if (!businessId) {
+      return { success: false, error: "Missing business ID" }
+    }
+
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+
+    if (!existingMedia || !existingMedia.thumbnailId) {
+      return { success: false, error: "No thumbnail found" }
+    }
+
+    // Delete the thumbnail from Blob storage
+    try {
+      await del(existingMedia.thumbnailId)
+    } catch (deleteError) {
+      console.error("Error deleting thumbnail from Blob storage:", deleteError)
+      // Continue with removing from the record even if blob deletion fails
+    }
+
+    // Update the business media record to remove thumbnail references
+    await kv.hset(`business:${businessId}:media`, {
+      thumbnailUrl: null,
+      thumbnailId: null,
+      thumbnailWidth: null,
+      thumbnailHeight: null,
+      thumbnailOriginalSize: null,
+      thumbnailCompressionSavings: null,
+    })
+
+    revalidatePath(`/video`)
+    revalidatePath(`/ad-design/customize`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting thumbnail:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete thumbnail",
+    }
+  }
+}
+
+/**
  * Upload a photo to the business's photo album with compression
  */
 export async function uploadPhoto(formData: FormData) {
   try {
     const businessId = formData.get("businessId") as string
     const file = formData.get("photo") as File
+    const folderId = formData.get("folderId") as string | null
+    const tags = formData.get("tags") as string | null
 
     if (!file || !businessId) {
       return { success: false, error: "Missing required fields" }
@@ -437,6 +497,16 @@ export async function uploadPhoto(formData: FormData) {
       // Calculate compression savings (in this case, none)
       const compressionSavings = 0
 
+      // Parse tags if provided
+      let parsedTags: string[] = []
+      if (tags) {
+        try {
+          parsedTags = JSON.parse(tags)
+        } catch (e) {
+          console.error("Error parsing tags:", e)
+        }
+      }
+
       // Create a media item
       const newPhoto: MediaItem = {
         id: filename,
@@ -449,25 +519,40 @@ export async function uploadPhoto(formData: FormData) {
         width: 1200, // Estimated width
         height: 800, // Estimated height
         createdAt: new Date().toISOString(),
+        folderId: folderId || undefined,
+        tags: parsedTags.length > 0 ? parsedTags : undefined,
       }
 
       // Get existing media data
-      const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [] }
+      const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [], folders: [], tags: [] }
 
       // Add the new photo to the album
       const updatedPhotoAlbum = [...(existingMedia.photoAlbum || []), newPhoto]
 
-      // Store reference in KV - ENSURE we stringify the photoAlbum array
+      // Update tags in the business media if new tags were added
+      const updatedTags = existingMedia.tags || []
+      if (parsedTags.length > 0) {
+        // Add any new tags that don't already exist
+        parsedTags.forEach((tag) => {
+          if (!updatedTags.includes(tag)) {
+            updatedTags.push(tag)
+          }
+        })
+      }
+
+      // Store reference in KV - ENSURE we stringify the photoAlbum array and tags array
       await kv.hset(`business:${businessId}:media`, {
         photoAlbum: JSON.stringify(updatedPhotoAlbum),
+        tags: JSON.stringify(updatedTags),
       })
 
-      revalidatePath(`/ad-design/customize`)
+      revalidatePath(`/photo-album`)
 
       return {
         success: true,
         photo: newPhoto,
         photoAlbum: updatedPhotoAlbum,
+        tags: updatedTags,
       }
     } catch (uploadError) {
       console.error("Error in Vercel Blob upload:", uploadError)
@@ -534,7 +619,7 @@ export async function deletePhoto(businessId: string, photoId: string) {
       photoAlbum: JSON.stringify(updatedPhotoAlbum),
     })
 
-    revalidatePath(`/ad-design/customize`)
+    revalidatePath(`/photo-album`)
 
     return {
       success: true,
@@ -562,7 +647,7 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
     const mediaData = await kv.hgetall(`business:${businessId}:media`)
 
     if (!mediaData) {
-      return { photoAlbum: [] }
+      return { photoAlbum: [], folders: [], tags: [] }
     }
 
     // Parse the photo album JSON
@@ -602,6 +687,38 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
       }
     }
 
+    // Parse folders if they exist
+    let folders: MediaFolder[] = []
+    if (mediaData.folders) {
+      try {
+        folders = JSON.parse(mediaData.folders as string)
+      } catch (error) {
+        console.error("Error parsing folders:", error)
+        folders = []
+
+        // Fix the data in Redis by storing an empty array
+        await kv.hset(`business:${businessId}:media`, {
+          folders: JSON.stringify([]),
+        })
+      }
+    }
+
+    // Parse tags if they exist
+    let tags: string[] = []
+    if (mediaData.tags) {
+      try {
+        tags = JSON.parse(mediaData.tags as string)
+      } catch (error) {
+        console.error("Error parsing tags:", error)
+        tags = []
+
+        // Fix the data in Redis by storing an empty array
+        await kv.hset(`business:${businessId}:media`, {
+          tags: JSON.stringify([]),
+        })
+      }
+    }
+
     // Construct the business media object
     const businessMedia: BusinessMedia = {
       videoUrl: mediaData.videoUrl as string,
@@ -610,12 +727,336 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
       thumbnailUrl: mediaData.thumbnailUrl as string,
       thumbnailId: mediaData.thumbnailId as string,
       photoAlbum,
+      folders,
+      tags,
     }
 
     return businessMedia
   } catch (error) {
     console.error("Error getting business media:", error)
-    return { photoAlbum: [] }
+    return { photoAlbum: [], folders: [], tags: [] }
+  }
+}
+
+/**
+ * Create a new folder
+ */
+export async function createFolder(businessId: string, folderName: string, parentId?: string) {
+  try {
+    if (!businessId || !folderName) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+
+    if (!existingMedia) {
+      return { success: false, error: "No media data found" }
+    }
+
+    // Create a new folder
+    const newFolder: MediaFolder = {
+      id: `folder_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
+      name: folderName,
+      createdAt: new Date().toISOString(),
+      parentId: parentId,
+    }
+
+    // Add the new folder to the list
+    const updatedFolders = [...(existingMedia.folders || []), newFolder]
+
+    // Store in KV
+    await kv.hset(`business:${businessId}:media`, {
+      folders: JSON.stringify(updatedFolders),
+    })
+
+    revalidatePath(`/photo-album`)
+
+    return {
+      success: true,
+      folder: newFolder,
+      folders: updatedFolders,
+    }
+  } catch (error) {
+    console.error("Error creating folder:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create folder",
+    }
+  }
+}
+
+/**
+ * Rename a folder
+ */
+export async function renameFolder(businessId: string, folderId: string, newName: string) {
+  try {
+    if (!businessId || !folderId || !newName) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+
+    if (!existingMedia || !existingMedia.folders) {
+      return { success: false, error: "No folders found" }
+    }
+
+    // Find the folder to rename
+    const folderIndex = existingMedia.folders.findIndex((folder) => folder.id === folderId)
+
+    if (folderIndex === -1) {
+      return { success: false, error: "Folder not found" }
+    }
+
+    // Update the folder name
+    const updatedFolders = [...existingMedia.folders]
+    updatedFolders[folderIndex] = {
+      ...updatedFolders[folderIndex],
+      name: newName,
+    }
+
+    // Store in KV
+    await kv.hset(`business:${businessId}:media`, {
+      folders: JSON.stringify(updatedFolders),
+    })
+
+    revalidatePath(`/photo-album`)
+
+    return {
+      success: true,
+      folders: updatedFolders,
+    }
+  } catch (error) {
+    console.error("Error renaming folder:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to rename folder",
+    }
+  }
+}
+
+/**
+ * Delete a folder
+ */
+export async function deleteFolder(businessId: string, folderId: string) {
+  try {
+    if (!businessId || !folderId) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+
+    if (!existingMedia || !existingMedia.folders) {
+      return { success: false, error: "No folders found" }
+    }
+
+    // Find the folder to delete
+    const folderIndex = existingMedia.folders.findIndex((folder) => folder.id === folderId)
+
+    if (folderIndex === -1) {
+      return { success: false, error: "Folder not found" }
+    }
+
+    // Remove the folder
+    const updatedFolders = existingMedia.folders.filter((folder) => folder.id !== folderId)
+
+    // Update photos to remove the folder reference
+    const updatedPhotoAlbum = existingMedia.photoAlbum.map((photo) => {
+      if (photo.folderId === folderId) {
+        return { ...photo, folderId: undefined }
+      }
+      return photo
+    })
+
+    // Store in KV
+    await kv.hset(`business:${businessId}:media`, {
+      folders: JSON.stringify(updatedFolders),
+      photoAlbum: JSON.stringify(updatedPhotoAlbum),
+    })
+
+    revalidatePath(`/photo-album`)
+
+    return {
+      success: true,
+      folders: updatedFolders,
+      photoAlbum: updatedPhotoAlbum,
+    }
+  } catch (error) {
+    console.error("Error deleting folder:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete folder",
+    }
+  }
+}
+
+/**
+ * Move a photo to a folder
+ */
+export async function movePhotoToFolder(businessId: string, photoId: string, folderId: string | null) {
+  try {
+    if (!businessId || !photoId) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+
+    if (!existingMedia || !existingMedia.photoAlbum) {
+      return { success: false, error: "No photo album found" }
+    }
+
+    // Find the photo to move
+    const photoIndex = existingMedia.photoAlbum.findIndex((photo) => photo.id === photoId)
+
+    if (photoIndex === -1) {
+      return { success: false, error: "Photo not found" }
+    }
+
+    // Update the photo's folder
+    const updatedPhotoAlbum = [...existingMedia.photoAlbum]
+    updatedPhotoAlbum[photoIndex] = {
+      ...updatedPhotoAlbum[photoIndex],
+      folderId: folderId || undefined,
+    }
+
+    // Store in KV
+    await kv.hset(`business:${businessId}:media`, {
+      photoAlbum: JSON.stringify(updatedPhotoAlbum),
+    })
+
+    revalidatePath(`/photo-album`)
+
+    return {
+      success: true,
+      photoAlbum: updatedPhotoAlbum,
+    }
+  } catch (error) {
+    console.error("Error moving photo to folder:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to move photo",
+    }
+  }
+}
+
+/**
+ * Add tags to a photo
+ */
+export async function addTagsToPhoto(businessId: string, photoId: string, tags: string[]) {
+  try {
+    if (!businessId || !photoId || !tags.length) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+
+    if (!existingMedia || !existingMedia.photoAlbum) {
+      return { success: false, error: "No photo album found" }
+    }
+
+    // Find the photo to update
+    const photoIndex = existingMedia.photoAlbum.findIndex((photo) => photo.id === photoId)
+
+    if (photoIndex === -1) {
+      return { success: false, error: "Photo not found" }
+    }
+
+    // Update the photo's tags
+    const updatedPhotoAlbum = [...existingMedia.photoAlbum]
+    const existingTags = updatedPhotoAlbum[photoIndex].tags || []
+    const newTags = [...new Set([...existingTags, ...tags])] // Remove duplicates
+
+    updatedPhotoAlbum[photoIndex] = {
+      ...updatedPhotoAlbum[photoIndex],
+      tags: newTags,
+    }
+
+    // Update the business's tag list
+    const updatedTags = existingMedia.tags || []
+
+    // Add any new tags that don't already exist in the business's tag list
+    tags.forEach((tag) => {
+      if (!updatedTags.includes(tag)) {
+        updatedTags.push(tag)
+      }
+    })
+
+    // Store in KV
+    await kv.hset(`business:${businessId}:media`, {
+      photoAlbum: JSON.stringify(updatedPhotoAlbum),
+      tags: JSON.stringify(updatedTags),
+    })
+
+    revalidatePath(`/photo-album`)
+
+    return {
+      success: true,
+      photoAlbum: updatedPhotoAlbum,
+      tags: updatedTags,
+    }
+  } catch (error) {
+    console.error("Error adding tags to photo:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to add tags",
+    }
+  }
+}
+
+/**
+ * Remove a tag from a photo
+ */
+export async function removeTagFromPhoto(businessId: string, photoId: string, tag: string) {
+  try {
+    if (!businessId || !photoId || !tag) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+
+    if (!existingMedia || !existingMedia.photoAlbum) {
+      return { success: false, error: "No photo album found" }
+    }
+
+    // Find the photo to update
+    const photoIndex = existingMedia.photoAlbum.findIndex((photo) => photo.id === photoId)
+
+    if (photoIndex === -1) {
+      return { success: false, error: "Photo not found" }
+    }
+
+    // Update the photo's tags
+    const updatedPhotoAlbum = [...existingMedia.photoAlbum]
+    const existingTags = updatedPhotoAlbum[photoIndex].tags || []
+    const newTags = existingTags.filter((t) => t !== tag)
+
+    updatedPhotoAlbum[photoIndex] = {
+      ...updatedPhotoAlbum[photoIndex],
+      tags: newTags.length > 0 ? newTags : undefined,
+    }
+
+    // Store in KV
+    await kv.hset(`business:${businessId}:media`, {
+      photoAlbum: JSON.stringify(updatedPhotoAlbum),
+    })
+
+    revalidatePath(`/photo-album`)
+
+    return {
+      success: true,
+      photoAlbum: updatedPhotoAlbum,
+    }
+  } catch (error) {
+    console.error("Error removing tag from photo:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to remove tag",
+    }
   }
 }
 
@@ -668,6 +1109,7 @@ export async function deleteAllBusinessMedia(businessId: string) {
     await kv.del(`business:${businessId}:media`)
 
     revalidatePath(`/ad-design/customize`)
+    revalidatePath(`/photo-album`)
 
     return { success: true }
   } catch (error) {
@@ -675,6 +1117,105 @@ export async function deleteAllBusinessMedia(businessId: string) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to delete all media",
+    }
+  }
+}
+
+/**
+ * Create a new tag
+ */
+export async function createTag(businessId: string, tagName: string) {
+  try {
+    if (!businessId || !tagName) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+
+    if (!existingMedia) {
+      return { success: false, error: "No media data found" }
+    }
+
+    // Check if tag already exists
+    const existingTags = existingMedia.tags || []
+    if (existingTags.includes(tagName)) {
+      return { success: false, error: "Tag already exists" }
+    }
+
+    // Add the new tag
+    const updatedTags = [...existingTags, tagName]
+
+    // Store in KV
+    await kv.hset(`business:${businessId}:media`, {
+      tags: JSON.stringify(updatedTags),
+    })
+
+    revalidatePath(`/photo-album`)
+
+    return {
+      success: true,
+      tags: updatedTags,
+    }
+  } catch (error) {
+    console.error("Error creating tag:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create tag",
+    }
+  }
+}
+
+/**
+ * Delete a tag
+ */
+export async function deleteTag(businessId: string, tagName: string) {
+  try {
+    if (!businessId || !tagName) {
+      return { success: false, error: "Missing required fields" }
+    }
+
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+
+    if (!existingMedia) {
+      return { success: false, error: "No media data found" }
+    }
+
+    // Remove the tag from the list
+    const existingTags = existingMedia.tags || []
+    const updatedTags = existingTags.filter((tag) => tag !== tagName)
+
+    // Remove the tag from all photos
+    const updatedPhotoAlbum = existingMedia.photoAlbum.map((photo) => {
+      if (photo.tags && photo.tags.includes(tagName)) {
+        const newTags = photo.tags.filter((tag) => tag !== tagName)
+        return {
+          ...photo,
+          tags: newTags.length > 0 ? newTags : undefined,
+        }
+      }
+      return photo
+    })
+
+    // Store in KV
+    await kv.hset(`business:${businessId}:media`, {
+      tags: JSON.stringify(updatedTags),
+      photoAlbum: JSON.stringify(updatedPhotoAlbum),
+    })
+
+    revalidatePath(`/photo-album`)
+
+    return {
+      success: true,
+      tags: updatedTags,
+      photoAlbum: updatedPhotoAlbum,
+    }
+  } catch (error) {
+    console.error("Error deleting tag:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete tag",
     }
   }
 }

@@ -2,10 +2,10 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Upload, VideoIcon, ImageIcon, X } from "lucide-react"
+import { ArrowLeft, Upload, VideoIcon, ImageIcon, X, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
@@ -13,6 +13,7 @@ import { compressImage, formatFileSize, createPreviewUrl } from "@/lib/media-uti
 import { CompressionStats } from "@/components/compression-stats"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { uploadThumbnail, uploadVideo, getBusinessMedia, deleteThumbnail } from "@/app/actions/media-actions"
 
 interface VideoItem {
   id: string
@@ -21,14 +22,10 @@ interface VideoItem {
   name: string
   size: number
   type: string
-  thumbnail?: {
-    file: File
-    url: string
-    originalSize: number
-    compressedSize: number
-    compressionSavings: number
-  }
 }
+
+// Mock business ID for demo purposes - in a real app, this would come from authentication
+const BUSINESS_ID = "demo-business-123"
 
 export default function VideoPage() {
   const { toast } = useToast()
@@ -48,13 +45,57 @@ export default function VideoPage() {
   } | null>(null)
   const [processingThumbnail, setProcessingThumbnail] = useState(false)
 
+  // For stored thumbnail
+  const [storedThumbnail, setStoredThumbnail] = useState<{
+    url: string
+    id: string
+  } | null>(null)
+  const [deletingThumbnail, setDeletingThumbnail] = useState(false)
+
   // For video handling
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null)
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
+  const [storedVideo, setStoredVideo] = useState<{
+    url: string
+    id: string
+    contentType: string
+  } | null>(null)
 
   const videoInputRef = useRef<HTMLInputElement>(null)
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
   const videoPlayerRefs = useRef<{ [key: string]: HTMLVideoElement }>({})
+
+  // Load existing media on component mount
+  useEffect(() => {
+    async function loadMedia() {
+      try {
+        const media = await getBusinessMedia(BUSINESS_ID)
+        if (media) {
+          // Set stored thumbnail if it exists
+          if (media.thumbnailUrl && media.thumbnailId) {
+            setStoredThumbnail({
+              url: media.thumbnailUrl,
+              id: media.thumbnailId,
+            })
+            setThumbnailPreview(media.thumbnailUrl)
+          }
+
+          // Set stored video if it exists
+          if (media.videoUrl && media.videoId) {
+            setStoredVideo({
+              url: media.videoUrl,
+              id: media.videoId,
+              contentType: media.videoContentType || "video/mp4",
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error loading media:", error)
+      }
+    }
+
+    loadMedia()
+  }, [])
 
   // Handle thumbnail selection
   const handleThumbnailSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,7 +110,7 @@ export default function VideoPage() {
     setProcessingThumbnail(true)
     toast({
       title: "Processing thumbnail...",
-      description: "Compressing image to under 600KB",
+      description: "Compressing image to optimize for web",
     })
 
     try {
@@ -111,8 +152,83 @@ export default function VideoPage() {
     setVideoPreview(url)
   }
 
-  // Handle upload of both video and thumbnail
-  const handleUpload = async () => {
+  // Handle thumbnail upload
+  const handleThumbnailUpload = async () => {
+    if (!selectedThumbnail) {
+      toast({
+        title: "No thumbnail selected",
+        description: "Please select a thumbnail image to upload",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsUploading(true)
+    setUploadProgress(10) // Start progress
+
+    try {
+      // If there's already a stored thumbnail, we need to replace it
+      // The server action will handle deleting the old one
+
+      // Create form data for upload
+      const formData = new FormData()
+      formData.append("businessId", BUSINESS_ID)
+      formData.append("thumbnail", selectedThumbnail)
+
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          const newProgress = prev + Math.random() * 15
+          return newProgress >= 90 ? 90 : newProgress
+        })
+      }, 500)
+
+      // Upload the thumbnail
+      const result = await uploadThumbnail(formData)
+      clearInterval(progressInterval)
+
+      if (result.success) {
+        setUploadProgress(100)
+        setStoredThumbnail({
+          url: result.url,
+          id: result.id,
+        })
+
+        toast({
+          title: "Thumbnail uploaded",
+          description: "Your thumbnail has been saved and will be available when you return",
+        })
+
+        // Reset the form
+        setSelectedThumbnail(null)
+        if (thumbnailInputRef.current) thumbnailInputRef.current.value = ""
+        setThumbnailStats(null)
+
+        // Keep the preview showing the stored thumbnail
+        setThumbnailPreview(result.url)
+      } else {
+        toast({
+          title: "Upload failed",
+          description: result.error || "There was an error uploading your thumbnail",
+          variant: "destructive",
+        })
+        setUploadProgress(0)
+      }
+    } catch (error) {
+      console.error("Error uploading thumbnail:", error)
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your thumbnail",
+        variant: "destructive",
+      })
+      setUploadProgress(0)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  // Handle video upload
+  const handleVideoUpload = async () => {
     if (!selectedVideo) {
       toast({
         title: "No video selected",
@@ -123,86 +239,134 @@ export default function VideoPage() {
     }
 
     setIsUploading(true)
-    setUploadProgress(0)
-
-    // Simulate upload progress
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => {
-        const newProgress = prev + Math.random() * 15
-        return newProgress >= 100 ? 100 : newProgress
-      })
-    }, 500)
+    setUploadProgress(10) // Start progress
 
     try {
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Create form data for upload
+      const formData = new FormData()
+      formData.append("businessId", BUSINESS_ID)
+      formData.append("video", selectedVideo)
 
-      const videoId = `video-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-      const videoUrl = URL.createObjectURL(selectedVideo)
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          const newProgress = prev + Math.random() * 10
+          return newProgress >= 90 ? 90 : newProgress
+        })
+      }, 500)
 
-      const newVideo: VideoItem = {
-        id: videoId,
-        file: selectedVideo,
-        url: videoUrl,
-        name: selectedVideo.name,
-        size: selectedVideo.size,
-        type: selectedVideo.type,
+      // Upload the video
+      const result = await uploadVideo(formData)
+      clearInterval(progressInterval)
+
+      if (result.success) {
+        setUploadProgress(100)
+        setStoredVideo({
+          url: result.url,
+          id: result.id,
+          contentType: result.contentType,
+        })
+
+        toast({
+          title: "Video uploaded",
+          description: "Your video has been saved and will be available when you return",
+        })
+
+        // Reset the form
+        setSelectedVideo(null)
+        if (videoInputRef.current) videoInputRef.current.value = ""
+
+        // Keep the preview showing the stored video
+        setVideoPreview(result.url)
+
+        // Switch to library tab
+        setActiveTab("library")
+      } else {
+        toast({
+          title: "Upload failed",
+          description: result.error || "There was an error uploading your video",
+          variant: "destructive",
+        })
+        setUploadProgress(0)
       }
-
-      // Add thumbnail if available
-      if (selectedThumbnail && thumbnailStats) {
-        const thumbnailUrl = URL.createObjectURL(selectedThumbnail)
-        newVideo.thumbnail = {
-          file: selectedThumbnail,
-          url: thumbnailUrl,
-          originalSize: thumbnailStats.originalSize,
-          compressedSize: thumbnailStats.compressedSize,
-          compressionSavings: thumbnailStats.compressionSavings,
-        }
-      }
-
-      setVideos((prev) => [...prev, newVideo])
-      setActiveTab("library")
-
-      toast({
-        title: "Upload complete",
-        description: `${selectedVideo.name} has been uploaded successfully`,
-      })
-
-      // Reset form
-      setSelectedVideo(null)
-      setVideoPreview(null)
-      setSelectedThumbnail(null)
-      setThumbnailPreview(null)
-      setThumbnailStats(null)
-
-      if (videoInputRef.current) videoInputRef.current.value = ""
-      if (thumbnailInputRef.current) thumbnailInputRef.current.value = ""
     } catch (error) {
-      console.error("Error uploading:", error)
+      console.error("Error uploading video:", error)
       toast({
         title: "Upload failed",
         description: "There was an error uploading your video",
         variant: "destructive",
       })
-    } finally {
-      clearInterval(progressInterval)
       setUploadProgress(0)
+    } finally {
       setIsUploading(false)
     }
   }
 
-  // Handle video playback and thumbnail display
-  const handleVideoEnded = (videoId: string) => {
-    // Show thumbnail when video ends
-    const videoElement = videoPlayerRefs.current[videoId]
-    if (videoElement) {
-      videoElement.currentTime = 0
+  // Handle thumbnail deletion - FIXED to use the new deleteThumbnail function
+  const handleDeleteThumbnail = async () => {
+    if (!storedThumbnail) {
+      console.log("No stored thumbnail to delete")
+      return
+    }
+
+    setDeletingThumbnail(true)
+
+    try {
+      // Use the new deleteThumbnail function instead of deletePhoto
+      const result = await deleteThumbnail(BUSINESS_ID)
+
+      if (result.success) {
+        // Update local state
+        setStoredThumbnail(null)
+        setThumbnailPreview(null)
+
+        // Clear the file input if it exists
+        if (thumbnailInputRef.current) thumbnailInputRef.current.value = ""
+
+        toast({
+          title: "Thumbnail deleted",
+          description: "Your thumbnail has been removed",
+        })
+      } else {
+        console.error("Error response from deleteThumbnail:", result)
+        toast({
+          title: "Deletion failed",
+          description: result.error || "There was an error deleting your thumbnail",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error deleting thumbnail:", error)
+      toast({
+        title: "Deletion failed",
+        description: "There was an error deleting your thumbnail",
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingThumbnail(false)
     }
   }
 
-  const handleVideoPlay = (video: VideoItem) => {
-    setCurrentVideo(video)
+  // Handle upload of both video and thumbnail
+  const handleUpload = async () => {
+    // First upload the thumbnail if selected
+    if (selectedThumbnail) {
+      await handleThumbnailUpload()
+    }
+
+    // Then upload the video if selected
+    if (selectedVideo) {
+      await handleVideoUpload()
+    }
+
+    // If neither is selected, show an error
+    if (!selectedThumbnail && !selectedVideo) {
+      toast({
+        title: "No files selected",
+        description: "Please select a video or thumbnail to upload",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -219,7 +383,7 @@ export default function VideoPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-6">
           <TabsTrigger value="upload">Upload Video</TabsTrigger>
-          <TabsTrigger value="library">Video Library ({videos.length})</TabsTrigger>
+          <TabsTrigger value="library">Video Library</TabsTrigger>
         </TabsList>
 
         <TabsContent value="upload">
@@ -240,7 +404,8 @@ export default function VideoPage() {
                   <>
                     <Alert className="mb-4 bg-blue-50 border-blue-200">
                       <AlertDescription className="text-xs text-blue-700">
-                        Thumbnails will be automatically compressed to under 600KB for optimal performance.
+                        Thumbnails will be automatically compressed for optimal performance. Only one thumbnail can be
+                        used at a time.
                       </AlertDescription>
                     </Alert>
                     <div
@@ -267,38 +432,73 @@ export default function VideoPage() {
                         alt="Thumbnail preview"
                         className="w-full h-auto rounded-lg object-cover aspect-video"
                       />
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2 h-8 w-8"
-                        onClick={() => {
-                          setSelectedThumbnail(null)
-                          setThumbnailPreview(null)
-                          setThumbnailStats(null)
-                          if (thumbnailInputRef.current) thumbnailInputRef.current.value = ""
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      {/* Show different buttons based on whether this is a stored thumbnail or a new one */}
+                      {storedThumbnail && !selectedThumbnail ? (
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={handleDeleteThumbnail}
+                          disabled={deletingThumbnail}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {deletingThumbnail && <span className="sr-only">Deleting...</span>}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={() => {
+                            setSelectedThumbnail(null)
+                            // If we have a stored thumbnail, show it again
+                            setThumbnailPreview(storedThumbnail ? storedThumbnail.url : null)
+                            setThumbnailStats(null)
+                            if (thumbnailInputRef.current) thumbnailInputRef.current.value = ""
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">File:</span>
-                        <span className="font-medium">{selectedThumbnail?.name}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Size:</span>
-                        <span className="font-medium">{formatFileSize(selectedThumbnail?.size || 0)}</span>
-                      </div>
-                    </div>
+                    {selectedThumbnail && (
+                      <>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">File:</span>
+                            <span className="font-medium">{selectedThumbnail.name}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Size:</span>
+                            <span className="font-medium">{formatFileSize(selectedThumbnail.size)}</span>
+                          </div>
+                        </div>
 
-                    {thumbnailStats && (
-                      <CompressionStats
-                        originalSize={thumbnailStats.originalSize}
-                        compressedSize={thumbnailStats.compressedSize}
-                        compressionSavings={thumbnailStats.compressionSavings}
-                      />
+                        {thumbnailStats && (
+                          <CompressionStats
+                            originalSize={thumbnailStats.originalSize}
+                            compressedSize={thumbnailStats.compressedSize}
+                            compressionSavings={thumbnailStats.compressionSavings}
+                          />
+                        )}
+
+                        <Button
+                          onClick={handleThumbnailUpload}
+                          disabled={isUploading || processingThumbnail}
+                          className="w-full"
+                        >
+                          {isUploading ? "Uploading..." : "Save Thumbnail"}
+                        </Button>
+                      </>
+                    )}
+
+                    {storedThumbnail && !selectedThumbnail && (
+                      <Alert className="bg-green-50 border-green-200">
+                        <AlertDescription className="text-xs text-green-700">
+                          This thumbnail is saved and will be used for your video.
+                        </AlertDescription>
+                      </Alert>
                     )}
                   </div>
                 )}
@@ -342,41 +542,56 @@ export default function VideoPage() {
                         className="w-full h-auto rounded-lg"
                         poster={thumbnailPreview || undefined}
                       />
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2 h-8 w-8"
-                        onClick={() => {
-                          setSelectedVideo(null)
-                          setVideoPreview(null)
-                          if (videoInputRef.current) videoInputRef.current.value = ""
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      {selectedVideo && (
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={() => {
+                            setSelectedVideo(null)
+                            // If we have a stored video, show it again
+                            setVideoPreview(storedVideo ? storedVideo.url : null)
+                            if (videoInputRef.current) videoInputRef.current.value = ""
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">File:</span>
-                        <span className="font-medium">{selectedVideo?.name}</span>
+                    {selectedVideo && (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">File:</span>
+                          <span className="font-medium">{selectedVideo.name}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Size:</span>
+                          <span className="font-medium">{formatFileSize(selectedVideo.size)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Type:</span>
+                          <span className="font-medium">{selectedVideo.type}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Size:</span>
-                        <span className="font-medium">{formatFileSize(selectedVideo?.size || 0)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Type:</span>
-                        <span className="font-medium">{selectedVideo?.type}</span>
-                      </div>
-                    </div>
+                    )}
+
+                    {storedVideo && !selectedVideo && (
+                      <Alert className="bg-green-50 border-green-200">
+                        <AlertDescription className="text-xs text-green-700">
+                          This video is saved and will be available when you return.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 )}
               </CardContent>
               <CardFooter className="flex justify-end">
-                <Button onClick={handleUpload} disabled={!selectedVideo || isUploading || processingThumbnail}>
-                  {isUploading ? "Uploading..." : "Upload Video"}
-                </Button>
+                {selectedVideo && (
+                  <Button onClick={handleVideoUpload} disabled={isUploading} className="w-full">
+                    {isUploading ? "Uploading..." : "Upload Video"}
+                  </Button>
+                )}
               </CardFooter>
 
               {isUploading && (
@@ -403,7 +618,7 @@ export default function VideoPage() {
         </TabsContent>
 
         <TabsContent value="library">
-          {videos.length === 0 ? (
+          {!storedVideo ? (
             <div className="text-center py-12 border-2 border-dashed rounded-lg">
               <VideoIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">No videos yet</h3>
@@ -412,37 +627,24 @@ export default function VideoPage() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {videos.map((video) => (
-                <Card key={video.id} className="overflow-hidden">
-                  <div className="relative">
-                    <video
-                      ref={(el) => {
-                        if (el) videoPlayerRefs.current[video.id] = el
-                      }}
-                      src={video.url}
-                      poster={video.thumbnail?.url}
-                      className="w-full h-auto aspect-video object-cover"
-                      controls
-                      onEnded={() => handleVideoEnded(video.id)}
-                      onPlay={() => handleVideoPlay(video)}
-                    />
+              <Card className="overflow-hidden">
+                <div className="relative">
+                  <video
+                    src={storedVideo.url}
+                    poster={storedThumbnail?.url}
+                    className="w-full h-auto aspect-video object-cover"
+                    controls
+                  />
+                </div>
+                <CardContent className="pt-4">
+                  <h3 className="font-medium">Your Video</h3>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-muted-foreground">Type:</span>
+                    <span>{storedVideo.contentType}</span>
                   </div>
-                  <CardContent className="pt-4">
-                    <h3 className="font-medium truncate" title={video.name}>
-                      {video.name}
-                    </h3>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-muted-foreground">Size:</span>
-                      <span>{formatFileSize(video.size)}</span>
-                    </div>
-                    {video.thumbnail && (
-                      <div className="mt-2 text-xs text-green-600">
-                        Custom thumbnail added ({video.thumbnail.compressionSavings}% compressed)
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                  {storedThumbnail && <div className="mt-2 text-xs text-green-600">Custom thumbnail added</div>}
+                </CardContent>
+              </Card>
             </div>
           )}
         </TabsContent>

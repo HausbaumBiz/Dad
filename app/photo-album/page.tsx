@@ -13,21 +13,39 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { compressImage, formatFileSize, isValidImage, calculateCompressionSavings } from "@/lib/media-utils"
 import { useToast } from "@/components/ui/use-toast"
-import { ChevronLeft, ChevronRight, Upload, ImageIcon, X, Loader2 } from "lucide-react"
-import { uploadPhoto, getBusinessMedia, deletePhoto } from "@/app/actions/media-actions"
+import { ChevronLeft, ChevronRight, Upload, ImageIcon, X, Loader2, FolderIcon, Tag } from "lucide-react"
+import {
+  uploadPhoto,
+  getBusinessMedia,
+  deletePhoto,
+  movePhotoToFolder,
+  type MediaItem,
+  type MediaFolder,
+} from "@/app/actions/media-actions"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
-import type { MediaItem } from "@/app/actions/media-actions"
+import { PhotoFolderManager } from "@/components/photo-folder-manager"
+import { PhotoTagManager } from "@/components/photo-tag-manager"
+import { Trash2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 export default function PhotoAlbumPage() {
   const [photos, setPhotos] = useState<MediaItem[]>([])
+  const [folders, setFolders] = useState<MediaFolder[]>([])
+  const [tags, setTags] = useState<string[]>([])
   const [isCompressing, setIsCompressing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [businessId, setBusinessId] = useState<string>("")
   const [businessName, setBusinessName] = useState<string>("")
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null)
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [activeTab, setActiveTab] = useState<string>("all")
+  const [photoDetailOpen, setPhotoDetailOpen] = useState(false)
+  const [selectedPhoto, setSelectedPhoto] = useState<MediaItem | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -55,11 +73,23 @@ export default function PhotoAlbumPage() {
 
         // Fetch existing photos for this business
         const mediaData = await getBusinessMedia(businessData.id)
-        if (mediaData && mediaData.photoAlbum) {
-          console.log(`Loaded ${mediaData.photoAlbum.length} photos from storage`)
-          setPhotos(mediaData.photoAlbum)
+        if (mediaData) {
+          if (mediaData.photoAlbum) {
+            console.log(`Loaded ${mediaData.photoAlbum.length} photos from storage`)
+            setPhotos(mediaData.photoAlbum)
+          }
+
+          if (mediaData.folders) {
+            console.log(`Loaded ${mediaData.folders.length} folders from storage`)
+            setFolders(mediaData.folders)
+          }
+
+          if (mediaData.tags) {
+            console.log(`Loaded ${mediaData.tags.length} tags from storage`)
+            setTags(mediaData.tags)
+          }
         } else {
-          console.log("No photos found in storage")
+          console.log("No media data found in storage")
         }
       } catch (error) {
         console.error("Error fetching business data:", error)
@@ -136,6 +166,16 @@ export default function PhotoAlbumPage() {
       formData.append("businessId", businessId)
       formData.append("photo", finalFile)
 
+      // Add folder if we're in a folder
+      if (currentFolder) {
+        formData.append("folderId", currentFolder)
+      }
+
+      // Add selected tags if any
+      if (selectedTags.length > 0) {
+        formData.append("tags", JSON.stringify(selectedTags))
+      }
+
       console.log(`Uploading to Blob storage with business ID: ${businessId}`)
 
       // Upload to Blob storage
@@ -146,6 +186,11 @@ export default function PhotoAlbumPage() {
           console.log("Upload successful:", result)
           // Update the photos state with the new photo album
           setPhotos(result.photoAlbum)
+
+          // Update tags if new ones were added
+          if (result.tags) {
+            setTags(result.tags)
+          }
 
           toast({
             title: "Image uploaded successfully",
@@ -212,13 +257,69 @@ export default function PhotoAlbumPage() {
     }
   }
 
+  const handleMovePhotoToFolder = async (photoId: string, folderId: string | null) => {
+    if (!businessId) {
+      console.error("No business ID available")
+      return
+    }
+
+    try {
+      const result = await movePhotoToFolder(businessId, photoId, folderId)
+
+      if (result.success) {
+        setPhotos(result.photoAlbum)
+        setPhotoDetailOpen(false)
+        toast({
+          title: "Photo moved",
+          description: folderId
+            ? `Photo moved to ${folders.find((f) => f.id === folderId)?.name || "folder"}`
+            : "Photo moved to root",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to move photo.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error moving photo:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openPhotoDetail = (photo: MediaItem) => {
+    setSelectedPhoto(photo)
+    setPhotoDetailOpen(true)
+  }
+
   const nextPhoto = () => {
-    setCurrentPhotoIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1))
+    setCurrentPhotoIndex((prev) => (prev === filteredPhotos.length - 1 ? 0 : prev + 1))
   }
 
   const prevPhoto = () => {
-    setCurrentPhotoIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1))
+    setCurrentPhotoIndex((prev) => (prev === 0 ? filteredPhotos.length - 1 : prev - 1))
   }
+
+  // Filter photos based on current folder and selected tags
+  const filteredPhotos = photos.filter((photo) => {
+    // Filter by folder
+    if (activeTab === "folders" && currentFolder) {
+      if (photo.folderId !== currentFolder) return false
+    }
+
+    // Filter by tags
+    if (activeTab === "tags" && selectedTags.length > 0) {
+      if (!photo.tags) return false
+      return selectedTags.every((tag) => photo.tags?.includes(tag))
+    }
+
+    return true
+  })
 
   if (isLoading) {
     return (
@@ -249,89 +350,113 @@ export default function PhotoAlbumPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <Card className="w-full max-w-4xl mx-auto">
+      <Card className="w-full max-w-6xl mx-auto">
         <CardHeader>
           <CardTitle className="text-2xl">{businessName}'s Photo Album</CardTitle>
           <CardDescription>
-            Upload and manage your photos. Images will be automatically compressed and saved to your account.
+            Upload, organize, and manage your photos. Images will be automatically compressed and saved to your account.
           </CardDescription>
         </CardHeader>
+
         <CardContent>
-          <div className="space-y-6">
-            <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-lg border-gray-300 hover:border-gray-400 transition-colors">
-              <ImageIcon className="h-12 w-12 text-gray-400 mb-4" />
-              <div className="space-y-2 text-center">
-                <p className="text-sm text-gray-500">Drag and drop your images, or click to browse</p>
-                <p className="text-xs text-gray-400">Supported formats: JPEG, PNG, GIF, WebP</p>
-              </div>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isCompressing}
-              >
-                {isCompressing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Compressing...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Photos
-                  </>
-                )}
-              </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                multiple
-              />
-            </div>
+          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="all">All Photos</TabsTrigger>
+              <TabsTrigger value="folders">Folders</TabsTrigger>
+              <TabsTrigger value="tags">Tags</TabsTrigger>
+            </TabsList>
 
-            {photos.length > 0 ? (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Your Photos ({photos.length})</h3>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {photos.map((photo, index) => (
-                    <div key={photo.id} className="relative group">
-                      <img
-                        src={photo.url || "/placeholder.svg"}
-                        alt={`Photo ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-md"
-                      />
-                      <button
-                        onClick={() => removePhoto(photo.id)}
-                        className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                      <div className="text-xs mt-1">
-                        <p className="truncate">{photo.filename}</p>
-                        <p className="text-gray-500">
-                          {formatFileSize(photo.size)}
-                          {photo.originalSize && (
-                            <span className="text-green-600 ml-1">
-                              (-{calculateCompressionSavings(photo.originalSize, photo.size).percentage}%)
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+            <TabsContent value="all" className="space-y-6">
+              <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-lg border-gray-300 hover:border-gray-400 transition-colors">
+                <ImageIcon className="h-12 w-12 text-gray-400 mb-4" />
+                <div className="space-y-2 text-center">
+                  <p className="text-sm text-gray-500">Drag and drop your images, or click to browse</p>
+                  <p className="text-xs text-gray-400">Supported formats: JPEG, PNG, GIF, WebP</p>
                 </div>
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isCompressing}
+                >
+                  {isCompressing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Compressing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Photos
+                    </>
+                  )}
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  multiple
+                />
               </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No photos in your album yet. Upload some photos to get started!</p>
-              </div>
-            )}
-          </div>
+
+              {renderPhotoGrid()}
+            </TabsContent>
+
+            <TabsContent value="folders" className="space-y-6">
+              <PhotoFolderManager
+                businessId={businessId}
+                folders={folders}
+                currentFolder={currentFolder}
+                onFolderChange={setCurrentFolder}
+                onFoldersUpdate={setFolders}
+              />
+
+              {currentFolder && (
+                <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-lg border-gray-300 hover:border-gray-400 transition-colors">
+                  <ImageIcon className="h-12 w-12 text-gray-400 mb-4" />
+                  <div className="space-y-2 text-center">
+                    <p className="text-sm text-gray-500">Upload photos to this folder</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isCompressing}
+                  >
+                    {isCompressing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Compressing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Photos
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {renderPhotoGrid()}
+            </TabsContent>
+
+            <TabsContent value="tags" className="space-y-6">
+              <PhotoTagManager
+                businessId={businessId}
+                availableTags={tags}
+                selectedTags={selectedTags}
+                onTagsUpdate={setTags}
+                onSelectedTagsChange={setSelectedTags}
+              />
+
+              {renderPhotoGrid()}
+            </TabsContent>
+          </Tabs>
         </CardContent>
+
         <CardFooter className="flex justify-between">
           <Button variant="outline" onClick={() => window.history.back()}>
             Back
@@ -340,7 +465,7 @@ export default function PhotoAlbumPage() {
           <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
             <DialogTrigger asChild>
               <Button
-                disabled={photos.length === 0}
+                disabled={filteredPhotos.length === 0}
                 onClick={() => {
                   setCurrentPhotoIndex(0)
                   setIsPreviewOpen(true)
@@ -353,15 +478,17 @@ export default function PhotoAlbumPage() {
               <DialogHeader>
                 <DialogTitle>Photo Album Preview</DialogTitle>
                 <DialogDescription>
-                  {photos.length > 0 ? `Photo ${currentPhotoIndex + 1} of ${photos.length}` : "No photos to display"}
+                  {filteredPhotos.length > 0
+                    ? `Photo ${currentPhotoIndex + 1} of ${filteredPhotos.length}`
+                    : "No photos to display"}
                 </DialogDescription>
               </DialogHeader>
 
-              {photos.length > 0 && (
+              {filteredPhotos.length > 0 && (
                 <div className="relative">
                   <div className="flex justify-center items-center h-[60vh]">
                     <img
-                      src={photos[currentPhotoIndex].url || "/placeholder.svg"}
+                      src={filteredPhotos[currentPhotoIndex].url || "/placeholder.svg"}
                       alt={`Photo ${currentPhotoIndex + 1}`}
                       className="max-h-full max-w-full object-contain"
                     />
@@ -392,7 +519,7 @@ export default function PhotoAlbumPage() {
                   </div>
 
                   <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-                    {photos.map((_, index) => (
+                    {filteredPhotos.map((_, index) => (
                       <button
                         key={index}
                         className={`w-2 h-2 rounded-full ${index === currentPhotoIndex ? "bg-white" : "bg-white/50"}`}
@@ -406,6 +533,193 @@ export default function PhotoAlbumPage() {
           </Dialog>
         </CardFooter>
       </Card>
+
+      {/* Photo Detail Dialog */}
+      <Dialog open={photoDetailOpen} onOpenChange={setPhotoDetailOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Photo Details</DialogTitle>
+          </DialogHeader>
+
+          {selectedPhoto && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-black rounded-lg overflow-hidden">
+                <img
+                  src={selectedPhoto.url || "/placeholder.svg"}
+                  alt={selectedPhoto.filename}
+                  className="w-full h-auto object-contain"
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">{selectedPhoto.filename}</h3>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-gray-500">Size</span>
+                      <span>{formatFileSize(selectedPhoto.size)}</span>
+                    </div>
+
+                    {selectedPhoto.createdAt && (
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-500">Uploaded</span>
+                        <span>{new Date(selectedPhoto.createdAt).toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-gray-500">Folder</span>
+                      <span>
+                        {selectedPhoto.folderId
+                          ? folders.find((f) => f.id === selectedPhoto.folderId)?.name || "Unknown folder"
+                          : "None"}
+                      </span>
+                    </div>
+
+                    <div className="py-2 border-b">
+                      <span className="text-gray-500">Tags</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedPhoto.tags && selectedPhoto.tags.length > 0 ? (
+                          selectedPhoto.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="px-2 py-1">
+                              {tag}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-sm text-gray-400">No tags</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Move to Folder</h4>
+                  <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="justify-start"
+                      onClick={() => handleMovePhotoToFolder(selectedPhoto.id, null)}
+                    >
+                      <FolderIcon className="h-4 w-4 mr-2" />
+                      Root
+                    </Button>
+
+                    {folders.map((folder) => (
+                      <Button
+                        key={folder.id}
+                        variant="outline"
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => handleMovePhotoToFolder(selectedPhoto.id, folder.id)}
+                      >
+                        <FolderIcon className="h-4 w-4 mr-2" />
+                        {folder.name}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Manage Tags</h4>
+                  <PhotoTagManager
+                    businessId={businessId}
+                    availableTags={tags}
+                    selectedTags={selectedPhoto.tags || []}
+                    photoId={selectedPhoto.id}
+                    onTagsUpdate={setTags}
+                  />
+                </div>
+
+                <Button
+                  variant="destructive"
+                  className="w-full justify-start mt-4"
+                  onClick={() => {
+                    removePhoto(selectedPhoto.id)
+                    setPhotoDetailOpen(false)
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Photo
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
+
+  // Helper function to render the photo grid
+  function renderPhotoGrid() {
+    return filteredPhotos.length > 0 ? (
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">
+          {activeTab === "folders" && currentFolder
+            ? `Photos in ${folders.find((f) => f.id === currentFolder)?.name || "folder"}`
+            : activeTab === "tags" && selectedTags.length > 0
+              ? `Photos with ${selectedTags.length === 1 ? "tag" : "tags"}: ${selectedTags.join(", ")}`
+              : `All Photos (${filteredPhotos.length})`}
+        </h3>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {filteredPhotos.map((photo) => (
+            <div key={photo.id} className="relative group">
+              <img
+                src={photo.url || "/placeholder.svg"}
+                alt={photo.filename}
+                className="w-full h-32 object-cover rounded-md cursor-pointer"
+                onClick={() => openPhotoDetail(photo)}
+              />
+              <button
+                onClick={() => removePhoto(photo.id)}
+                className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              {/* Folder and tag indicators */}
+              <div className="absolute bottom-1 left-1 flex gap-1">
+                {photo.folderId && (
+                  <div className="bg-black bg-opacity-50 rounded-full p-1 text-white">
+                    <FolderIcon className="h-3 w-3" />
+                  </div>
+                )}
+
+                {photo.tags && photo.tags.length > 0 && (
+                  <div className="bg-black bg-opacity-50 rounded-full p-1 text-white">
+                    <Tag className="h-3 w-3" />
+                  </div>
+                )}
+              </div>
+
+              <div className="text-xs mt-1">
+                <p className="truncate">{photo.filename}</p>
+                <p className="text-gray-500">
+                  {formatFileSize(photo.size)}
+                  {photo.originalSize && (
+                    <span className="text-green-600 ml-1">
+                      (-{calculateCompressionSavings(photo.originalSize, photo.size).percentage}%)
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <div className="text-center py-8 text-gray-500">
+        <p>
+          {activeTab === "folders" && currentFolder
+            ? "No photos in this folder yet. Upload some photos to get started!"
+            : activeTab === "tags" && selectedTags.length > 0
+              ? `No photos with ${selectedTags.length === 1 ? "tag" : "all tags"}: ${selectedTags.join(", ")}`
+              : "No photos in your album yet. Upload some photos to get started!"}
+        </p>
+      </div>
+    )
+  }
 }
