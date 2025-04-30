@@ -7,15 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 // Import the Dialog components at the top of the file
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 export default function AdDesignPage() {
   const router = useRouter()
   const [selectedDesign, setSelectedDesign] = useState<number | null>(null)
-  const [isColorModalOpen, setIsColorModalOpen] = useState(false)
   const [selectedColor, setSelectedColor] = useState<string>("blue")
 
   // Add state for the new dialogs after the existing state declarations
@@ -83,19 +80,12 @@ export default function AdDesignPage() {
 
   // Handle design selection
   const handleDesignSelect = (designId: number) => {
-    setSelectedDesign(designId)
-    setIsColorModalOpen(true)
-  }
+    // Save the selected design to localStorage
+    localStorage.setItem("hausbaum_selected_design", designId.toString())
+    localStorage.setItem("hausbaum_selected_color", "blue") // Default to blue
 
-  // Handle color selection and navigation to customize page
-  const handleContinue = () => {
-    if (selectedDesign) {
-      // Save the selected design and color to localStorage
-      localStorage.setItem("hausbaum_selected_design", selectedDesign.toString())
-      localStorage.setItem("hausbaum_selected_color", selectedColor)
-
-      router.push(`/ad-design/customize?design=${selectedDesign}&color=${selectedColor}`)
-    }
+    // Navigate directly to customize page
+    router.push(`/ad-design/customize?design=${designId}&color=blue`)
   }
 
   // Define colorValues based on selectedColor
@@ -1107,36 +1097,6 @@ export default function AdDesignPage() {
           </div>
         </div>
       </main>
-
-      {/* Color Selection Modal */}
-      <Dialog open={isColorModalOpen} onOpenChange={setIsColorModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Choose a Color Theme</DialogTitle>
-          </DialogHeader>
-
-          <div className="py-6">
-            <RadioGroup value={selectedColor} onValueChange={setSelectedColor} className="grid grid-cols-2 gap-4">
-              {colorOptions.map((color) => (
-                <div key={color.value} className="flex items-center space-x-2">
-                  <RadioGroupItem value={color.value} id={color.value} />
-                  <Label htmlFor={color.value} className="flex items-center gap-2 cursor-pointer">
-                    <div className="w-6 h-6 rounded-full" style={{ backgroundColor: color.primary }}></div>
-                    {color.label}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-
-          <DialogFooter>
-            <Button onClick={() => setIsColorModalOpen(false)} variant="outline">
-              Cancel
-            </Button>
-            <Button onClick={handleContinue}>Continue to Customization</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Savings Dialog */}
       <Dialog open={isSavingsDialogOpen} onOpenChange={setIsSavingsDialogOpen}>

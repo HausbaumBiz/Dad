@@ -136,7 +136,17 @@ export default function WorkbenchPage() {
                     iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/jobs-icon-NE5EpebSE0Zp2qBCfvaAKSpMiNJZ9n.png"
                     label="Create A Job Listing"
                   />
+                  <WorkbenchButton
+                    href="/photo-album"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/photoalbum01-FsC6igao1fZh4IqPiYVjWz4Yf7dfdk.png"
+                    label="Photo Album"
+                  />
 
+                  <WorkbenchButton
+                    href="/video"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/VideoWorkbenchsm-YrIJQbd7zwVz1lHvneZM793EzVaKe0.png"
+                    label="Video"
+                  />
                   <WorkbenchButton
                     href="/statistics"
                     iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/stats002-gW6ZaTQQkxNHACfsxA0LoZMnih5oax.png"
@@ -169,21 +179,8 @@ function WorkbenchButton({ href, iconSrc, label }: WorkbenchButtonProps) {
   if (href === "/ad-design") {
     return (
       <Link
-        href="/ad-design"
+        href="/ad-design/customize"
         className="flex items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-all group"
-        onClick={(e) => {
-          // For Ad Workbench, check if we have a saved design
-          if (label === "Ad Workbench") {
-            const savedDesign = localStorage.getItem("hausbaum_selected_design")
-            const savedColor = localStorage.getItem("hausbaum_selected_color")
-
-            if (savedDesign) {
-              e.preventDefault()
-              // Redirect to customize page with the saved design and color
-              window.location.href = `/ad-design/customize?design=${savedDesign}&color=${savedColor || "blue"}`
-            }
-          }
-        }}
       >
         <div className="flex items-center justify-center w-16 h-16 mr-6 flex-shrink-0">
           <Image

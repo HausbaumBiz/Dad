@@ -6,32 +6,17 @@ import type React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Play, Pause } from "lucide-react"
-import { ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
-import {
-  getBusinessMedia,
-  uploadVideo,
-  uploadThumbnail,
-  uploadPhoto,
-  deletePhoto,
-  saveMediaSettings,
-  type MediaItem,
-} from "@/app/actions/media-actions"
+import { getBusinessMedia, deletePhoto, saveMediaSettings, type MediaItem } from "@/app/actions/media-actions"
 import { saveBusinessAdDesign } from "@/app/actions/business-actions"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
-
-// Add imports for Link component if not already present
-import Link from "next/link"
-
-// First, add the import for the FileSizeWarning component
-import { FileSizeWarning } from "@/components/file-size-warning"
 
 interface PhotoItem {
   id: string
@@ -151,11 +136,7 @@ export default function CustomizeAdDesignPage() {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const [isPhotoAlbumOpen, setIsPhotoAlbumOpen] = useState(false)
 
-  // Current upload state
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [videoFile, setVideoFile] = useState<File | null>(null)
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  // Video state
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
 
@@ -163,9 +144,7 @@ export default function CustomizeAdDesignPage() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [showThumbnail, setShowThumbnail] = useState(true)
 
-  // Ref for file input to reset it
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const thumbnailInputRef = useRef<HTMLInputElement>(null)
+  // Video refs
   const videoRef = useRef<HTMLVideoElement>(null)
   const verticalVideoRef = useRef<HTMLVideoElement>(null)
   const mobileVideoRef = useRef<HTMLVideoElement>(null)
@@ -284,54 +263,6 @@ export default function CustomizeAdDesignPage() {
       ...prev,
       [name]: value,
     }))
-  }
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setImageFile(file)
-
-      // Create preview URL
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        setImagePreview(event.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setVideoFile(file)
-      setFormData((prev) => ({ ...prev, videoFile: file }))
-
-      // Create preview URL
-      const url = URL.createObjectURL(file)
-      setVideoPreview(url)
-
-      // Reset playing state when a new video is uploaded
-      setIsPlaying(false)
-      setShowThumbnail(true)
-    }
-  }
-
-  const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setThumbnailFile(file)
-      setFormData((prev) => ({ ...prev, thumbnailFile: file }))
-
-      // Create preview URL
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        setThumbnailPreview(event.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-
-      // Ensure thumbnail is shown
-      setShowThumbnail(true)
-    }
   }
 
   // Function to handle saving coupon as image
@@ -492,58 +423,6 @@ export default function CustomizeAdDesignPage() {
     }
   }, [videoRef.current, verticalVideoRef.current, mobileVideoRef.current])
 
-  const handleAddToPhotoAlbum = async () => {
-    if (imageFile && imagePreview && businessId) {
-      try {
-        // Create FormData for upload
-        const formData = new FormData()
-        formData.append("businessId", businessId)
-        formData.append("photo", imageFile)
-
-        // Upload the photo
-        const result = await uploadPhoto(formData)
-
-        if (result.success && result.photo) {
-          // Add the new photo to the album
-          const newPhoto: PhotoItem = {
-            id: result.photo.id,
-            url: result.photo.url,
-            name: result.photo.filename,
-          }
-
-          setPhotos((prev) => [...prev, newPhoto])
-
-          // Reset the current upload
-          setImageFile(null)
-          setImagePreview(null)
-
-          // Reset the file input
-          if (fileInputRef.current) {
-            fileInputRef.current.value = ""
-          }
-
-          toast({
-            title: "Success",
-            description: "Photo added to album successfully!",
-          })
-        } else {
-          toast({
-            title: "Error",
-            description: result.error || "Failed to upload photo. Please try again.",
-            variant: "destructive",
-          })
-        }
-      } catch (error) {
-        console.error("Error uploading photo:", error)
-        toast({
-          title: "Error",
-          description: "An unexpected error occurred. Please try again.",
-          variant: "destructive",
-        })
-      }
-    }
-  }
-
   const handleRemovePhoto = async (id: string) => {
     if (!businessId) return
 
@@ -615,86 +494,6 @@ export default function CustomizeAdDesignPage() {
 
     try {
       setIsLoading(true)
-
-      // Upload video if selected
-      // Upload video if selected
-      const videoUrl = null
-      const thumbnailUrl = null
-
-      // Upload video if selected
-      if (formData.videoFile) {
-        try {
-          // Check file size before attempting upload
-          const fileSizeMB = formData.videoFile.size / (1024 * 1024)
-          if (fileSizeMB > 100) {
-            // 100MB limit
-            toast({
-              title: "Error",
-              description: `Video file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 100MB.`,
-              variant: "destructive",
-            })
-            setIsLoading(false)
-            return
-          }
-
-          const videoFormData = new FormData()
-          videoFormData.append("businessId", businessId)
-          videoFormData.append("video", formData.videoFile)
-          videoFormData.append("designId", selectedDesign?.toString() || "1")
-
-          const videoResult = await uploadVideo(videoFormData)
-
-          if (!videoResult.success) {
-            throw new Error(videoResult.error || "Failed to upload video")
-          }
-        } catch (error: any) {
-          console.error("Error uploading video:", error)
-          toast({
-            title: "Error",
-            description: error.message || "Failed to upload video. Please try a smaller file or different format.",
-            variant: "destructive",
-          })
-          setIsLoading(false)
-          return
-        }
-      }
-
-      // Upload thumbnail if selected
-      if (formData.thumbnailFile) {
-        try {
-          // Check file size before attempting upload
-          const fileSizeMB = formData.thumbnailFile.size / (1024 * 1024)
-          if (fileSizeMB > 10) {
-            // 10MB limit
-            toast({
-              title: "Error",
-              description: `Thumbnail file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is 10MB.`,
-              variant: "destructive",
-            })
-            setIsLoading(false)
-            return
-          }
-
-          const thumbnailFormData = new FormData()
-          thumbnailFormData.append("businessId", businessId)
-          thumbnailFormData.append("thumbnail", formData.thumbnailFile)
-
-          const thumbnailResult = await uploadThumbnail(thumbnailFormData)
-
-          if (!thumbnailResult.success) {
-            throw new Error(thumbnailResult.error || "Failed to upload thumbnail")
-          }
-        } catch (error: any) {
-          console.error("Error uploading thumbnail:", error)
-          toast({
-            title: "Error",
-            description: error.message || "Failed to upload thumbnail. Please try a smaller file or different format.",
-            variant: "destructive",
-          })
-          setIsLoading(false)
-          return
-        }
-      }
 
       // Save hidden fields settings
       await saveMediaSettings(businessId, { hiddenFields })
@@ -2015,194 +1814,129 @@ export default function CustomizeAdDesignPage() {
         <div className="max-w-4xl mx-auto">
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Customize Your AdBox</h1>
-            <p className="text-gray-600">
-              Enter your business information and upload media files to complete your AdBox design.
-            </p>
-            <div className="mt-4">
-              <Link
-                href="/ad-design"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                style={{ backgroundColor: colorValues.primary }}
-              >
-                Select Another Design
-              </Link>
-            </div>
+            <p className="text-gray-600">Enter your business information and select your Design.</p>
           </div>
 
           {selectedDesign ? (
             <>
               {renderDesignPreview()}
 
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {/* Video Upload Section - Moved above Business Information */}
-                <Card>
-                  <div className="p-6 space-y-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-xl font-semibold">Upload Video</h2>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="hideVideo"
-                          checked={hiddenFields.video}
-                          onChange={() => toggleFieldVisibility("video")}
-                          className="mr-2"
-                        />
-                        <label htmlFor="hideVideo" className="text-sm text-gray-500">
-                          Hide from AdBox
-                        </label>
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="videoUpload" className="block mb-2">
-                        Upload Video (
-                        {selectedDesign === 2 || selectedDesign === 3
-                          ? "16:9 ratio recommended"
-                          : "9:16 ratio recommended"}
-                        )
-                      </label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                        <input
-                          type="file"
-                          id="videoUpload"
-                          accept=".mp4,.mov,.m4v,.3gp"
-                          onChange={handleVideoUpload}
-                          className="hidden"
-                        />
-                        <label
-                          htmlFor="videoUpload"
-                          className="cursor-pointer flex flex-col items-center justify-center"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="text-gray-400 mb-2"
-                          >
-                            <path d="m22 8-6 4 6 4V8Z" />
-                            <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
-                          </svg>
-                          <span className="text-sm font-medium text-gray-700">Click to upload video</span>
-                          <span className="text-xs text-gray-500 mt-1">MP4, MOV, M4V, 3GP accepted</span>
-                          <span className="text-xs text-gray-500 mt-1">
-                            {selectedDesign === 2 || selectedDesign === 3
-                              ? "Landscape format (16:9) recommended for this design"
-                              : "Portrait format (9:16) recommended for this design"}
-                          </span>
-                        </label>
-                      </div>
-                      {videoFile && (
-                        <p className="mt-2 text-sm text-green-600">
-                          Video uploaded: {videoFile.name} ({Math.round(videoFile.size / 1024)} KB)
-                        </p>
-                      )}
-                      {videoPreview && !videoFile && (
-                        <p className="mt-2 text-sm text-blue-600">Using previously saved video</p>
-                      )}
-                    </div>
-                    {/* After the video file input: */}
-                    <FileSizeWarning fileType="video" maxSize={50} />
-                  </div>
-                </Card>
+              {/* Color Selection Section */}
+              <Card>
+                <div className="p-6 space-y-6">
+                  <h2 className="text-xl font-semibold">Color Theme</h2>
 
-                {/* Thumbnail Upload Section */}
-                <Card>
-                  <div className="p-6 space-y-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-xl font-semibold">Upload Video Thumbnail</h2>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="hideThumbnail"
-                          checked={hiddenFields.thumbnail}
-                          onChange={() => toggleFieldVisibility("thumbnail")}
-                          className="mr-2"
-                        />
-                        <label htmlFor="hideThumbnail" className="text-sm text-gray-500">
-                          Hide from AdBox
-                        </label>
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="thumbnailUpload" className="block mb-2">
-                        Upload Thumbnail Image (will be shown before video plays)
-                      </label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                        <input
-                          type="file"
-                          id="thumbnailUpload"
-                          ref={thumbnailInputRef}
-                          accept=".jpg,.jpeg,.png,.webp"
-                          onChange={handleThumbnailUpload}
-                          className="hidden"
-                        />
-                        <label
-                          htmlFor="thumbnailUpload"
-                          className="cursor-pointer flex flex-col items-center justify-center"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="text-gray-400 mb-2"
+                  <div className="grid grid-cols-5 sm:grid-cols-9 gap-2">
+                    {Object.entries(colorMap).map(([colorKey, colorObj]) => (
+                      <button
+                        key={colorKey}
+                        onClick={() => setSelectedColor(colorKey)}
+                        className={`w-10 h-10 rounded-lg border-2 transition-all ${
+                          selectedColor === colorKey ? "ring-2 ring-offset-1" : "hover:scale-105"
+                        }`}
+                        style={{
+                          background: `linear-gradient(to right, ${colorObj.primary}, ${colorObj.secondary})`,
+                          borderColor: selectedColor === colorKey ? colorObj.primary : "transparent",
+                          ringColor: colorObj.primary,
+                        }}
+                        aria-label={`Select ${colorKey} theme`}
+                      >
+                        <span className="sr-only">{colorKey}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Design Selection Section */}
+              <Card>
+                <div className="p-6 space-y-6">
+                  <h2 className="text-xl font-semibold">Design Layout</h2>
+                  <p className="text-gray-600 mb-4">Choose a layout for your AdBox</p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map((designId) => (
+                      <button
+                        key={designId}
+                        onClick={() => setSelectedDesign(designId)}
+                        className={`relative border-2 rounded-lg overflow-hidden transition-all ${
+                          selectedDesign === designId
+                            ? `border-[${colorValues.primary}] ring-2 ring-offset-1`
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                        style={{
+                          borderColor: selectedDesign === designId ? colorValues.primary : undefined,
+                          ringColor: selectedDesign === designId ? colorValues.primary : undefined,
+                        }}
+                      >
+                        <div className="aspect-[3/4] bg-gray-50 flex flex-col">
+                          {/* Design preview thumbnail */}
+                          <div
+                            className="h-8 text-white text-center text-sm font-medium flex items-center justify-center"
+                            style={{
+                              background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
+                            }}
                           >
-                            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-                            <circle cx="9" cy="9" r="2" />
-                            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                          </svg>
-                          <span className="text-sm font-medium text-gray-700">Click to upload thumbnail</span>
-                          <span className="text-xs text-gray-500 mt-1">JPG, PNG, WebP accepted</span>
-                          <span className="text-xs text-gray-500 mt-1">
-                            This image will be shown before the video plays and after it ends. Use the controls below
-                            the video to play/pause.
-                          </span>
-                        </label>
-                      </div>
-                      {thumbnailFile && (
-                        <div className="mt-4">
-                          <p className="text-sm text-green-600 mb-2">
-                            Thumbnail uploaded: {thumbnailFile.name} ({Math.round(thumbnailFile.size / 1024)} KB)
-                          </p>
-                          {thumbnailPreview && (
-                            <div className="relative h-40 bg-gray-100 rounded-lg overflow-hidden">
-                              <img
-                                src={thumbnailPreview || "/placeholder.svg"}
-                                alt="Thumbnail preview"
-                                className="w-full h-full object-contain"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {thumbnailPreview && !thumbnailFile && (
-                        <div className="mt-4">
-                          <p className="text-sm text-blue-600 mb-2">Using previously saved thumbnail</p>
-                          <div className="relative h-40 bg-gray-100 rounded-lg overflow-hidden">
-                            <img
-                              src={thumbnailPreview || "/placeholder.svg"}
-                              alt="Thumbnail preview"
-                              className="w-full h-full object-contain"
-                            />
+                            Business Name
+                          </div>
+
+                          <div className="flex-1 p-2 flex flex-col items-center justify-center">
+                            {/* Design 1 - Right video */}
+                            {designId === 1 && (
+                              <div className="w-full h-full flex items-center">
+                                <div className="flex-1 bg-white rounded-md p-1 text-[6px]">
+                                  <div className="h-2 w-3/4 bg-gray-200 rounded mb-1"></div>
+                                  <div className="h-2 w-1/2 bg-gray-200 rounded"></div>
+                                </div>
+                                <div className="w-1/3 h-3/4 ml-1 bg-gray-300 rounded-md"></div>
+                              </div>
+                            )}
+
+                            {/* Design 2 - Top video */}
+                            {designId === 2 && (
+                              <div className="w-full h-full flex flex-col">
+                                <div className="w-full h-1/3 bg-gray-300 rounded-md mb-1"></div>
+                                <div className="flex-1 bg-white rounded-md p-1 text-[6px]">
+                                  <div className="h-2 w-3/4 bg-gray-200 rounded mb-1"></div>
+                                  <div className="h-2 w-1/2 bg-gray-200 rounded"></div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Design 3 - Bottom video */}
+                            {designId === 3 && (
+                              <div className="w-full h-full flex flex-col">
+                                <div className="flex-1 bg-white rounded-md p-1 text-[6px] mb-1">
+                                  <div className="h-2 w-3/4 bg-gray-200 rounded mb-1"></div>
+                                  <div className="h-2 w-1/2 bg-gray-200 rounded"></div>
+                                </div>
+                                <div className="w-full h-1/3 bg-gray-300 rounded-md"></div>
+                              </div>
+                            )}
+
+                            {/* Design 4 - Left video */}
+                            {designId === 4 && (
+                              <div className="w-full h-full flex items-center">
+                                <div className="w-1/3 h-3/4 mr-1 bg-gray-300 rounded-md"></div>
+                                <div className="flex-1 bg-white rounded-md p-1 text-[6px]">
+                                  <div className="h-2 w-3/4 bg-gray-200 rounded mb-1"></div>
+                                  <div className="h-2 w-1/2 bg-gray-200 rounded"></div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="h-6 bg-gray-100 text-xs flex items-center justify-center font-medium">
+                            Design {designId}
                           </div>
                         </div>
-                      )}
-                    </div>
-                    {/* After the thumbnail file input: */}
-                    <FileSizeWarning fileType="image" maxSize={5} />
+                      </button>
+                    ))}
                   </div>
-                </Card>
+                </div>
+              </Card>
 
+              <form onSubmit={handleSubmit} className="space-y-8">
                 {/* Business Information Section */}
                 <Card>
                   <div className="p-6 space-y-6">
@@ -2362,143 +2096,6 @@ export default function CustomizeAdDesignPage() {
                       <p className="text-sm text-gray-500 mt-1">
                         This text will be displayed prominently in your AdBox
                       </p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Photo Album Section */}
-                <Card>
-                  <div className="p-6 space-y-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-xl font-semibold">Photo Album</h2>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="hidePhotoAlbum"
-                          checked={hiddenFields.photoAlbum}
-                          onChange={() => toggleFieldVisibility("photoAlbum")}
-                          className="mr-2"
-                        />
-                        <Label htmlFor="hidePhotoAlbum" className="text-sm text-gray-500">
-                          Hide from AdBox
-                        </Label>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="imageUpload" className="block mb-2">
-                          Upload Images for Photo Album
-                        </Label>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                          <input
-                            type="file"
-                            id="imageUpload"
-                            ref={fileInputRef}
-                            accept=".jpg,.jpeg,.png,.webp,.gif"
-                            onChange={handleImageUpload}
-                            className="hidden"
-                          />
-                          <label
-                            htmlFor="imageUpload"
-                            className="cursor-pointer flex flex-col items-center justify-center"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="24"
-                              height="24"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-gray-400 mb-2"
-                            >
-                              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-                              <circle cx="9" cy="9" r="2" />
-                              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                            </svg>
-                            <span className="text-sm font-medium text-gray-700">Click to upload image</span>
-                            <span className="text-xs text-gray-500 mt-1">JPG, PNG, WebP, GIF accepted</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      {imagePreview && (
-                        <div className="space-y-4">
-                          <div className="relative h-40 bg-gray-100 rounded-lg overflow-hidden">
-                            <img
-                              src={imagePreview || "/placeholder.svg"}
-                              alt="Preview"
-                              className="w-full h-full object-contain"
-                            />
-                            <button
-                              type="button"
-                              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
-                              onClick={() => {
-                                setImageFile(null)
-                                setImagePreview(null)
-                                if (fileInputRef.current) {
-                                  fileInputRef.current.value = ""
-                                }
-                              }}
-                            >
-                              <X size={16} />
-                            </button>
-                          </div>
-
-                          <Button
-                            type="button"
-                            onClick={handleAddToPhotoAlbum}
-                            className="w-full"
-                            style={{ backgroundColor: colorValues.primary, color: "white" }}
-                          >
-                            Add to Photo Album
-                          </Button>
-                        </div>
-                      )}
-
-                      <div className="mt-4">
-                        <h3 className="text-md font-medium mb-2">Current Photo Album ({photos.length} photos)</h3>
-
-                        {photos.length > 0 ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                            {photos.map((photo) => (
-                              <div key={photo.id} className="relative group">
-                                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                                  <img
-                                    src={photo.url || "/placeholder.svg"}
-                                    alt={photo.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemovePhoto(photo.id)}
-                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500 text-center py-4">
-                            No photos in album yet. Upload and add photos above.
-                          </p>
-                        )}
-
-                        {photos.length > 0 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="mt-4 w-full"
-                            onClick={handleOpenPhotoAlbum}
-                          >
-                            View Photo Album
-                          </Button>
-                        )}
-                      </div>
                     </div>
                   </div>
                 </Card>
