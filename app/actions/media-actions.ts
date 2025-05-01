@@ -86,441 +86,627 @@ async function compressImageBuffer(
   return processImageData(buffer, contentType, options)
 }
 
-/**
- * Upload a video to Vercel Blob storage
- */
-export async function uploadVideo(formData: FormData) {
-  try {
-    console.log("Starting uploadVideo server action")
-    console.log("FormData keys:", [...formData.keys()])
-
-    const businessId = formData.get("businessId")
-    if (!businessId || typeof businessId !== "string") {
-      console.error("Missing or invalid businessId:", businessId)
-      return { success: false, error: "Missing or invalid businessId" }
-    }
-
-    const videoFile = formData.get("video")
-    if (!videoFile) {
-      console.error("Missing video file in formData")
-      return { success: false, error: "Missing video file" }
-    }
-
-    // Check if the video is a File or Blob
-    if (!(videoFile instanceof Blob)) {
-      console.error("Video is not a Blob:", typeof videoFile)
-      return { success: false, error: "Invalid video format" }
-    }
-
-    const designId = formData.get("designId") || "default-design"
-
-    // Log file details
-    console.log(`Video file details - Size: ${videoFile.size} bytes, Type: ${videoFile.type}`)
-
-    // Check file size
-    const fileSizeMB = videoFile.size / MB_IN_BYTES
-    if (fileSizeMB > MAX_VIDEO_SIZE_MB) {
-      return {
-        success: false,
-        error: `Video file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is ${MAX_VIDEO_SIZE_MB}MB.`,
-      }
-    }
-
-    // Generate a unique filename with timestamp
-    const timestamp = Date.now()
-    const randomString = Math.random().toString(36).substring(2, 10)
-    const extension = "mp4" // Default to mp4 if we can't determine the extension
-    const filename = `${businessId}/videos/${timestamp}-${randomString}.${extension}`
-
-    // Ensure we have a valid content type
-    const contentType = videoFile.type || `video/${extension}`
-
-    console.log(`Generated filename: ${filename}`)
-
-    try {
-      // Upload to Vercel Blob with proper error handling
-      let blob
-      try {
-        console.log(`Attempting to upload video: ${filename}, size: ${videoFile.size} bytes, type: ${contentType}`)
-
-        // Convert the Blob to an ArrayBuffer and then to a Buffer
-        const arrayBuffer = await videoFile.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
-
-        console.log(`Successfully converted video to buffer, size: ${buffer.length} bytes`)
-
-        // Create a blob options object with no null values
-        const blobOptions = {
-          access: "public",
-          addRandomSuffix: false,
-          contentType: contentType || "video/mp4", // Ensure we always have a content type
-        }
-
-        console.log("Blob upload options:", blobOptions)
-
-        // Use the buffer for upload instead of the file directly
-        blob = await put(filename, buffer, blobOptions)
-        console.log("Video upload successful:", blob)
-      } catch (blobError) {
-        console.error("Blob upload error details:", blobError)
-
-        // Add more detailed error logging
-        if (blobError instanceof Error) {
-          console.error("Error name:", blobError.name)
-          console.error("Error message:", blobError.message)
-          console.error("Error stack:", blobError.stack)
-        }
-
-        // Check if the error is related to the Vercel Blob token
-        if (
-          blobError instanceof Error &&
-          (blobError.message.includes("token") ||
-            blobError.message.includes("unauthorized") ||
-            blobError.message.includes("permission"))
-        ) {
-          return {
-            success: false,
-            error: "Blob storage authentication failed. Please check your BLOB_READ_WRITE_TOKEN environment variable.",
-          }
-        }
-
-        // Try to get more details about the error
-        if (blobError instanceof Error) {
-          console.error("Error name:", blobError.name)
-          console.error("Error message:", blobError.message)
-          console.error("Error stack:", blobError.stack)
-        }
-
-        // Check if the error is a Response object
-        if (
-          blobError instanceof Response ||
-          (typeof blobError === "object" && blobError !== null && "text" in blobError)
-        ) {
-          const status = blobError instanceof Response ? blobError.status : "unknown"
-          const statusText = blobError instanceof Response ? blobError.statusText : "unknown"
-          console.error(`Response status: ${status} ${statusText}`)
-
-          try {
-            // Try to get the response text without parsing as JSON
-            const errorText = await (blobError as Response).text()
-            console.error("Response error text:", errorText)
-
-            // Check if it contains "Request Entity Too Large"
-            if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
-              return {
-                success: false,
-                error: `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB.`,
-              }
-            }
-
-            // For other error messages
-            return {
-              success: false,
-              error: `Upload failed: ${errorText.substring(0, 100)}...`,
-            }
-          } catch (textError) {
-            console.error("Error getting response text:", textError)
-            return {
-              success: false,
-              error: `Upload failed with status ${status}: ${statusText}`,
-            }
-          }
-        }
-
-        // Check for null args error
-        if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
-          return {
-            success: false,
-            error:
-              "Upload failed: One or more required parameters were missing. Please try again with a different file.",
-          }
-        }
-
-        // Handle other types of errors
-        return {
-          success: false,
-          error:
-            blobError instanceof Error
-              ? `Blob upload failed: ${blobError.message}`
-              : "Unknown error during blob upload",
-        }
-      }
-
-      // Get existing media data or initialize new object
-      const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [] }
-
-      // If there's an existing video, delete it to save storage
-      if (existingMedia.videoId) {
-        try {
-          await del(existingMedia.videoId)
-        } catch (deleteError) {
-          console.error("Error deleting previous video:", deleteError)
-          // Continue even if deletion fails
-        }
-      }
-
-      // Store reference in KV
-      await kv.hset(`business:${businessId}:media`, {
-        videoUrl: blob.url,
-        videoContentType: blob.contentType,
-        videoId: filename,
-        designId: designId,
-      })
-
-      revalidatePath(`/ad-design/customize`)
-      revalidatePath(`/video`)
-
-      return {
-        success: true,
-        url: blob.url,
-        contentType: blob.contentType,
-        size: blob.size,
-        id: filename,
-      }
-    } catch (uploadError) {
-      console.error("Error in Vercel Blob upload:", uploadError)
-
-      // Try to extract more detailed error information
-      let errorMessage = "Failed to upload video to storage"
-
-      if (uploadError instanceof Error) {
-        errorMessage = uploadError.message
-      } else if (typeof uploadError === "object" && uploadError !== null) {
-        errorMessage = JSON.stringify(uploadError)
-      }
-
-      return {
-        success: false,
-        error: errorMessage,
-      }
-    }
-  } catch (error) {
-    console.error("Error in uploadVideo function:", error)
-    // Log more details about the error
-    if (error instanceof Error) {
-      console.error("Error name:", error.name)
-      console.error("Error message:", error.message)
-      console.error("Error stack:", error.stack)
-    } else {
-      console.error("Non-Error object thrown:", error)
-    }
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to upload video",
-    }
-  }
+// Define the type for the business media
+interface BusinessMediaUpdated {
+  businessId: string
+  videoUrl?: string
+  videoId?: string
+  videoContentType?: string
+  thumbnailUrl?: string
+  thumbnailId?: string
+  aspectRatio?: string
 }
 
-/**
- * Upload a thumbnail image to Vercel Blob storage with compression
- */
-export async function uploadThumbnail(formData: FormData) {
+// Upload a thumbnail image
+export async function uploadThumbnail(formData: FormData): Promise<{
+  success: boolean
+  url?: string
+  id?: string
+  error?: string
+}> {
   try {
     const businessId = formData.get("businessId") as string
-    const file = formData.get("thumbnail") as File
+    const thumbnail = formData.get("thumbnail") as File
+    const aspectRatio = (formData.get("aspectRatio") as string) || "16:9"
 
-    if (!file || !businessId) {
-      return { success: false, error: "Missing required fields" }
-    }
-
-    // Check file size
-    const fileSizeMB = file.size / MB_IN_BYTES
-    if (fileSizeMB > MAX_IMAGE_SIZE_MB) {
+    if (!businessId || !thumbnail) {
       return {
         success: false,
-        error: `Thumbnail file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is ${MAX_IMAGE_SIZE_MB}MB.`,
+        error: "Missing required fields",
       }
     }
 
-    // Get the original file size
-    const originalSize = file.size
-
-    // Generate a unique filename
-    const format = "jpeg" // Default format
-    const filename = `${businessId}/thumbnails/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${format}`
-
-    // Ensure we have a valid content type
-    const contentType = file.type || "image/jpeg"
-
-    try {
-      // Upload to Vercel Blob directly without compression
-      let blob
+    // Check if there's an existing thumbnail for this business
+    const existingMedia = await getBusinessMedia(businessId)
+    if (existingMedia?.thumbnailId) {
+      // Delete the existing thumbnail
       try {
-        // Convert the File to a Buffer
-        const arrayBuffer = await file.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
-
-        // Create a blob options object with no null values
-        const blobOptions = {
-          access: "public",
-          addRandomSuffix: false,
-          contentType: contentType,
-        }
-
-        blob = await put(filename, buffer, blobOptions)
-      } catch (blobError) {
-        console.error("Blob upload error details:", blobError)
-
-        // Handle Response object error (Request Entity Too Large)
-        if (
-          blobError instanceof Response ||
-          (typeof blobError === "object" && blobError !== null && "text" in blobError)
-        ) {
-          try {
-            // Try to get the response text
-            const errorText = await (blobError as Response).text()
-
-            // Check if it contains "Request Entity Too Large"
-            if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
-              return {
-                success: false,
-                error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
-              }
-            }
-
-            return {
-              success: false,
-              error: `Blob upload failed: ${errorText.substring(0, 100)}...`,
-            }
-          } catch (textError) {
-            // If we can't get the text, return a generic error
-            return {
-              success: false,
-              error: "File upload failed. The file may be too large or in an unsupported format.",
-            }
-          }
-        }
-
-        // Check for null args error
-        if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
-          return {
-            success: false,
-            error:
-              "Upload failed: One or more required parameters were missing. Please try again with a different file.",
-          }
-        }
-
-        // Handle other types of errors
-        return {
-          success: false,
-          error:
-            blobError instanceof Error
-              ? `Blob upload failed: ${blobError.message}`
-              : "Unknown error during blob upload",
-        }
+        await del(existingMedia.thumbnailId)
+      } catch (error) {
+        console.error("Error deleting existing thumbnail:", error)
+        // Continue with the upload even if deletion fails
       }
+    }
 
-      // Calculate compression savings (in this case, none)
-      const compressionSavings = 0
+    // Upload the new thumbnail
+    const blob = await put(`thumbnails/${businessId}/${thumbnail.name}`, thumbnail, {
+      access: "public",
+    })
 
-      // Get existing media data
-      const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [] }
+    // Store the thumbnail info in Redis
+    const mediaKey = `business:${businessId}:media`
+    await kv.hset(mediaKey, {
+      thumbnailUrl: blob.url,
+      thumbnailId: blob.url,
+      aspectRatio,
+    })
 
-      // If there's an existing thumbnail, delete it
-      if (existingMedia.thumbnailId) {
-        try {
-          await del(existingMedia.thumbnailId)
-        } catch (deleteError) {
-          console.error("Error deleting previous thumbnail:", deleteError)
-        }
-      }
+    revalidatePath("/video")
 
-      // Store reference in KV
-      await kv.hset(`business:${businessId}:media`, {
-        thumbnailUrl: blob.url,
-        thumbnailId: filename,
-        thumbnailWidth: 800, // Estimated width
-        thumbnailHeight: 600, // Estimated height
-        thumbnailOriginalSize: originalSize,
-        thumbnailCompressionSavings: compressionSavings,
-      })
-
-      revalidatePath(`/ad-design/customize`)
-      revalidatePath(`/video`)
-
-      return {
-        success: true,
-        url: blob.url,
-        contentType: blob.contentType,
-        size: blob.size,
-        originalSize,
-        compressionSavings,
-        width: 800, // Estimated width
-        height: 600, // Estimated height
-        id: filename,
-      }
-    } catch (uploadError) {
-      console.error("Error in Vercel Blob upload:", uploadError)
-
-      // Try to extract more detailed error information
-      let errorMessage = "Failed to upload thumbnail to storage"
-
-      if (uploadError instanceof Error) {
-        errorMessage = uploadError.message
-      } else if (typeof uploadError === "object" && uploadError !== null) {
-        errorMessage = JSON.stringify(uploadError)
-      }
-
-      return {
-        success: false,
-        error: errorMessage,
-      }
+    return {
+      success: true,
+      url: blob.url,
+      id: blob.url,
     }
   } catch (error) {
     console.error("Error uploading thumbnail:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to upload thumbnail",
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
+
+// Upload a video
+export async function uploadVideo(formData: FormData): Promise<{
+  success: boolean
+  url?: string
+  id?: string
+  contentType?: string
+  error?: string
+}> {
+  try {
+    const businessId = formData.get("businessId") as string
+    const video = formData.get("video") as File
+    const aspectRatio = (formData.get("aspectRatio") as string) || "16:9"
+
+    if (!businessId || !video) {
+      return {
+        success: false,
+        error: "Missing required fields",
+      }
+    }
+
+    // Check if there's an existing video for this business
+    const existingMedia = await getBusinessMedia(businessId)
+    if (existingMedia?.videoId) {
+      // Delete the existing video
+      try {
+        await del(existingMedia.videoId)
+      } catch (error) {
+        console.error("Error deleting existing video:", error)
+        // Continue with the upload even if deletion fails
+      }
+    }
+
+    // Upload the new video
+    const blob = await put(`videos/${businessId}/${video.name}`, video, {
+      access: "public",
+    })
+
+    // Store the video info in Redis
+    const mediaKey = `business:${businessId}:media`
+    await kv.hset(mediaKey, {
+      videoUrl: blob.url,
+      videoId: blob.url,
+      videoContentType: video.type,
+      aspectRatio,
+    })
+
+    revalidatePath("/video")
+
+    return {
+      success: true,
+      url: blob.url,
+      id: blob.url,
+      contentType: video.type,
+    }
+  } catch (error) {
+    console.error("Error uploading video:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }
+  }
+}
+
+// Get business media
+export async function getBusinessMedia(businessId: string): Promise<BusinessMediaUpdated | null> {
+  try {
+    const mediaKey = `business:${businessId}:media`
+    const media = await kv.hgetall(mediaKey)
+
+    if (!media) {
+      return null
+    }
+
+    return media as BusinessMediaUpdated
+  } catch (error) {
+    console.error("Error getting business media:", error)
+    return null
+  }
+}
+
+// Delete a thumbnail
+export async function deleteThumbnail(businessId: string): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    const existingMedia = await getBusinessMedia(businessId)
+    if (!existingMedia?.thumbnailId) {
+      return {
+        success: false,
+        error: "No thumbnail found",
+      }
+    }
+
+    // Delete the thumbnail from Blob storage
+    await del(existingMedia.thumbnailId)
+
+    // Update Redis
+    const mediaKey = `business:${businessId}:media`
+    await kv.hdel(mediaKey, "thumbnailUrl", "thumbnailId")
+
+    revalidatePath("/video")
+
+    return {
+      success: true,
+    }
+  } catch (error) {
+    console.error("Error deleting thumbnail:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
     }
   }
 }
 
 /**
+ * Upload a video to Vercel Blob storage
+ */
+// export async function uploadVideo(formData: FormData) {
+//   try {
+//     console.log("Starting uploadVideo server action")
+//     console.log("FormData keys:", [...formData.keys()])
+
+//     const businessId = formData.get("businessId")
+//     if (!businessId || typeof businessId !== "string") {
+//       console.error("Missing or invalid businessId:", businessId)
+//       return { success: false, error: "Missing or invalid businessId" }
+//     }
+
+//     const videoFile = formData.get("video")
+//     if (!videoFile) {
+//       console.error("Missing video file in formData")
+//       return { success: false, error: "Missing video file" }
+//     }
+
+//     // Check if the video is a File or Blob
+//     if (!(videoFile instanceof Blob)) {
+//       console.error("Video is not a Blob:", typeof videoFile)
+//       return { success: false, error: "Invalid video format" }
+//     }
+
+//     const designId = formData.get("designId") || "default-design"
+
+//     // Log file details
+//     console.log(`Video file details - Size: ${videoFile.size} bytes, Type: ${videoFile.type}`)
+
+//     // Check file size
+//     const fileSizeMB = videoFile.size / MB_IN_BYTES
+//     if (fileSizeMB > MAX_VIDEO_SIZE_MB) {
+//       return {
+//         success: false,
+//         error: `Video file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is ${MAX_VIDEO_SIZE_MB}MB.`,
+//       }
+//     }
+
+//     // Generate a unique filename with timestamp
+//     const timestamp = Date.now()
+//     const randomString = Math.random().toString(36).substring(2, 10)
+//     const extension = "mp4" // Default to mp4 if we can't determine the extension
+//     const filename = `${businessId}/videos/${timestamp}-${randomString}.${extension}`
+
+//     // Ensure we have a valid content type
+//     const contentType = videoFile.type || `video/${extension}`
+
+//     console.log(`Generated filename: ${filename}`)
+
+//     try {
+//       // Upload to Vercel Blob with proper error handling
+//       let blob
+//       try {
+//         console.log(`Attempting to upload video: ${filename}, size: ${videoFile.size} bytes, type: ${contentType}`)
+
+//         // Convert the Blob to an ArrayBuffer and then to a Buffer
+//         const arrayBuffer = await videoFile.arrayBuffer()
+//         const buffer = Buffer.from(arrayBuffer)
+
+//         console.log(`Successfully converted video to buffer, size: ${buffer.length} bytes`)
+
+//         // Create a blob options object with no null values
+//         const blobOptions = {
+//           access: "public",
+//           addRandomSuffix: false,
+//           contentType: contentType || "video/mp4", // Ensure we always have a content type
+//         }
+
+//         console.log("Blob upload options:", blobOptions)
+
+//         // Use the buffer for upload instead of the file directly
+//         blob = await put(filename, buffer, blobOptions)
+//         console.log("Video upload successful:", blob)
+//       } catch (blobError) {
+//         console.error("Blob upload error details:", blobError)
+
+//         // Add more detailed error logging
+//         if (blobError instanceof Error) {
+//           console.error("Error name:", blobError.name)
+//           console.error("Error message:", blobError.message)
+//           console.error("Error stack:", blobError.stack)
+//         }
+
+//         // Check if the error is related to the Vercel Blob token
+//         if (
+//           blobError instanceof Error &&
+//           (blobError.message.includes("token") ||
+//             blobError.message.includes("unauthorized") ||
+//             blobError.message.includes("permission"))
+//         ) {
+//           return {
+//             success: false,
+//             error: "Blob storage authentication failed. Please check your BLOB_READ_WRITE_TOKEN environment variable.",
+//           }
+//         }
+
+//         // Try to get more details about the error
+//         if (blobError instanceof Error) {
+//           console.error("Error name:", blobError.name)
+//           console.error("Error message:", blobError.message)
+//           console.error("Error stack:", blobError.stack)
+//         }
+
+//         // Check if the error is a Response object
+//         if (
+//           blobError instanceof Response ||
+//           (typeof blobError === "object" && blobError !== null && "text" in blobError)
+//         ) {
+//           const status = blobError instanceof Response ? blobError.status : "unknown"
+//           const statusText = blobError instanceof Response ? blobError.statusText : "unknown"
+//           console.error(`Response status: ${status} ${statusText}`)
+
+//           try {
+//             // Try to get the response text without parsing as JSON
+//             const errorText = await (blobError as Response).text()
+//             console.error("Response error text:", errorText)
+
+//             // Check if it contains "Request Entity Too Large"
+//             if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
+//               return {
+//                 success: false,
+//                 error: `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB.`,
+//               }
+//             }
+
+//             // For other error messages
+//             return {
+//               success: false,
+//               error: `Upload failed: ${errorText.substring(0, 100)}...`,
+//             }
+//           } catch (textError) {
+//             console.error("Error getting response text:", textError)
+//             return {
+//               success: false,
+//               error: `Upload failed with status ${status}: ${statusText}`,
+//             }
+//           }
+//         }
+
+//         // Check for null args error
+//         if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
+//           return {
+//             success: false,
+//             error:
+//               "Upload failed: One or more required parameters were missing. Please try again with a different file.",
+//           }
+//         }
+
+//         // Handle other types of errors
+//         return {
+//           success: false,
+//           error:
+//             blobError instanceof Error
+//               ? `Blob upload failed: ${blobError.message}`
+//               : "Unknown error during blob upload",
+//         }
+//       }
+
+//       // Get existing media data or initialize new object
+//       const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [] }
+
+//       // If there's an existing video, delete it to save storage
+//       if (existingMedia.videoId) {
+//         try {
+//           await del(existingMedia.videoId)
+//         } catch (deleteError) {
+//           console.error("Error deleting previous video:", deleteError)
+//           // Continue even if deletion fails
+//         }
+//       }
+
+//       // Store reference in KV
+//       await kv.hset(`business:${businessId}:media`, {
+//         videoUrl: blob.url,
+//         videoContentType: blob.contentType,
+//         videoId: filename,
+//         designId: designId,
+//       })
+
+//       revalidatePath(`/ad-design/customize`)
+//       revalidatePath(`/video`)
+
+//       return {
+//         success: true,
+//         url: blob.url,
+//         contentType: blob.contentType,
+//         size: blob.size,
+//         id: filename,
+//       }
+//     } catch (uploadError) {
+//       console.error("Error in Vercel Blob upload:", uploadError)
+
+//       // Try to extract more detailed error information
+//       let errorMessage = "Failed to upload video to storage"
+
+//       if (uploadError instanceof Error) {
+//         errorMessage = uploadError.message
+//       } else if (typeof uploadError === "object" && uploadError !== null) {
+//         errorMessage = JSON.stringify(uploadError)
+//       }
+
+//       return {
+//         success: false,
+//         error: errorMessage,
+//       }
+//     }
+//   } catch (error) {
+//     console.error("Error in uploadVideo function:", error)
+//     // Log more details about the error
+//     if (error instanceof Error) {
+//       console.error("Error name:", error.name)
+//       console.error("Error message:", error.message)
+//       console.error("Error stack:", error.stack)
+//     } else {
+//       console.error("Non-Error object thrown:", error)
+//     }
+//     return {
+//       success: false,
+//       error: error instanceof Error ? error.message : "Failed to upload video",
+//     }
+//   }
+// }
+
+/**
+ * Upload a thumbnail image to Vercel Blob storage with compression
+ */
+// export async function uploadThumbnail(formData: FormData) {
+//   try {
+//     const businessId = formData.get("businessId") as string
+//     const file = formData.get("thumbnail") as File
+
+//     if (!file || !businessId) {
+//       return { success: false, error: "Missing required fields" }
+//     }
+
+//     // Check file size
+//     const fileSizeMB = file.size / MB_IN_BYTES
+//     if (fileSizeMB > MAX_IMAGE_SIZE_MB) {
+//       return {
+//         success: false,
+//         error: `Thumbnail file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is ${MAX_IMAGE_SIZE_MB}MB.`,
+//       }
+//     }
+
+//     // Get the original file size
+//     const originalSize = file.size
+
+//     // Generate a unique filename
+//     const format = "jpeg" // Default format
+//     const filename = `${businessId}/thumbnails/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${format}`
+
+//     // Ensure we have a valid content type
+//     const contentType = file.type || "image/jpeg"
+
+//     try {
+//       // Upload to Vercel Blob directly without compression
+//       let blob
+//       try {
+//         // Convert the File to a Buffer
+//         const arrayBuffer = await file.arrayBuffer()
+//         const buffer = Buffer.from(arrayBuffer)
+
+//         // Create a blob options object with no null values
+//         const blobOptions = {
+//           access: "public",
+//           addRandomSuffix: false,
+//           contentType: contentType,
+//         }
+
+//         blob = await put(filename, buffer, blobOptions)
+//       } catch (blobError) {
+//         console.error("Blob upload error details:", blobError)
+
+//         // Handle Response object error (Request Entity Too Large)
+//         if (
+//           blobError instanceof Response ||
+//           (typeof blobError === "object" && blobError !== null && "text" in blobError)
+//         ) {
+//           try {
+//             // Try to get the response text
+//             const errorText = await (blobError as Response).text()
+
+//             // Check if it contains "Request Entity Too Large"
+//             if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
+//               return {
+//                 success: false,
+//                 error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
+//               }
+//             }
+
+//             return {
+//               success: false,
+//               error: `Blob upload failed: ${errorText.substring(0, 100)}...`,
+//             }
+//           } catch (textError) {
+//             // If we can't get the text, return a generic error
+//             return {
+//               success: false,
+//               error: "File upload failed. The file may be too large or in an unsupported format.",
+//             }
+//           }
+//         }
+
+//         // Check for null args error
+//         if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
+//           return {
+//             success: false,
+//             error:
+//               "Upload failed: One or more required parameters were missing. Please try again with a different file.",
+//           }
+//         }
+
+//         // Handle other types of errors
+//         return {
+//           success: false,
+//           error:
+//             blobError instanceof Error
+//               ? `Blob upload failed: ${blobError.message}`
+//               : "Unknown error during blob upload",
+//         }
+//       }
+
+//       // Calculate compression savings (in this case, none)
+//       const compressionSavings = 0
+
+//       // Get existing media data
+//       const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [] }
+
+//       // If there's an existing thumbnail, delete it
+//       if (existingMedia.thumbnailId) {
+//         try {
+//           await del(existingMedia.thumbnailId)
+//         } catch (deleteError) {
+//           console.error("Error deleting previous thumbnail:", deleteError)
+//         }
+//       }
+
+//       // Store reference in KV
+//       await kv.hset(`business:${businessId}:media`, {
+//         thumbnailUrl: blob.url,
+//         thumbnailId: filename,
+//         thumbnailWidth: 800, // Estimated width
+//         thumbnailHeight: 600, // Estimated height
+//         thumbnailOriginalSize: originalSize,
+//         thumbnailCompressionSavings: compressionSavings,
+//       })
+
+//       revalidatePath(`/ad-design/customize`)
+//       revalidatePath(`/video`)
+
+//       return {
+//         success: true,
+//         url: blob.url,
+//         contentType: blob.contentType,
+//         size: blob.size,
+//         originalSize,
+//         compressionSavings,
+//         width: 800, // Estimated width
+//         height: 600, // Estimated height
+//         id: filename,
+//       }
+//     } catch (uploadError) {
+//       console.error("Error in Vercel Blob upload:", uploadError)
+
+//       // Try to extract more detailed error information
+//       let errorMessage = "Failed to upload thumbnail to storage"
+
+//       if (uploadError instanceof Error) {
+//         errorMessage = uploadError.message
+//       } else if (typeof uploadError === "object" && uploadError !== null) {
+//         errorMessage = JSON.stringify(uploadError)
+//       }
+
+//       return {
+//         success: false,
+//         error: errorMessage,
+//       }
+//     }
+//   } catch (error) {
+//     console.error("Error uploading thumbnail:", error)
+//     return {
+//       success: false,
+//       error: error instanceof Error ? error.message : "Failed to upload thumbnail",
+//     }
+//   }
+// }
+
+/**
  * Delete a thumbnail for a business
  */
-export async function deleteThumbnail(businessId: string) {
-  try {
-    if (!businessId) {
-      return { success: false, error: "Missing business ID" }
-    }
+// export async function deleteThumbnail(businessId: string) {
+//   try {
+//     if (!businessId) {
+//       return { success: false, error: "Missing business ID" }
+//     }
 
-    // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+//     // Get existing media data
+//     const existingMedia = await getBusinessMedia(businessId)
 
-    if (!existingMedia || !existingMedia.thumbnailId) {
-      return { success: false, error: "No thumbnail found" }
-    }
+//     if (!existingMedia || !existingMedia.thumbnailId) {
+//       return { success: false, error: "No thumbnail found" }
+//     }
 
-    // Delete the thumbnail from Blob storage
-    try {
-      await del(existingMedia.thumbnailId)
-    } catch (deleteError) {
-      console.error("Error deleting thumbnail from Blob storage:", deleteError)
-      // Continue with removing from the record even if blob deletion fails
-    }
+//     // Delete the thumbnail from Blob storage
+//     try {
+//       await del(existingMedia.thumbnailId)
+//     } catch (deleteError) {
+//       console.error("Error deleting thumbnail from Blob storage:", deleteError)
+//       // Continue with removing from the record even if blob deletion fails
+//     }
 
-    // Update the business media record to remove thumbnail references
-    await kv.hset(`business:${businessId}:media`, {
-      thumbnailUrl: null,
-      thumbnailId: null,
-      thumbnailWidth: null,
-      thumbnailHeight: null,
-      thumbnailOriginalSize: null,
-      thumbnailCompressionSavings: null,
-    })
+//     // Update the business media record to remove thumbnail references
+//     await kv.hset(`business:${businessId}:media`, {
+//       thumbnailUrl: null,
+//       thumbnailId: null,
+//       thumbnailWidth: null,
+//       thumbnailHeight: null,
+//       thumbnailOriginalSize: null,
+//       thumbnailCompressionSavings: null,
+//     })
 
-    revalidatePath(`/video`)
-    revalidatePath(`/ad-design/customize`)
+//     revalidatePath(`/video`)
+//     revalidatePath(`/ad-design/customize`)
 
-    return { success: true }
-  } catch (error) {
-    console.error("Error deleting thumbnail:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to delete thumbnail",
-    }
-  }
-}
+//     return { success: true }
+//   } catch (error) {
+//     console.error("Error deleting thumbnail:", error)
+//     return {
+//       success: false,
+//       error: error instanceof Error ? error.message : "Failed to delete thumbnail",
+//     }
+//   }
+// }
 
 /**
  * Upload a photo to the business's photo album with compression
@@ -653,7 +839,7 @@ export async function uploadPhoto(formData: FormData) {
       }
 
       // Get existing media data
-      const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [], folders: [], tags: [] }
+      const existingMedia = (await getBusinessMediaOriginal(businessId)) || { photoAlbum: [], folders: [], tags: [] }
 
       // Add the new photo to the album
       const updatedPhotoAlbum = [...(existingMedia.photoAlbum || []), newPhoto]
@@ -719,7 +905,7 @@ export async function deletePhoto(businessId: string, photoId: string) {
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia || !existingMedia.photoAlbum) {
       return { success: false, error: "No photo album found" }
@@ -766,7 +952,7 @@ export async function deletePhoto(businessId: string, photoId: string) {
 /**
  * Get all media for a business
  */
-export async function getBusinessMedia(businessId: string): Promise<BusinessMedia | null> {
+export async function getBusinessMediaOriginal(businessId: string): Promise<BusinessMedia | null> {
   try {
     if (!businessId) {
       return null
@@ -940,7 +1126,7 @@ export async function createFolder(businessId: string, folderName: string, paren
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia) {
       return { success: false, error: "No media data found" }
@@ -988,7 +1174,7 @@ export async function renameFolder(businessId: string, folderId: string, newName
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia || !existingMedia.folders) {
       return { success: false, error: "No folders found" }
@@ -1038,7 +1224,7 @@ export async function deleteFolder(businessId: string, folderId: string) {
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia || !existingMedia.folders) {
       return { success: false, error: "No folders found" }
@@ -1096,7 +1282,7 @@ export async function movePhotoToFolder(businessId: string, photoId: string, fol
     console.log(`Moving photo ${photoId} to folder ${folderId || "root"} for business ${businessId}`)
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia || !existingMedia.photoAlbum) {
       console.error("No photo album found for business", businessId)
@@ -1150,7 +1336,7 @@ export async function addTagsToPhoto(businessId: string, photoId: string, tags: 
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia || !existingMedia.photoAlbum) {
       return { success: false, error: "No photo album found" }
@@ -1215,7 +1401,7 @@ export async function removeTagFromPhoto(businessId: string, photoId: string, ta
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia || !existingMedia.photoAlbum) {
       return { success: false, error: "No photo album found" }
@@ -1268,7 +1454,7 @@ export async function deleteAllBusinessMedia(businessId: string) {
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia) {
       return { success: true, message: "No media to delete" }
@@ -1329,7 +1515,7 @@ export async function createTag(businessId: string, tagName: string) {
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia) {
       return { success: false, error: "No media data found" }
@@ -1374,7 +1560,7 @@ export async function deleteTag(businessId: string, tagName: string) {
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMedia(businessId)
+    const existingMedia = await getBusinessMediaOriginal(businessId)
 
     if (!existingMedia) {
       return { success: false, error: "No media data found" }

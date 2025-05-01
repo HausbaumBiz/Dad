@@ -5,7 +5,16 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Upload, VideoIcon, ImageIcon, X, Trash2 } from "lucide-react"
+import {
+  ArrowLeft,
+  Upload,
+  VideoIcon,
+  ImageIcon,
+  X,
+  Trash2,
+  LayoutTemplateIcon as LayoutLandscape,
+  LayoutTemplateIcon as LayoutPortrait,
+} from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
@@ -14,10 +23,14 @@ import { CompressionStats } from "@/components/compression-stats"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { uploadThumbnail, uploadVideo, getBusinessMedia, deleteThumbnail } from "@/app/actions/media-actions"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
 
 // Add these constants
 const MAX_VIDEO_SIZE_MB = 50
 const MB_IN_BYTES = 1024 * 1024
+
+type AspectRatio = "16:9" | "9:16"
 
 interface VideoItem {
   id: string
@@ -66,6 +79,7 @@ export default function VideoPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [activeTab, setActiveTab] = useState("upload")
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9")
 
   // For thumbnail handling
   const [selectedThumbnail, setSelectedThumbnail] = useState<File | null>(null)
@@ -81,6 +95,7 @@ export default function VideoPage() {
   const [storedThumbnail, setStoredThumbnail] = useState<{
     url: string
     id: string
+    aspectRatio?: AspectRatio
   } | null>(null)
   const [deletingThumbnail, setDeletingThumbnail] = useState(false)
 
@@ -91,6 +106,7 @@ export default function VideoPage() {
     url: string
     id: string
     contentType: string
+    aspectRatio?: AspectRatio
   } | null>(null)
 
   const videoInputRef = useRef<HTMLInputElement>(null)
@@ -108,6 +124,7 @@ export default function VideoPage() {
             setStoredThumbnail({
               url: media.thumbnailUrl,
               id: media.thumbnailId,
+              aspectRatio: (media.aspectRatio as AspectRatio) || "16:9",
             })
             setThumbnailPreview(media.thumbnailUrl)
           }
@@ -118,7 +135,13 @@ export default function VideoPage() {
               url: media.videoUrl,
               id: media.videoId,
               contentType: media.videoContentType || "video/mp4",
+              aspectRatio: (media.aspectRatio as AspectRatio) || "16:9",
             })
+
+            // Set the aspect ratio based on the stored video
+            if (media.aspectRatio) {
+              setAspectRatio(media.aspectRatio as AspectRatio)
+            }
           }
         }
       } catch (error) {
@@ -206,6 +229,7 @@ export default function VideoPage() {
       const formData = new FormData()
       formData.append("businessId", BUSINESS_ID)
       formData.append("thumbnail", selectedThumbnail)
+      formData.append("aspectRatio", aspectRatio)
 
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -224,6 +248,7 @@ export default function VideoPage() {
         setStoredThumbnail({
           url: result.url,
           id: result.id,
+          aspectRatio,
         })
 
         toast({
@@ -294,6 +319,7 @@ export default function VideoPage() {
       // Create form data for upload
       const formData = new FormData()
       formData.append("businessId", BUSINESS_ID)
+      formData.append("aspectRatio", aspectRatio)
 
       // Use a new blob with explicit type to ensure proper serialization
       const videoBlob = new Blob([await selectedVideo.arrayBuffer()], {
@@ -331,6 +357,7 @@ export default function VideoPage() {
           url: result.url,
           id: result.id,
           contentType: result.contentType,
+          aspectRatio,
         })
 
         toast({
@@ -461,6 +488,11 @@ export default function VideoPage() {
     }
   }
 
+  // Get the appropriate aspect ratio class for the video/thumbnail container
+  const getAspectRatioClass = () => {
+    return aspectRatio === "16:9" ? "aspect-video" : "aspect-[9/16]"
+  }
+
   return (
     <div className="container max-w-6xl py-8">
       <div className="flex items-center mb-6">
@@ -479,6 +511,36 @@ export default function VideoPage() {
         </TabsList>
 
         <TabsContent value="upload">
+          {/* Aspect Ratio Selector */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Video Orientation</CardTitle>
+              <CardDescription>Select the aspect ratio for your video</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={aspectRatio}
+                onValueChange={(value) => setAspectRatio(value as AspectRatio)}
+                className="flex flex-col sm:flex-row gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="16:9" id="landscape" />
+                  <Label htmlFor="landscape" className="flex items-center gap-2 cursor-pointer">
+                    <LayoutLandscape className="h-5 w-5" />
+                    <span>Landscape (16:9)</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="9:16" id="portrait" />
+                  <Label htmlFor="portrait" className="flex items-center gap-2 cursor-pointer">
+                    <LayoutPortrait className="h-5 w-5" />
+                    <span>Vertical (9:16)</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </CardContent>
+          </Card>
+
           <div className="grid md:grid-cols-2 gap-6">
             {/* Thumbnail Upload */}
             <Card>
@@ -501,7 +563,7 @@ export default function VideoPage() {
                       </AlertDescription>
                     </Alert>
                     <div
-                      className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+                      className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors ${getAspectRatioClass()}`}
                       onClick={() => thumbnailInputRef.current?.click()}
                     >
                       <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
@@ -519,11 +581,13 @@ export default function VideoPage() {
                 ) : (
                   <div className="space-y-4">
                     <div className="relative">
-                      <img
-                        src={thumbnailPreview || "/placeholder.svg"}
-                        alt="Thumbnail preview"
-                        className="w-full h-auto rounded-lg object-cover aspect-video"
-                      />
+                      <div className={`w-full overflow-hidden rounded-lg ${getAspectRatioClass()}`}>
+                        <img
+                          src={thumbnailPreview || "/placeholder.svg"}
+                          alt="Thumbnail preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                       {/* Show different buttons based on whether this is a stored thumbnail or a new one */}
                       {storedThumbnail && !selectedThumbnail ? (
                         <Button
@@ -564,6 +628,10 @@ export default function VideoPage() {
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Size:</span>
                             <span className="font-medium">{formatFileSize(selectedThumbnail.size)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Aspect Ratio:</span>
+                            <span className="font-medium">{aspectRatio}</span>
                           </div>
                         </div>
 
@@ -617,7 +685,7 @@ export default function VideoPage() {
               <CardContent>
                 {!videoPreview ? (
                   <div
-                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+                    className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors ${getAspectRatioClass()}`}
                     onClick={() => videoInputRef.current?.click()}
                   >
                     <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
@@ -634,12 +702,14 @@ export default function VideoPage() {
                 ) : (
                   <div className="space-y-4">
                     <div className="relative">
-                      <video
-                        src={videoPreview}
-                        controls
-                        className="w-full h-auto rounded-lg"
-                        poster={thumbnailPreview || undefined}
-                      />
+                      <div className={`w-full overflow-hidden rounded-lg ${getAspectRatioClass()}`}>
+                        <video
+                          src={videoPreview}
+                          controls
+                          className="w-full h-full object-cover"
+                          poster={thumbnailPreview || undefined}
+                        />
+                      </div>
                       {selectedVideo && (
                         <Button
                           variant="destructive"
@@ -670,6 +740,10 @@ export default function VideoPage() {
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Type:</span>
                           <span className="font-medium">{selectedVideo.type}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Aspect Ratio:</span>
+                          <span className="font-medium">{aspectRatio}</span>
                         </div>
                       </div>
                     )}
@@ -708,7 +782,8 @@ export default function VideoPage() {
               <AlertDescription>
                 <p className="text-sm">
                   <strong>Note:</strong> The thumbnail will be displayed before the video plays and after it ends. For
-                  best results, use an image that represents the content of your video.
+                  best results, use an image that represents the content of your video and matches the selected aspect
+                  ratio.
                 </p>
               </AlertDescription>
             </Alert>
@@ -727,18 +802,26 @@ export default function VideoPage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card className="overflow-hidden">
                 <div className="relative">
-                  <video
-                    src={storedVideo.url}
-                    poster={storedThumbnail?.url}
-                    className="w-full h-auto aspect-video object-cover"
-                    controls
-                  />
+                  <div
+                    className={`w-full overflow-hidden ${storedVideo.aspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-video"}`}
+                  >
+                    <video
+                      src={storedVideo.url}
+                      poster={storedThumbnail?.url}
+                      className="w-full h-full object-cover"
+                      controls
+                    />
+                  </div>
                 </div>
                 <CardContent className="pt-4">
                   <h3 className="font-medium">Your Video</h3>
                   <div className="flex justify-between text-sm mt-1">
                     <span className="text-muted-foreground">Type:</span>
                     <span>{storedVideo.contentType}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-muted-foreground">Aspect Ratio:</span>
+                    <span>{storedVideo.aspectRatio || "16:9"}</span>
                   </div>
                   {storedThumbnail && <div className="mt-2 text-xs text-green-600">Custom thumbnail added</div>}
                 </CardContent>
