@@ -466,6 +466,29 @@ export default function VideoPage() {
     }
   }
 
+  // Handle video removal
+  const handleRemoveVideo = () => {
+    setSelectedVideo(null)
+    setVideoPreview(null)
+    if (videoInputRef.current) videoInputRef.current.value = ""
+
+    toast({
+      title: "Video removed",
+      description: "The video has been removed. You can select a new one.",
+    })
+  }
+
+  // Handle stored video removal
+  const handleRemoveStoredVideo = () => {
+    setStoredVideo(null)
+    setVideoPreview(null)
+
+    toast({
+      title: "Video removed",
+      description: "Your video has been removed from the library.",
+    })
+  }
+
   // Handle upload of both video and thumbnail
   const handleUpload = async () => {
     // First upload the thumbnail if selected
@@ -490,7 +513,7 @@ export default function VideoPage() {
 
   // Get the appropriate aspect ratio class for the video/thumbnail container
   const getAspectRatioClass = () => {
-    return aspectRatio === "16:9" ? "aspect-video" : "aspect-[9/16]"
+    return aspectRatio === "16:9" ? "aspect-video w-full" : "aspect-[9/16] w-full max-w-[280px] mx-auto"
   }
 
   return (
@@ -758,11 +781,17 @@ export default function VideoPage() {
                   </div>
                 )}
               </CardContent>
-              <CardFooter className="flex justify-end">
+              <CardFooter className="flex justify-between gap-2">
                 {selectedVideo && (
-                  <Button onClick={handleVideoUpload} disabled={isUploading} className="w-full">
-                    {isUploading ? "Uploading..." : "Upload Video"}
-                  </Button>
+                  <>
+                    <Button variant="outline" onClick={handleRemoveVideo} disabled={isUploading} className="flex-1">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remove Video
+                    </Button>
+                    <Button onClick={handleVideoUpload} disabled={isUploading} className="flex-1">
+                      {isUploading ? "Uploading..." : "Upload Video"}
+                    </Button>
+                  </>
                 )}
               </CardFooter>
 
@@ -803,7 +832,11 @@ export default function VideoPage() {
               <Card className="overflow-hidden">
                 <div className="relative">
                   <div
-                    className={`w-full overflow-hidden ${storedVideo.aspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-video"}`}
+                    className={`overflow-hidden ${
+                      storedVideo.aspectRatio === "9:16"
+                        ? "aspect-[9/16] w-full max-w-[280px] mx-auto"
+                        : "aspect-video w-full"
+                    }`}
                   >
                     <video
                       src={storedVideo.url}
@@ -825,6 +858,12 @@ export default function VideoPage() {
                   </div>
                   {storedThumbnail && <div className="mt-2 text-xs text-green-600">Custom thumbnail added</div>}
                 </CardContent>
+                <CardFooter>
+                  <Button variant="outline" onClick={handleRemoveStoredVideo} className="w-full flex items-center">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Remove Video
+                  </Button>
+                </CardFooter>
               </Card>
             </div>
           )}
