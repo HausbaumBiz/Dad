@@ -31,36 +31,36 @@ interface VideoItem {
 // Mock business ID for demo purposes - in a real app, this would come from authentication
 const BUSINESS_ID = "demo-business-123"
 
-// Add this function near the top of the component:
+export default function VideoPage() {
+  const { toast } = useToast()
 
-const checkBlobConfig = async () => {
-  try {
-    const response = await fetch("/api/verify-blob-config")
-    const data = await response.json()
+  // Move the checkBlobConfig function inside the component
+  const checkBlobConfig = async () => {
+    try {
+      const response = await fetch("/api/verify-blob-config")
+      const data = await response.json()
 
-    if (data.success) {
+      if (data.success) {
+        toast({
+          title: "Blob storage configured correctly",
+          description: `Found ${data.blobCount} blobs in storage. Token is present.`,
+        })
+      } else {
+        toast({
+          title: "Blob storage configuration issue",
+          description: `Error: ${data.error}. Token present: ${data.hasToken}`,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
       toast({
-        title: "Blob storage configured correctly",
-        description: `Found ${data.blobCount} blobs in storage. Token is present.`,
-      })
-    } else {
-      toast({
-        title: "Blob storage configuration issue",
-        description: `Error: ${data.error}. Token present: ${data.hasToken}`,
+        title: "Failed to check Blob configuration",
+        description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       })
     }
-  } catch (error) {
-    toast({
-      title: "Failed to check Blob configuration",
-      description: error instanceof Error ? error.message : "Unknown error",
-      variant: "destructive",
-    })
   }
-}
 
-export default function VideoPage() {
-  const { toast } = useToast()
   const [videos, setVideos] = useState<VideoItem[]>([])
   const [currentVideo, setCurrentVideo] = useState<VideoItem | null>(null)
   const [isUploading, setIsUploading] = useState(false)

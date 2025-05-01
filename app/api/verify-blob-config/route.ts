@@ -1,33 +1,54 @@
+import { put, list } from "@vercel/blob"
 import { NextResponse } from "next/server"
-import { list } from "@vercel/blob"
 
 export async function GET() {
   try {
-    // Try to list blobs to verify the configuration
-    const result = await list()
+    // Check if we have a token
+    const hasToken = !!process.env.BLOB_READ_WRITE_TOKEN
 
-    return NextResponse.json({
-      success: true,
-      message: "Blob storage configuration is valid",
-      blobCount: result.blobs.length,
-      hasToken: !!process.env.BLOB_READ_WRITE_TOKEN,
-    })
-  } catch (error) {
-    console.error("Error verifying Blob storage configuration:", error)
-
-    let errorMessage = "Unknown error"
-    if (error instanceof Error) {
-      errorMessage = error.message
+    if (!hasToken) {
+      return NextResponse.json({
+        success: false,
+        error: "BLOB_READ_WRITE_TOKEN is not set",
+        hasToken: false,
+        blobCount: 0,
+      })
     }
 
-    return NextResponse.json(
-      {
+    // Try to list blobs to verify access
+    try {
+      // Create a test path that's unique to this verification
+      const testPath = `verify-blob-config-${Date.now()}.txt`
+
+      // Try to put a small test blob
+      await put(testPath, "Test content", {
+        access: "public",
+      })
+
+      // List blobs to count them
+      const { blobs } = await list()
+
+      return NextResponse.json({
+        success: true,
+        hasToken: true,
+        blobCount: blobs.length,
+      })
+    } catch (blobError) {
+      console.error("Blob operation error:", blobError)
+      return NextResponse.json({
         success: false,
-        error: errorMessage,
-        hasToken: !!process.env.BLOB_READ_WRITE_TOKEN,
-        tokenLength: process.env.BLOB_READ_WRITE_TOKEN ? process.env.BLOB_READ_WRITE_TOKEN.length : 0,
-      },
-      { status: 500 },
-    )
+        error: blobError instanceof Error ? blobError.message : "Unknown blob operation error",
+        hasToken: true,
+        blobCount: 0,
+      })
+    }
+  } catch (error) {
+    console.error("Verify blob config error:", error)
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      hasToken: false,
+      blobCount: 0,
+    })
   }
 }
