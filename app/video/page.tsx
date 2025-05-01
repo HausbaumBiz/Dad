@@ -31,6 +31,34 @@ interface VideoItem {
 // Mock business ID for demo purposes - in a real app, this would come from authentication
 const BUSINESS_ID = "demo-business-123"
 
+// Add this function near the top of the component:
+
+const checkBlobConfig = async () => {
+  try {
+    const response = await fetch("/api/verify-blob-config")
+    const data = await response.json()
+
+    if (data.success) {
+      toast({
+        title: "Blob storage configured correctly",
+        description: `Found ${data.blobCount} blobs in storage. Token is present.`,
+      })
+    } else {
+      toast({
+        title: "Blob storage configuration issue",
+        description: `Error: ${data.error}. Token present: ${data.hasToken}`,
+        variant: "destructive",
+      })
+    }
+  } catch (error) {
+    toast({
+      title: "Failed to check Blob configuration",
+      description: error instanceof Error ? error.message : "Unknown error",
+      variant: "destructive",
+    })
+  }
+}
+
 export default function VideoPage() {
   const { toast } = useToast()
   const [videos, setVideos] = useState<VideoItem[]>([])
@@ -267,14 +295,16 @@ export default function VideoPage() {
       const formData = new FormData()
       formData.append("businessId", BUSINESS_ID)
 
-      // Use a new blob to ensure the file is properly serialized
-      const videoBlob = new Blob([await selectedVideo.arrayBuffer()], { type: selectedVideo.type })
+      // Use a new blob with explicit type to ensure proper serialization
+      const videoBlob = new Blob([await selectedVideo.arrayBuffer()], {
+        type: selectedVideo.type || "video/mp4",
+      })
       formData.append("video", videoBlob, selectedVideo.name)
 
       // Add design ID if needed
       formData.append("designId", "default-design")
 
-      // Log the form data contents
+      // Log the form data contents for debugging
       console.log("Form data created with keys:", [...formData.keys()])
       console.log(
         "Video blob size in form:",
@@ -554,12 +584,18 @@ export default function VideoPage() {
             {/* Video Upload */}
             <Card>
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <VideoIcon className="h-5 w-5" />
-                  <div>
-                    <CardTitle>Upload Video</CardTitle>
-                    <CardDescription>Select a video file to upload</CardDescription>
+                {/* Add this button in the CardHeader of the Video Upload card: */}
+                <div className="flex justify-between items-center w-full">
+                  <div className="flex items-center gap-2">
+                    <VideoIcon className="h-5 w-5" />
+                    <div>
+                      <CardTitle>Upload Video</CardTitle>
+                      <CardDescription>Select a video file to upload</CardDescription>
+                    </div>
                   </div>
+                  <Button variant="outline" size="sm" onClick={checkBlobConfig} className="text-xs">
+                    Check Storage
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>

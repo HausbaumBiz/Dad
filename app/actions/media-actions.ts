@@ -153,7 +153,7 @@ export async function uploadVideo(formData: FormData) {
         const blobOptions = {
           access: "public",
           addRandomSuffix: false,
-          contentType: contentType,
+          contentType: contentType || "video/mp4", // Ensure we always have a content type
         }
 
         console.log("Blob upload options:", blobOptions)
@@ -163,6 +163,26 @@ export async function uploadVideo(formData: FormData) {
         console.log("Video upload successful:", blob)
       } catch (blobError) {
         console.error("Blob upload error details:", blobError)
+
+        // Add more detailed error logging
+        if (blobError instanceof Error) {
+          console.error("Error name:", blobError.name)
+          console.error("Error message:", blobError.message)
+          console.error("Error stack:", blobError.stack)
+        }
+
+        // Check if the error is related to the Vercel Blob token
+        if (
+          blobError instanceof Error &&
+          (blobError.message.includes("token") ||
+            blobError.message.includes("unauthorized") ||
+            blobError.message.includes("permission"))
+        ) {
+          return {
+            success: false,
+            error: "Blob storage authentication failed. Please check your BLOB_READ_WRITE_TOKEN environment variable.",
+          }
+        }
 
         // Try to get more details about the error
         if (blobError instanceof Error) {
