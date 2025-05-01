@@ -365,6 +365,22 @@ export default function VideoPage() {
         console.error("Error message:", error.message)
         console.error("Error stack:", error.stack)
         errorMessage = `Error: ${error.message}`
+      } else if (typeof error === "object" && error !== null) {
+        // Try to extract more information from the error object
+        console.error("Error object:", JSON.stringify(error, null, 2))
+        if ("message" in error) {
+          errorMessage = `Error: ${(error as any).message}`
+        }
+      }
+
+      // Check if the error message contains "Request Entity Too Large"
+      if (
+        typeof errorMessage === "string" &&
+        (errorMessage.includes("Request Entity Too Large") ||
+          errorMessage.includes("Body exceeded") ||
+          errorMessage.includes("413"))
+      ) {
+        errorMessage = `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB.`
       }
 
       toast({

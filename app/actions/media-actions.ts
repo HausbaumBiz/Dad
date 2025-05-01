@@ -129,18 +129,11 @@ export async function uploadVideo(formData: FormData) {
     // Generate a unique filename with timestamp
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 10)
-
-    // Get file extension from content type or default to mp4
-    let extension = "mp4"
-    const contentType = videoFile.type || "video/mp4"
-    if (contentType) {
-      const match = contentType.match(/\/([a-zA-Z0-9]+)$/)
-      if (match && match[1]) {
-        extension = match[1]
-      }
-    }
-
+    const extension = "mp4" // Default to mp4 if we can't determine the extension
     const filename = `${businessId}/videos/${timestamp}-${randomString}.${extension}`
+
+    // Ensure we have a valid content type
+    const contentType = videoFile.type || `video/${extension}`
 
     console.log(`Generated filename: ${filename}`)
 
@@ -160,7 +153,7 @@ export async function uploadVideo(formData: FormData) {
         const blobOptions = {
           access: "public",
           addRandomSuffix: false,
-          contentType: contentType,
+          contentType: contentType || "video/mp4", // Ensure we always have a content type
         }
 
         console.log("Blob upload options:", blobOptions)
@@ -171,18 +164,48 @@ export async function uploadVideo(formData: FormData) {
       } catch (blobError) {
         console.error("Blob upload error details:", blobError)
 
+        // Add more detailed error logging
+        if (blobError instanceof Error) {
+          console.error("Error name:", blobError.name)
+          console.error("Error message:", blobError.message)
+          console.error("Error stack:", blobError.stack)
+        }
+
+        // Check if the error is related to the Vercel Blob token
+        if (
+          blobError instanceof Error &&
+          (blobError.message.includes("token") ||
+            blobError.message.includes("unauthorized") ||
+            blobError.message.includes("permission"))
+        ) {
+          return {
+            success: false,
+            error: "Blob storage authentication failed. Please check your BLOB_READ_WRITE_TOKEN environment variable.",
+          }
+        }
+
+        // Try to get more details about the error
+        if (blobError instanceof Error) {
+          console.error("Error name:", blobError.name)
+          console.error("Error message:", blobError.message)
+          console.error("Error stack:", blobError.stack)
+        }
+
         // Check if the error is a Response object
-        if (blobError instanceof Response) {
-          const status = blobError.status
-          const statusText = blobError.statusText
+        if (
+          blobError instanceof Response ||
+          (typeof blobError === "object" && blobError !== null && "text" in blobError)
+        ) {
+          const status = blobError instanceof Response ? blobError.status : "unknown"
+          const statusText = blobError instanceof Response ? blobError.statusText : "unknown"
           console.error(`Response status: ${status} ${statusText}`)
 
           try {
             // Try to get the response text without parsing as JSON
-            const errorText = await blobError.text()
+            const errorText = await (blobError as Response).text()
             console.error("Response error text:", errorText)
 
-            // Check for specific error messages
+            // Check if it contains "Request Entity Too Large"
             if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
               return {
                 success: false,
@@ -190,17 +213,10 @@ export async function uploadVideo(formData: FormData) {
               }
             }
 
-            if (errorText.includes("Unauthorized") || errorText.includes("Invalid token")) {
-              return {
-                success: false,
-                error:
-                  "Blob storage authentication failed. Please check your BLOB_READ_WRITE_TOKEN environment variable.",
-              }
-            }
-
+            // For other error messages
             return {
               success: false,
-              error: `Blob upload failed: ${errorText.substring(0, 100)}...`,
+              error: `Upload failed: ${errorText.substring(0, 100)}...`,
             }
           } catch (textError) {
             console.error("Error getting response text:", textError)
@@ -346,25 +362,19 @@ export async function uploadThumbnail(formData: FormData) {
         console.error("Blob upload error details:", blobError)
 
         // Handle Response object error (Request Entity Too Large)
-        if (blobError instanceof Response) {
+        if (
+          blobError instanceof Response ||
+          (typeof blobError === "object" && blobError !== null && "text" in blobError)
+        ) {
           try {
-            // Try to get the response text without parsing as JSON
-            const errorText = await blobError.text()
-            console.error("Response error text:", errorText)
+            // Try to get the response text
+            const errorText = await (blobError as Response).text()
 
-            // Check for specific error messages
+            // Check if it contains "Request Entity Too Large"
             if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
               return {
                 success: false,
                 error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
-              }
-            }
-
-            if (errorText.includes("Unauthorized") || errorText.includes("Invalid token")) {
-              return {
-                success: false,
-                error:
-                  "Blob storage authentication failed. Please check your BLOB_READ_WRITE_TOKEN environment variable.",
               }
             }
 
@@ -565,25 +575,19 @@ export async function uploadPhoto(formData: FormData) {
         console.error("Blob upload error details:", blobError)
 
         // Handle Response object error (Request Entity Too Large)
-        if (blobError instanceof Response) {
+        if (
+          blobError instanceof Response ||
+          (typeof blobError === "object" && blobError !== null && "text" in blobError)
+        ) {
           try {
-            // Try to get the response text without parsing as JSON
-            const errorText = await blobError.text()
-            console.error("Response error text:", errorText)
+            // Try to get the response text
+            const errorText = await (blobError as Response).text()
 
-            // Check for specific error messages
+            // Check if it contains "Request Entity Too Large"
             if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
               return {
                 success: false,
                 error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
-              }
-            }
-
-            if (errorText.includes("Unauthorized") || errorText.includes("Invalid token")) {
-              return {
-                success: false,
-                error:
-                  "Blob storage authentication failed. Please check your BLOB_READ_WRITE_TOKEN environment variable.",
               }
             }
 
