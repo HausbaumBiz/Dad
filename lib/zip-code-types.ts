@@ -11,6 +11,7 @@ export interface ZipCodeData {
   county?: string
   timezone?: string
   population?: number
+  distance?: number // Added for radius search results
 }
 
 export interface ZipCodeSearchParams {

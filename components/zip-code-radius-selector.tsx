@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, X, Search } from "lucide-react"
 import type { ZipCodeData } from "@/lib/zip-code-types"
+import { useToast } from "@/components/ui/use-toast"
 
 interface ZipCodeRadiusSelectorProps {
   onZipCodesSelected?: (zipCodes: ZipCodeData[]) => void
@@ -33,6 +34,7 @@ export function ZipCodeRadiusSelector({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [zipDetails, setZipDetails] = useState<ZipCodeData | null>(null)
+  const { toast } = useToast()
 
   // Notify parent component when ZIP codes change
   useEffect(() => {
@@ -53,24 +55,25 @@ export function ZipCodeRadiusSelector({
     setError(null)
 
     try {
-      // First validate the ZIP code
-      const detailsResponse = await fetch(`/api/zip-codes/search?zip=${zipCode}`)
-
-      if (!detailsResponse.ok) {
-        throw new Error("Invalid ZIP code. Please enter a valid 5-digit ZIP code.")
-      }
-
-      const detailsData = await detailsResponse.json()
-      setZipDetails(detailsData.zipCode)
-
-      // Then find ZIP codes within the radius
-      const response = await fetch(`/api/zip-codes/search?zip=${zipCode}&radius=${radius}&limit=${maxResults}`)
+      // Use our new ZipCodeAPI.com integration
+      const response = await fetch(`/api/zip-codes/zipcode-api?zip=${zipCode}&radius=${radius}`)
 
       if (!response.ok) {
-        throw new Error("Failed to find ZIP codes in this radius. Please try again.")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to find ZIP codes in this radius. Please try again.")
       }
 
       const data = await response.json()
+
+      if (!data.zipCodes || !Array.isArray(data.zipCodes)) {
+        throw new Error("Invalid response from ZIP code search")
+      }
+
+      // Set the first result as the ZIP details (the center ZIP code)
+      if (data.zipCodes.length > 0) {
+        const centerZip = data.zipCodes.find((z) => z.zip === zipCode) || data.zipCodes[0]
+        setZipDetails(centerZip)
+      }
 
       // Add the results to the existing results (avoiding duplicates)
       setZipResults((prevResults) => {
@@ -81,11 +84,26 @@ export function ZipCodeRadiusSelector({
 
       // Clear the input
       setZipCode("")
+
+      toast({
+        title: "ZIP Codes Found",
+        description: `Found ${data.zipCodes.length} ZIP codes within ${radius} miles of ${zipCode}`,
+      })
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message)
+        toast({
+          title: "Error",
+          description: err.message,
+          variant: "destructive",
+        })
       } else {
         setError("An error occurred while searching for ZIP codes")
+        toast({
+          title: "Error",
+          description: "An error occurred while searching for ZIP codes",
+          variant: "destructive",
+        })
       }
     } finally {
       setIsLoading(false)
@@ -159,8 +177,11 @@ export function ZipCodeRadiusSelector({
             <Input
               type="number"
               id="radius"
-              value={radius}
-              onChange={(e) => setRadius(Number(e.target.value))}
+              value={radius.toString()}
+              onChange={(e) => {
+                const val = e.target.value === "" ? defaultRadius : Number(e.target.value)
+                setRadius(isNaN(val) ? defaultRadius : val)
+              }}
               disabled={isNationwide}
               className="w-20 text-center"
               min={5}
@@ -182,6 +203,7 @@ export function ZipCodeRadiusSelector({
                       {zip.city && zip.state && (
                         <span className="text-xs text-gray-500 block">
                           {zip.city}, {zip.state}
+                          {zip.distance !== undefined && <span className="ml-1">({zip.distance.toFixed(1)} mi)</span>}
                         </span>
                       )}
                     </div>
