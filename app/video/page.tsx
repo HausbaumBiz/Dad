@@ -14,6 +14,7 @@ import {
   Trash2,
   LayoutTemplateIcon as LayoutLandscape,
   LayoutTemplateIcon as LayoutPortrait,
+  SliceIcon as ChunksIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
@@ -25,10 +26,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { uploadThumbnail, uploadVideo, getBusinessMedia, deleteThumbnail } from "@/app/actions/media-actions"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
+import { useChunkedUpload } from "@/hooks/use-chunked-upload"
+import { Switch } from "@/components/ui/switch"
 
 // Add these constants
 const MAX_VIDEO_SIZE_MB = 50
+const MAX_CHUNKED_VIDEO_SIZE_MB = 500 // 500MB limit for chunked uploads
 const MB_IN_BYTES = 1024 * 1024
+const DEFAULT_CHUNK_SIZE_MB = 5
 
 type AspectRatio = "16:9" | "9:16"
 
@@ -80,6 +85,8 @@ export default function VideoPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [activeTab, setActiveTab] = useState("upload")
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9")
+  const [useChunkedUploading, setUseChunkedUploading] = useState(true)
+  const [chunkSizeMB, setChunkSizeMB] = useState(DEFAULT_CHUNK_SIZE_MB)
 
   // For thumbnail handling
   const [selectedThumbnail, setSelectedThumbnail] = useState<File | null>(null)
@@ -108,6 +115,61 @@ export default function VideoPage() {
     contentType: string
     aspectRatio?: AspectRatio
   } | null>(null)
+
+  // Chunked upload state
+  const {
+    uploadFile,
+    cancelUpload,
+    isUploading: isChunkUploading,
+    progress: chunkProgress,
+    error: chunkError,
+    uploadedChunks,
+    totalChunks,
+  } = useChunkedUpload({
+    chunkSize: chunkSizeMB * MB_IN_BYTES,
+    onProgress: (progress) => {
+      setUploadProgress(progress)
+    },
+    onChunkComplete: (chunkIndex, totalChunks) => {
+      toast({
+        title: `Chunk ${chunkIndex + 1} of ${totalChunks} uploaded`,
+        description: `Upload progress: ${Math.round(((chunkIndex + 1) / totalChunks) * 100)}%`,
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      })
+      setIsUploading(false)
+    },
+    onComplete: (result) => {
+      if (result.success) {
+        setStoredVideo({
+          url: result.url,
+          id: result.id,
+          contentType: result.contentType,
+          aspectRatio,
+        })
+
+        toast({
+          title: "Video uploaded successfully",
+          description: "Your video has been saved and will be available when you return",
+        })
+
+        // Reset the form
+        setSelectedVideo(null)
+        if (videoInputRef.current) videoInputRef.current.value = ""
+
+        // Keep the preview showing the stored video
+        setVideoPreview(result.url)
+
+        // Switch to library tab
+        setActiveTab("library")
+      }
+    },
+  })
 
   const videoInputRef = useRef<HTMLInputElement>(null)
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
@@ -201,6 +263,20 @@ export default function VideoPage() {
   const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    // Check file size based on upload method
+    const fileSizeMB = file.size / MB_IN_BYTES
+    const maxSize = useChunkedUploading ? MAX_CHUNKED_VIDEO_SIZE_MB : MAX_VIDEO_SIZE_MB
+
+    if (fileSizeMB > maxSize) {
+      toast({
+        title: "File too large",
+        description: `Video file size (${fileSizeMB.toFixed(2)}MB) exceeds the ${maxSize}MB limit.`,
+        variant: "destructive",
+      })
+      if (videoInputRef.current) videoInputRef.current.value = ""
+      return
+    }
 
     setSelectedVideo(file)
     const url = await createPreviewUrl(file)
@@ -299,129 +375,130 @@ export default function VideoPage() {
     const fileSizeMB = selectedVideo.size / MB_IN_BYTES
     console.log(`Uploading video: ${selectedVideo.name}, Size: ${fileSizeMB.toFixed(2)}MB, Type: ${selectedVideo.type}`)
 
-    if (fileSizeMB > MAX_VIDEO_SIZE_MB) {
+    const maxSize = useChunkedUploading ? MAX_CHUNKED_VIDEO_SIZE_MB : MAX_VIDEO_SIZE_MB
+    if (fileSizeMB > maxSize) {
       toast({
         title: "File too large",
-        description: `Video file size (${fileSizeMB.toFixed(2)}MB) exceeds the ${MAX_VIDEO_SIZE_MB}MB limit.`,
+        description: `Video file size (${fileSizeMB.toFixed(2)}MB) exceeds the ${maxSize}MB limit.`,
         variant: "destructive",
       })
       return
     }
 
     setIsUploading(true)
-    setUploadProgress(10) // Start progress
+    setUploadProgress(0)
 
     try {
-      // Create a simple blob from the file to test if it's valid
-      const testBlob = new Blob([selectedVideo], { type: selectedVideo.type })
-      console.log("Test blob created:", testBlob.size, testBlob.type)
-
-      // Create form data for upload
-      const formData = new FormData()
-      formData.append("businessId", BUSINESS_ID)
-      formData.append("aspectRatio", aspectRatio)
-
-      // Use a new blob with explicit type to ensure proper serialization
-      const videoBlob = new Blob([await selectedVideo.arrayBuffer()], {
-        type: selectedVideo.type || "video/mp4",
-      })
-      formData.append("video", videoBlob, selectedVideo.name)
-
-      // Add design ID if needed
-      formData.append("designId", "default-design")
-
-      // Log the form data contents for debugging
-      console.log("Form data created with keys:", [...formData.keys()])
-      console.log(
-        "Video blob size in form:",
-        formData.get("video") instanceof Blob ? (formData.get("video") as Blob).size : "Not a blob",
-      )
-
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          const newProgress = prev + Math.random() * 10
-          return newProgress >= 90 ? 90 : newProgress
-        })
-      }, 500)
-
-      // Upload the video
-      console.log("Starting video upload in page component...")
-      const result = await uploadVideo(formData)
-      console.log("Upload result from page:", result)
-      clearInterval(progressInterval)
-
-      if (result.success) {
-        setUploadProgress(100)
-        setStoredVideo({
-          url: result.url,
-          id: result.id,
-          contentType: result.contentType,
-          aspectRatio,
-        })
-
+      if (useChunkedUploading) {
+        // Use chunked upload
         toast({
-          title: "Video uploaded",
-          description: "Your video has been saved and will be available when you return",
+          title: "Starting chunked upload",
+          description: `File will be split into ${Math.ceil(selectedVideo.size / (chunkSizeMB * MB_IN_BYTES))} chunks`,
         })
 
-        // Reset the form
-        setSelectedVideo(null)
-        if (videoInputRef.current) videoInputRef.current.value = ""
-
-        // Keep the preview showing the stored video
-        setVideoPreview(result.url)
-
-        // Switch to library tab
-        setActiveTab("library")
+        await uploadFile(selectedVideo, BUSINESS_ID, aspectRatio)
       } else {
-        console.error("Video upload error result:", result)
-        toast({
-          title: "Upload failed",
-          description: result.error || "There was an error uploading your video",
-          variant: "destructive",
-        })
-        setUploadProgress(0)
-      }
-    } catch (error) {
-      console.error("Error in video upload:", error)
-      let errorMessage = "There was an error uploading your video"
+        // Use regular upload
+        // Create form data for upload
+        const formData = new FormData()
+        formData.append("businessId", BUSINESS_ID)
+        formData.append("aspectRatio", aspectRatio)
+        formData.append("video", selectedVideo, selectedVideo.name)
 
-      if (error instanceof Error) {
-        console.error("Error name:", error.name)
-        console.error("Error message:", error.message)
-        console.error("Error stack:", error.stack)
-        errorMessage = `Error: ${error.message}`
-      } else if (typeof error === "object" && error !== null) {
-        // Try to extract more information from the error object
-        console.error("Error object:", JSON.stringify(error, null, 2))
-        if ("message" in error) {
-          errorMessage = `Error: ${(error as any).message}`
+        // Simulate progress
+        const progressInterval = setInterval(() => {
+          setUploadProgress((prev) => {
+            const newProgress = prev + Math.random() * 10
+            return newProgress >= 90 ? 90 : newProgress
+          })
+        }, 500)
+
+        // Upload the video with error handling
+        console.log("Starting regular video upload...")
+
+        try {
+          const result = await uploadVideo(formData)
+          console.log("Upload result:", result)
+
+          clearInterval(progressInterval)
+
+          if (result.success) {
+            setUploadProgress(100)
+            setStoredVideo({
+              url: result.url,
+              id: result.id,
+              contentType: result.contentType,
+              aspectRatio,
+            })
+
+            toast({
+              title: "Video uploaded",
+              description: "Your video has been saved and will be available when you return",
+            })
+
+            // Reset the form
+            setSelectedVideo(null)
+            if (videoInputRef.current) videoInputRef.current.value = ""
+
+            // Keep the preview showing the stored video
+            setVideoPreview(result.url)
+
+            // Switch to library tab
+            setActiveTab("library")
+          } else {
+            console.error("Video upload failed:", result.error)
+            toast({
+              title: "Upload failed",
+              description: result.error || "There was an error uploading your video",
+              variant: "destructive",
+            })
+            setUploadProgress(0)
+          }
+        } catch (uploadError) {
+          clearInterval(progressInterval)
+          console.error("Error during upload:", uploadError)
+
+          // Check if the error message contains "Request Entity Too Large"
+          let errorMessage = "An error occurred during upload"
+
+          if (uploadError instanceof Error) {
+            errorMessage = uploadError.message
+
+            // Check for specific error patterns
+            if (
+              errorMessage.includes("Request Entity Too Large") ||
+              errorMessage.includes("413") ||
+              errorMessage.includes("too large") ||
+              (errorMessage.includes("Unexpected token") && errorMessage.includes("Request"))
+            ) {
+              errorMessage = `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB or use chunked upload.`
+            }
+          }
+
+          toast({
+            title: "Upload failed",
+            description: errorMessage,
+            variant: "destructive",
+          })
+          setUploadProgress(0)
         }
       }
-
-      // Check if the error message contains "Request Entity Too Large"
-      if (
-        typeof errorMessage === "string" &&
-        (errorMessage.includes("Request Entity Too Large") ||
-          errorMessage.includes("Body exceeded") ||
-          errorMessage.includes("413"))
-      ) {
-        errorMessage = `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB.`
-      }
-
+    } catch (error) {
+      console.error("Unexpected error in video upload:", error)
       toast({
         title: "Upload failed",
-        description: errorMessage,
+        description: "An unexpected error occurred during upload. Please try again with a smaller file.",
         variant: "destructive",
       })
       setUploadProgress(0)
     } finally {
-      setIsUploading(false)
+      if (!useChunkedUploading) {
+        setIsUploading(false)
+      }
     }
   }
 
-  // Handle thumbnail deletion - FIXED to use the new deleteThumbnail function
+  // Handle thumbnail deletion
   const handleDeleteThumbnail = async () => {
     if (!storedThumbnail) {
       console.log("No stored thumbnail to delete")
@@ -468,14 +545,33 @@ export default function VideoPage() {
 
   // Handle video removal
   const handleRemoveVideo = () => {
-    setSelectedVideo(null)
-    setVideoPreview(null)
-    if (videoInputRef.current) videoInputRef.current.value = ""
+    // If there's a selected video (not yet uploaded), clear it
+    if (selectedVideo) {
+      setSelectedVideo(null)
+      if (videoInputRef.current) videoInputRef.current.value = ""
 
-    toast({
-      title: "Video removed",
-      description: "The video has been removed. You can select a new one.",
-    })
+      // If there's a stored video, show that instead
+      if (storedVideo) {
+        setVideoPreview(storedVideo.url)
+      } else {
+        setVideoPreview(null)
+      }
+
+      toast({
+        title: "Video removed",
+        description: "The video has been removed. You can select a new one.",
+      })
+    }
+    // If there's a stored video (already uploaded), clear that
+    else if (storedVideo) {
+      setStoredVideo(null)
+      setVideoPreview(null)
+
+      toast({
+        title: "Video removed",
+        description: "Your video has been removed from the library.",
+      })
+    }
   }
 
   // Handle stored video removal
@@ -489,26 +585,16 @@ export default function VideoPage() {
     })
   }
 
-  // Handle upload of both video and thumbnail
-  const handleUpload = async () => {
-    // First upload the thumbnail if selected
-    if (selectedThumbnail) {
-      await handleThumbnailUpload()
-    }
+  // Handle canceling chunked upload
+  const handleCancelUpload = () => {
+    cancelUpload()
+    setIsUploading(false)
+    setUploadProgress(0)
 
-    // Then upload the video if selected
-    if (selectedVideo) {
-      await handleVideoUpload()
-    }
-
-    // If neither is selected, show an error
-    if (!selectedThumbnail && !selectedVideo) {
-      toast({
-        title: "No files selected",
-        description: "Please select a video or thumbnail to upload",
-        variant: "destructive",
-      })
-    }
+    toast({
+      title: "Upload canceled",
+      description: "Video upload has been canceled",
+    })
   }
 
   // Get the appropriate aspect ratio class for the video/thumbnail container
@@ -561,6 +647,53 @@ export default function VideoPage() {
                   </Label>
                 </div>
               </RadioGroup>
+            </CardContent>
+          </Card>
+
+          {/* Chunked Upload Toggle */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Upload Method</CardTitle>
+              <CardDescription>Choose how to upload your video</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="chunked-upload">Chunked Upload</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {useChunkedUploading
+                      ? `Upload larger videos (up to ${MAX_CHUNKED_VIDEO_SIZE_MB}MB) by splitting them into ${chunkSizeMB}MB chunks`
+                      : `Standard upload (max ${MAX_VIDEO_SIZE_MB}MB)`}
+                  </p>
+                </div>
+                <Switch id="chunked-upload" checked={useChunkedUploading} onCheckedChange={setUseChunkedUploading} />
+              </div>
+
+              {useChunkedUploading && (
+                <div className="mt-4">
+                  <Label htmlFor="chunk-size">Chunk Size: {chunkSizeMB}MB</Label>
+                  <input
+                    id="chunk-size"
+                    type="range"
+                    min="1"
+                    max="10"
+                    step="1"
+                    value={chunkSizeMB}
+                    onChange={(e) => setChunkSizeMB(Number.parseInt(e.target.value))}
+                    className="w-full mt-2"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>Smaller (more reliable)</span>
+                    <span>Larger (faster)</span>
+                  </div>
+                </div>
+              )}
+
+              <Alert className="mt-4 bg-blue-50 border-blue-200">
+                <AlertDescription className="text-xs text-blue-700">
+                  Chunked upload is enabled by default for better reliability with larger files and slower connections.
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
 
@@ -691,7 +824,6 @@ export default function VideoPage() {
             {/* Video Upload */}
             <Card>
               <CardHeader>
-                {/* Add this button in the CardHeader of the Video Upload card: */}
                 <div className="flex justify-between items-center w-full">
                   <div className="flex items-center gap-2">
                     <VideoIcon className="h-5 w-5" />
@@ -713,7 +845,9 @@ export default function VideoPage() {
                   >
                     <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground mb-1">Click to select a video file</p>
-                    <p className="text-xs text-muted-foreground">MP4, MOV, WebM up to 50MB</p>
+                    <p className="text-xs text-muted-foreground">
+                      MP4, MOV, WebM up to {useChunkedUploading ? MAX_CHUNKED_VIDEO_SIZE_MB : MAX_VIDEO_SIZE_MB}MB
+                    </p>
                     <input
                       type="file"
                       ref={videoInputRef}
@@ -768,6 +902,15 @@ export default function VideoPage() {
                           <span className="text-muted-foreground">Aspect Ratio:</span>
                           <span className="font-medium">{aspectRatio}</span>
                         </div>
+                        {useChunkedUploading && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Upload Method:</span>
+                            <span className="font-medium flex items-center">
+                              <ChunksIcon className="h-4 w-4 mr-1" />
+                              Chunked ({Math.ceil(selectedVideo.size / (chunkSizeMB * MB_IN_BYTES))} chunks)
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -782,25 +925,42 @@ export default function VideoPage() {
                 )}
               </CardContent>
               <CardFooter className="flex justify-between gap-2">
-                {selectedVideo && (
-                  <>
-                    <Button variant="outline" onClick={handleRemoveVideo} disabled={isUploading} className="flex-1">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Remove Video
-                    </Button>
-                    <Button onClick={handleVideoUpload} disabled={isUploading} className="flex-1">
-                      {isUploading ? "Uploading..." : "Upload Video"}
-                    </Button>
-                  </>
-                )}
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={isUploading ? handleCancelUpload : handleRemoveVideo}
+                    disabled={!selectedVideo && !videoPreview && !isUploading}
+                    className="flex-1"
+                  >
+                    {isUploading ? (
+                      <>
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel Upload
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Remove Video
+                      </>
+                    )}
+                  </Button>
+                  <Button onClick={handleVideoUpload} disabled={isUploading || !selectedVideo} className="flex-1">
+                    {isUploading ? "Uploading..." : "Upload Video"}
+                  </Button>
+                </>
               </CardFooter>
 
               {isUploading && (
                 <div className="px-6 pb-4">
                   <Progress value={uploadProgress} className="h-2" />
-                  <p className="text-xs text-center mt-1 text-muted-foreground">
-                    Uploading... {Math.round(uploadProgress)}%
-                  </p>
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-xs text-muted-foreground">Uploading... {Math.round(uploadProgress)}%</p>
+                    {useChunkedUploading && uploadedChunks > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Chunk {uploadedChunks} of {totalChunks}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </Card>

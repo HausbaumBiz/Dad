@@ -507,16 +507,21 @@ export default function PhotoAlbumPage() {
           </div>
         </CardContent>
 
-        <CardFooter className="flex justify-between">
+        <CardFooter className="flex flex-col sm:flex-row gap-4 sm:justify-between">
           <Button variant="outline" onClick={() => window.history.back()}>
             Back
           </Button>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             {filteredPhotos.length > 0 && (
               <>
                 {isEditMode ? (
-                  <Button onClick={() => savePhotoOrder()} disabled={isSavingOrder} variant="default">
+                  <Button
+                    onClick={() => savePhotoOrder()}
+                    disabled={isSavingOrder}
+                    variant="default"
+                    className="w-full sm:w-auto"
+                  >
                     {isSavingOrder ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
@@ -525,7 +530,7 @@ export default function PhotoAlbumPage() {
                     Save Order
                   </Button>
                 ) : (
-                  <Button onClick={() => setIsEditMode(true)} variant="outline">
+                  <Button onClick={() => setIsEditMode(true)} variant="outline" className="w-full sm:w-auto">
                     <GripVertical className="mr-2 h-4 w-4" />
                     Reorder Photos
                   </Button>
@@ -541,6 +546,7 @@ export default function PhotoAlbumPage() {
                     setCurrentPhotoIndex(0)
                     setIsPreviewOpen(true)
                   }}
+                  className="w-full sm:w-auto"
                 >
                   Preview Photo Album
                 </Button>

@@ -177,6 +177,15 @@ export async function uploadVideo(formData: FormData): Promise<{
       }
     }
 
+    // Check file size
+    const fileSizeMB = video.size / (1024 * 1024)
+    if (fileSizeMB > 50) {
+      return {
+        success: false,
+        error: `Video file size (${fileSizeMB.toFixed(2)}MB) exceeds the 50MB limit.`,
+      }
+    }
+
     // Check if there's an existing video for this business
     const existingMedia = await getBusinessMedia(businessId)
     if (existingMedia?.videoId) {
@@ -189,33 +198,79 @@ export async function uploadVideo(formData: FormData): Promise<{
       }
     }
 
-    // Upload the new video
-    const blob = await put(`videos/${businessId}/${video.name}`, video, {
-      access: "public",
-    })
+    // Upload the new video with proper error handling
+    try {
+      console.log(`Attempting to upload video for business ${businessId}`)
 
-    // Store the video info in Redis
-    const mediaKey = `business:${businessId}:media`
-    await kv.hset(mediaKey, {
-      videoUrl: blob.url,
-      videoId: blob.url,
-      videoContentType: video.type,
-      aspectRatio,
-    })
+      const blob = await put(`videos/${businessId}/${video.name}`, video, {
+        access: "public",
+      })
 
-    revalidatePath("/video")
+      console.log("Video upload successful:", blob)
 
-    return {
-      success: true,
-      url: blob.url,
-      id: blob.url,
-      contentType: video.type,
+      // Store the video info in Redis
+      const mediaKey = `business:${businessId}:media`
+      await kv.hset(mediaKey, {
+        videoUrl: blob.url,
+        videoId: blob.url,
+        videoContentType: video.type,
+        aspectRatio,
+      })
+
+      revalidatePath("/video")
+
+      return {
+        success: true,
+        url: blob.url,
+        id: blob.url,
+        contentType: video.type,
+      }
+    } catch (uploadError) {
+      console.error("Upload error details:", uploadError)
+
+      // Convert the error to a string to avoid JSON parsing issues
+      let errorMessage = "Unknown upload error"
+
+      // Handle Response object errors (like "Request Entity Too Large")
+      if (uploadError instanceof Response) {
+        const status = uploadError.status
+        const statusText = uploadError.statusText
+
+        try {
+          // Try to get the text content without parsing as JSON
+          const errorText = await uploadError.text()
+          console.error(`Response error (${status}): ${errorText}`)
+
+          // Check for specific error messages
+          if (errorText.includes("Request Entity Too Large") || status === 413) {
+            errorMessage = `File is too large for upload. Please reduce the file size to under 50MB or use chunked upload.`
+          } else {
+            errorMessage = `Upload failed with status ${status}: ${statusText}`
+          }
+        } catch (textError) {
+          console.error("Error getting response text:", textError)
+          errorMessage = `Upload failed with status ${status}: ${statusText}`
+        }
+      } else if (uploadError instanceof Error) {
+        errorMessage = uploadError.message
+
+        // Check for specific error messages in the error object
+        if (errorMessage.includes("too large") || errorMessage.includes("exceeds") || errorMessage.includes("413")) {
+          errorMessage = `File is too large for upload. Please reduce the file size to under 50MB or use chunked upload.`
+        }
+      }
+
+      // Return a properly formatted error response
+      return {
+        success: false,
+        error: errorMessage,
+      }
     }
   } catch (error) {
-    console.error("Error uploading video:", error)
+    console.error("Error in uploadVideo function:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? error.message : "Unknown error during video upload",
     }
   }
 }
