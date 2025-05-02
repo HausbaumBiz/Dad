@@ -17,11 +17,26 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { compressImage, formatFileSize, isValidImage, calculateCompressionSavings } from "@/lib/media-utils"
 import { useToast } from "@/components/ui/use-toast"
-import { ChevronLeft, ChevronRight, Upload, ImageIcon, X, Loader2, Tag, GripVertical, Save } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Upload,
+  ImageIcon,
+  X,
+  Loader2,
+  Tag,
+  GripVertical,
+  Save,
+  ArrowUp,
+  ArrowDown,
+  List,
+  Grid,
+} from "lucide-react"
 import { uploadPhoto, getBusinessMedia, deletePhoto, type MediaItem } from "@/app/actions/media-actions"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
 import { Trash2 } from "lucide-react"
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
+import { useMobile } from "@/hooks/use-mobile"
 
 export default function PhotoAlbumPage() {
   const [photos, setPhotos] = useState<MediaItem[]>([])
@@ -37,8 +52,10 @@ export default function PhotoAlbumPage() {
   const [isSavingLabel, setIsSavingLabel] = useState(false)
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  const isMobile = useMobile()
 
   // Fetch the business ID and existing photos when the component mounts
   useEffect(() => {
@@ -109,6 +126,13 @@ export default function PhotoAlbumPage() {
 
     fetchBusinessData()
   }, [toast])
+
+  // When edit mode is enabled and on mobile, switch to list view automatically
+  useEffect(() => {
+    if (isEditMode && isMobile) {
+      setViewMode("list")
+    }
+  }, [isEditMode, isMobile])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -371,6 +395,42 @@ export default function PhotoAlbumPage() {
     }
   }
 
+  // Move a photo up in the list
+  const movePhotoUp = (index: number) => {
+    if (index <= 0) return // Already at the top
+
+    const updatedPhotos = [...photos]
+    const temp = updatedPhotos[index]
+    updatedPhotos[index] = updatedPhotos[index - 1]
+    updatedPhotos[index - 1] = temp
+
+    // Update sortOrder for all items
+    const updatedItems = updatedPhotos.map((item, idx) => ({
+      ...item,
+      sortOrder: idx,
+    }))
+
+    setPhotos(updatedItems)
+  }
+
+  // Move a photo down in the list
+  const movePhotoDown = (index: number) => {
+    if (index >= photos.length - 1) return // Already at the bottom
+
+    const updatedPhotos = [...photos]
+    const temp = updatedPhotos[index]
+    updatedPhotos[index] = updatedPhotos[index + 1]
+    updatedPhotos[index + 1] = temp
+
+    // Update sortOrder for all items
+    const updatedItems = updatedPhotos.map((item, idx) => ({
+      ...item,
+      sortOrder: idx,
+    }))
+
+    setPhotos(updatedItems)
+  }
+
   // Save the photo order to Redis
   const savePhotoOrder = async (photosToSave = photos) => {
     if (!businessId) return
@@ -387,6 +447,10 @@ export default function PhotoAlbumPage() {
       // Exit edit mode if we're in it
       if (isEditMode) {
         setIsEditMode(false)
+        // Reset to grid view if we're not on mobile
+        if (!isMobile) {
+          setViewMode("grid")
+        }
       }
     } catch (error) {
       console.error("Error saving photo order:", error)
@@ -503,7 +567,7 @@ export default function PhotoAlbumPage() {
               />
             </div>
 
-            {renderPhotoGrid()}
+            {renderPhotoContent()}
           </div>
         </CardContent>
 
@@ -534,6 +598,29 @@ export default function PhotoAlbumPage() {
                     <GripVertical className="mr-2 h-4 w-4" />
                     Reorder Photos
                   </Button>
+                )}
+
+                {isEditMode && (
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <Button
+                      variant={viewMode === "list" ? "default" : "outline"}
+                      size="icon"
+                      onClick={() => setViewMode("list")}
+                      className="flex-1 sm:flex-none"
+                      title="List View"
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === "grid" ? "default" : "outline"}
+                      size="icon"
+                      onClick={() => setViewMode("grid")}
+                      className="flex-1 sm:flex-none"
+                      title="Grid View"
+                    >
+                      <Grid className="h-4 w-4" />
+                    </Button>
+                  </div>
                 )}
               </>
             )}
@@ -697,7 +784,7 @@ export default function PhotoAlbumPage() {
     </div>
   )
 
-  function renderPhotoGrid() {
+  function renderPhotoContent() {
     if (filteredPhotos.length === 0) {
       return (
         <div className="text-center py-8 text-gray-500">
@@ -708,75 +795,136 @@ export default function PhotoAlbumPage() {
 
     return (
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-2">
           <h3 className="text-lg font-medium">All Photos ({filteredPhotos.length})</h3>
-          {isEditMode && <p className="text-sm text-gray-500">Drag photos to reorder them, then click "Save Order"</p>}
+
+          {isEditMode && (
+            <div className="text-sm text-gray-500">
+              {viewMode === "grid" ? (
+                <p>Drag photos to reorder them, then click "Save Order"</p>
+              ) : (
+                <p>Use the arrows to reorder photos, then click "Save Order"</p>
+              )}
+            </div>
+          )}
         </div>
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="photos" direction="horizontal">
-            {(provided) => (
-              <div
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"
-              >
-                {filteredPhotos.map((photo, index) => (
-                  <Draggable key={photo.id} draggableId={photo.id} index={index} isDragDisabled={!isEditMode}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        className={`relative group ${snapshot.isDragging ? "z-50" : ""}`}
-                      >
-                        <div className="flex flex-col">
-                          <div className="relative">
-                            {isEditMode && (
-                              <div
-                                {...provided.dragHandleProps}
-                                className="absolute top-1 left-1 bg-black bg-opacity-50 rounded-full p-1 text-white z-10"
-                              >
-                                <GripVertical className="h-4 w-4" />
-                              </div>
-                            )}
-                            <img
-                              src={photo.url || "/placeholder.svg"}
-                              alt={photo.filename}
-                              className={`w-full h-32 object-cover rounded-md ${isEditMode ? "cursor-move" : "cursor-pointer"}`}
-                              onClick={isEditMode ? undefined : () => openPhotoDetail(photo)}
-                            />
-                            {!isEditMode && (
-                              <button
-                                onClick={() => removePhoto(photo.id)}
-                                className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
+        {isEditMode && viewMode === "list" ? renderListView() : renderGridView()}
+      </div>
+    )
+  }
 
-                          <div className="text-xs mt-1">
-                            {photo.label && <p className="font-medium text-sm truncate">{photo.label}</p>}
-                            <p className="truncate">{photo.filename}</p>
-                            <p className="text-gray-500">
-                              {formatFileSize(photo.size)}
-                              {photo.originalSize && (
-                                <span className="text-green-600 ml-1">
-                                  (-{calculateCompressionSavings(photo.originalSize, photo.size).percentage}%)
-                                </span>
-                              )}
-                            </p>
-                          </div>
+  function renderGridView() {
+    return (
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="photos" direction="horizontal">
+          {(provided) => (
+            <div
+              {...provided.droppableProps}
+              ref={provided.innerRef}
+              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"
+            >
+              {filteredPhotos.map((photo, index) => (
+                <Draggable key={photo.id} draggableId={photo.id} index={index} isDragDisabled={!isEditMode}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      className={`relative group ${snapshot.isDragging ? "z-50" : ""}`}
+                    >
+                      <div className="flex flex-col">
+                        <div className="relative">
+                          {isEditMode && (
+                            <div
+                              {...provided.dragHandleProps}
+                              className="absolute top-1 left-1 bg-black bg-opacity-50 rounded-full p-1 text-white z-10"
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </div>
+                          )}
+                          <img
+                            src={photo.url || "/placeholder.svg"}
+                            alt={photo.filename}
+                            className={`w-full h-32 object-cover rounded-md ${isEditMode ? "cursor-move" : "cursor-pointer"}`}
+                            onClick={isEditMode ? undefined : () => openPhotoDetail(photo)}
+                          />
+                          {!isEditMode && (
+                            <button
+                              onClick={() => removePhoto(photo.id)}
+                              className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="text-xs mt-1">
+                          {photo.label && <p className="font-medium text-sm truncate">{photo.label}</p>}
+                          <p className="truncate">{photo.filename}</p>
+                          <p className="text-gray-500">
+                            {formatFileSize(photo.size)}
+                            {photo.originalSize && (
+                              <span className="text-green-600 ml-1">
+                                (-{calculateCompressionSavings(photo.originalSize, photo.size).percentage}%)
+                              </span>
+                            )}
+                          </p>
                         </div>
                       </div>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
+    )
+  }
+
+  function renderListView() {
+    return (
+      <div className="space-y-2 border rounded-md">
+        {filteredPhotos.map((photo, index) => (
+          <div key={photo.id} className="flex items-center p-3 border-b last:border-b-0 bg-white hover:bg-gray-50">
+            <div className="flex-shrink-0 mr-3">
+              <img
+                src={photo.url || "/placeholder.svg"}
+                alt={photo.filename}
+                className="w-16 h-16 object-cover rounded-md"
+              />
+            </div>
+
+            <div className="flex-grow min-w-0">
+              {photo.label && <p className="font-medium text-sm truncate">{photo.label}</p>}
+              <p className="text-xs truncate">{photo.filename}</p>
+              <p className="text-xs text-gray-500">{formatFileSize(photo.size)}</p>
+            </div>
+
+            <div className="flex-shrink-0 flex flex-col gap-1 ml-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => movePhotoUp(index)}
+                disabled={index === 0}
+                className="h-8 w-8"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => movePhotoDown(index)}
+                disabled={index === filteredPhotos.length - 1}
+                className="h-8 w-8"
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
