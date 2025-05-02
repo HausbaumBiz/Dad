@@ -54,11 +54,19 @@ export function useChunkedUpload(options: ChunkedUploadOptions = {}) {
       })
 
       try {
+        console.log(`Starting chunked upload of ${file.name} (${file.size} bytes) in ${totalChunks} chunks`)
+
+        // Track the last successful chunk
+        let lastSuccessfulChunk = -1
+        let isComplete = false
+
         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
           // Prepare the chunk
           const start = chunkIndex * chunkSize
           const end = Math.min(start + chunkSize, file.size)
           const chunk = file.slice(start, end)
+
+          console.log(`Uploading chunk ${chunkIndex + 1}/${totalChunks} (${start}-${end}, ${chunk.size} bytes)`)
 
           // Create form data for this chunk
           const formData = new FormData()
@@ -70,6 +78,7 @@ export function useChunkedUpload(options: ChunkedUploadOptions = {}) {
           formData.append("fileType", file.type)
           formData.append("chunk", chunk)
           formData.append("aspectRatio", aspectRatio)
+          formData.append("isLastChunk", (chunkIndex === totalChunks - 1).toString())
 
           // Upload the chunk
           const response = await fetch("/api/media/chunked-upload", {
@@ -79,12 +88,15 @@ export function useChunkedUpload(options: ChunkedUploadOptions = {}) {
 
           if (!response.ok) {
             const errorText = await response.text()
+            console.error(`Chunk ${chunkIndex + 1} upload failed with status ${response.status}: ${errorText}`)
             throw new Error(`Chunk upload failed: ${errorText}`)
           }
 
           const result = await response.json()
+          console.log(`Chunk ${chunkIndex + 1} upload result:`, result)
 
           if (!result.success) {
+            console.error(`Chunk ${chunkIndex + 1} upload failed:`, result.error)
             throw new Error(result.error || "Chunk upload failed")
           }
 
@@ -104,8 +116,13 @@ export function useChunkedUpload(options: ChunkedUploadOptions = {}) {
             onChunkComplete(chunkIndex, totalChunks)
           }
 
+          lastSuccessfulChunk = chunkIndex
+
           // If this is the last chunk and the server indicates completion
           if (result.isComplete) {
+            console.log("Server indicated upload is complete")
+            isComplete = true
+
             setState((prev) => ({
               ...prev,
               isUploading: false,
@@ -120,29 +137,69 @@ export function useChunkedUpload(options: ChunkedUploadOptions = {}) {
           }
         }
 
-        // Check if the upload is complete
-        const statusResponse = await fetch(`/api/media/chunked-upload?businessId=${businessId}&fileId=${fileId}`)
-        const statusResult = await statusResponse.json()
+        // If we've uploaded all chunks but the server didn't indicate completion
+        if (lastSuccessfulChunk === totalChunks - 1 && !isComplete) {
+          console.log("All chunks uploaded, finalizing video directly")
 
-        if (statusResult.success && statusResult.isComplete) {
-          setState((prev) => ({
-            ...prev,
-            isUploading: false,
-            progress: 100,
-          }))
+          // Instead of checking status, let's finalize the video directly
+          const finalizeFormData = new FormData()
+          finalizeFormData.append("businessId", businessId)
+          finalizeFormData.append("fileId", fileId)
+          finalizeFormData.append("fileName", file.name)
+          finalizeFormData.append("fileType", file.type)
+          finalizeFormData.append("totalChunks", totalChunks.toString())
+          finalizeFormData.append("aspectRatio", aspectRatio)
+          finalizeFormData.append("action", "finalize")
 
-          if (onComplete) {
-            onComplete(statusResult)
+          const finalizeResponse = await fetch("/api/media/chunked-upload", {
+            method: "POST",
+            body: finalizeFormData,
+          })
+
+          if (!finalizeResponse.ok) {
+            const errorText = await finalizeResponse.text()
+            console.error(`Finalization failed with status ${finalizeResponse.status}: ${errorText}`)
+            throw new Error(`Finalization failed: ${errorText}`)
           }
 
-          return statusResult
-        } else {
-          throw new Error("Upload did not complete successfully")
+          const finalizeResult = await finalizeResponse.json()
+          console.log("Finalization result:", finalizeResult)
+
+          if (finalizeResult.success) {
+            console.log("Video finalized successfully")
+
+            setState((prev) => ({
+              ...prev,
+              isUploading: false,
+              progress: 100,
+            }))
+
+            if (onComplete) {
+              onComplete(finalizeResult)
+            }
+
+            return finalizeResult
+          } else {
+            console.error("Video finalization failed:", finalizeResult.error)
+            throw new Error(`Video finalization failed: ${finalizeResult.error || "Unknown error"}`)
+          }
         }
+
+        // If we get here, something went wrong
+        console.error(`Upload incomplete: Last successful chunk was ${lastSuccessfulChunk + 1}/${totalChunks}`)
+        throw new Error(`Upload incomplete: Only ${lastSuccessfulChunk + 1} of ${totalChunks} chunks were processed`)
       } catch (error) {
         console.error("Error in chunked upload:", error)
 
-        const errorObj = error instanceof Error ? error : new Error("Unknown upload error")
+        // Create a proper Error object with a meaningful message
+        let errorObj: Error
+        if (error instanceof Error) {
+          errorObj = error
+        } else if (typeof error === "string") {
+          errorObj = new Error(error)
+        } else {
+          errorObj = new Error("Unknown upload error")
+        }
 
         setState((prev) => ({
           ...prev,
