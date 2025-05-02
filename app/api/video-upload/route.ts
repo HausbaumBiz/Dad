@@ -3,15 +3,20 @@ import { put } from "@vercel/blob"
 import { kv } from "@/lib/redis"
 import { revalidatePath } from "next/cache"
 
-// Increase the body parser size limit for this specific route
+// Explicitly set the runtime to nodejs
+export const runtime = "nodejs" // 'edge' runtime has stricter limits
+
+// Configure bodyParser for this route
 export const config = {
   api: {
     bodyParser: {
       sizeLimit: "100mb",
     },
+    responseLimit: false,
   },
 }
 
+// Rest of your code remains the same...
 export async function POST(request: NextRequest) {
   try {
     // Log the request size to help with debugging
