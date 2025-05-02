@@ -109,11 +109,15 @@ export default function ZipCodeAdminPage() {
         const mappedZipCode: any = {}
 
         // Handle different column naming conventions
-        mappedZipCode.zip = zipCode.zip || zipCode.zipcode || zipCode.postal_code || ""
-        mappedZipCode.latitude = zipCode.latitude || zipCode.lat || 0
-        mappedZipCode.longitude = zipCode.longitude || zipCode.lng || zipCode.long || 0
-        mappedZipCode.city = zipCode.city || zipCode.city_name || ""
-        mappedZipCode.state = zipCode.state || zipCode.state_name || zipCode.state_id || ""
+        mappedZipCode.zip = zipCode.zip || zipCode.zipCode || zipCode.zipcode || zipCode.postal_code || ""
+
+        // Handle lat/lng specifically for the user's format
+        mappedZipCode.latitude = Number.parseFloat(String(zipCode.latitude || zipCode.lat || 0))
+        mappedZipCode.longitude = Number.parseFloat(String(zipCode.longitude || zipCode.lng || zipCode.long || 0))
+
+        // Handle city and state with the user's format
+        mappedZipCode.city = zipCode.city || ""
+        mappedZipCode.state = zipCode.state || zipCode.state_name || ""
 
         // Optional fields
         if (zipCode.county) mappedZipCode.county = zipCode.county
@@ -135,34 +139,40 @@ export default function ZipCodeAdminPage() {
 
       if (validZipCodes.length === 0) {
         throw new Error(
-          "No valid ZIP code records found after validation. Please ensure your file has the required fields: zip, latitude/lat, longitude/lng, city, and state/state_name.",
+          "No valid ZIP code records found after validation. Please ensure your file has the required fields: zipCode, latitude, longitude, city, and state.",
         )
       }
 
       setDebugInfo((prev) => `${prev}\n\nValid records: ${validZipCodes.length} out of ${zipCodes.length}`)
 
-      // Since we're in a preview environment without a real API endpoint,
-      // we'll simulate a successful import with mock data
-      // This avoids the "Internal server error" when the API endpoint doesn't exist
-
-      // Mock successful import
-      setUploadStats({
-        total: validZipCodes.length,
-        imported: validZipCodes.length,
-        errors: 0,
-        skipped: 0,
+      // Send the data to the server
+      const response = await fetch("/api/zip-codes/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer admin-token", // Replace with actual auth in production
+        },
+        body: JSON.stringify({ zipCodes: validZipCodes }),
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to import ZIP codes")
+      }
+
+      const result = await response.json()
+      setUploadStats(result.stats)
+
+      // Update database stats
+      const statsResponse = await fetch("/api/zip-codes/stats")
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json()
+        setDbStats(statsData)
+      }
 
       setDebugInfo(
-        (prev) =>
-          `${prev}\n\nImport simulation successful. In a production environment, these records would be sent to the server.`,
+        (prev) => `${prev}\n\nImport successful. Imported ${result.stats.imported} ZIP codes to the database.`,
       )
-
-      // Mock database stats update
-      setDbStats({
-        count: validZipCodes.length,
-        lastUpdated: new Date().toISOString(),
-      })
     } catch (error) {
       console.error("Error uploading ZIP codes:", error)
       setError(error instanceof Error ? error.message : "An unknown error occurred")
@@ -181,42 +191,76 @@ export default function ZipCodeAdminPage() {
     setZipDetails(null)
 
     try {
-      // Since we're in a preview environment without a real API endpoint,
-      // we'll simulate a successful search with mock data
+      // First get the ZIP code details
+      const detailsResponse = await fetch(`/api/zip-codes/search?zip=${searchZip}`)
 
-      if (searchRadius === "0") {
-        // Mock single ZIP code search
-        setZipDetails({
-          zip: searchZip,
-          city: "Sample City",
-          state: "Sample State",
-          latitude: 40.7128,
-          longitude: -74.006,
-          county: "Sample County",
-        })
-      } else {
-        // Mock radius search
-        const mockResults: ZipCodeData[] = Array.from({ length: 5 }, (_, i) => ({
-          zip: `${Number.parseInt(searchZip) + i + 1}`,
-          city: `City ${i + 1}`,
-          state: "Sample State",
-          latitude: 40.7128 + i * 0.01,
-          longitude: -74.006 - i * 0.01,
-          county: `County ${i + 1}`,
-        }))
-
-        setSearchResults(mockResults)
+      if (!detailsResponse.ok) {
+        const errorData = await detailsResponse.json()
+        throw new Error(errorData.error || "ZIP code not found")
       }
 
-      setDebugInfo(
-        (prev) =>
-          `${prev}\n\nSearch simulation successful. In a production environment, this would query the database.`,
-      )
-    } catch (error) {
-      console.error("Error searching ZIP codes:", error)
-      setError(error instanceof Error ? error.message : "An unknown error occurred")
+      const detailsData = await detailsResponse.json()
+
+      if (detailsData.zipCode) {
+        setZipDetails(detailsData.zipCode)
+      }
+
+      // Then search for ZIP codes in radius
+      if (searchRadius !== "0") {
+        const response = await fetch(`/api/zip-codes/radius?zip=${searchZip}&radius=${searchRadius}&limit=50`)
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to find ZIP codes in this radius")
+        }
+
+        const data = await response.json()
+
+        if (data.zipCodes && Array.isArray(data.zipCodes)) {
+          setSearchResults(data.zipCodes)
+        }
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError("An error occurred while searching for ZIP codes")
+      }
     } finally {
       setIsSearching(false)
+    }
+  }
+
+  // Handle importing sample data
+  const handleImportSample = async () => {
+    setIsUploading(true)
+    setError(null)
+    setDebugInfo(null)
+
+    try {
+      const response = await fetch("/api/zip-codes/import-sample")
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to import sample ZIP codes")
+      }
+
+      const data = await response.json()
+      setUploadStats(data.stats)
+
+      // Update database stats
+      const statsResponse = await fetch("/api/zip-codes/stats")
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json()
+        setDbStats(statsData)
+      }
+
+      setDebugInfo(`Successfully imported ${data.stats.imported} sample ZIP codes`)
+    } catch (error) {
+      console.error("Error importing sample ZIP codes:", error)
+      setError(error instanceof Error ? error.message : "An unknown error occurred")
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -238,6 +282,28 @@ export default function ZipCodeAdminPage() {
               <div>
                 <p className="text-lg font-medium">Total ZIP Codes: {dbStats.count.toLocaleString()}</p>
                 <p className="text-sm text-gray-500">Last Updated: {new Date(dbStats.lastUpdated).toLocaleString()}</p>
+
+                {dbStats.count === 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleImportSample}
+                    disabled={isUploading}
+                    className="mt-4"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <Database className="mr-2 h-4 w-4" />
+                        Import Sample ZIP Codes
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             ) : (
               <p className="text-gray-500 italic">Loading database statistics...</p>
@@ -265,8 +331,8 @@ export default function ZipCodeAdminPage() {
                   disabled={isUploading}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Accepts CSV or JSON files with ZIP code data. Required fields: zip, latitude/lat, longitude/lng, city,
-                  state/state_name
+                  Accepts CSV or JSON files with ZIP code data. Required fields: zipCode, latitude, longitude, city,
+                  state
                 </p>
               </div>
 
@@ -419,6 +485,7 @@ export default function ZipCodeAdminPage() {
                       <th className="pb-2">City</th>
                       <th className="pb-2">State</th>
                       <th className="pb-2 hidden md:table-cell">County</th>
+                      <th className="pb-2">Distance</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -428,6 +495,7 @@ export default function ZipCodeAdminPage() {
                         <td className="py-2">{zip.city}</td>
                         <td className="py-2">{zip.state}</td>
                         <td className="py-2 hidden md:table-cell">{zip.county || "-"}</td>
+                        <td className="py-2">{zip.distance !== undefined ? `${zip.distance.toFixed(1)} mi` : "-"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -437,16 +505,6 @@ export default function ZipCodeAdminPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Preview Environment Notice */}
-      <Alert className="mt-8">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Preview Environment</AlertTitle>
-        <AlertDescription>
-          You are currently in a preview environment. The ZIP code database functionality is simulated. In a production
-          environment, you would need to set up the proper API endpoints and database.
-        </AlertDescription>
-      </Alert>
     </div>
   )
 }
@@ -486,21 +544,12 @@ function parseCSV(csv: string): ZipCodeData[] {
   // Parse header row, trimming each header
   const headers = lines[0].split(",").map((h) => h.trim())
 
-  if (headers.length < 5) {
-    throw new Error(`CSV must have at least 5 columns, found ${headers.length}: ${headers.join(", ")}`)
-  }
+  // Check for the specific format: zipCode,latitude,longitude,city,state
+  const expectedHeaders = ["zipCode", "latitude", "longitude", "city", "state"]
+  const hasAllExpectedHeaders = expectedHeaders.every((header) => headers.includes(header))
 
-  // Check for required headers (allowing for variations)
-  const hasZip = headers.some((h) => /^zip(code)?$/i.test(h))
-  const hasLat = headers.some((h) => /^(lat|latitude)$/i.test(h))
-  const hasLng = headers.some((h) => /^(lng|long|longitude)$/i.test(h))
-  const hasCity = headers.some((h) => /^city(_name)?$/i.test(h))
-  const hasState = headers.some((h) => /^state(_name|_id)?$/i.test(h))
-
-  if (!hasZip || !hasLat || !hasLng || !hasCity || !hasState) {
-    throw new Error(
-      `Missing required columns. Required: zip, lat/latitude, lng/longitude, city, state/state_name. Found: ${headers.join(", ")}`,
-    )
+  if (!hasAllExpectedHeaders) {
+    throw new Error(`CSV must have the columns: ${expectedHeaders.join(", ")}. Found: ${headers.join(", ")}`)
   }
 
   const zipCodes: ZipCodeData[] = []
@@ -510,26 +559,8 @@ function parseCSV(csv: string): ZipCodeData[] {
     const line = lines[i].trim()
     if (!line) continue // Skip empty lines
 
-    // Handle quoted values with commas inside them
-    const values: string[] = []
-    let inQuote = false
-    let currentValue = ""
-
-    for (let j = 0; j < line.length; j++) {
-      const char = line[j]
-
-      if (char === '"' && (j === 0 || line[j - 1] !== "\\")) {
-        inQuote = !inQuote
-      } else if (char === "," && !inQuote) {
-        values.push(currentValue.trim())
-        currentValue = ""
-      } else {
-        currentValue += char
-      }
-    }
-
-    // Add the last value
-    values.push(currentValue.trim())
+    // Split the line by comma
+    const values = line.split(",").map((v) => v.trim())
 
     // Skip if we don't have enough values
     if (values.length < headers.length) {
@@ -537,23 +568,28 @@ function parseCSV(csv: string): ZipCodeData[] {
       continue
     }
 
-    // Create object with header->value mapping
-    const zipData: Record<string, any> = {}
-
+    // Create a map of header -> value
+    const record: Record<string, string> = {}
     headers.forEach((header, index) => {
-      if (index < values.length) {
-        const value = values[index].replace(/^"|"$/g, "") // Remove surrounding quotes
-
-        // Convert numeric values
-        if (/^(lat|latitude|lng|long|longitude|population)$/i.test(header)) {
-          zipData[header] = value ? Number.parseFloat(value) : 0
-        } else {
-          zipData[header] = value
-        }
-      }
+      record[header] = values[index]
     })
 
-    zipCodes.push(zipData as unknown as ZipCodeData)
+    // Create the ZIP code object with the expected format
+    const zipCode: ZipCodeData = {
+      zip: record.zipCode,
+      latitude: Number.parseFloat(record.latitude),
+      longitude: Number.parseFloat(record.longitude),
+      city: record.city,
+      state: record.state,
+      country: "US", // Default to US
+    }
+
+    // Add optional fields if they exist
+    if (record.county) zipCode.county = record.county
+    if (record.timezone) zipCode.timezone = record.timezone
+    if (record.population) zipCode.population = Number.parseInt(record.population, 10)
+
+    zipCodes.push(zipCode)
   }
 
   return zipCodes

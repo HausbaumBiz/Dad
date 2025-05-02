@@ -4,8 +4,10 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { importZipCodes } from "@/lib/zip-code-db"
+import { importZipCodes } from "@/lib/zip-code-memory" // Use in-memory storage
 import type { ZipCodeData } from "@/lib/zip-code-types"
+
+export const dynamic = "force-dynamic"
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,12 +26,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid data format. Expected an array of ZIP codes." }, { status: 400 })
     }
 
-    // Import the ZIP codes
-    const stats = await importZipCodes(body.zipCodes as ZipCodeData[])
+    // Pre-validate ZIP codes
+    const validZipCodes = body.zipCodes.filter((zipCode: any) => {
+      // Map zipCode to zip if needed
+      if (zipCode.zipCode !== undefined && zipCode.zip === undefined) {
+        zipCode.zip = zipCode.zipCode
+      }
 
-    return NextResponse.json({ success: true, stats })
+      // Must have a ZIP code
+      if (!zipCode.zip) return false
+
+      // Convert coordinates to numbers if they're strings
+      if (zipCode.latitude !== undefined && typeof zipCode.latitude === "string") {
+        zipCode.latitude = Number.parseFloat(zipCode.latitude)
+      }
+
+      if (zipCode.longitude !== undefined && typeof zipCode.longitude === "string") {
+        zipCode.longitude = Number.parseFloat(zipCode.longitude)
+      }
+
+      return true
+    })
+
+    // Import the ZIP codes
+    const stats = await importZipCodes(validZipCodes as ZipCodeData[])
+
+    return NextResponse.json({
+      success: true,
+      stats,
+      originalCount: body.zipCodes.length,
+      validCount: validZipCodes.length,
+    })
   } catch (error) {
     console.error("Error importing ZIP codes:", error)
-    return NextResponse.json({ error: "Failed to import ZIP codes" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Failed to import ZIP codes",
+        message: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
+    )
   }
 }

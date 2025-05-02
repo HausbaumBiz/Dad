@@ -135,8 +135,11 @@ export function ServiceAreaSectionEnhanced() {
             <Input
               type="number"
               id="radius"
-              value={radius}
-              onChange={(e) => setRadius(Number.parseInt(e.target.value))}
+              value={radius.toString()}
+              onChange={(e) => {
+                const value = e.target.value === "" ? 25 : Number(e.target.value)
+                setRadius(isNaN(value) ? 25 : value)
+              }}
               disabled={isNationwide}
               className="w-20 text-center"
               min={5}

@@ -4,52 +4,34 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { searchZipCodes, findZipCodesInRadius, getZipCode } from "@/lib/zip-code-db"
+import { getZipCode } from "@/lib/zip-code-memory" // Use in-memory storage
+
+export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-
-    // Get search parameters
     const zip = searchParams.get("zip")
-    const radius = searchParams.get("radius")
-    const state = searchParams.get("state")
-    const city = searchParams.get("city")
-    const limit = searchParams.get("limit")
 
-    // Convert limit to number if provided
-    const limitNum = limit ? Number.parseInt(limit, 10) : undefined
-
-    // If searching by radius
-    if (zip && radius) {
-      const radiusMiles = Number.parseFloat(radius)
-      if (isNaN(radiusMiles)) {
-        return NextResponse.json({ error: "Invalid radius" }, { status: 400 })
-      }
-
-      const zipCodes = await findZipCodesInRadius(zip, radiusMiles, limitNum || 100)
-      return NextResponse.json({ zipCodes })
+    if (!zip) {
+      return NextResponse.json({ error: "ZIP code is required" }, { status: 400 })
     }
 
-    // If looking up a single ZIP code
-    if (zip && !radius && !state && !city) {
-      const zipData = await getZipCode(zip)
-      if (!zipData) {
-        return NextResponse.json({ error: "ZIP code not found" }, { status: 404 })
-      }
-      return NextResponse.json({ zipCode: zipData })
+    const zipCode = await getZipCode(zip)
+
+    if (!zipCode) {
+      return NextResponse.json({ error: `ZIP code ${zip} not found` }, { status: 404 })
     }
 
-    // If searching by other criteria
-    const zipCodes = await searchZipCodes({
-      state,
-      city,
-      limit: limitNum,
-    })
-
-    return NextResponse.json({ zipCodes })
+    return NextResponse.json({ zipCode })
   } catch (error) {
-    console.error("Error searching ZIP codes:", error)
-    return NextResponse.json({ error: "Failed to search ZIP codes" }, { status: 500 })
+    console.error("Error searching ZIP code:", error)
+    return NextResponse.json(
+      {
+        error: "Failed to search ZIP code",
+        message: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
+    )
   }
 }

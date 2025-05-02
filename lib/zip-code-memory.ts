@@ -1,20 +1,16 @@
 /**
- * ZIP code database utilities using Vercel KV (Redis)
+ * In-memory ZIP code database (temporary solution)
  */
 
-import { kv } from "@/lib/redis"
 import type { ZipCodeData, ZipCodeSearchParams, ZipCodeImportStats } from "./zip-code-types"
 import { haversineDistance } from "./zip-code-utils"
 
-// Key prefixes for Redis
-const ZIP_KEY_PREFIX = "zip:"
-const ZIP_META_KEY = "zip:meta"
-
-// Flag to disable geospatial indexing
-const ENABLE_GEOSPATIAL = false
+// In-memory storage
+const zipCodeStore: Map<string, ZipCodeData> = new Map()
+let lastUpdated = ""
 
 /**
- * Save a single ZIP code to the database
+ * Save a single ZIP code to the in-memory store
  */
 export async function saveZipCode(zipData: ZipCodeData): Promise<boolean> {
   try {
@@ -22,7 +18,8 @@ export async function saveZipCode(zipData: ZipCodeData): Promise<boolean> {
     const sanitizedZipData = sanitizeZipData(zipData)
 
     // Store the ZIP code data
-    await kv.set(`${ZIP_KEY_PREFIX}${sanitizedZipData.zip}`, JSON.stringify(sanitizedZipData))
+    zipCodeStore.set(sanitizedZipData.zip, sanitizedZipData)
+    lastUpdated = new Date().toISOString()
 
     return true
   } catch (error) {
@@ -84,7 +81,7 @@ export async function importZipCodes(zipCodes: ZipCodeData[]): Promise<ZipCodeIm
     errors: 0,
   }
 
-  // Process in batches to avoid overwhelming Redis
+  // Process in batches
   const BATCH_SIZE = 100
 
   for (let i = 0; i < zipCodes.length; i += BATCH_SIZE) {
@@ -112,9 +109,6 @@ export async function importZipCodes(zipCodes: ZipCodeData[]): Promise<ZipCodeIm
     await Promise.all(promises)
   }
 
-  // Update metadata
-  await updateZipCodeMetadata()
-
   return stats
 }
 
@@ -123,8 +117,7 @@ export async function importZipCodes(zipCodes: ZipCodeData[]): Promise<ZipCodeIm
  */
 export async function getZipCode(zip: string): Promise<ZipCodeData | null> {
   try {
-    const data = await kv.get(`${ZIP_KEY_PREFIX}${zip}`)
-    return data ? JSON.parse(data as string) : null
+    return zipCodeStore.get(zip) || null
   } catch (error) {
     console.error(`Error getting ZIP code ${zip}:`, error)
     return null
@@ -146,31 +139,8 @@ export async function findZipCodesInRadius(
       throw new Error(`ZIP code ${centralZip} not found`)
     }
 
-    // Always use the manual radius search
-    return findZipCodesInRadiusManual(centralZip, radiusMiles, limit)
-  } catch (error) {
-    console.error(`Error finding ZIP codes in radius of ${centralZip}:`, error)
-    return []
-  }
-}
-
-/**
- * Manual radius search
- */
-async function findZipCodesInRadiusManual(
-  centralZip: string,
-  radiusMiles: number,
-  limit = 100,
-): Promise<ZipCodeData[]> {
-  try {
-    // Get the central ZIP code data
-    const centralZipData = await getZipCode(centralZip)
-    if (!centralZipData) {
-      throw new Error(`ZIP code ${centralZip} not found`)
-    }
-
     // Get all ZIP codes
-    const allZipCodes = await getAllZipCodes()
+    const allZipCodes = Array.from(zipCodeStore.values())
 
     // Calculate distances and filter
     const zipCodesWithDistance = allZipCodes.map((zipData) => {
@@ -193,36 +163,7 @@ async function findZipCodesInRadiusManual(
         return { ...zipData, distance }
       })
   } catch (error) {
-    console.error(`Error in manual radius search for ${centralZip}:`, error)
-    return []
-  }
-}
-
-/**
- * Get all ZIP codes
- */
-async function getAllZipCodes(): Promise<ZipCodeData[]> {
-  try {
-    // Get all keys matching the ZIP code pattern
-    const keys = await kv.keys(`${ZIP_KEY_PREFIX}*`)
-
-    // Get data for each key
-    const zipDataPromises = keys.map(async (key) => {
-      try {
-        const data = await kv.get(key)
-        return data ? JSON.parse(data as string) : null
-      } catch (error) {
-        console.error(`Error getting data for key ${key}:`, error)
-        return null
-      }
-    })
-
-    const zipData = await Promise.all(zipDataPromises)
-
-    // Filter out any null results
-    return zipData.filter(Boolean) as ZipCodeData[]
-  } catch (error) {
-    console.error("Error getting all ZIP codes:", error)
+    console.error(`Error finding ZIP codes in radius of ${centralZip}:`, error)
     return []
   }
 }
@@ -238,7 +179,7 @@ export async function searchZipCodes(params: ZipCodeSearchParams): Promise<ZipCo
     }
 
     // Get all ZIP codes and filter them
-    const allZipCodes = await getAllZipCodes()
+    const allZipCodes = Array.from(zipCodeStore.values())
 
     let filteredZipCodes = allZipCodes
 
@@ -273,75 +214,11 @@ export async function searchZipCodes(params: ZipCodeSearchParams): Promise<ZipCo
 }
 
 /**
- * Update metadata about the ZIP code database
- */
-async function updateZipCodeMetadata(): Promise<void> {
-  try {
-    const keys = await kv.keys(`${ZIP_KEY_PREFIX}*`)
-    const zipCount = keys.length
-
-    const metadata = {
-      count: zipCount,
-      lastUpdated: new Date().toISOString(),
-    }
-
-    // Store as a JSON string
-    await kv.set(ZIP_META_KEY, JSON.stringify(metadata))
-  } catch (error) {
-    console.error("Error updating ZIP code metadata:", error)
-  }
-}
-
-/**
  * Get metadata about the ZIP code database
  */
 export async function getZipCodeMetadata(): Promise<{ count: number; lastUpdated: string }> {
-  try {
-    // Default values if no metadata is found
-    const defaultMetadata = { count: 0, lastUpdated: "" }
-
-    // Get the metadata from Redis
-    const data = await kv.get(ZIP_META_KEY)
-
-    // If no data, return default values
-    if (!data) {
-      return defaultMetadata
-    }
-
-    // If data is already an object with the expected properties
-    if (typeof data === "object" && data !== null) {
-      return {
-        count: typeof data.count === "number" ? data.count : 0,
-        lastUpdated: typeof data.lastUpdated === "string" ? data.lastUpdated : "",
-      }
-    }
-
-    // If data is a string, try to parse it as JSON
-    if (typeof data === "string") {
-      try {
-        const parsed = JSON.parse(data)
-        return {
-          count: typeof parsed.count === "number" ? parsed.count : 0,
-          lastUpdated: typeof parsed.lastUpdated === "string" ? parsed.lastUpdated : "",
-        }
-      } catch (parseError) {
-        console.error("Error parsing ZIP code metadata:", parseError)
-        return defaultMetadata
-      }
-    }
-
-    // If we get here, the data is in an unexpected format
-    console.error("ZIP code metadata is in an unexpected format:", data)
-    return defaultMetadata
-  } catch (error) {
-    console.error("Error getting ZIP code metadata:", error)
-    return { count: 0, lastUpdated: "" }
+  return {
+    count: zipCodeStore.size,
+    lastUpdated: lastUpdated,
   }
-}
-
-/**
- * Check if coordinates are valid
- */
-function isValidCoordinate(lat: number, lng: number): boolean {
-  return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
 }

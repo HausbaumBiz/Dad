@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Loader2, X, Search } from "lucide-react"
+import { Loader2, X, Search, AlertCircle, Database } from "lucide-react"
 import type { ZipCodeData } from "@/lib/zip-code-types"
 import { useToast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 interface ZipCodeRadiusSelectorProps {
   onZipCodesSelected?: (zipCodes: ZipCodeData[]) => void
@@ -32,9 +33,28 @@ export function ZipCodeRadiusSelector({
   const [isNationwide, setIsNationwide] = useState(false)
   const [zipResults, setZipResults] = useState<ZipCodeData[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [zipDetails, setZipDetails] = useState<ZipCodeData | null>(null)
+  const [dbEmpty, setDbEmpty] = useState(false)
   const { toast } = useToast()
+
+  // Check if the ZIP code database is empty
+  useEffect(() => {
+    async function checkDatabase() {
+      try {
+        const response = await fetch("/api/zip-codes/stats")
+        if (response.ok) {
+          const data = await response.json()
+          setDbEmpty(data.count === 0)
+        }
+      } catch (error) {
+        console.error("Error checking ZIP code database:", error)
+      }
+    }
+
+    checkDatabase()
+  }, [])
 
   // Notify parent component when ZIP codes change
   useEffect(() => {
@@ -42,6 +62,32 @@ export function ZipCodeRadiusSelector({
       onZipCodesSelected(zipResults)
     }
   }, [zipResults, onZipCodesSelected])
+
+  const handleImportSample = async () => {
+    setIsImporting(true)
+    try {
+      const response = await fetch("/api/zip-codes/import-sample")
+      if (!response.ok) {
+        throw new Error("Failed to import sample ZIP codes")
+      }
+
+      const data = await response.json()
+      toast({
+        title: "Sample ZIP Codes Imported",
+        description: `Imported ${data.stats.imported} sample ZIP codes`,
+      })
+
+      setDbEmpty(false)
+    } catch (error) {
+      toast({
+        title: "Import Error",
+        description: error instanceof Error ? error.message : "Failed to import sample ZIP codes",
+        variant: "destructive",
+      })
+    } finally {
+      setIsImporting(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,8 +101,24 @@ export function ZipCodeRadiusSelector({
     setError(null)
 
     try {
-      // Use our new ZipCodeAPI.com integration
-      const response = await fetch(`/api/zip-codes/zipcode-api?zip=${zipCode}&radius=${radius}`)
+      // First validate the ZIP code
+      const detailsResponse = await fetch(`/api/zip-codes/search?zip=${zipCode}`)
+
+      if (!detailsResponse.ok) {
+        const errorData = await detailsResponse.json()
+        throw new Error(errorData.error || "Invalid ZIP code. Please enter a valid 5-digit ZIP code.")
+      }
+
+      const detailsData = await detailsResponse.json()
+
+      if (!detailsData.zipCode) {
+        throw new Error("ZIP code not found in our database")
+      }
+
+      setZipDetails(detailsData.zipCode)
+
+      // Then find ZIP codes within the radius using our custom implementation
+      const response = await fetch(`/api/zip-codes/radius?zip=${zipCode}&radius=${radius}&limit=${maxResults}`)
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -67,12 +129,6 @@ export function ZipCodeRadiusSelector({
 
       if (!data.zipCodes || !Array.isArray(data.zipCodes)) {
         throw new Error("Invalid response from ZIP code search")
-      }
-
-      // Set the first result as the ZIP details (the center ZIP code)
-      if (data.zipCodes.length > 0) {
-        const centerZip = data.zipCodes.find((z) => z.zip === zipCode) || data.zipCodes[0]
-        setZipDetails(centerZip)
       }
 
       // Add the results to the existing results (avoiding duplicates)
@@ -124,6 +180,35 @@ export function ZipCodeRadiusSelector({
         <CardTitle className="text-2xl text-center">Define Your Service Area</CardTitle>
       </CardHeader>
       <CardContent>
+        {dbEmpty && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>ZIP Code Database Empty</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2">
+              <p>Your ZIP code database appears to be empty. Import sample data to use this feature.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleImportSample}
+                disabled={isImporting}
+                className="self-start"
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Database className="mr-2 h-4 w-4" />
+                    Import Sample ZIP Codes
+                  </>
+                )}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="text-center">
             <Label htmlFor="zipCode" className="block mb-1">
@@ -140,7 +225,7 @@ export function ZipCodeRadiusSelector({
                   id="zipCode"
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
-                  disabled={isNationwide || isLoading}
+                  disabled={isNationwide || isLoading || dbEmpty}
                   className="pl-10"
                   placeholder="Enter ZIP code"
                   maxLength={5}
@@ -148,7 +233,7 @@ export function ZipCodeRadiusSelector({
                   title="Please enter a valid 5-digit ZIP code"
                 />
               </div>
-              <Button type="submit" disabled={isNationwide || isLoading || !zipCode}>
+              <Button type="submit" disabled={isNationwide || isLoading || !zipCode || dbEmpty}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
