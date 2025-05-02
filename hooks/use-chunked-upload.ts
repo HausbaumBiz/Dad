@@ -191,15 +191,7 @@ export function useChunkedUpload(options: ChunkedUploadOptions = {}) {
       } catch (error) {
         console.error("Error in chunked upload:", error)
 
-        // Create a proper Error object with a meaningful message
-        let errorObj: Error
-        if (error instanceof Error) {
-          errorObj = error
-        } else if (typeof error === "string") {
-          errorObj = new Error(error)
-        } else {
-          errorObj = new Error("Unknown upload error")
-        }
+        const errorObj = error instanceof Error ? error : new Error("Unknown upload error")
 
         setState((prev) => ({
           ...prev,

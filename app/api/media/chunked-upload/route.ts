@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       // Store chunk data directly without nesting in an object
       await kv.hset(chunkKey, `chunk_url:${chunkIndex}`, chunkBlob.url)
       await kv.hset(chunkKey, `chunk_path:${chunkIndex}`, chunkPath)
-      await kv.hset(chunkKey, `chunk_size:${chunkIndex}`, chunkBlob.size ? chunkBlob.size.toString() : "0")
+      await kv.hset(chunkKey, `chunk_size:${chunkIndex}`, chunkBlob.size.toString())
       await kv.hset(chunkKey, `chunk_uploaded:${chunkIndex}`, new Date().toISOString())
 
       console.log(`Chunk ${chunkIndex + 1} metadata stored in Redis`)
@@ -74,13 +74,13 @@ export async function POST(request: NextRequest) {
           aspectRatio,
           startTime: new Date().toISOString(),
           // Set expiry for cleanup of abandoned uploads
-          expiry: new Date(Date.now() + CHUNK_EXPIRY_HOURS * 60 * 60 * 1000).toISOString(),
+          expiry: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           uploadedChunks: "1", // Initialize with 1 for the first chunk
         })
       } else {
         // Update the uploaded chunks count
         const currentUploaded = await kv.hget(chunkKey, "uploadedChunks")
-        const newUploaded = currentUploaded ? (Number.parseInt(currentUploaded as string, 10) + 1).toString() : "1"
+        const newUploaded = currentUploaded ? (Number.parseInt(currentUploaded, 10) + 1).toString() : "1"
         await kv.hset(chunkKey, "uploadedChunks", newUploaded)
         console.log(`Updated uploaded chunks count to ${newUploaded}`)
       }
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
 
       // Get the current uploaded chunks count
       const uploadedChunksStr = await kv.hget(chunkKey, "uploadedChunks")
-      const uploadedChunks = uploadedChunksStr ? Number.parseInt(uploadedChunksStr as string, 10) : 0
+      const uploadedChunks = uploadedChunksStr ? Number.parseInt(uploadedChunksStr, 10) : 0
       console.log(`Current uploaded chunks: ${uploadedChunks}/${totalChunks}`)
 
       return NextResponse.json({
