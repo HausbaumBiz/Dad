@@ -1,12 +1,5 @@
 {
-  "functions": {
-    "api/**/*": {
-      "memory": 1024,
-      "maxDuration": 60
-    },
-    "app/**/*": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  }
+  "buildCommand": "next build",
+  "devCommand": "next dev",
+  "installCommand": "npm install"
 }
