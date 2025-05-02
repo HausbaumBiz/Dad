@@ -36,8 +36,8 @@ const DEMO_VIDEO_URL = "https://storage.googleapis.com/gtv-videos-bucket/sample/
 type AspectRatio = "16:9" | "9:16"
 
 // File size thresholds
-const REGULAR_UPLOAD_LIMIT_MB = 100 // Increased from 50MB to 100MB
-const MAX_UPLOAD_SIZE_MB = 100 // Maximum size for uploads
+const REGULAR_UPLOAD_LIMIT_MB = 50
+const MAX_UPLOAD_SIZE_MB = 500 // Maximum size for chunked uploads
 
 export default function VideoPage() {
   const { toast } = useToast()
@@ -189,20 +189,11 @@ export default function VideoPage() {
 
       // Check if the error is related to "Request Entity Too Large"
       let errorMessage = "There was an error uploading your video. Please try again."
-      if (uploadError instanceof Error) {
-        if (
-          uploadError.message.includes("Request Entity Too Large") ||
-          uploadError.message.includes("413") ||
-          uploadError.message.includes("body size limit")
-        ) {
-          errorMessage = `The video file is too large for the server to process. Please try a smaller file (under ${MAX_UPLOAD_SIZE_MB}MB).`
-        } else if (uploadError.message.includes("timeout") || uploadError.message.includes("ETIMEDOUT")) {
-          errorMessage = "The upload timed out. Please try with a smaller file or check your connection."
-        } else if (uploadError.message.includes("Unexpected token")) {
-          errorMessage = "The server returned an invalid response. This often happens when the file is too large."
-        } else {
-          errorMessage = uploadError.message
-        }
+      if (uploadError instanceof Error && uploadError.message.includes("Request Entity Too Large")) {
+        errorMessage =
+          "The video file is too large for the server to process. Please try using the chunked upload option."
+      } else if (uploadError instanceof Error && uploadError.message.includes("Unexpected token")) {
+        errorMessage = "The server returned an invalid response. This often happens when the file is too large."
       }
 
       toast({
