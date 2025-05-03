@@ -11,6 +11,10 @@ import { Loader2, Upload, Search, Database, AlertCircle, FileJson, Save, Info } 
 import type { ZipCodeData, ZipCodeImportStats } from "@/lib/zip-code-types"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
+// Add this at the top of the file, after the imports
+const CSV_BLOB_URL =
+  "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/uszips11-0iYnSKUBgC7Dm6DtxL3bXwFzHgh6Qe.csv"
+
 export default function ZipCodeAdminPage() {
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -34,6 +38,9 @@ export default function ZipCodeAdminPage() {
   } | null>(null)
   const [dataSource, setDataSource] = useState<string | null>(null)
 
+  // Add this function inside the component, after the other state variables
+  const [csvFileInfo, setCsvFileInfo] = useState<{ exists: boolean; url: string } | null>(null)
+
   // Fetch database stats on load
   useEffect(() => {
     async function fetchDbStats() {
@@ -48,8 +55,25 @@ export default function ZipCodeAdminPage() {
       }
     }
 
+    async function checkCsvFile() {
+      try {
+        const response = await fetch(CSV_BLOB_URL, { method: "HEAD" })
+        setCsvFileInfo({
+          exists: response.ok,
+          url: CSV_BLOB_URL,
+        })
+      } catch (error) {
+        console.error("Error checking CSV file:", error)
+        setCsvFileInfo({
+          exists: false,
+          url: CSV_BLOB_URL,
+        })
+      }
+    }
+
     fetchDbStats()
     checkBlobStorage() // Check Blob storage on page load
+    checkCsvFile() // Check CSV file on page load
   }, [])
 
   // Handle file selection
@@ -500,6 +524,33 @@ export default function ZipCodeAdminPage() {
                 )}
               </div>
             )}
+
+            {csvFileInfo && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                <h3 className="font-medium mb-2">CSV File Status:</h3>
+                {csvFileInfo.exists ? (
+                  <div className="text-sm">
+                    <p>
+                      <span className="text-green-600 font-medium">✓</span> CSV file exists and will be used as fallback
+                    </p>
+                    <p className="mt-1 text-xs text-gray-600">
+                      <a
+                        href={csvFileInfo.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        View CSV File
+                      </a>
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-amber-600">
+                    <span className="font-medium">⚠</span> CSV file not found or not accessible
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -668,7 +719,13 @@ export default function ZipCodeAdminPage() {
                 ZIP Code Details:
                 {dataSource && (
                   <span className="text-xs ml-2 text-gray-500">
-                    (Data source: {dataSource === "blob" ? "Blob Storage" : "File System"})
+                    (Data source:{" "}
+                    {dataSource === "blob"
+                      ? blobInfo?.exists
+                        ? "JSON in Blob Storage"
+                        : "CSV in Blob Storage"
+                      : "File System"}
+                    )
                   </span>
                 )}
               </h3>
