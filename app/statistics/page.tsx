@@ -19,13 +19,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import Link from "next/link"
-import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2 } from "lucide-react"
+import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2, MapPin } from "lucide-react"
 import type { CategorySelection } from "@/components/category-selector"
 import { getBusinessCategories, removeBusinessCategory } from "@/app/actions/category-actions"
 import { useToast } from "@/components/ui/use-toast"
 import { getBusinessKeywords } from "@/app/actions/keyword-actions"
 import { Badge } from "@/components/ui/badge"
 import { type JobListing, getBusinessJobs, removeJobListing } from "@/app/actions/job-actions"
+import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
+import type { ZipCodeData } from "@/lib/zip-code-types"
 
 export default function StatisticsPage() {
   const router = useRouter()
@@ -43,6 +45,9 @@ export default function StatisticsPage() {
   const [jobToRemove, setJobToRemove] = useState<string | null>(null)
   const [showRemoveJobDialog, setShowRemoveJobDialog] = useState(false)
   const [isRemovingJob, setIsRemovingJob] = useState(false)
+  const [zipCodes, setZipCodes] = useState<ZipCodeData[]>([])
+  const [isNationwide, setIsNationwide] = useState(false)
+  const [isZipCodesLoading, setIsZipCodesLoading] = useState(true)
 
   // Load selected categories from server on component mount
   useEffect(() => {
@@ -113,6 +118,31 @@ export default function StatisticsPage() {
     }
 
     loadKeywords()
+  }, [])
+
+  // Load ZIP codes from server on component mount
+  useEffect(() => {
+    async function loadZipCodes() {
+      setIsZipCodesLoading(true)
+      try {
+        const result = await getBusinessZipCodes()
+        if (result.success && result.data) {
+          setZipCodes(result.data.zipCodes)
+          setIsNationwide(result.data.isNationwide)
+        }
+      } catch (error) {
+        console.error("Error loading ZIP codes:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load your service area",
+          variant: "destructive",
+        })
+      } finally {
+        setIsZipCodesLoading(false)
+      }
+    }
+
+    loadZipCodes()
   }, [])
 
   useEffect(() => {
@@ -517,6 +547,69 @@ export default function StatisticsPage() {
 
             <Card>
               <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b flex flex-row items-center justify-between">
+                <CardTitle className="text-teal-700">Your Service Area</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/business-focus")}
+                  className="flex items-center gap-1"
+                >
+                  <Edit className="h-4 w-4" />
+                  <span className="hidden sm:inline">Manage Service Area</span>
+                  <span className="sm:hidden">Manage</span>
+                </Button>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {isZipCodesLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2">Loading your service area...</span>
+                  </div>
+                ) : isNationwide ? (
+                  <div className="text-center py-4">
+                    <Badge className="px-3 py-1.5 text-sm bg-green-100 text-green-800 hover:bg-green-100">
+                      Nationwide Service
+                    </Badge>
+                    <p className="mt-2 text-gray-600">Your business serves customers nationwide</p>
+                  </div>
+                ) : zipCodes.length > 0 ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <MapPin className="h-5 w-5 text-teal-600" />
+                      <h3 className="font-medium">Your service covers {zipCodes.length} ZIP codes</h3>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto p-2 border rounded-lg">
+                      <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {zipCodes.map((zip) => (
+                          <li key={zip.zip} className="px-3 py-2 bg-gray-50 rounded text-sm">
+                            <span className="font-medium">{zip.zip}</span>
+                            {zip.city && zip.state && (
+                              <span className="text-xs text-gray-500 block truncate">
+                                {zip.city}, {zip.state}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="flex justify-center mb-4">
+                      <AlertCircle className="h-12 w-12 text-amber-500" />
+                    </div>
+                    <p className="text-gray-500 mb-4">No service area defined yet.</p>
+                    <Button onClick={() => router.push("/business-focus")} className="flex items-center gap-2">
+                      <PlusCircle className="h-4 w-4" />
+                      Define Service Area
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b flex flex-row items-center justify-between">
                 <CardTitle className="text-teal-700">Your Job Listings</CardTitle>
                 <Button
                   variant="outline"
@@ -569,15 +662,6 @@ export default function StatisticsPage() {
                     </Button>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                <CardTitle className="text-teal-700">Zip Codes</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <p>This section contains data about zip codes.</p>
               </CardContent>
             </Card>
 

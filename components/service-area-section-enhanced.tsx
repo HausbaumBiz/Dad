@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Loader2, X, Search, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/components/ui/use-toast"
 import type { ZipCodeData } from "@/lib/zip-code-types"
+import { saveBusinessZipCodes, getBusinessZipCodes } from "@/app/actions/zip-code-actions"
 
 export function ServiceAreaSectionEnhanced() {
   const [zipCode, setZipCode] = useState("")
@@ -18,8 +20,27 @@ export function ServiceAreaSectionEnhanced() {
   const [isNationwide, setIsNationwide] = useState(false)
   const [zipResults, setZipResults] = useState<ZipCodeData[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dataSource, setDataSource] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  // Load saved ZIP codes on component mount
+  useEffect(() => {
+    async function loadZipCodes() {
+      try {
+        const result = await getBusinessZipCodes()
+        if (result.success && result.data) {
+          setZipResults(result.data.zipCodes)
+          setIsNationwide(result.data.isNationwide)
+        }
+      } catch (error) {
+        console.error("Error loading ZIP codes:", error)
+      }
+    }
+
+    loadZipCodes()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -78,6 +99,31 @@ export function ServiceAreaSectionEnhanced() {
 
   const handleRemoveAll = () => {
     setZipResults([])
+  }
+
+  const handleSaveZipCodes = async () => {
+    setIsSaving(true)
+    try {
+      const result = await saveBusinessZipCodes(zipResults, isNationwide)
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Your service area has been saved",
+        })
+      } else {
+        throw new Error(result.message || "Failed to save service area")
+      }
+    } catch (error) {
+      console.error("Error saving ZIP codes:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save your service area",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -226,7 +272,16 @@ export function ServiceAreaSectionEnhanced() {
         </p>
 
         <div className="mt-6 flex justify-end">
-          <Button>Submit</Button>
+          <Button onClick={handleSaveZipCodes} disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Submit"
+            )}
+          </Button>
         </div>
       </CardContent>
     </Card>
