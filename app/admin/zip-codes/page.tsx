@@ -150,7 +150,7 @@ export default function ZipCodeAdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer admin-token", // Replace with actual auth in production
+          Authorization: "Bearer ULMAAIjcDFkMmZlZTE2NjU1MTM0ODA2YjVkOTAzZDQyYjQ2NWMyY3AxMA", // Replace with actual auth in production
         },
         body: JSON.stringify({ zipCodes: validZipCodes }),
       })

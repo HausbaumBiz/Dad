@@ -4,7 +4,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { importZipCodes } from "@/lib/zip-code-memory" // Use in-memory storage
+import { importZipCodes } from "@/lib/zip-code-file" // Use file-based storage
 import type { ZipCodeData } from "@/lib/zip-code-types"
 
 export const dynamic = "force-dynamic"
@@ -14,8 +14,19 @@ export async function POST(request: NextRequest) {
     // Check for admin authorization
     // This is a simple example - you should implement proper authentication
     const authHeader = request.headers.get("authorization")
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized - Missing authorization header" }, { status: 401 })
+    }
+
+    // Accept both "Bearer TOKEN" and just "TOKEN" formats
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.substring(7) // Remove "Bearer " prefix
+      : authHeader
+
+    // Check if the token is valid (in a real app, you would validate against a database or auth service)
+    const validToken = "ULMAAIjcDFkMmZlZTE2NjU1MTM0ODA2YjVkOTAzZDQyYjQ2NWMyY3AxMA"
+    if (token !== validToken) {
+      return NextResponse.json({ error: "Unauthorized - Invalid token" }, { status: 401 })
     }
 
     // Parse the request body

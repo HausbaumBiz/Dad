@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
-import { ServiceAreaSection } from "@/components/service-area-section"
+// Import the enhanced service area section
+import { ServiceAreaSectionEnhanced } from "@/components/service-area-section-enhanced"
 import { KeywordsSection } from "@/components/keywords-section"
 import { CategorySelector, type CategorySelection } from "@/components/category-selector"
 import { SuggestCategoryModal } from "@/components/suggest-category-modal"
@@ -114,7 +115,8 @@ export default function BusinessFocusPage() {
             </p>
           </div>
 
-          <ServiceAreaSection />
+          {/* Replace the ServiceAreaSection with ServiceAreaSectionEnhanced */}
+          <ServiceAreaSectionEnhanced />
 
           <KeywordsSection />
 
