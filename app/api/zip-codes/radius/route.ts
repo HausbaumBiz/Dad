@@ -4,7 +4,7 @@ import { list } from "@vercel/blob"
 import { haversineDistance } from "@/lib/zip-code-utils"
 import { findZipCodesInRadius } from "@/lib/zip-code-file" // Fallback to file-based storage
 
-export const dynamic = "force-dynamic" // Fixed: Changed from force_dynamic to force-dynamic
+export const dynamic = "force-dynamic"
 
 // Cache for ZIP code data to avoid fetching from Blob storage on every request
 let zipCodeCache: Record<string, ZipCodeData> | null = null

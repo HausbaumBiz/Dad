@@ -2,14 +2,15 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { Loader2, X, Search } from "lucide-react"
-import { findZipCodesInRadius, getZipCodeData, type ZipCodeData } from "@/lib/zip-code-utils"
+import { Loader2, X, Search, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import type { ZipCodeData } from "@/lib/zip-code-types"
 
 export function ServiceAreaSectionEnhanced() {
   const [zipCode, setZipCode] = useState("")
@@ -18,24 +19,7 @@ export function ServiceAreaSectionEnhanced() {
   const [zipResults, setZipResults] = useState<ZipCodeData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [zipDatabase, setZipDatabase] = useState<ZipCodeData[]>([])
-  const [isDbLoading, setIsDbLoading] = useState(true)
-
-  // Load ZIP code database on component mount
-  useEffect(() => {
-    const loadZipData = async () => {
-      try {
-        const data = await getZipCodeData()
-        setZipDatabase(data)
-        setIsDbLoading(false)
-      } catch (err) {
-        setError("Failed to load ZIP code database")
-        setIsDbLoading(false)
-      }
-    }
-
-    loadZipData()
-  }, [])
+  const [dataSource, setDataSource] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,19 +29,35 @@ export function ServiceAreaSectionEnhanced() {
       return
     }
 
+    // Validate ZIP code format
+    if (!/^\d{5}$/.test(zipCode)) {
+      setError("Invalid ZIP code format. Must be 5 digits.")
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
     try {
-      // Find ZIP codes within the radius
-      const results = await findZipCodesInRadius(zipCode, radius, zipDatabase)
+      // Use the API endpoint to search for ZIP codes within the radius
+      const response = await fetch(`/api/zip-codes/radius?zip=${zipCode}&radius=${radius}&limit=100`)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
 
       // Add the results to the existing results (avoiding duplicates)
       setZipResults((prevResults) => {
         const existingZips = new Set(prevResults.map((z) => z.zip))
-        const newResults = results.filter((z) => !existingZips.has(z.zip))
+        const newResults = data.zipCodes.filter((z: ZipCodeData) => !existingZips.has(z.zip))
         return [...prevResults, ...newResults]
       })
+
+      // Store the data source for informational purposes
+      setDataSource(data.source || "unknown")
 
       // Clear the input
       setZipCode("")
@@ -102,13 +102,13 @@ export function ServiceAreaSectionEnhanced() {
                   id="zipCode"
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
-                  disabled={isNationwide || isDbLoading}
+                  disabled={isNationwide}
                   className="pl-10"
                   placeholder="Enter ZIP code"
                   required
                 />
               </div>
-              <Button type="submit" disabled={isNationwide || isLoading || isDbLoading}>
+              <Button type="submit" disabled={isNationwide || isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -119,13 +119,17 @@ export function ServiceAreaSectionEnhanced() {
                 )}
               </Button>
             </div>
-            {isDbLoading && (
-              <p className="text-sm text-amber-600 mt-2">
-                <Loader2 className="inline mr-2 h-4 w-4 animate-spin" />
-                Loading ZIP code database...
+            {dataSource && (
+              <p className="text-xs text-gray-500 mt-1">
+                Using ZIP code data from: {dataSource === "blob" ? "online database" : dataSource}
               </p>
             )}
-            {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+            {error && (
+              <Alert variant="destructive" className="mt-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           </div>
         </form>
 
@@ -162,6 +166,9 @@ export function ServiceAreaSectionEnhanced() {
                         <span className="text-xs text-gray-500 block">
                           {zip.city}, {zip.state}
                         </span>
+                      )}
+                      {zip.distance !== undefined && (
+                        <span className="text-xs text-blue-500">{zip.distance.toFixed(1)} miles</span>
                       )}
                     </div>
                     <Button
