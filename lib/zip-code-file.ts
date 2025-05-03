@@ -26,31 +26,41 @@ interface ZipCodeIndex {
  */
 async function initializeDataDir(): Promise<void> {
   try {
+    console.log(`Creating directory: ${DATA_DIR}`)
     // Create the main data directory if it doesn't exist
     await fs.mkdir(DATA_DIR, { recursive: true })
+    console.log(`Directory created or already exists: ${DATA_DIR}`)
 
+    console.log(`Creating directory: ${STATE_INDEX_DIR}`)
     // Create the state index directory if it doesn't exist
     await fs.mkdir(STATE_INDEX_DIR, { recursive: true })
+    console.log(`Directory created or already exists: ${STATE_INDEX_DIR}`)
 
     // Check if the index file exists, create it if not
     try {
       await fs.access(INDEX_FILE)
+      console.log(`Index file exists: ${INDEX_FILE}`)
     } catch (error) {
       // Create an empty index file
+      console.log(`Creating index file: ${INDEX_FILE}`)
       const emptyIndex: ZipCodeIndex = {
         count: 0,
         lastUpdated: new Date().toISOString(),
         states: {},
       }
       await fs.writeFile(INDEX_FILE, JSON.stringify(emptyIndex, null, 2))
+      console.log(`Index file created: ${INDEX_FILE}`)
     }
 
     // Check if the ZIP data file exists, create it if not
     try {
       await fs.access(ZIP_DATA_FILE)
+      console.log(`ZIP data file exists: ${ZIP_DATA_FILE}`)
     } catch (error) {
       // Create an empty ZIP data file
+      console.log(`Creating ZIP data file: ${ZIP_DATA_FILE}`)
       await fs.writeFile(ZIP_DATA_FILE, JSON.stringify({}, null, 2))
+      console.log(`ZIP data file created: ${ZIP_DATA_FILE}`)
     }
   } catch (error) {
     console.error("Error initializing ZIP code data directory:", error)
@@ -105,7 +115,16 @@ async function getAllZipCodes(): Promise<Record<string, ZipCodeData>> {
 async function saveAllZipCodes(zipCodes: Record<string, ZipCodeData>): Promise<void> {
   try {
     await initializeDataDir()
-    await fs.writeFile(ZIP_DATA_FILE, JSON.stringify(zipCodes, null, 2))
+    console.log(`Saving ZIP codes to file: ${ZIP_DATA_FILE}`)
+    console.log(`Total ZIP codes to save: ${Object.keys(zipCodes).length}`)
+
+    // Convert to JSON with pretty formatting
+    const jsonData = JSON.stringify(zipCodes, null, 2)
+    console.log(`JSON data size: ${jsonData.length} bytes`)
+
+    // Write to file
+    await fs.writeFile(ZIP_DATA_FILE, jsonData)
+    console.log(`ZIP codes saved successfully to: ${ZIP_DATA_FILE}`)
   } catch (error) {
     console.error("Error saving ZIP code data:", error)
     throw error
@@ -253,8 +272,11 @@ export async function importZipCodes(zipCodes: ZipCodeData[]): Promise<ZipCodeIm
     errors: 0,
   }
 
+  console.log(`Starting import of ${zipCodes.length} ZIP codes`)
+
   // Get current ZIP codes
   const currentZipCodes = await getAllZipCodes()
+  console.log(`Current ZIP codes in database: ${Object.keys(currentZipCodes).length}`)
 
   // Process all ZIP codes
   for (const zipData of zipCodes) {
@@ -280,7 +302,9 @@ export async function importZipCodes(zipCodes: ZipCodeData[]): Promise<ZipCodeIm
 
   // Save all ZIP codes at once
   try {
+    console.log(`Saving ${Object.keys(currentZipCodes).length} ZIP codes to database`)
     await saveAllZipCodes(currentZipCodes)
+    console.log(`ZIP codes saved successfully`)
 
     // Update state indexes and main index
     const index = await getIndex()
@@ -296,6 +320,7 @@ export async function importZipCodes(zipCodes: ZipCodeData[]): Promise<ZipCodeIm
     })
 
     // Save state indexes
+    console.log(`Updating state indexes for ${Object.keys(stateMap).length} states`)
     for (const [state, zips] of Object.entries(stateMap)) {
       await saveStateIndex(state, zips)
       index.states[state] = zips.length
@@ -305,6 +330,7 @@ export async function importZipCodes(zipCodes: ZipCodeData[]): Promise<ZipCodeIm
     index.count = Object.keys(currentZipCodes).length
     index.lastUpdated = new Date().toISOString()
     await updateIndex(index)
+    console.log(`Index updated: ${index.count} ZIP codes`)
   } catch (error) {
     console.error("Error saving ZIP codes:", error)
     stats.errors += stats.imported

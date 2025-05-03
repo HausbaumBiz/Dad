@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Upload, Search, Database, AlertCircle } from "lucide-react"
+import { Loader2, Upload, Search, Database, AlertCircle, FileJson, Save, Info } from "lucide-react"
 import type { ZipCodeData, ZipCodeImportStats } from "@/lib/zip-code-types"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
@@ -23,6 +23,16 @@ export default function ZipCodeAdminPage() {
   const [dbStats, setDbStats] = useState<{ count: number; lastUpdated: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<string | null>(null)
+  const [isSavingToBlob, setIsSavingToBlob] = useState(false)
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const [isCheckingBlob, setIsCheckingBlob] = useState(false)
+  const [blobInfo, setBlobInfo] = useState<{
+    exists: boolean
+    url?: string
+    size?: number
+    uploadedAt?: string
+  } | null>(null)
+  const [dataSource, setDataSource] = useState<string | null>(null)
 
   // Fetch database stats on load
   useEffect(() => {
@@ -39,6 +49,7 @@ export default function ZipCodeAdminPage() {
     }
 
     fetchDbStats()
+    checkBlobStorage() // Check Blob storage on page load
   }, [])
 
   // Handle file selection
@@ -47,6 +58,7 @@ export default function ZipCodeAdminPage() {
       setFile(e.target.files[0])
       setError(null)
       setDebugInfo(null)
+      setBlobUrl(null)
     }
   }
 
@@ -181,6 +193,103 @@ export default function ZipCodeAdminPage() {
     }
   }
 
+  // Save to Blob Storage
+  const saveToBlob = async () => {
+    if (!file) return
+
+    setIsSavingToBlob(true)
+    setError(null)
+    setBlobUrl(null)
+
+    try {
+      // Read the file
+      const fileContent = await readFileAsText(file)
+
+      // Parse the file content
+      let zipCodes: ZipCodeData[] = []
+
+      if (file.name.endsWith(".json")) {
+        zipCodes = JSON.parse(fileContent)
+      } else if (file.name.endsWith(".csv")) {
+        zipCodes = parseCSV(fileContent)
+      } else {
+        throw new Error("Unsupported file format. Please upload a CSV or JSON file.")
+      }
+
+      // Map and validate the data
+      const validZipCodes = zipCodes
+        .map((zipCode) => {
+          const mappedZipCode: any = {}
+          mappedZipCode.zip = zipCode.zip || zipCode.zipCode || zipCode.zipcode || zipCode.postal_code || ""
+          mappedZipCode.latitude = Number.parseFloat(String(zipCode.latitude || zipCode.lat || 0))
+          mappedZipCode.longitude = Number.parseFloat(String(zipCode.longitude || zipCode.lng || zipCode.long || 0))
+          mappedZipCode.city = zipCode.city || ""
+          mappedZipCode.state = zipCode.state || zipCode.state_name || ""
+          if (zipCode.county) mappedZipCode.county = zipCode.county
+          if (zipCode.timezone) mappedZipCode.timezone = zipCode.timezone
+          if (zipCode.population) mappedZipCode.population = Number(zipCode.population)
+          return mappedZipCode as ZipCodeData
+        })
+        .filter(
+          (zipCode) =>
+            zipCode.zip &&
+            !isNaN(Number(zipCode.latitude)) &&
+            !isNaN(Number(zipCode.longitude)) &&
+            zipCode.city &&
+            zipCode.state,
+        )
+
+      if (validZipCodes.length === 0) {
+        throw new Error("No valid ZIP code records found after validation.")
+      }
+
+      // Convert to a record format (zip -> data)
+      const zipCodeRecord: Record<string, ZipCodeData> = {}
+      validZipCodes.forEach((zipCode) => {
+        zipCodeRecord[zipCode.zip] = zipCode
+      })
+
+      // Convert to JSON
+      const jsonData = JSON.stringify(zipCodeRecord, null, 2)
+
+      // Create a Blob from the JSON data
+      const blob = new Blob([jsonData], { type: "application/json" })
+      const fileToUpload = new File([blob], "zip-data.json", { type: "application/json" })
+
+      // Create FormData
+      const formData = new FormData()
+      formData.append("file", fileToUpload)
+
+      // Upload to Blob Storage
+      const response = await fetch("/api/zip-codes/upload-blob", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to upload to Blob Storage")
+      }
+
+      const result = await response.json()
+      setBlobUrl(result.url)
+      setDebugInfo(
+        (prev) =>
+          `${prev || ""}\n\nSuccessfully saved to Blob Storage!\nFile: zip-data.json\nRecords: ${
+            validZipCodes.length
+          }\nURL: ${result.url}`,
+      )
+
+      // Check Blob storage again to update the UI
+      await checkBlobStorage()
+    } catch (error) {
+      console.error("Error saving to Blob Storage:", error)
+      setError(error instanceof Error ? error.message : "An unknown error occurred")
+    } finally {
+      setIsSavingToBlob(false)
+    }
+  }
+
   // Handle ZIP code search
   const handleSearch = async () => {
     if (!searchZip) return
@@ -189,6 +298,7 @@ export default function ZipCodeAdminPage() {
     setError(null)
     setSearchResults([])
     setZipDetails(null)
+    setDataSource(null)
 
     try {
       // First get the ZIP code details
@@ -203,6 +313,7 @@ export default function ZipCodeAdminPage() {
 
       if (detailsData.zipCode) {
         setZipDetails(detailsData.zipCode)
+        setDataSource(detailsData.source || "unknown")
       }
 
       // Then search for ZIP codes in radius
@@ -218,6 +329,9 @@ export default function ZipCodeAdminPage() {
 
         if (data.zipCodes && Array.isArray(data.zipCodes)) {
           setSearchResults(data.zipCodes)
+          if (!dataSource) {
+            setDataSource(data.source || "unknown")
+          }
         }
       }
     } catch (err) {
@@ -264,9 +378,54 @@ export default function ZipCodeAdminPage() {
     }
   }
 
+  // Check if the ZIP code data exists in Blob storage
+  const checkBlobStorage = async () => {
+    setIsCheckingBlob(true)
+    setError(null)
+    setDebugInfo((prev) => `${prev || ""}\n\nChecking for ZIP code data in Blob storage...`)
+
+    try {
+      const response = await fetch("/api/zip-codes/check-blob")
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to check Blob storage")
+      }
+
+      const data = await response.json()
+      setBlobInfo(data)
+
+      if (data.exists) {
+        setDebugInfo((prev) => `${prev}\nFile exists in Blob storage: ${data.url}`)
+        setDebugInfo((prev) => `${prev}\nFile size: ${data.size} bytes`)
+        setDebugInfo((prev) => `${prev}\nUploaded at: ${new Date(data.uploadedAt).toLocaleString()}`)
+      } else {
+        setDebugInfo((prev) => `${prev}\nFile does not exist in Blob storage`)
+        if (data.message) {
+          setDebugInfo((prev) => `${prev}\nMessage: ${data.message}`)
+        }
+      }
+    } catch (error) {
+      console.error("Error checking Blob storage:", error)
+      setError(error instanceof Error ? error.message : "An unknown error occurred")
+    } finally {
+      setIsCheckingBlob(false)
+    }
+  }
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-8 text-center">ZIP Code Database Administration</h1>
+
+      {!blobInfo?.exists && (
+        <Alert className="mb-6">
+          <Info className="h-4 w-4" />
+          <AlertTitle>No ZIP Code Data in Blob Storage</AlertTitle>
+          <AlertDescription>
+            ZIP code data file not found in Blob storage. Please upload a CSV or JSON file and save it to Blob storage.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Database Stats */}
@@ -283,30 +442,63 @@ export default function ZipCodeAdminPage() {
                 <p className="text-lg font-medium">Total ZIP Codes: {dbStats.count.toLocaleString()}</p>
                 <p className="text-sm text-gray-500">Last Updated: {new Date(dbStats.lastUpdated).toLocaleString()}</p>
 
-                {dbStats.count === 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleImportSample}
-                    disabled={isUploading}
-                    className="mt-4"
-                  >
-                    {isUploading ? (
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {dbStats.count === 0 && (
+                    <Button variant="outline" size="sm" onClick={handleImportSample} disabled={isUploading}>
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        <>
+                          <Database className="mr-2 h-4 w-4" />
+                          Import Sample ZIP Codes
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  <Button variant="outline" size="sm" onClick={checkBlobStorage} disabled={isCheckingBlob}>
+                    {isCheckingBlob ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Importing...
+                        Checking...
                       </>
                     ) : (
                       <>
-                        <Database className="mr-2 h-4 w-4" />
-                        Import Sample ZIP Codes
+                        <FileJson className="mr-2 h-4 w-4" />
+                        Check Blob Storage
                       </>
                     )}
                   </Button>
-                )}
+                </div>
               </div>
             ) : (
               <p className="text-gray-500 italic">Loading database statistics...</p>
+            )}
+
+            {blobInfo && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                <h3 className="font-medium mb-2">Blob Storage Status:</h3>
+                {blobInfo.exists ? (
+                  <div className="text-sm">
+                    <p>
+                      <span className="text-green-600 font-medium">✓</span> File exists in Blob storage
+                    </p>
+                    <p className="mt-1 text-xs text-gray-600">
+                      Size: {blobInfo.size ? (blobInfo.size / 1024).toFixed(2) + " KB" : "Unknown"}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Uploaded: {blobInfo.uploadedAt ? new Date(blobInfo.uploadedAt).toLocaleString() : "Unknown"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-amber-600">
+                    <span className="font-medium">⚠</span> ZIP code data file not found in Blob storage
+                  </p>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -328,7 +520,7 @@ export default function ZipCodeAdminPage() {
                   type="file"
                   accept=".csv,.json"
                   onChange={handleFileChange}
-                  disabled={isUploading}
+                  disabled={isUploading || isSavingToBlob}
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Accepts CSV or JSON files with ZIP code data. Required fields: zipCode, latitude, longitude, city,
@@ -336,22 +528,64 @@ export default function ZipCodeAdminPage() {
                 </p>
               </div>
 
-              <Button onClick={handleUpload} disabled={!file || isUploading} className="w-full">
-                {isUploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  "Upload and Import"
-                )}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button onClick={handleUpload} disabled={!file || isUploading || isSavingToBlob} className="flex-1">
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload to Database
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={saveToBlob}
+                  disabled={!file || isUploading || isSavingToBlob}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  {isSavingToBlob ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save as JSON to Blob
+                    </>
+                  )}
+                </Button>
+              </div>
 
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {blobUrl && (
+                <Alert>
+                  <FileJson className="h-4 w-4" />
+                  <AlertTitle>File Saved to Blob Storage</AlertTitle>
+                  <AlertDescription>
+                    <p className="mb-2">Your file has been saved as JSON to Blob Storage.</p>
+                    <a
+                      href={blobUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline break-all"
+                    >
+                      {blobUrl}
+                    </a>
+                  </AlertDescription>
                 </Alert>
               )}
 
@@ -430,7 +664,14 @@ export default function ZipCodeAdminPage() {
           {/* Single ZIP code details */}
           {zipDetails && (
             <div className="bg-gray-50 p-4 rounded-md mb-4">
-              <h3 className="font-medium mb-2">ZIP Code Details:</h3>
+              <h3 className="font-medium mb-2">
+                ZIP Code Details:
+                {dataSource && (
+                  <span className="text-xs ml-2 text-gray-500">
+                    (Data source: {dataSource === "blob" ? "Blob Storage" : "File System"})
+                  </span>
+                )}
+              </h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>ZIP Code:</div>
                 <div className="font-medium">{zipDetails.zip}</div>
