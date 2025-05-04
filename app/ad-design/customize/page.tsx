@@ -67,8 +67,13 @@ export default function CustomizeAdDesignPage() {
 
   const [formData, setFormData] = useState({
     businessName: "Business Name",
-    address: "123 Business St, City, ST 12345",
-    phone: "(555) 123-4567",
+    streetAddress: "123 Business St",
+    city: "City",
+    state: "ST",
+    zipCode: "12345",
+    phoneArea: "555",
+    phonePrefix: "123",
+    phoneLine: "4567",
     hours: "Mon-Fri: 9AM-5PM\nSat: 10AM-3PM",
     website: "www.businessname.com",
     freeText: "We offer professional services with 10+ years of experience in the industry.",
@@ -86,6 +91,8 @@ export default function CustomizeAdDesignPage() {
     thumbnail: boolean
     photoAlbum: boolean
     freeText: boolean
+    savingsButton: boolean
+    jobsButton: boolean
   }>({
     address: false,
     phone: false,
@@ -95,6 +102,8 @@ export default function CustomizeAdDesignPage() {
     thumbnail: false,
     photoAlbum: false,
     freeText: false,
+    savingsButton: false,
+    jobsButton: false,
   })
 
   // Add a handler function for toggling field visibility
@@ -233,7 +242,12 @@ export default function CustomizeAdDesignPage() {
     }
   }
 
-  // Load business data
+  // Add this function after the getFormattedPhone function
+  const getFormattedAddress = () => {
+    return `${formData.streetAddress}, ${formData.city}, ${formData.state} ${formData.zipCode}`
+  }
+
+  // Modify the loadBusinessData function to parse phone number
   const loadBusinessData = async (id: string) => {
     try {
       // In a real app, you would fetch the business data from your API
@@ -243,15 +257,34 @@ export default function CustomizeAdDesignPage() {
       // const businessDetails = await getBusinessDetails(id)
 
       // For now, we'll just set some default values if none are loaded
-      setFormData((prev) => ({
-        ...prev,
-        businessName: "Your Business Name", // Replace with actual data
-        address: "Your Business Address", // Replace with actual data
-        phone: "Your Business Phone", // Replace with actual data
-        hours: "Your Business Hours", // Replace with actual data
-        website: "Your Business Website", // Replace with actual data
-        freeText: "Your Business Description", // Replace with actual data
-      }))
+      setFormData((prev) => {
+        // Parse phone number if it exists in format (555) 123-4567
+        let phoneArea = "555"
+        let phonePrefix = "123"
+        let phoneLine = "4567"
+
+        const phoneMatch = prev.phone?.match(/$$(\d{3})$$\s*(\d{3})-(\d{4})/)
+        if (phoneMatch) {
+          phoneArea = phoneMatch[1]
+          phonePrefix = phoneMatch[2]
+          phoneLine = phoneMatch[3]
+        }
+
+        return {
+          ...prev,
+          businessName: "Your Business Name", // Replace with actual data
+          streetAddress: "123 Main St", // Replace with actual data
+          city: "Your City", // Replace with actual data
+          state: "ST", // Replace with actual data
+          zipCode: "12345", // Replace with actual data
+          phoneArea,
+          phonePrefix,
+          phoneLine,
+          hours: "Your Business Hours", // Replace with actual data
+          website: "Your Business Website", // Replace with actual data
+          freeText: "Your Business Description", // Replace with actual data
+        }
+      })
     } catch (error) {
       console.error("Error loading business data:", error)
     }
@@ -262,6 +295,34 @@ export default function CustomizeAdDesignPage() {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
+    }))
+  }
+
+  // Add this function after the handleInputChange function
+  const getFormattedPhone = () => {
+    return `(${formData.phoneArea}) ${formData.phonePrefix}-${formData.phoneLine}`
+  }
+
+  // Add this function after the getFormattedPhone function
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const { value } = e.target
+
+    // Allow only numbers
+    const numericValue = value.replace(/[^0-9]/g, "")
+
+    // Limit length based on the field
+    let truncatedValue = numericValue
+    if (field === "phoneArea") {
+      truncatedValue = numericValue.slice(0, 3)
+    } else if (field === "phonePrefix") {
+      truncatedValue = numericValue.slice(0, 3)
+    } else if (field === "phoneLine") {
+      truncatedValue = numericValue.slice(0, 4)
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      [field]: truncatedValue,
     }))
   }
 
@@ -480,6 +541,7 @@ export default function CustomizeAdDesignPage() {
     }
   }
 
+  // Modify the handleSubmit function to save the formatted phone number
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -498,11 +560,18 @@ export default function CustomizeAdDesignPage() {
       // Save hidden fields settings
       await saveMediaSettings(businessId, { hiddenFields })
 
+      // Format the phone number for saving
+      const formattedData = {
+        ...formData,
+        phone: getFormattedPhone(), // Use the formatted phone number
+        address: getFormattedAddress(), // Add the formatted address
+      }
+
       // Save business ad design data
       await saveBusinessAdDesign(businessId, {
         designId: selectedDesign,
         colorScheme: selectedColor,
-        businessInfo: formData,
+        businessInfo: formattedData,
       })
 
       toast({
@@ -627,52 +696,56 @@ export default function CustomizeAdDesignPage() {
   // Feature buttons component
   const FeatureButtons = () => (
     <div className="flex justify-center gap-4 p-4 bg-gray-100 rounded-b-lg">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setIsSavingsDialogOpen(true)}
-        className="flex items-center gap-2"
-        style={{ borderColor: colorValues.primary, color: colorValues.primary }}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      {!hiddenFields.savingsButton && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsSavingsDialogOpen(true)}
+          className="flex items-center gap-2"
+          style={{ borderColor: colorValues.primary, color: colorValues.primary }}
         >
-          <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-          <path d="M7 7h.01" />
-        </svg>
-        Savings
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setIsJobsDialogOpen(true)}
-        className="flex items-center gap-2"
-        style={{ borderColor: colorValues.primary, color: colorValues.primary }}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+            <path d="M7 7h.01" />
+          </svg>
+          Savings
+        </Button>
+      )}
+      {!hiddenFields.jobsButton && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsJobsDialogOpen(true)}
+          className="flex items-center gap-2"
+          style={{ borderColor: colorValues.primary, color: colorValues.primary }}
         >
-          <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
-          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-        </svg>
-        Job Opportunities
-      </Button>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+          </svg>
+          Job Opportunities
+        </Button>
+      )}
     </div>
   )
 
@@ -719,7 +792,7 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Address</p>
-                        <p className="text-sm text-gray-600">{formData.address}</p>
+                        <p className="text-sm text-gray-600">{getFormattedAddress()}</p>
                       </div>
                     </div>
                   )}
@@ -744,7 +817,7 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Phone</p>
-                        <p className="text-sm text-gray-600">{formData.phone}</p>
+                        <p className="text-sm text-gray-600">{getFormattedPhone()}</p>
                       </div>
                     </div>
                   )}
@@ -1032,7 +1105,7 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Address</p>
-                        <p className="text-sm text-gray-600">{formData.address}</p>
+                        <p className="text-sm text-gray-600">{getFormattedAddress()}</p>
                       </div>
                     </div>
                   )}
@@ -1057,7 +1130,7 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Phone</p>
-                        <p className="text-sm text-gray-600">{formData.phone}</p>
+                        <p className="text-sm text-gray-600">{getFormattedPhone()}</p>
                       </div>
                     </div>
                   )}
@@ -1349,7 +1422,7 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Address</p>
-                        <p className="text-sm text-gray-600">{formData.address}</p>
+                        <p className="text-sm text-gray-600">{getFormattedAddress()}</p>
                       </div>
                     </div>
                   )}
@@ -1374,7 +1447,7 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Phone</p>
-                        <p className="text-sm text-gray-600">{formData.phone}</p>
+                        <p className="text-sm text-gray-600">{getFormattedPhone()}</p>
                       </div>
                     </div>
                   )}
@@ -1491,6 +1564,274 @@ export default function CustomizeAdDesignPage() {
           </div>
         </div>
       )
+    } else if (selectedDesign === 5) {
+      // Modern Business Card design
+      return (
+        <div className="mb-8">
+          <h2 className="text-xl font-bold mb-4">Selected Design: Design 5</h2>
+          <div className="overflow-hidden rounded-lg shadow-md">
+            <Card className="max-w-md mx-auto">
+              <div
+                className="p-5 text-white"
+                style={{
+                  background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
+                }}
+              >
+                <h3 className="text-2xl font-bold">{formData.businessName}</h3>
+                {!hiddenFields.freeText && formData.freeText && (
+                  <p className="text-base mt-1 opacity-90">{formData.freeText}</p>
+                )}
+              </div>
+
+              <div className="pt-6 px-6 space-y-4">
+                {!hiddenFields.phone && (
+                  <div className="flex items-start gap-3">
+                    <div className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: colorValues.primary }}>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Phone</p>
+                      <p>{getFormattedPhone()}</p>
+                    </div>
+                  </div>
+                )}
+
+                {!hiddenFields.address && (
+                  <div className="flex items-start gap-3">
+                    <div className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: colorValues.primary }}>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Address</p>
+                      <p>{getFormattedAddress()}</p>
+                    </div>
+                  </div>
+                )}
+
+                {!hiddenFields.hours && (
+                  <div className="flex items-start gap-3">
+                    <div className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: colorValues.primary }}>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Hours of Operation</p>
+                      <div className="space-y-1">
+                        {formData.hours.split("\n").map((line, i) => (
+                          <p key={i} className="text-sm">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Video Section */}
+              {!hiddenFields.video && (
+                <div className="border-t pt-4 mt-4 px-4">
+                  <div className="relative w-full pb-[56.25%]">
+                    {/* Thumbnail overlay */}
+                    {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
+                      <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                        <img
+                          src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
+                          alt="Video thumbnail"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+
+                    {videoPreview ? (
+                      <video
+                        ref={videoRef}
+                        src={videoPreview}
+                        className="absolute top-0 left-0 w-full h-full rounded-md"
+                        onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
+                        muted
+                      />
+                    ) : (
+                      <div
+                        className="absolute inset-0 flex items-center justify-center cursor-pointer bg-gray-100 rounded-md"
+                        onClick={handlePlayVideo}
+                      >
+                        <div
+                          className="rounded-full p-3 shadow-lg"
+                          style={{
+                            background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
+                          }}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="32"
+                            height="32"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="text-white"
+                          >
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Custom video controls */}
+                  {videoPreview && <VideoControls />}
+                </div>
+              )}
+
+              {/* Footer with buttons */}
+
+              <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
+                {!hiddenFields.photoAlbum && (
+                  <button
+                    onClick={handleOpenPhotoAlbum}
+                    className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ color: colorValues.primary }}
+                    >
+                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                      <circle cx="9" cy="9" r="2"></circle>
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                    </svg>
+                    View Photo Album
+                  </button>
+                )}
+
+                {!hiddenFields.website && (
+                  <button
+                    onClick={() => window.open(`https://${formData.website}`, "_blank")}
+                    className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                    style={{ backgroundColor: colorValues.primary }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-white"
+                    >
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                    Visit Website
+                  </button>
+                )}
+
+                {!hiddenFields.savingsButton && (
+                  <button
+                    onClick={() => setIsSavingsDialogOpen(true)}
+                    className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ color: colorValues.primary }}
+                    >
+                      <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+                      <path d="M7 7h.01" />
+                    </svg>
+                    View Coupons
+                  </button>
+                )}
+
+                {!hiddenFields.jobsButton && (
+                  <button
+                    onClick={() => setIsJobsDialogOpen(true)}
+                    className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ color: colorValues.primary }}
+                    >
+                      <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
+                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                    </svg>
+                    Job Opportunities
+                  </button>
+                )}
+              </div>
+
+              <div className="p-3 text-center text-white" style={{ backgroundColor: colorValues.primary }}>
+                <p className="font-medium">Design 5</p>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )
     } else {
       // Default Teal Waves design (design #1 or #6) with portrait video (9:16)
       return (
@@ -1529,7 +1870,7 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Address</p>
-                        <p className="text-sm text-gray-600">{formData.address}</p>
+                        <p className="text-sm text-gray-600">{getFormattedAddress()}</p>
                       </div>
                     </div>
                   )}
@@ -1553,7 +1894,7 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Phone</p>
-                        <p className="text-sm text-gray-600">{formData.phone}</p>
+                        <p className="text-sm text-gray-600">{getFormattedPhone()}</p>
                       </div>
                     </div>
                   )}
@@ -1854,8 +2195,8 @@ export default function CustomizeAdDesignPage() {
                   <h2 className="text-xl font-semibold">Design Layout</h2>
                   <p className="text-gray-600 mb-4">Choose a layout for your AdBox</p>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[1, 2, 3, 4].map((designId) => (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {[1, 2, 3, 4, 5].map((designId) => (
                       <button
                         key={designId}
                         onClick={() => setSelectedDesign(designId)}
@@ -1924,6 +2265,31 @@ export default function CustomizeAdDesignPage() {
                                 </div>
                               </div>
                             )}
+
+                            {/* Design 5 - Modern Card */}
+                            {designId === 5 && (
+                              <div className="w-full h-full flex flex-col">
+                                <div className="w-full bg-white rounded-md p-1 mb-1">
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                    <div className="h-1 w-10 bg-gray-200 rounded"></div>
+                                  </div>
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                    <div className="h-1 w-8 bg-gray-200 rounded"></div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                    <div className="h-1 w-12 bg-gray-200 rounded"></div>
+                                  </div>
+                                </div>
+                                <div className="w-full h-1/3 bg-gray-300 rounded-md mb-1"></div>
+                                <div className="w-full flex gap-1">
+                                  <div className="flex-1 h-2 bg-gray-200 rounded"></div>
+                                  <div className="flex-1 h-2 bg-gray-200 rounded"></div>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           <div className="h-6 bg-gray-100 text-xs flex items-center justify-center font-medium">
@@ -1957,7 +2323,7 @@ export default function CustomizeAdDesignPage() {
 
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <label htmlFor="address">Address</label>
+                          <label htmlFor="streetAddress">Address</label>
                           <div className="flex items-center">
                             <input
                               type="checkbox"
@@ -1971,14 +2337,54 @@ export default function CustomizeAdDesignPage() {
                             </label>
                           </div>
                         </div>
-                        <input
-                          id="address"
-                          name="address"
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          value={formData.address}
-                          onChange={handleInputChange}
-                          required
-                        />
+                        <div className="space-y-3">
+                          <input
+                            id="streetAddress"
+                            name="streetAddress"
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            value={formData.streetAddress}
+                            onChange={handleInputChange}
+                            placeholder="Street Address"
+                            required
+                          />
+                          <div className="grid grid-cols-12 gap-2">
+                            <div className="col-span-6">
+                              <input
+                                id="city"
+                                name="city"
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                value={formData.city}
+                                onChange={handleInputChange}
+                                placeholder="City"
+                                required
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <input
+                                id="state"
+                                name="state"
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                value={formData.state}
+                                onChange={handleInputChange}
+                                placeholder="State"
+                                maxLength={2}
+                                required
+                              />
+                            </div>
+                            <div className="col-span-4">
+                              <input
+                                id="zipCode"
+                                name="zipCode"
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                value={formData.zipCode}
+                                onChange={handleInputChange}
+                                placeholder="ZIP Code"
+                                maxLength={10}
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       <div>
@@ -1997,14 +2403,45 @@ export default function CustomizeAdDesignPage() {
                             </label>
                           </div>
                         </div>
-                        <input
-                          id="phone"
-                          name="phone"
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          value={formData.phone}
-                          onChange={handleInputChange}
-                          required
-                        />
+                        <div className="flex gap-2">
+                          <div className="w-24">
+                            <input
+                              id="phoneArea"
+                              name="phoneArea"
+                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-center"
+                              value={formData.phoneArea}
+                              onChange={(e) => handlePhoneChange(e, "phoneArea")}
+                              placeholder="Area"
+                              maxLength={3}
+                              required
+                            />
+                          </div>
+                          <div className="w-24">
+                            <input
+                              id="phonePrefix"
+                              name="phonePrefix"
+                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-center"
+                              value={formData.phonePrefix}
+                              onChange={(e) => handlePhoneChange(e, "phonePrefix")}
+                              placeholder="Prefix"
+                              maxLength={3}
+                              required
+                            />
+                          </div>
+                          <div className="w-28">
+                            <input
+                              id="phoneLine"
+                              name="phoneLine"
+                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-center"
+                              value={formData.phoneLine}
+                              onChange={(e) => handlePhoneChange(e, "phoneLine")}
+                              placeholder="Line"
+                              maxLength={4}
+                              required
+                            />
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">Format: (123) 456-7890</p>
                       </div>
 
                       <div>
@@ -2096,6 +2533,66 @@ export default function CustomizeAdDesignPage() {
                       <p className="text-sm text-gray-500 mt-1">
                         This text will be displayed prominently in your AdBox
                       </p>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Feature Buttons Section */}
+                <Card>
+                  <div className="p-6 space-y-6">
+                    <h2 className="text-xl font-semibold">Feature Buttons</h2>
+                    <div className="space-y-4">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="hideSavingsButton"
+                          checked={hiddenFields.savingsButton}
+                          onChange={() => toggleFieldVisibility("savingsButton")}
+                          className="mr-2"
+                        />
+                        <label htmlFor="hideSavingsButton" className="text-gray-700">
+                          Hide Savings Button
+                        </label>
+                      </div>
+
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="hideJobsButton"
+                          checked={hiddenFields.jobsButton}
+                          onChange={() => toggleFieldVisibility("jobsButton")}
+                          className="mr-2"
+                        />
+                        <label htmlFor="hideJobsButton" className="text-gray-700">
+                          Hide Job Opportunities Button
+                        </label>
+                      </div>
+
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="hideWebsiteButton"
+                          checked={hiddenFields.website}
+                          onChange={() => toggleFieldVisibility("website")}
+                          className="mr-2"
+                        />
+                        <label htmlFor="hideWebsiteButton" className="text-gray-700">
+                          Hide Website Button/Link
+                        </label>
+                      </div>
+
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="hidePhotoAlbumButton"
+                          checked={hiddenFields.photoAlbum}
+                          onChange={() => toggleFieldVisibility("photoAlbum")}
+                          className="mr-2"
+                        />
+                        <label htmlFor="hidePhotoAlbumButton" className="text-gray-700">
+                          Hide Photo Album Button/Link
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </Card>
