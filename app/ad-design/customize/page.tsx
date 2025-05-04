@@ -439,6 +439,7 @@ export default function CustomizeAdDesignPage() {
   useEffect(() => {
     // Get all video elements that currently exist in the DOM
     const videoElements = [videoRef.current, verticalVideoRef.current, mobileVideoRef.current].filter(Boolean)
+    const timeUpdateHandlers = new Map()
 
     const handleVideoEnd = () => {
       console.log("Video ended, showing thumbnail")
@@ -466,18 +467,22 @@ export default function CustomizeAdDesignPage() {
 
         video.removeEventListener("timeupdate", timeUpdateHandler)
         video.addEventListener("timeupdate", timeUpdateHandler)
+
+        // Store the handler reference so we can remove it later
+        timeUpdateHandlers.set(video, timeUpdateHandler)
       }
     })
 
     return () => {
-      // Clean up all event listeners
+      // Clean up all event listeners safely
       videoElements.forEach((video) => {
         if (video) {
           video.removeEventListener("ended", handleVideoEnd)
-          // Remove all timeupdate listeners
-          const clone = video.cloneNode(true)
-          if (video.parentNode) {
-            video.parentNode.replaceChild(clone, video)
+
+          // Remove timeupdate listener using the stored reference
+          const timeUpdateHandler = timeUpdateHandlers.get(video)
+          if (timeUpdateHandler) {
+            video.removeEventListener("timeupdate", timeUpdateHandler)
           }
         }
       })
