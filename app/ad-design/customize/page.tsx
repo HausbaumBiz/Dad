@@ -50,7 +50,7 @@ export default function CustomizeAdDesignPage() {
   const [openDialogId, setOpenDialogId] = useState<string | null>(null)
 
   // Color mapping
-  const colorMap: Record<string, { primary: string; secondary: string }> = {
+  const colorMap: Record<string, { primary: string; secondary: string; textColor?: string }> = {
     blue: { primary: "#007BFF", secondary: "#0056b3" },
     purple: { primary: "#6f42c1", secondary: "#5e37a6" },
     green: { primary: "#28a745", secondary: "#218838" },
@@ -58,8 +58,12 @@ export default function CustomizeAdDesignPage() {
     orange: { primary: "#fd7e14", secondary: "#e65f02" },
     red: { primary: "#dc3545", secondary: "#c82333" },
     black: { primary: "#000000", secondary: "#333333" },
+    white: { primary: "#ffffff", secondary: "#f8f9fa", textColor: "#000000" },
+    yellow: { primary: "#ffc107", secondary: "#ffdb58", textColor: "#000000" },
     slategrey: { primary: "#708090", secondary: "#4E5964" },
     brown: { primary: "#8B4513", secondary: "#6B3610" },
+    darkpink: { primary: "#FF1493", secondary: "#C71585" },
+    lightpink: { primary: "#FFC0CB", secondary: "#FFB6C1", textColor: "#000000" },
   }
 
   // Get the selected color values
@@ -707,7 +711,10 @@ export default function CustomizeAdDesignPage() {
           size="sm"
           onClick={() => setIsSavingsDialogOpen(true)}
           className="flex items-center gap-2"
-          style={{ borderColor: colorValues.primary, color: colorValues.primary }}
+          style={{
+            borderColor: colorValues.primary,
+            color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+          }}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -715,7 +722,7 @@ export default function CustomizeAdDesignPage() {
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="currentColor"
+            stroke={selectedColor === "white" || selectedColor === "yellow" ? "#000000" : "currentColor"}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -732,7 +739,10 @@ export default function CustomizeAdDesignPage() {
           size="sm"
           onClick={() => setIsJobsDialogOpen(true)}
           className="flex items-center gap-2"
-          style={{ borderColor: colorValues.primary, color: colorValues.primary }}
+          style={{
+            borderColor: colorValues.primary,
+            color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+          }}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -740,7 +750,7 @@ export default function CustomizeAdDesignPage() {
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="currentColor"
+            stroke={selectedColor === "white" || selectedColor === "yellow" ? "#000000" : "currentColor"}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -765,7 +775,7 @@ export default function CustomizeAdDesignPage() {
           <div className="overflow-hidden rounded-lg shadow-md">
             <Card className="relative overflow-hidden">
               <div
-                className="p-5 text-white"
+                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
                 style={{
                   background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
                 }}
@@ -789,7 +799,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
                           <circle cx="12" cy="10" r="3"></circle>
@@ -815,7 +828,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                         </svg>
@@ -840,7 +856,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <circle cx="12" cy="12" r="10"></circle>
                           <polyline points="12 6 12 12 16 14"></polyline>
@@ -870,7 +889,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
@@ -878,7 +900,12 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Website</p>
-                        <p className="text-sm underline" style={{ color: colorValues.primary }}>
+                        <p
+                          className="text-sm underline"
+                          style={{
+                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
+                          }}
+                        >
                           {formData.website}
                         </p>
                       </div>
@@ -898,7 +925,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
                           <circle cx="9" cy="9" r="2"></circle>
@@ -909,7 +939,9 @@ export default function CustomizeAdDesignPage() {
                         <p className="font-medium text-gray-800">Photo Album</p>
                         <button
                           className="text-sm underline cursor-pointer"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
+                          }}
                           onClick={handleOpenPhotoAlbum}
                         >
                           Browse Photos {photos.length > 0 && `(${photos.length})`}
@@ -923,7 +955,12 @@ export default function CustomizeAdDesignPage() {
               {/* Free Text Section */}
               {!hiddenFields.freeText && formData.freeText && (
                 <div className="w-full bg-white p-4 text-center border-t border-gray-100">
-                  <p className="text-lg font-medium" style={{ color: colorValues.primary }}>
+                  <p
+                    className="text-lg font-medium"
+                    style={{
+                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    }}
+                  >
                     {formData.freeText}
                   </p>
                 </div>
@@ -995,7 +1032,10 @@ export default function CustomizeAdDesignPage() {
                 </div>
               )}
 
-              <div className="p-3 text-center text-white" style={{ backgroundColor: colorValues.primary }}>
+              <div
+                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
+                style={{ backgroundColor: colorValues.primary }}
+              >
                 <p className="font-medium">Design 3</p>
               </div>
               {/* Add Feature Buttons */}
@@ -1012,7 +1052,7 @@ export default function CustomizeAdDesignPage() {
           <div className="overflow-hidden rounded-lg shadow-md">
             <Card className="relative overflow-hidden">
               <div
-                className="p-5 text-white"
+                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
                 style={{
                   background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
                 }}
@@ -1102,7 +1142,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
                           <circle cx="12" cy="10" r="3"></circle>
@@ -1128,7 +1171,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                         </svg>
@@ -1153,7 +1199,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <circle cx="12" cy="12" r="10"></circle>
                           <polyline points="12 6 12 12 16 14"></polyline>
@@ -1183,7 +1232,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
@@ -1191,7 +1243,12 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Website</p>
-                        <p className="text-sm underline" style={{ color: colorValues.primary }}>
+                        <p
+                          className="text-sm underline"
+                          style={{
+                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
+                          }}
+                        >
                           {formData.website}
                         </p>
                       </div>
@@ -1211,7 +1268,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
                           <circle cx="9" cy="9" r="2"></circle>
@@ -1222,7 +1282,9 @@ export default function CustomizeAdDesignPage() {
                         <p className="font-medium text-gray-800">Photo Album</p>
                         <button
                           className="text-sm underline cursor-pointer"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
+                          }}
                           onClick={handleOpenPhotoAlbum}
                         >
                           Browse Photos {photos.length > 0 && `(${photos.length})`}
@@ -1236,13 +1298,21 @@ export default function CustomizeAdDesignPage() {
               {/* Free Text Section */}
               {!hiddenFields.freeText && formData.freeText && (
                 <div className="w-full bg-white p-4 text-center border-t border-gray-100">
-                  <p className="text-lg font-medium" style={{ color: colorValues.primary }}>
+                  <p
+                    className="text-lg font-medium"
+                    style={{
+                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    }}
+                  >
                     {formData.freeText}
                   </p>
                 </div>
               )}
 
-              <div className="p-3 text-center text-white" style={{ backgroundColor: colorValues.primary }}>
+              <div
+                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
+                style={{ backgroundColor: colorValues.primary }}
+              >
                 <p className="font-medium">Design 4</p>
               </div>
 
@@ -1329,7 +1399,7 @@ export default function CustomizeAdDesignPage() {
           <div className="overflow-hidden rounded-lg shadow-md">
             <Card className="relative overflow-hidden">
               <div
-                className="p-5 text-white"
+                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
                 style={{
                   background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
                 }}
@@ -1419,7 +1489,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
                           <circle cx="12" cy="10" r="3"></circle>
@@ -1445,7 +1518,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                         </svg>
@@ -1470,7 +1546,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <circle cx="12" cy="12" r="10"></circle>
                           <polyline points="12 6 12 12 16 14"></polyline>
@@ -1500,7 +1579,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
@@ -1508,7 +1590,12 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Website</p>
-                        <p className="text-sm underline" style={{ color: colorValues.primary }}>
+                        <p
+                          className="text-sm underline"
+                          style={{
+                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
+                          }}
+                        >
                           {formData.website}
                         </p>
                       </div>
@@ -1528,7 +1615,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
                           <circle cx="9" cy="9" r="2"></circle>
@@ -1539,7 +1629,9 @@ export default function CustomizeAdDesignPage() {
                         <p className="font-medium text-gray-800">Photo Album</p>
                         <button
                           className="text-sm underline cursor-pointer"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
+                          }}
                           onClick={handleOpenPhotoAlbum}
                         >
                           Browse Photos {photos.length > 0 && `(${photos.length})`}
@@ -1553,13 +1645,21 @@ export default function CustomizeAdDesignPage() {
               {/* Free Text Section */}
               {!hiddenFields.freeText && formData.freeText && (
                 <div className="w-full bg-white p-4 text-center border-t border-gray-100">
-                  <p className="text-lg font-medium" style={{ color: colorValues.primary }}>
+                  <p
+                    className="text-lg font-medium"
+                    style={{
+                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    }}
+                  >
                     {formData.freeText}
                   </p>
                 </div>
               )}
 
-              <div className="p-3 text-center text-white" style={{ backgroundColor: colorValues.primary }}>
+              <div
+                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
+                style={{ backgroundColor: colorValues.primary }}
+              >
                 <p className="font-medium">Design 2</p>
               </div>
 
@@ -1577,7 +1677,7 @@ export default function CustomizeAdDesignPage() {
           <div className="overflow-hidden rounded-lg shadow-md">
             <Card className="max-w-md mx-auto">
               <div
-                className="p-5 text-white"
+                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
                 style={{
                   background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
                 }}
@@ -1591,7 +1691,13 @@ export default function CustomizeAdDesignPage() {
               <div className="pt-6 px-6 space-y-4">
                 {!hiddenFields.phone && (
                   <div className="flex items-start gap-3">
-                    <div className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: colorValues.primary }}>
+                    <div
+                      className="h-5 w-5 mt-0.5 flex-shrink-0"
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
+                    >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="20"
@@ -1615,7 +1721,13 @@ export default function CustomizeAdDesignPage() {
 
                 {!hiddenFields.address && (
                   <div className="flex items-start gap-3">
-                    <div className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: colorValues.primary }}>
+                    <div
+                      className="h-5 w-5 mt-0.5 flex-shrink-0"
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
+                    >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="20"
@@ -1640,7 +1752,13 @@ export default function CustomizeAdDesignPage() {
 
                 {!hiddenFields.hours && (
                   <div className="flex items-start gap-3">
-                    <div className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: colorValues.primary }}>
+                    <div
+                      className="h-5 w-5 mt-0.5 flex-shrink-0"
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
+                    >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="20"
@@ -1746,7 +1864,10 @@ export default function CustomizeAdDesignPage() {
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      style={{ color: colorValues.primary }}
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
                     >
                       <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
                       <circle cx="9" cy="9" r="2"></circle>
@@ -1760,7 +1881,10 @@ export default function CustomizeAdDesignPage() {
                   <button
                     onClick={() => window.open(`https://${formData.website}`, "_blank")}
                     className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-                    style={{ backgroundColor: colorValues.primary }}
+                    style={{
+                      backgroundColor:
+                        selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    }}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -1796,7 +1920,10 @@ export default function CustomizeAdDesignPage() {
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      style={{ color: colorValues.primary }}
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
                     >
                       <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
                       <path d="M7 7h.01" />
@@ -1820,7 +1947,10 @@ export default function CustomizeAdDesignPage() {
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      style={{ color: colorValues.primary }}
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
                     >
                       <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
                       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
@@ -1830,7 +1960,10 @@ export default function CustomizeAdDesignPage() {
                 )}
               </div>
 
-              <div className="p-3 text-center text-white" style={{ backgroundColor: colorValues.primary }}>
+              <div
+                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
+                style={{ backgroundColor: colorValues.primary }}
+              >
                 <p className="font-medium">Design 5</p>
               </div>
             </Card>
@@ -1845,7 +1978,7 @@ export default function CustomizeAdDesignPage() {
           <div className="overflow-hidden rounded-lg shadow-md relative">
             <Card className="relative overflow-hidden">
               <div
-                className="p-5 text-white"
+                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
                 style={{
                   background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
                 }}
@@ -1867,7 +2000,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
                           <circle cx="12" cy="10" r="3"></circle>
@@ -1892,7 +2028,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                         </svg>
@@ -1916,7 +2055,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <circle cx="12" cy="12" r="10"></circle>
                           <polyline points="12 6 12 12 16 14"></polyline>
@@ -1945,7 +2087,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
@@ -1953,7 +2098,12 @@ export default function CustomizeAdDesignPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">Website</p>
-                        <p className="text-sm underline" style={{ color: colorValues.primary }}>
+                        <p
+                          className="text-sm underline"
+                          style={{
+                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
+                          }}
+                        >
                           {formData.website}
                         </p>
                       </div>
@@ -1972,7 +2122,10 @@ export default function CustomizeAdDesignPage() {
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
                         >
                           <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
                           <circle cx="9" cy="9" r="2"></circle>
@@ -1983,7 +2136,9 @@ export default function CustomizeAdDesignPage() {
                         <p className="font-medium text-gray-800">Photo Album</p>
                         <button
                           className="text-sm underline cursor-pointer"
-                          style={{ color: colorValues.primary }}
+                          style={{
+                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
+                          }}
                           onClick={handleOpenPhotoAlbum}
                         >
                           Browse Photos {photos.length > 0 && `(${photos.length})`}
@@ -1996,7 +2151,13 @@ export default function CustomizeAdDesignPage() {
                 {/* Free Text Section */}
                 {!hiddenFields.freeText && formData.freeText && (
                   <div className="w-full bg-white p-4 text-center border-t border-gray-100">
-                    <p className="text-lg font-medium" style={{ color: colorValues.primary }}>
+                    <p
+                      className="text-lg font-medium"
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
+                    >
                       {formData.freeText}
                     </p>
                   </div>
@@ -2070,7 +2231,10 @@ export default function CustomizeAdDesignPage() {
                 </div>
               )}
 
-              <div className="p-3 text-center text-white" style={{ backgroundColor: colorValues.primary }}>
+              <div
+                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
+                style={{ backgroundColor: colorValues.primary }}
+              >
                 <p className="font-medium">Design 1</p>
               </div>
 
@@ -2182,7 +2346,12 @@ export default function CustomizeAdDesignPage() {
                         }`}
                         style={{
                           background: `linear-gradient(to right, ${colorObj.primary}, ${colorObj.secondary})`,
-                          borderColor: selectedColor === colorKey ? colorObj.primary : "transparent",
+                          borderColor:
+                            colorKey === "white"
+                              ? "#000000"
+                              : selectedColor === colorKey
+                                ? colorObj.primary
+                                : "transparent",
                           ringColor: colorObj.primary,
                         }}
                         aria-label={`Select ${colorKey} theme`}
@@ -2605,8 +2774,12 @@ export default function CustomizeAdDesignPage() {
                 <div className="flex justify-center pt-4">
                   <button
                     type="submit"
-                    className="px-8 py-2 bg-blue-600 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    style={{ backgroundColor: colorValues.primary }}
+                    className={`px-8 py-2 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 ${colorValues.textColor ? "text-black" : "text-white"}`}
+                    style={{
+                      backgroundColor: colorValues.primary,
+                      borderColor: colorValues.textColor ? "#ddd" : "transparent",
+                      borderWidth: colorValues.textColor ? "1px" : "0",
+                    }}
                     disabled={isLoading}
                   >
                     {isLoading ? "Saving..." : "Save and Continue"}
