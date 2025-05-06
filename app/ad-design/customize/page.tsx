@@ -748,7 +748,7 @@ export default function CustomizeAdDesignPage() {
     // Default to Design 5 (Modern Business Card design)
     return (
       <div className="mb-8">
-        <h2 className="text-xl font-bold mb-4">Selected Design: Design 5</h2>
+        <h2 className="text-xl font-bold mb-4">Customize Your Design</h2>
         <div className="overflow-hidden rounded-lg shadow-md">
           <Card className="max-w-md mx-auto">
             <div
@@ -1027,13 +1027,6 @@ export default function CustomizeAdDesignPage() {
                   Job Opportunities
                 </button>
               )}
-            </div>
-
-            <div
-              className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
-              style={{ backgroundColor: colorValues.primary }}
-            >
-              <p className="font-medium">Design 5</p>
             </div>
           </Card>
         </div>
