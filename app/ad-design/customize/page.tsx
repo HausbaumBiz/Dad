@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Play, Pause } from "lucide-react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
@@ -29,7 +28,7 @@ export default function CustomizeAdDesignPage() {
   const searchParams = useSearchParams()
   const designId = searchParams.get("design")
   const colorParam = searchParams.get("color") || "blue"
-  const [selectedDesign, setSelectedDesign] = useState<number | null>(designId ? Number.parseInt(designId) : 6)
+  const [selectedDesign, setSelectedDesign] = useState<number | null>(designId ? Number.parseInt(designId) : 5)
   const [selectedColor, setSelectedColor] = useState(colorParam)
   const [businessId, setBusinessId] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
@@ -146,8 +145,9 @@ export default function CustomizeAdDesignPage() {
 
   // Photo album state
   const [photos, setPhotos] = useState<PhotoItem[]>([])
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
-  const [isPhotoAlbumOpen, setIsPhotoAlbumOpen] = useState(false)
+  // Remove or comment out these state variables
+  // const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
+  // const [isPhotoAlbumOpen, setIsPhotoAlbumOpen]
 
   // Video state
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
@@ -159,8 +159,7 @@ export default function CustomizeAdDesignPage() {
 
   // Video refs
   const videoRef = useRef<HTMLVideoElement>(null)
-  const verticalVideoRef = useRef<HTMLVideoElement>(null)
-  const mobileVideoRef = useRef<HTMLVideoElement>(null)
+  // Remove this line: const mobileVideoRef = useRef<HTMLVideoElement>(null)
 
   // Refs for coupons
   const couponRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
@@ -390,60 +389,50 @@ export default function CustomizeAdDesignPage() {
     // Set isPlaying to true immediately to update UI
     setIsPlaying(true)
 
-    // Get all video elements
-    const videoElements = [videoRef.current, verticalVideoRef.current, mobileVideoRef.current].filter(Boolean)
+    // Get video element
+    const videoElement = videoRef.current
 
-    // Reset all videos to beginning to ensure consistent playback
-    videoElements.forEach((video) => {
-      if (video) {
-        video.currentTime = 0
+    // Reset video to beginning to ensure consistent playback
+    if (videoElement) {
+      videoElement.currentTime = 0
+    }
+
+    // Play video
+    if (videoElement) {
+      // Make sure audio is enabled
+      videoElement.muted = false
+
+      const playPromise = videoElement.play()
+
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log("Video playback started successfully")
+          })
+          .catch((error) => {
+            console.error("Error playing video:", error)
+            // If video fails to play, show thumbnail again
+            setShowThumbnail(true)
+            setIsPlaying(false)
+          })
       }
-    })
-
-    // Play all videos (only one will be visible at a time)
-    videoElements.forEach((video) => {
-      if (video) {
-        // Make sure audio is enabled
-        video.muted = false
-
-        const playPromise = video.play()
-
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              console.log("Video playback started successfully")
-            })
-            .catch((error) => {
-              console.error("Error playing video:", error)
-              // If all videos fail to play, show thumbnail again
-              if (videoElements.every((v) => v.paused)) {
-                setShowThumbnail(true)
-                setIsPlaying(false)
-              }
-            })
-        }
-      }
-    })
+    }
   }
 
   const handlePauseVideo = () => {
-    const videoElements = [videoRef.current, verticalVideoRef.current, mobileVideoRef.current]
-
-    videoElements.forEach((video) => {
-      if (video) {
-        video.pause()
-      }
-    })
+    if (videoRef.current) {
+      videoRef.current.pause()
+    }
 
     setIsPlaying(false)
     // Don't show thumbnail on pause, only when video ends or before it starts
   }
 
-  // Add video end handler
+  // Update the video end handler useEffect
   useEffect(() => {
-    // Get all video elements that currently exist in the DOM
-    const videoElements = [videoRef.current, verticalVideoRef.current, mobileVideoRef.current].filter(Boolean)
-    const timeUpdateHandlers = new Map()
+    // Get video element that currently exists in the DOM
+    const videoElement = videoRef.current
+    let timeUpdateHandler: (() => void) | null = null
 
     const handleVideoEnd = () => {
       console.log("Video ended, showing thumbnail")
@@ -451,47 +440,39 @@ export default function CustomizeAdDesignPage() {
       setShowThumbnail(true) // Show thumbnail when video ends
     }
 
-    // Add event listeners to all video elements
-    videoElements.forEach((video) => {
-      if (video) {
-        // Remove any existing event listeners first to avoid duplicates
-        video.removeEventListener("ended", handleVideoEnd)
+    // Add event listeners to video element
+    if (videoElement) {
+      // Remove any existing event listeners first to avoid duplicates
+      videoElement.removeEventListener("ended", handleVideoEnd)
 
-        // Add the event listener for video end
-        video.addEventListener("ended", handleVideoEnd)
+      // Add the event listener for video end
+      videoElement.addEventListener("ended", handleVideoEnd)
 
-        // Also monitor the currentTime to detect when video is near the end
-        // This is a backup in case the ended event doesn't fire properly
-        const timeUpdateHandler = () => {
-          if (video.currentTime >= video.duration - 0.2 && video.duration > 0) {
-            console.log(`Video near end: ${video.currentTime}/${video.duration}`)
-            handleVideoEnd()
-          }
+      // Also monitor the currentTime to detect when video is near the end
+      // This is a backup in case the ended event doesn't fire properly
+      timeUpdateHandler = () => {
+        if (videoElement.currentTime >= videoElement.duration - 0.2 && videoElement.duration > 0) {
+          console.log(`Video near end: ${videoElement.currentTime}/${videoElement.duration}`)
+          handleVideoEnd()
         }
-
-        video.removeEventListener("timeupdate", timeUpdateHandler)
-        video.addEventListener("timeupdate", timeUpdateHandler)
-
-        // Store the handler reference so we can remove it later
-        timeUpdateHandlers.set(video, timeUpdateHandler)
       }
-    })
+
+      videoElement.removeEventListener("timeupdate", timeUpdateHandler)
+      videoElement.addEventListener("timeupdate", timeUpdateHandler)
+    }
 
     return () => {
       // Clean up all event listeners safely
-      videoElements.forEach((video) => {
-        if (video) {
-          video.removeEventListener("ended", handleVideoEnd)
+      if (videoElement) {
+        videoElement.removeEventListener("ended", handleVideoEnd)
 
-          // Remove timeupdate listener using the stored reference
-          const timeUpdateHandler = timeUpdateHandlers.get(video)
-          if (timeUpdateHandler) {
-            video.removeEventListener("timeupdate", timeUpdateHandler)
-          }
+        // Remove timeupdate listener
+        if (timeUpdateHandler) {
+          videoElement.removeEventListener("timeupdate", timeUpdateHandler)
         }
-      })
+      }
     }
-  }, [videoRef.current, verticalVideoRef.current, mobileVideoRef.current])
+  }, [videoRef.current])
 
   const handleRemovePhoto = async (id: string) => {
     if (!businessId) return
@@ -503,11 +484,11 @@ export default function CustomizeAdDesignPage() {
         setPhotos((prev) => prev.filter((photo) => photo.id !== id))
 
         // If we're removing the current photo and it's the last one, adjust the index
-        if (photos.length > 0) {
-          if (currentPhotoIndex >= photos.length - 1) {
-            setCurrentPhotoIndex(Math.max(0, photos.length - 2))
-          }
-        }
+        // if (photos.length > 0) {
+        //   if (currentPhotoIndex >= photos.length - 1) {
+        //     setCurrentPhotoIndex(Math.max(0, photos.length - 2))
+        //   }
+        // }
 
         toast({
           title: "Success",
@@ -531,24 +512,22 @@ export default function CustomizeAdDesignPage() {
   }
 
   const handleOpenPhotoAlbum = () => {
-    if (photos.length > 0) {
-      setIsPhotoAlbumOpen(true)
-    } else {
-      alert("Your photo album is empty. Please add photos first.")
-    }
+    // Navigate to the photo album page instead of opening a dialog
+    window.location.href = "/photo-album"
   }
 
-  const handleNextPhoto = () => {
-    if (photos.length > 1) {
-      setCurrentPhotoIndex((prev) => (prev + 1) % photos.length)
-    }
-  }
+  // Remove or comment out these functions
+  // const handleNextPhoto = () => {
+  //   if (photos.length > 1) {
+  //     setCurrentPhotoIndex((prev) => (prev + 1) % photos.length)
+  //   }
+  // }
 
-  const handlePrevPhoto = () => {
-    if (photos.length > 1) {
-      setCurrentPhotoIndex((prev) => (prev - 1 + photos.length) % photos.length)
-    }
-  }
+  // const handlePrevPhoto = () => {
+  //   if (photos.length > 1) {
+  //     setCurrentPhotoIndex((prev) => (prev - 1 + photos.length) % photos.length)
+  //   }
+  // }
 
   // Modify the handleSubmit function to save the formatted phone number
   const handleSubmit = async (e: React.FormEvent) => {
@@ -713,7 +692,7 @@ export default function CustomizeAdDesignPage() {
           className="flex items-center gap-2"
           style={{
             borderColor: colorValues.primary,
-            color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+            color: colorValues.primary,
           }}
         >
           <svg
@@ -722,7 +701,7 @@ export default function CustomizeAdDesignPage() {
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={selectedColor === "white" || selectedColor === "yellow" ? "#000000" : "currentColor"}
+            stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -741,7 +720,7 @@ export default function CustomizeAdDesignPage() {
           className="flex items-center gap-2"
           style={{
             borderColor: colorValues.primary,
-            color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+            color: colorValues.primary,
           }}
         >
           <svg
@@ -750,7 +729,7 @@ export default function CustomizeAdDesignPage() {
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={selectedColor === "white" || selectedColor === "yellow" ? "#000000" : "currentColor"}
+            stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -766,1554 +745,300 @@ export default function CustomizeAdDesignPage() {
 
   // Update the renderDesignPreview function to handle all designs with the selected color
   const renderDesignPreview = () => {
-    // Render the selected design based on the designId
-    if (selectedDesign === 3) {
-      // Emerald Valley design (mirror of Purple Horizon)
-      return (
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Selected Design: Design 3</h2>
-          <div className="overflow-hidden rounded-lg shadow-md">
-            <Card className="relative overflow-hidden">
-              <div
-                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{
-                  background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                }}
-              >
-                <h3 className="text-xl font-bold text-center">{formData.businessName}</h3>
-              </div>
-
-              {/* Business Info Section - Top section */}
-              <div className="p-6 bg-white">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {!hiddenFields.address && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                          <circle cx="12" cy="10" r="3"></circle>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Address</p>
-                        <p className="text-sm text-gray-600">{getFormattedAddress()}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.phone && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Phone</p>
-                        <p className="text-sm text-gray-600">{getFormattedPhone()}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.hours && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Hours</p>
-                        {formData.hours.split("\n").map((line, i) => (
-                          <p key={i} className="text-sm text-gray-600">
-                            {line}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.website && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Website</p>
-                        <p
-                          className="text-sm underline"
-                          style={{
-                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          {formData.website}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.photoAlbum && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm md:col-span-2">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                          <circle cx="9" cy="9" r="2"></circle>
-                          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Photo Album</p>
-                        <button
-                          className="text-sm underline cursor-pointer"
-                          style={{
-                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
-                          }}
-                          onClick={handleOpenPhotoAlbum}
-                        >
-                          Browse Photos {photos.length > 0 && `(${photos.length})`}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Free Text Section */}
+    // Default to Design 5 (Modern Business Card design)
+    return (
+      <div className="mb-8">
+        <h2 className="text-xl font-bold mb-4">Selected Design: Design 5</h2>
+        <div className="overflow-hidden rounded-lg shadow-md">
+          <Card className="max-w-md mx-auto">
+            <div
+              className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
+              style={{
+                background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
+              }}
+            >
+              <h3 className="text-2xl font-bold">{formData.businessName}</h3>
               {!hiddenFields.freeText && formData.freeText && (
-                <div className="w-full bg-white p-4 text-center border-t border-gray-100">
-                  <p
-                    className="text-lg font-medium"
-                    style={{
-                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                    }}
-                  >
-                    {formData.freeText}
-                  </p>
-                </div>
+                <p className="text-base mt-1 opacity-90">{formData.freeText}</p>
               )}
+            </div>
 
-              {/* Landscape Video Player - Bottom section */}
-              {!hiddenFields.video && (
-                <div className="w-full bg-gradient-to-b from-gray-50 to-gray-100 p-4">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className="relative mx-auto w-full max-w-[392px] h-auto aspect-video bg-white rounded-lg border-2 shadow-lg overflow-hidden"
-                      style={{ borderColor: colorValues.primary }}
-                    >
-                      {/* Thumbnail overlay */}
-                      {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
-                        <div className="absolute inset-0 z-20">
-                          <img
-                            src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
-                            alt="Video thumbnail"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-
-                      {videoPreview ? (
-                        <video
-                          ref={videoRef}
-                          src={videoPreview}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
-                          muted
-                        />
-                      ) : (
-                        <div
-                          className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                          onClick={handlePlayVideo}
-                        >
-                          <div
-                            className="rounded-full p-3 shadow-lg"
-                            style={{
-                              background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                            }}
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-white"
-                            >
-                              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                      <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                        16:9 ratio
-                      </div>
-                    </div>
-
-                    {/* Custom video controls */}
-                    {videoPreview && <VideoControls />}
-                  </div>
-                </div>
-              )}
-
-              <div
-                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{ backgroundColor: colorValues.primary }}
-              >
-                <p className="font-medium">Design 3</p>
-              </div>
-              {/* Add Feature Buttons */}
-              <FeatureButtons />
-            </Card>
-          </div>
-        </div>
-      )
-    } else if (selectedDesign === 4) {
-      // Amber Sunrise design (mirror of Teal Waves)
-      return (
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Selected Design: Design 4</h2>
-          <div className="overflow-hidden rounded-lg shadow-md">
-            <Card className="relative overflow-hidden">
-              <div
-                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{
-                  background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                }}
-              >
-                <h3 className="text-xl font-bold text-center">{formData.businessName}</h3>
-              </div>
-              <div className="p-6 bg-gradient-to-b from-white to-gray-50">
-                {/* Video Player - Positioned absolutely on larger screens (LEFT SIDE) */}
-                {!hiddenFields.video && (
+            <div className="pt-6 px-6 space-y-4">
+              {!hiddenFields.phone && (
+                <div className="flex items-start gap-3">
                   <div
-                    className="hidden lg:block absolute top-[40%] left-4 transform -translate-y-1/2 w-[220px] h-[392px] bg-white rounded-lg border-2 shadow-lg overflow-hidden"
-                    style={{ borderColor: colorValues.primary }}
-                  >
-                    <div className="relative w-full h-full">
-                      {/* Thumbnail overlay */}
-                      {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
-                        <div className="absolute inset-0 z-20">
-                          <img
-                            src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
-                            alt="Video thumbnail"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-
-                      {videoPreview ? (
-                        <video
-                          ref={verticalVideoRef}
-                          src={videoPreview}
-                          className="absolute inset-0 w-full h-full object-cover z-10" // Add z-index to ensure it's on top
-                          onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
-                          muted
-                          playsInline // Add playsInline for better mobile support
-                          style={{ pointerEvents: "auto" }} // Ensure clicks are registered
-                        />
-                      ) : (
-                        <div
-                          className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                          onClick={handlePlayVideo}
-                        >
-                          <div
-                            className="rounded-full p-3 shadow-lg"
-                            style={{
-                              background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                            }}
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-white"
-                            >
-                              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Custom video controls for desktop - positioned below video */}
-                {!hiddenFields.video && videoPreview && (
-                  <div className="hidden lg:block absolute left-4 top-[calc(40%+205px)] w-[220px]">
-                    <VideoControls />
-                  </div>
-                )}
-
-                {/* Business info shifted to the right */}
-                <div className={`space-y-4 ${!hiddenFields.video ? "lg:ml-[240px]" : ""}`}>
-                  {!hiddenFields.address && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                          <circle cx="12" cy="10" r="3"></circle>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Address</p>
-                        <p className="text-sm text-gray-600">{getFormattedAddress()}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.phone && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Phone</p>
-                        <p className="text-sm text-gray-600">{getFormattedPhone()}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.hours && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Hours</p>
-                        {formData.hours.split("\n").map((line, i) => (
-                          <p key={i} className="text-sm text-gray-600">
-                            {line}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.website && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Website</p>
-                        <p
-                          className="text-sm underline"
-                          style={{
-                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          {formData.website}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.photoAlbum && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                          <circle cx="9" cy="9" r="2"></circle>
-                          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Photo Album</p>
-                        <button
-                          className="text-sm underline cursor-pointer"
-                          style={{
-                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
-                          }}
-                          onClick={handleOpenPhotoAlbum}
-                        >
-                          Browse Photos {photos.length > 0 && `(${photos.length})`}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Free Text Section */}
-              {!hiddenFields.freeText && formData.freeText && (
-                <div className="w-full bg-white p-4 text-center border-t border-gray-100">
-                  <p
-                    className="text-lg font-medium"
+                    className="h-5 w-5 mt-0.5 flex-shrink-0"
                     style={{
                       color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
                     }}
                   >
-                    {formData.freeText}
-                  </p>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Phone</p>
+                    <p>{getFormattedPhone()}</p>
+                  </div>
                 </div>
               )}
 
-              <div
-                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{ backgroundColor: colorValues.primary }}
-              >
-                <p className="font-medium">Design 4</p>
-              </div>
-
-              {/* Add Feature Buttons */}
-              <FeatureButtons />
-            </Card>
-
-            {/* Video Space for Mobile - Only shown on small screens */}
-            {!hiddenFields.video && (
-              <div className="lg:hidden w-full bg-gradient-to-b from-gray-100 to-gray-200 rounded-b-lg overflow-hidden flex items-center justify-center">
-                <div className="relative w-full py-6">
-                  <div className="mx-auto w-[220px] flex flex-col items-center">
-                    <div
-                      className="w-full h-[392px] bg-white rounded-lg border-2 flex flex-col items-center justify-center overflow-hidden"
-                      style={{ borderColor: colorValues.primary }}
+              {!hiddenFields.address && (
+                <div className="flex items-start gap-3">
+                  <div
+                    className="h-5 w-5 mt-0.5 flex-shrink-0"
+                    style={{
+                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      <div className="relative w-full h-full">
-                        {/* Thumbnail overlay for mobile */}
-                        {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
-                          <div className="absolute inset-0 z-20">
-                            <img
-                              src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
-                              alt="Video thumbnail"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-
-                        {videoPreview ? (
-                          <video
-                            ref={mobileVideoRef}
-                            src={videoPreview}
-                            className="absolute inset-0 w-full h-full object-cover z-10" // Add z-index to ensure it's on top
-                            onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
-                            muted
-                            playsInline
-                            style={{ pointerEvents: "auto" }} // Ensure clicks are registered
-                          />
-                        ) : (
-                          <div
-                            className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                            onClick={handlePlayVideo}
-                          >
-                            <div
-                              className="rounded-full p-3 shadow-lg"
-                              style={{
-                                background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                              }}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="32"
-                                height="32"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="text-white"
-                              >
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                              </svg>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Custom video controls for mobile */}
-                    {videoPreview && <VideoControls />}
+                      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+                      <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Address</p>
+                    <p>{getFormattedAddress()}</p>
                   </div>
                 </div>
+              )}
+
+              {!hiddenFields.hours && (
+                <div className="flex items-start gap-3">
+                  <div
+                    className="h-5 w-5 mt-0.5 flex-shrink-0"
+                    style={{
+                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Hours of Operation</p>
+                    <div className="space-y-1">
+                      {formData.hours.split("\n").map((line, i) => (
+                        <p key={i} className="text-sm">
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Video Section */}
+            {!hiddenFields.video && (
+              <div className="border-t pt-4 mt-4 px-4">
+                <div className="relative w-full pb-[56.25%]">
+                  {/* Thumbnail overlay */}
+                  {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
+                    <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                      <img
+                        src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
+                        alt="Video thumbnail"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+
+                  {videoPreview ? (
+                    <video
+                      ref={videoRef}
+                      src={videoPreview}
+                      className="absolute top-0 left-0 w-full h-full rounded-md"
+                      onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
+                      muted
+                    />
+                  ) : (
+                    <div
+                      className="absolute inset-0 flex items-center justify-center cursor-pointer bg-gray-100 rounded-md"
+                      onClick={handlePlayVideo}
+                    >
+                      <div
+                        className="rounded-full p-3 shadow-lg"
+                        style={{
+                          background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="32"
+                          height="32"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-white"
+                        >
+                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom video controls */}
+                {videoPreview && <VideoControls />}
               </div>
             )}
-          </div>
-        </div>
-      )
-    } else if (selectedDesign === 2) {
-      // Purple Horizon design with landscape video (16:9)
-      return (
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Selected Design: Design 2</h2>
-          <div className="overflow-hidden rounded-lg shadow-md">
-            <Card className="relative overflow-hidden">
-              <div
-                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{
-                  background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                }}
-              >
-                <h3 className="text-xl font-bold text-center">{formData.businessName}</h3>
-              </div>
 
-              {/* Landscape Video Player - Top section */}
-              {!hiddenFields.video && (
-                <div className="w-full bg-gradient-to-b from-gray-100 to-gray-50 p-4">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className="relative mx-auto w-full max-w-[392px] h-auto aspect-video bg-white rounded-lg border-2 shadow-lg overflow-hidden"
-                      style={{ borderColor: colorValues.primary }}
-                    >
-                      {/* Thumbnail overlay */}
-                      {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
-                        <div className="absolute inset-0 z-20">
-                          <img
-                            src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
-                            alt="Video thumbnail"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
+            {/* Footer with buttons */}
 
-                      {videoPreview ? (
-                        <video
-                          ref={videoRef}
-                          src={videoPreview}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
-                          muted
-                        />
-                      ) : (
-                        <div
-                          className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                          onClick={handlePlayVideo}
-                        >
-                          <div
-                            className="rounded-full p-3 shadow-lg"
-                            style={{
-                              background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                            }}
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-white"
-                            >
-                              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                      <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                        16:9 ratio
-                      </div>
-                    </div>
-
-                    {/* Custom video controls */}
-                    {videoPreview && <VideoControls />}
-                  </div>
-                </div>
-              )}
-
-              {/* Business Info Section */}
-              <div className="p-6 bg-white">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {!hiddenFields.address && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                          <circle cx="12" cy="10" r="3"></circle>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Address</p>
-                        <p className="text-sm text-gray-600">{getFormattedAddress()}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.phone && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Phone</p>
-                        <p className="text-sm text-gray-600">{getFormattedPhone()}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.hours && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Hours</p>
-                        {formData.hours.split("\n").map((line, i) => (
-                          <p key={i} className="text-sm text-gray-600">
-                            {line}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.website && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Website</p>
-                        <p
-                          className="text-sm underline"
-                          style={{
-                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          {formData.website}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!hiddenFields.photoAlbum && (
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg shadow-sm md:col-span-2">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                          <circle cx="9" cy="9" r="2"></circle>
-                          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Photo Album</p>
-                        <button
-                          className="text-sm underline cursor-pointer"
-                          style={{
-                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
-                          }}
-                          onClick={handleOpenPhotoAlbum}
-                        >
-                          Browse Photos {photos.length > 0 && `(${photos.length})`}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Free Text Section */}
-              {!hiddenFields.freeText && formData.freeText && (
-                <div className="w-full bg-white p-4 text-center border-t border-gray-100">
-                  <p
-                    className="text-lg font-medium"
-                    style={{
-                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                    }}
-                  >
-                    {formData.freeText}
-                  </p>
-                </div>
-              )}
-
-              <div
-                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{ backgroundColor: colorValues.primary }}
-              >
-                <p className="font-medium">Design 2</p>
-              </div>
-
-              {/* Add Feature Buttons */}
-              <FeatureButtons />
-            </Card>
-          </div>
-        </div>
-      )
-    } else if (selectedDesign === 5) {
-      // Modern Business Card design
-      return (
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Selected Design: Design 5</h2>
-          <div className="overflow-hidden rounded-lg shadow-md">
-            <Card className="max-w-md mx-auto">
-              <div
-                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{
-                  background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                }}
-              >
-                <h3 className="text-2xl font-bold">{formData.businessName}</h3>
-                {!hiddenFields.freeText && formData.freeText && (
-                  <p className="text-base mt-1 opacity-90">{formData.freeText}</p>
-                )}
-              </div>
-
-              <div className="pt-6 px-6 space-y-4">
-                {!hiddenFields.phone && (
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="h-5 w-5 mt-0.5 flex-shrink-0"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Phone</p>
-                      <p>{getFormattedPhone()}</p>
-                    </div>
-                  </div>
-                )}
-
-                {!hiddenFields.address && (
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="h-5 w-5 mt-0.5 flex-shrink-0"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                        <circle cx="12" cy="10" r="3"></circle>
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Address</p>
-                      <p>{getFormattedAddress()}</p>
-                    </div>
-                  </div>
-                )}
-
-                {!hiddenFields.hours && (
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="h-5 w-5 mt-0.5 flex-shrink-0"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Hours of Operation</p>
-                      <div className="space-y-1">
-                        {formData.hours.split("\n").map((line, i) => (
-                          <p key={i} className="text-sm">
-                            {line}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Video Section */}
-              {!hiddenFields.video && (
-                <div className="border-t pt-4 mt-4 px-4">
-                  <div className="relative w-full pb-[56.25%]">
-                    {/* Thumbnail overlay */}
-                    {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
-                      <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
-                        <img
-                          src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
-                          alt="Video thumbnail"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-
-                    {videoPreview ? (
-                      <video
-                        ref={videoRef}
-                        src={videoPreview}
-                        className="absolute top-0 left-0 w-full h-full rounded-md"
-                        onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
-                        muted
-                      />
-                    ) : (
-                      <div
-                        className="absolute inset-0 flex items-center justify-center cursor-pointer bg-gray-100 rounded-md"
-                        onClick={handlePlayVideo}
-                      >
-                        <div
-                          className="rounded-full p-3 shadow-lg"
-                          style={{
-                            background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                          }}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="32"
-                            height="32"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="text-white"
-                          >
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Custom video controls */}
-                  {videoPreview && <VideoControls />}
-                </div>
-              )}
-
-              {/* Footer with buttons */}
-
-              <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
-                {!hiddenFields.photoAlbum && (
-                  <button
-                    onClick={handleOpenPhotoAlbum}
-                    className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
-                    >
-                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                      <circle cx="9" cy="9" r="2"></circle>
-                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                    </svg>
-                    View Photo Album
-                  </button>
-                )}
-
-                {!hiddenFields.website && (
-                  <button
-                    onClick={() => window.open(`https://${formData.website}`, "_blank")}
-                    className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-                    style={{
-                      backgroundColor:
-                        selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                    }}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="text-white"
-                    >
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                    </svg>
-                    Visit Website
-                  </button>
-                )}
-
-                {!hiddenFields.savingsButton && (
-                  <button
-                    onClick={() => setIsSavingsDialogOpen(true)}
-                    className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
-                    >
-                      <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-                      <path d="M7 7h.01" />
-                    </svg>
-                    View Coupons
-                  </button>
-                )}
-
-                {!hiddenFields.jobsButton && (
-                  <button
-                    onClick={() => setIsJobsDialogOpen(true)}
-                    className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
-                    >
-                      <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
-                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                    </svg>
-                    Job Opportunities
-                  </button>
-                )}
-              </div>
-
-              <div
-                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{ backgroundColor: colorValues.primary }}
-              >
-                <p className="font-medium">Design 5</p>
-              </div>
-            </Card>
-          </div>
-        </div>
-      )
-    } else {
-      // Default Teal Waves design (design #1 or #6) with portrait video (9:16)
-      return (
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Selected Design: Design 1</h2>
-          <div className="overflow-hidden rounded-lg shadow-md relative">
-            <Card className="relative overflow-hidden">
-              <div
-                className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{
-                  background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                }}
-              >
-                <h3 className="text-xl font-bold text-center">{formData.businessName}</h3>
-              </div>
-              <div className="p-6 bg-gradient-to-b from-white to-gray-50">
-                <div className="space-y-4">
-                  {!hiddenFields.address && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                          <circle cx="12" cy="10" r="3"></circle>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Address</p>
-                        <p className="text-sm text-gray-600">{getFormattedAddress()}</p>
-                      </div>
-                    </div>
-                  )}
-                  {!hiddenFields.phone && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Phone</p>
-                        <p className="text-sm text-gray-600">{getFormattedPhone()}</p>
-                      </div>
-                    </div>
-                  )}
-                  {!hiddenFields.hours && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Hours</p>
-                        {formData.hours.split("\n").map((line, i) => (
-                          <p key={i} className="text-sm text-gray-600">
-                            {line}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {!hiddenFields.website && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Website</p>
-                        <p
-                          className="text-sm underline"
-                          style={{
-                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          {formData.website}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {!hiddenFields.photoAlbum && (
-                    <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                          <circle cx="9" cy="9" r="2"></circle>
-                          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">Photo Album</p>
-                        <button
-                          className="text-sm underline cursor-pointer"
-                          style={{
-                            color: selectedColor === "white" ? "#000000" : colorValues.primary,
-                          }}
-                          onClick={handleOpenPhotoAlbum}
-                        >
-                          Browse Photos {photos.length > 0 && `(${photos.length})`}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Free Text Section */}
-                {!hiddenFields.freeText && formData.freeText && (
-                  <div className="w-full bg-white p-4 text-center border-t border-gray-100">
-                    <p
-                      className="text-lg font-medium"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
-                    >
-                      {formData.freeText}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Video Player - Positioned absolutely on larger screens */}
-              {!hiddenFields.video && (
-                <div
-                  className="hidden lg:block absolute top-[40%] right-4 transform -translate-y-1/2 w-[220px] h-[392px] bg-white rounded-lg border-2 shadow-lg overflow-hidden"
-                  style={{ borderColor: colorValues.primary }}
+            <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
+              {!hiddenFields.photoAlbum && (
+                <button
+                  onClick={handleOpenPhotoAlbum}
+                  className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
                 >
-                  <div className="relative w-full h-full">
-                    {/* Thumbnail overlay */}
-                    {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
-                      <div className="absolute inset-0 z-20">
-                        <img
-                          src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
-                          alt="Video thumbnail"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-
-                    {videoPreview ? (
-                      <video
-                        ref={verticalVideoRef}
-                        src={videoPreview}
-                        className="absolute inset-0 w-full h-full object-cover z-10" // Add z-index to ensure it's on top
-                        onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
-                        muted
-                        playsInline // Add playsInline for better mobile support
-                        style={{ pointerEvents: "auto" }} // Ensure clicks are registered
-                      />
-                    ) : (
-                      <div
-                        className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                        onClick={handlePlayVideo}
-                      >
-                        <div
-                          className="rounded-full p-3 shadow-lg"
-                          style={{
-                            background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                          }}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="32"
-                            height="32"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="text-white"
-                          >
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    }}
+                  >
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                    <circle cx="9" cy="9" r="2"></circle>
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                  </svg>
+                  View Photo Album
+                </button>
               )}
 
-              {/* Custom video controls for desktop - positioned below video */}
-              {!hiddenFields.video && videoPreview && (
-                <div className="hidden lg:block absolute right-4 top-[calc(40%+205px)] w-[220px]">
-                  <VideoControls />
-                </div>
+              {!hiddenFields.website && (
+                <button
+                  onClick={() => window.open(`https://${formData.website}`, "_blank")}
+                  className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                  style={{
+                    backgroundColor:
+                      selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-white"
+                  >
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                  </svg>
+                  Visit Website
+                </button>
               )}
 
-              <div
-                className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
-                style={{ backgroundColor: colorValues.primary }}
-              >
-                <p className="font-medium">Design 1</p>
-              </div>
+              {!hiddenFields.savingsButton && (
+                <button
+                  onClick={() => setIsSavingsDialogOpen(true)}
+                  className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    }}
+                  >
+                    <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+                    <path d="M7 7h.01" />
+                  </svg>
+                  View Coupons
+                </button>
+              )}
 
-              {/* Add Feature Buttons */}
-              <FeatureButtons />
-            </Card>
+              {!hiddenFields.jobsButton && (
+                <button
+                  onClick={() => setIsJobsDialogOpen(true)}
+                  className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    }}
+                  >
+                    <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
+                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                  </svg>
+                  Job Opportunities
+                </button>
+              )}
+            </div>
 
-            {/* Video Space for Mobile - Only shown on small screens */}
-            {!hiddenFields.video && (
-              <div className="lg:hidden w-full bg-gradient-to-b from-gray-100 to-gray-200 rounded-b-lg overflow-hidden flex items-center justify-center">
-                <div className="relative w-full py-6">
-                  <div className="mx-auto w-[220px] flex flex-col items-center">
-                    <div
-                      className="w-full h-[392px] bg-white rounded-lg border-2 flex flex-col items-center justify-center overflow-hidden"
-                      style={{ borderColor: colorValues.primary }}
-                    >
-                      <div className="relative w-full h-full">
-                        {/* Thumbnail overlay for mobile */}
-                        {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
-                          <div className="absolute inset-0 z-20">
-                            <img
-                              src={thumbnailPreview || "/placeholder.svg?height=392&width=220"}
-                              alt="Video thumbnail"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-
-                        {videoPreview ? (
-                          <video
-                            ref={mobileVideoRef}
-                            src={videoPreview}
-                            className="absolute inset-0 w-full h-full object-cover z-10" // Add z-index to ensure it's on top
-                            onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
-                            muted
-                            playsInline
-                            style={{ pointerEvents: "auto" }} // Ensure clicks are registered
-                          />
-                        ) : (
-                          <div
-                            className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                            onClick={handlePlayVideo}
-                          >
-                            <div
-                              className="rounded-full p-3 shadow-lg"
-                              style={{
-                                background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                              }}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="32"
-                                height="32"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="text-white"
-                              >
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                              </svg>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Custom video controls for mobile */}
-                    {videoPreview && <VideoControls />}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+            <div
+              className={`p-3 text-center ${colorValues.textColor ? "text-black" : "text-white"}`}
+              style={{ backgroundColor: colorValues.primary }}
+            >
+              <p className="font-medium">Design 5</p>
+            </div>
+          </Card>
         </div>
-      )
-    }
+      </div>
+    )
   }
 
   return (
@@ -2357,119 +1082,6 @@ export default function CustomizeAdDesignPage() {
                         aria-label={`Select ${colorKey} theme`}
                       >
                         <span className="sr-only">{colorKey}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-
-              {/* Design Selection Section */}
-              <Card>
-                <div className="p-6 space-y-6">
-                  <h2 className="text-xl font-semibold">Design Layout</h2>
-                  <p className="text-gray-600 mb-4">Choose a layout for your AdBox</p>
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {[1, 2, 3, 4, 5].map((designId) => (
-                      <button
-                        key={designId}
-                        onClick={() => setSelectedDesign(designId)}
-                        className={`relative border-2 rounded-lg overflow-hidden transition-all ${
-                          selectedDesign === designId
-                            ? `border-[${colorValues.primary}] ring-2 ring-offset-1`
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                        style={{
-                          borderColor: selectedDesign === designId ? colorValues.primary : undefined,
-                          ringColor: selectedDesign === designId ? colorValues.primary : undefined,
-                        }}
-                      >
-                        <div className="aspect-[3/4] bg-gray-50 flex flex-col">
-                          {/* Design preview thumbnail */}
-                          <div
-                            className="h-8 text-white text-center text-sm font-medium flex items-center justify-center"
-                            style={{
-                              background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                            }}
-                          >
-                            Business Name
-                          </div>
-
-                          <div className="flex-1 p-2 flex flex-col items-center justify-center">
-                            {/* Design 1 - Right video */}
-                            {designId === 1 && (
-                              <div className="w-full h-full flex items-center">
-                                <div className="flex-1 bg-white rounded-md p-1 text-[6px]">
-                                  <div className="h-2 w-3/4 bg-gray-200 rounded mb-1"></div>
-                                  <div className="h-2 w-1/2 bg-gray-200 rounded"></div>
-                                </div>
-                                <div className="w-1/3 h-3/4 ml-1 bg-gray-300 rounded-md"></div>
-                              </div>
-                            )}
-
-                            {/* Design 2 - Top video */}
-                            {designId === 2 && (
-                              <div className="w-full h-full flex flex-col">
-                                <div className="w-full h-1/3 bg-gray-300 rounded-md mb-1"></div>
-                                <div className="flex-1 bg-white rounded-md p-1 text-[6px]">
-                                  <div className="h-2 w-3/4 bg-gray-200 rounded mb-1"></div>
-                                  <div className="h-2 w-1/2 bg-gray-200 rounded"></div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Design 3 - Bottom video */}
-                            {designId === 3 && (
-                              <div className="w-full h-full flex flex-col">
-                                <div className="flex-1 bg-white rounded-md p-1 text-[6px] mb-1">
-                                  <div className="h-2 w-3/4 bg-gray-200 rounded mb-1"></div>
-                                  <div className="h-2 w-1/2 bg-gray-200 rounded"></div>
-                                </div>
-                                <div className="w-full h-1/3 bg-gray-300 rounded-md"></div>
-                              </div>
-                            )}
-
-                            {/* Design 4 - Left video */}
-                            {designId === 4 && (
-                              <div className="w-full h-full flex items-center">
-                                <div className="w-1/3 h-3/4 mr-1 bg-gray-300 rounded-md"></div>
-                                <div className="flex-1 bg-white rounded-md p-1 text-[6px]">
-                                  <div className="h-2 w-3/4 bg-gray-200 rounded mb-1"></div>
-                                  <div className="h-2 w-1/2 bg-gray-200 rounded"></div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Design 5 - Modern Card */}
-                            {designId === 5 && (
-                              <div className="w-full h-full flex flex-col">
-                                <div className="w-full bg-white rounded-md p-1 mb-1">
-                                  <div className="flex items-center gap-1 mb-1">
-                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                                    <div className="h-1 w-10 bg-gray-200 rounded"></div>
-                                  </div>
-                                  <div className="flex items-center gap-1 mb-1">
-                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                                    <div className="h-1 w-8 bg-gray-200 rounded"></div>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <div className="w-1 h-1 rounded-full bg-gray-300"></div>
-                                    <div className="h-1 w-12 bg-gray-200 rounded"></div>
-                                  </div>
-                                </div>
-                                <div className="w-full h-1/3 bg-gray-300 rounded-md mb-1"></div>
-                                <div className="w-full flex gap-1">
-                                  <div className="flex-1 h-2 bg-gray-200 rounded"></div>
-                                  <div className="flex-1 h-2 bg-gray-200 rounded"></div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="h-6 bg-gray-100 text-xs flex items-center justify-center font-medium">
-                            Design {designId}
-                          </div>
-                        </div>
                       </button>
                     ))}
                   </div>
@@ -2806,7 +1418,8 @@ export default function CustomizeAdDesignPage() {
 
       <MainFooter />
 
-      {/* Photo Album Modal */}
+      {/* Remove the photo album dialog by commenting out or removing the following section (around line 1000): */}
+      {/*
       <Dialog open={isPhotoAlbumOpen} onOpenChange={setIsPhotoAlbumOpen}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
@@ -2844,32 +1457,68 @@ export default function CustomizeAdDesignPage() {
                 )}
               </div>
             ) : (
-              <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                <p className="text-gray-500">No photos in album</p>
+              <div className="aspect-video bg-gray-100 rounded-lg flex flex-col items-center justify-center p-6 text-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="48"
+                  height="48"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-gray-400 mb-4"
+                >
+                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                  <circle cx="9" cy="9" r="2"></circle>
+                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                </svg>
+                <p className="text-gray-600 font-medium mb-2">Your photo album is empty</p>
+                <p className="text-gray-500 text-sm mb-4">
+                  Upload photos from the Media Manager to showcase your business
+                </p>
+                <Button
+                  onClick={() => (window.location.href = "/photo-album")}
+                  variant="outline"
+                  style={{
+                    borderColor: colorValues.primary,
+                    color: colorValues.primary,
+                  }}
+                >
+                  Go to Media Manager
+                </Button>
               </div>
             )}
           </div>
 
           <div className="mt-4 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-24 overflow-y-auto">
-            {photos.map((photo, index) => (
-              <div
-                key={photo.id}
-                className={`aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${
-                  index === currentPhotoIndex ? "border-primary" : "border-transparent"
-                }`}
-                onClick={() => setCurrentPhotoIndex(index)}
-                style={{ borderColor: index === currentPhotoIndex ? colorValues.primary : "transparent" }}
-              >
-                <img
-                  src={photo.url || "/placeholder.svg"}
-                  alt={`Thumbnail ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
+            {photos.length > 0 ? (
+              photos.map((photo, index) => (
+                <div
+                  key={photo.id}
+                  className={`aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${
+                    index === currentPhotoIndex ? "border-primary" : "border-transparent"
+                  }`}
+                  onClick={() => setCurrentPhotoIndex(index)}
+                  style={{ borderColor: index === currentPhotoIndex ? colorValues.primary : "transparent" }}
+                >
+                  <img
+                    src={photo.url || "/placeholder.svg"}
+                    alt={`Thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center text-sm text-gray-500 py-2">
+                No photos available in your album
               </div>
-            ))}
+            )}
           </div>
         </DialogContent>
       </Dialog>
+      */}
 
       {/* Savings Dialog */}
       <Dialog open={isSavingsDialogOpen} onOpenChange={setIsSavingsDialogOpen}>
