@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import type React from "react"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -11,7 +11,7 @@ import { Play, Pause } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
-import { getBusinessMedia, deletePhoto, saveMediaSettings, type MediaItem } from "@/app/actions/media-actions"
+import { getBusinessMedia, saveMediaSettings, type MediaItem } from "@/app/actions/media-actions"
 import { saveBusinessAdDesign } from "@/app/actions/business-actions"
 
 import { MainHeader } from "@/components/main-header"
@@ -24,7 +24,6 @@ interface PhotoItem {
 }
 
 export default function CustomizeAdDesignPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const designId = searchParams.get("design")
   const colorParam = searchParams.get("color") || "blue"
@@ -117,37 +116,8 @@ export default function CustomizeAdDesignPage() {
     }))
   }
 
-  // Add sample coupons data
-  const sampleCoupons = [
-    {
-      id: "1",
-      businessName: formData.businessName,
-      title: "Summer Special",
-      discount: "20% OFF",
-      description: "Get 20% off on all summer products",
-      code: "SUMMER20",
-      startDate: "2025-06-01",
-      expirationDate: "2025-08-31",
-      terms: "No cash value. Cannot be combined with other offers.",
-    },
-    {
-      id: "2",
-      businessName: formData.businessName,
-      title: "New Customer",
-      discount: "$10 OFF",
-      description: "First-time customers get $10 off their purchase",
-      code: "NEWCUST10",
-      startDate: "2025-01-01",
-      expirationDate: "2025-12-31",
-      terms: "Valid for first-time customers only.",
-    },
-  ]
-
   // Photo album state
   const [photos, setPhotos] = useState<PhotoItem[]>([])
-  // Remove or comment out these state variables
-  // const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
-  // const [isPhotoAlbumOpen, setIsPhotoAlbumOpen]
 
   // Video state
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
@@ -159,7 +129,6 @@ export default function CustomizeAdDesignPage() {
 
   // Video refs
   const videoRef = useRef<HTMLVideoElement>(null)
-  // Remove this line: const mobileVideoRef = useRef<HTMLVideoElement>(null)
 
   // Refs for coupons
   const couponRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
@@ -329,56 +298,6 @@ export default function CustomizeAdDesignPage() {
     }))
   }
 
-  // Function to handle saving coupon as image
-  const handleSaveCoupon = (couponId: string) => {
-    const couponElement = couponRefs.current[couponId]
-    if (!couponElement) return
-
-    // Show saving message
-    alert("Saving coupon to your device...")
-
-    // In a real implementation, you would use html2canvas to capture the coupon as an image
-    // and then create a download link or use the Web Share API for mobile
-
-    // Example implementation (commented out as it requires html2canvas library):
-    /*
-    import html2canvas from 'html2canvas';
-    
-    html2canvas(couponElement).then(canvas => {
-      const imgData = canvas.toDataURL('image/png');
-      
-      // For mobile devices, try to use the Web Share API
-      if (navigator.share && navigator.canShare) {
-        fetch(imgData)
-          .then(res => res.blob())
-          .then(blob => {
-            const file = new File([blob], "coupon.png", { type: "image/png" });
-            navigator.share({
-              files: [file],
-              title: 'Your Coupon',
-              text: 'Here is your saved coupon',
-            }).catch(err => {
-              // Fallback to download if sharing fails
-              downloadImage(imgData);
-            });
-          });
-      } else {
-        // For desktop, create a download link
-        downloadImage(imgData);
-      }
-    });
-    
-    function downloadImage(imgData) {
-      const link = document.createElement('a');
-      link.href = imgData;
-      link.download = `coupon-${couponId}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-    */
-  }
-
   // Video control functions
   const handlePlayVideo = () => {
     console.log("Play video triggered")
@@ -474,60 +393,10 @@ export default function CustomizeAdDesignPage() {
     }
   }, [videoRef.current])
 
-  const handleRemovePhoto = async (id: string) => {
-    if (!businessId) return
-
-    try {
-      const result = await deletePhoto(businessId, id)
-
-      if (result.success) {
-        setPhotos((prev) => prev.filter((photo) => photo.id !== id))
-
-        // If we're removing the current photo and it's the last one, adjust the index
-        // if (photos.length > 0) {
-        //   if (currentPhotoIndex >= photos.length - 1) {
-        //     setCurrentPhotoIndex(Math.max(0, photos.length - 2))
-        //   }
-        // }
-
-        toast({
-          title: "Success",
-          description: "Photo removed from album.",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to remove photo. Please try again.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error removing photo:", error)
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
   const handleOpenPhotoAlbum = () => {
     // Navigate to the photo album page instead of opening a dialog
     window.location.href = "/photo-album"
   }
-
-  // Remove or comment out these functions
-  // const handleNextPhoto = () => {
-  //   if (photos.length > 1) {
-  //     setCurrentPhotoIndex((prev) => (prev + 1) % photos.length)
-  //   }
-  // }
-
-  // const handlePrevPhoto = () => {
-  //   if (photos.length > 1) {
-  //     setCurrentPhotoIndex((prev) => (prev - 1 + photos.length) % photos.length)
-  //   }
-  // }
 
   // Modify the handleSubmit function to save the formatted phone number
   const handleSubmit = async (e: React.FormEvent) => {
@@ -681,74 +550,12 @@ export default function CustomizeAdDesignPage() {
     }
   }, [isJobsDialogOpen])
 
-  // Feature buttons component
-  const FeatureButtons = () => (
-    <div className="flex justify-center gap-4 p-4 bg-gray-100 rounded-b-lg">
-      {!hiddenFields.savingsButton && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsSavingsDialogOpen(true)}
-          className="flex items-center gap-2"
-          style={{
-            borderColor: colorValues.primary,
-            color: colorValues.primary,
-          }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-            <path d="M7 7h.01" />
-          </svg>
-          Savings
-        </Button>
-      )}
-      {!hiddenFields.jobsButton && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsJobsDialogOpen(true)}
-          className="flex items-center gap-2"
-          style={{
-            borderColor: colorValues.primary,
-            color: colorValues.primary,
-          }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
-            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-          </svg>
-          Job Opportunities
-        </Button>
-      )}
-    </div>
-  )
-
   // Update the renderDesignPreview function to handle all designs with the selected color
   const renderDesignPreview = () => {
     // Default to Design 5 (Modern Business Card design)
     return (
       <div className="mb-8">
-        <h2 className="text-xl font-bold mb-4">Customize Your Design</h2>
+        
         <div className="overflow-hidden rounded-lg shadow-md">
           <Card className="max-w-md mx-auto">
             <div
@@ -1042,7 +849,7 @@ export default function CustomizeAdDesignPage() {
         <div className="max-w-4xl mx-auto">
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Customize Your AdBox</h1>
-            <p className="text-gray-600">Enter your business information and select your Design.</p>
+            <p className="text-gray-600">Enter your business information.</p>
           </div>
 
           {selectedDesign ? (
@@ -1410,108 +1217,6 @@ export default function CustomizeAdDesignPage() {
       </main>
 
       <MainFooter />
-
-      {/* Remove the photo album dialog by commenting out or removing the following section (around line 1000): */}
-      {/*
-      <Dialog open={isPhotoAlbumOpen} onOpenChange={setIsPhotoAlbumOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Photo Album</DialogTitle>
-          </DialogHeader>
-
-          <div className="relative">
-            {photos.length > 0 ? (
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                <img
-                  src={photos[currentPhotoIndex].url || "/placeholder.svg"}
-                  alt={`Photo ${currentPhotoIndex + 1}`}
-                  className="w-full h-full object-contain"
-                />
-
-                <div className="absolute bottom-2 left-0 right-0 text-center text-white text-sm">
-                  {currentPhotoIndex + 1} of {photos.length}
-                </div>
-
-                {photos.length > 1 && (
-                  <>
-                    <button
-                      onClick={handlePrevPhoto}
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
-                    >
-                      <ChevronLeft size={24} />
-                    </button>
-                    <button
-                      onClick={handleNextPhoto}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
-                    >
-                      <ChevronRight size={24} />
-                    </button>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="aspect-video bg-gray-100 rounded-lg flex flex-col items-center justify-center p-6 text-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="48"
-                  height="48"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-gray-400 mb-4"
-                >
-                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                  <circle cx="9" cy="9" r="2"></circle>
-                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                </svg>
-                <p className="text-gray-600 font-medium mb-2">Your photo album is empty</p>
-                <p className="text-gray-500 text-sm mb-4">
-                  Upload photos from the Media Manager to showcase your business
-                </p>
-                <Button
-                  onClick={() => (window.location.href = "/photo-album")}
-                  variant="outline"
-                  style={{
-                    borderColor: colorValues.primary,
-                    color: colorValues.primary,
-                  }}
-                >
-                  Go to Media Manager
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-4 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-24 overflow-y-auto">
-            {photos.length > 0 ? (
-              photos.map((photo, index) => (
-                <div
-                  key={photo.id}
-                  className={`aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${
-                    index === currentPhotoIndex ? "border-primary" : "border-transparent"
-                  }`}
-                  onClick={() => setCurrentPhotoIndex(index)}
-                  style={{ borderColor: index === currentPhotoIndex ? colorValues.primary : "transparent" }}
-                >
-                  <img
-                    src={photo.url || "/placeholder.svg"}
-                    alt={`Thumbnail ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center text-sm text-gray-500 py-2">
-                No photos available in your album
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-      */}
 
       {/* Savings Dialog */}
       <Dialog open={isSavingsDialogOpen} onOpenChange={setIsSavingsDialogOpen}>
