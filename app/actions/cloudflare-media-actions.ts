@@ -63,7 +63,7 @@ export async function saveCloudflareVideo(
     const existingMedia = await getCloudflareBusinessMedia(businessId)
 
     // Check if there's already a video - if so, delete it from Cloudflare
-    if (existingMedia?.cloudflareVideoId) {
+    if (existingMedia?.cloudflareVideoId && existingMedia.cloudflareVideoId !== videoId) {
       try {
         console.log(
           `Attempting to delete existing video: ${existingMedia.cloudflareVideoId} for business ${businessId}`,
@@ -109,6 +109,7 @@ export async function saveCloudflareVideo(
       videoAspectRatio: aspectRatio,
     })
 
+    // Force revalidation to ensure the UI updates immediately
     revalidatePath("/video")
 
     return {
@@ -264,18 +265,22 @@ export async function checkCloudflareVideoStatus(
           : JSON.stringify(videoDetails.video.status)
     }
 
+    // Check if the video is ready to stream
+    const isReady = videoDetails.video.readyToStream || false
+
     // Update the video status in Redis
     const mediaKey = `business:${businessId}:cloudflare-media`
     await kv.hset(mediaKey, {
       cloudflareVideoStatus: statusValue,
-      cloudflareVideoReadyToStream: videoDetails.video.readyToStream || false,
+      cloudflareVideoReadyToStream: isReady,
     })
 
+    // Force revalidation to ensure the UI updates
     revalidatePath("/video")
 
     return {
       success: true,
-      readyToStream: videoDetails.video.readyToStream || false,
+      readyToStream: isReady,
       status: statusValue,
     }
   } catch (error) {

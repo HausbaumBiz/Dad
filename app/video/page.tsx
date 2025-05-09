@@ -15,6 +15,7 @@ import {
   LayoutTemplateIcon as LayoutLandscape,
   LayoutTemplateIcon as LayoutPortrait,
   AlertTriangle,
+  Trash2,
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
@@ -23,9 +24,16 @@ import { formatFileSize, createPreviewUrl } from "@/lib/media-utils"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { saveCloudflareVideo } from "@/app/actions/cloudflare-media-actions"
+import {
+  saveCloudflareVideo,
+  getCloudflareBusinessMedia,
+  deleteCloudflareVideo,
+  type CloudflareBusinessMedia,
+  checkCloudflareVideoStatus,
+} from "@/app/actions/cloudflare-media-actions"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
 import { useRouter } from "next/navigation"
+import { CloudflareStreamPlayer } from "@/components/cloudflare-stream-player"
 
 // Add these constants
 const MAX_VIDEO_SIZE_MB = 200 // Cloudflare Stream accepts larger videos
@@ -46,10 +54,15 @@ export default function VideoPage() {
   const [cloudflareConfigured, setCloudflareConfigured] = useState(false)
   const [businessId, setBusinessId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [existingVideo, setExistingVideo] = useState<CloudflareBusinessMedia | null>(null)
+  const [isDeletingVideo, setIsDeletingVideo] = useState(false)
+  // First, add a new state for tracking video processing
+  const [isProcessingVideo, setIsProcessingVideo] = useState(false)
+  const [processingProgress, setProcessingProgress] = useState(0)
 
   const videoInputRef = useRef<HTMLInputElement>(null)
 
-  // Load business ID on component mount
+  // Load business ID and existing video on component mount
   useEffect(() => {
     async function loadBusiness() {
       try {
@@ -71,6 +84,13 @@ export default function VideoPage() {
 
         setBusinessId(business.id)
         console.log(`Loaded business ID: ${business.id}`)
+
+        // Load existing video if any
+        const media = await getCloudflareBusinessMedia(business.id)
+        if (media && media.cloudflareVideoId) {
+          setExistingVideo(media)
+          setAspectRatio((media.videoAspectRatio as AspectRatio) || "16:9")
+        }
       } catch (error) {
         console.error("Error loading business:", error)
         toast({
@@ -169,6 +189,9 @@ export default function VideoPage() {
     setVideoPreview(url)
   }
 
+  // Now modify the handleVideoUpload function to set isProcessingVideo
+  // Replace the existing handleVideoUpload function with this updated version:
+
   // Handle video upload to Cloudflare Stream
   const handleVideoUpload = async () => {
     if (!businessId) {
@@ -213,6 +236,9 @@ export default function VideoPage() {
         throw new Error("Failed to get Cloudflare upload URL")
       }
 
+      // Store the video ID for status polling
+      setCloudflareVideoId(uploadData.videoId)
+
       // Upload the video directly to Cloudflare Stream
       const formData = new FormData()
       formData.append("file", selectedVideo)
@@ -253,7 +279,7 @@ export default function VideoPage() {
       // Upload completed successfully
       toast({
         title: "Video uploaded successfully",
-        description: "Your video has been uploaded to Cloudflare Stream and will be available shortly.",
+        description: "Your video is being processed and will be available shortly.",
       })
 
       // Save the video information in our backend
@@ -265,11 +291,17 @@ export default function VideoPage() {
         setVideoPreview(null)
         if (videoInputRef.current) videoInputRef.current.value = ""
 
-        // Keep user on the current page and show a success message
-        toast({
-          title: "Upload complete",
-          description: "Your video has been uploaded successfully. You can now manage it from this page.",
-        })
+        // Start polling for video processing status
+        setIsProcessingVideo(true)
+        setProcessingProgress(10)
+        setCloudflareVideoId(uploadData.videoId) // Make sure this is set for polling
+
+        // Immediately try to get the video info
+        const media = await getCloudflareBusinessMedia(businessId)
+        if (media && media.cloudflareVideoId) {
+          setExistingVideo(media)
+          console.log("Initial video data loaded after upload:", media)
+        }
       } else {
         throw new Error(result.error || "Failed to save video information")
       }
@@ -280,9 +312,99 @@ export default function VideoPage() {
         description: error instanceof Error ? error.message : "An unknown error occurred during upload",
         variant: "destructive",
       })
+      setIsProcessingVideo(false)
     } finally {
       setIsUploading(false)
       setUploadProgress(0)
+    }
+  }
+
+  // Add this after the other useEffect hooks
+  useEffect(() => {
+    // Poll for video status if we have a video that's processing
+    let interval: NodeJS.Timeout | null = null
+
+    if (isProcessingVideo && businessId && cloudflareVideoId) {
+      console.log(`Starting polling for video ${cloudflareVideoId}`)
+
+      // Define the polling function
+      const checkVideoStatus = async () => {
+        try {
+          // Use the server action that directly checks with Cloudflare API
+          const statusResult = await checkCloudflareVideoStatus(businessId)
+          console.log("Video status check result:", statusResult)
+
+          if (statusResult.success) {
+            // Update processing progress for visual feedback
+            setProcessingProgress((prev) => Math.min(prev + 5, 95))
+
+            // If the video is ready to stream, stop polling and update UI
+            if (statusResult.readyToStream) {
+              setIsProcessingVideo(false)
+
+              // Fetch the latest video data to update the UI
+              const media = await getCloudflareBusinessMedia(businessId)
+              if (media && media.cloudflareVideoId) {
+                setExistingVideo(media)
+                console.log("Video is ready to stream, updating UI")
+
+                toast({
+                  title: "Video ready",
+                  description: "Your video is now ready to stream.",
+                })
+              }
+            }
+          } else {
+            console.warn("Failed to check video status:", statusResult.error)
+          }
+        } catch (error) {
+          console.error("Error checking video status:", error)
+        }
+      }
+
+      // Run immediately once
+      checkVideoStatus()
+
+      // Then set up interval
+      interval = setInterval(checkVideoStatus, 3000) // Check every 3 seconds
+    }
+
+    return () => {
+      if (interval) {
+        console.log("Clearing video status polling interval")
+        clearInterval(interval)
+      }
+    }
+  }, [isProcessingVideo, businessId, cloudflareVideoId, toast])
+
+  // Handle video deletion
+  const handleDeleteVideo = async () => {
+    if (!businessId || !existingVideo?.cloudflareVideoId) {
+      return
+    }
+
+    try {
+      setIsDeletingVideo(true)
+      const result = await deleteCloudflareVideo(businessId)
+
+      if (result.success) {
+        setExistingVideo(null)
+        toast({
+          title: "Video deleted",
+          description: "Your video has been deleted successfully.",
+        })
+      } else {
+        throw new Error(result.error || "Failed to delete video")
+      }
+    } catch (error) {
+      console.error("Error deleting video:", error)
+      toast({
+        title: "Delete failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeletingVideo(false)
     }
   }
 
@@ -354,6 +476,57 @@ export default function VideoPage() {
           <span>Videos are stored and streamed using Cloudflare Stream for better performance and reliability.</span>
         </AlertDescription>
       </Alert>
+
+      {/* Display existing video if available */}
+      {existingVideo && existingVideo.cloudflareVideoId && (
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold">Your Video</h2>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteVideo}
+              disabled={isDeletingVideo || isProcessingVideo}
+              className="flex items-center gap-2"
+            >
+              {isDeletingVideo ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {isDeletingVideo ? "Deleting..." : "Delete Video"}
+            </Button>
+          </div>
+
+          {isProcessingVideo ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Processing Video</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-5 w-5 animate-spin text-blue-500" />
+                    <p>Your video is being processed by Cloudflare Stream...</p>
+                  </div>
+                  <Progress value={processingProgress} className="h-2" />
+                  <p className="text-sm text-muted-foreground">
+                    This may take a few moments depending on the video size.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <CloudflareStreamPlayer
+              videoId={existingVideo.cloudflareVideoId}
+              aspectRatio={(existingVideo.videoAspectRatio as AspectRatio) || "16:9"}
+              title="Your Business Video"
+            />
+          )}
+
+          <p className="text-sm text-muted-foreground mt-4">
+            {isProcessingVideo
+              ? "Your video will be available for streaming once processing is complete."
+              : "This video is now available for streaming. You can replace it by uploading a new video."}
+          </p>
+        </div>
+      )}
 
       {/* Aspect Ratio Selector */}
       <Card className="mb-6">
@@ -432,7 +605,7 @@ export default function VideoPage() {
           <div className="flex items-center gap-2">
             <VideoIcon className="h-5 w-5" />
             <div>
-              <CardTitle>Upload Video</CardTitle>
+              <CardTitle>{existingVideo ? "Replace Video" : "Upload Video"}</CardTitle>
               <CardDescription>Select a video file to upload to Cloudflare Stream</CardDescription>
             </div>
           </div>
@@ -494,7 +667,7 @@ export default function VideoPage() {
         <CardFooter className="flex justify-end">
           <>
             <Button onClick={handleVideoUpload} disabled={isUploading || !selectedVideo || !cloudflareConfigured}>
-              {isUploading ? "Uploading..." : "Upload to Cloudflare Stream"}
+              {isUploading ? "Uploading..." : existingVideo ? "Replace Video" : "Upload Video"}
             </Button>
           </>
         </CardFooter>

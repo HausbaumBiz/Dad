@@ -87,6 +87,9 @@ export async function getVideoDetails(videoId: string): Promise<{
   error?: string
 }> {
   try {
+    // Add logging to help debug
+    console.log(`Fetching video details for ID: ${videoId}`)
+
     const response = await fetch(`${CLOUDFLARE_API_BASE}/${videoId}`, {
       method: "GET",
       headers,
@@ -103,6 +106,7 @@ export async function getVideoDetails(videoId: string): Promise<{
         // If JSON parsing fails, just use the HTTP status
       }
 
+      console.error(`Error fetching video details: ${errorMessage}`)
       return {
         success: false,
         error: errorMessage,
@@ -121,6 +125,7 @@ export async function getVideoDetails(videoId: string): Promise<{
     }
 
     if (!data.success || !data.result) {
+      console.error("Failed to get video details from Cloudflare:", data)
       return {
         success: false,
         error: "Failed to get video details from Cloudflare",
@@ -129,6 +134,15 @@ export async function getVideoDetails(videoId: string): Promise<{
 
     // Extract the status and handle it properly
     const videoData = data.result
+
+    // Log the video data for debugging
+    console.log("Cloudflare video data:", {
+      id: videoData.uid,
+      status: videoData.status,
+      readyToStream: videoData.readyToStream,
+      created: videoData.created,
+    })
+
     // If status is an object, convert it to a string representation
     if (videoData.status && typeof videoData.status === "object") {
       videoData.status = JSON.stringify(videoData.status)
