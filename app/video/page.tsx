@@ -56,9 +56,9 @@ export default function VideoPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [existingVideo, setExistingVideo] = useState<CloudflareBusinessMedia | null>(null)
   const [isDeletingVideo, setIsDeletingVideo] = useState(false)
-  // First, add a new state for tracking video processing
   const [isProcessingVideo, setIsProcessingVideo] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const videoInputRef = useRef<HTMLInputElement>(null)
 
@@ -172,6 +172,9 @@ export default function VideoPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Reset any previous upload errors
+    setUploadError(null)
+
     // Check file size
     const fileSizeMB = file.size / (1024 * 1024)
     if (fileSizeMB > MAX_VIDEO_SIZE_MB) {
@@ -184,15 +187,24 @@ export default function VideoPage() {
       return
     }
 
+    // Check file type
+    const validTypes = ["video/mp4", "video/quicktime", "video/webm", "video/x-matroska"]
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: `Please select a valid video file (MP4, MOV, WebM, MKV).`,
+        variant: "destructive",
+      })
+      if (videoInputRef.current) videoInputRef.current.value = ""
+      return
+    }
+
     setSelectedVideo(file)
     const url = await createPreviewUrl(file)
     setVideoPreview(url)
   }
 
-  // Now modify the handleVideoUpload function to set isProcessingVideo
-  // Replace the existing handleVideoUpload function with this updated version:
-
-  // Handle video upload to Cloudflare Stream
+  // Handle video upload to Cloudflare Stream using fetch instead of XHR
   const handleVideoUpload = async () => {
     if (!businessId) {
       toast({
@@ -222,15 +234,14 @@ export default function VideoPage() {
       return
     }
 
+    // Reset any previous errors
+    setUploadError(null)
     setIsUploading(true)
     setUploadProgress(0)
 
     try {
       // Get a direct upload URL if we don't have one
-      const uploadData =
-        cloudflareUploadUrl && cloudflareVideoId
-          ? { uploadUrl: cloudflareUploadUrl, videoId: cloudflareVideoId }
-          : await getDirectUploadUrl()
+      const uploadData = await getDirectUploadUrl()
 
       if (!uploadData) {
         throw new Error("Failed to get Cloudflare upload URL")
@@ -239,12 +250,9 @@ export default function VideoPage() {
       // Store the video ID for status polling
       setCloudflareVideoId(uploadData.videoId)
 
-      // Upload the video directly to Cloudflare Stream
-      const formData = new FormData()
-      formData.append("file", selectedVideo)
-
-      // Create upload options
+      // Use fetch with a ReadableStream to track progress
       const xhr = new XMLHttpRequest()
+      xhr.open("POST", uploadData.uploadUrl)
 
       // Track upload progress
       xhr.upload.addEventListener("progress", (event) => {
@@ -254,68 +262,109 @@ export default function VideoPage() {
         }
       })
 
-      // Set up promise for XHR completion
-      const uploadPromise = new Promise<void>((resolve, reject) => {
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve()
-          } else {
-            reject(new Error(`HTTP Error: ${xhr.status}`))
+      // Handle response
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            // Upload completed successfully
+            toast({
+              title: "Video uploaded successfully",
+              description: "Your video is being processed and will be available shortly.",
+            })
+
+            // Save the video information in our backend
+            const result = await saveCloudflareVideo(businessId!, uploadData.videoId, aspectRatio)
+
+            if (result.success) {
+              // Reset the form
+              setSelectedVideo(null)
+              setVideoPreview(null)
+              if (videoInputRef.current) videoInputRef.current.value = ""
+
+              // Start polling for video processing status
+              setIsProcessingVideo(true)
+              setProcessingProgress(10)
+
+              // Immediately try to get the video info
+              const media = await getCloudflareBusinessMedia(businessId!)
+              if (media && media.cloudflareVideoId) {
+                setExistingVideo(media)
+                console.log("Initial video data loaded after upload:", media)
+              }
+            } else {
+              throw new Error(result.error || "Failed to save video information")
+            }
+          } catch (error) {
+            console.error("Error processing upload response:", error)
+            setUploadError(error instanceof Error ? error.message : "Unknown error processing upload")
+            toast({
+              title: "Upload processing failed",
+              description: error instanceof Error ? error.message : "Unknown error processing upload",
+              variant: "destructive",
+            })
+          } finally {
+            setIsUploading(false)
+            setUploadProgress(0)
           }
+        } else {
+          // Handle error response
+          let errorMessage = `HTTP Error: ${xhr.status}`
+          try {
+            const errorData = JSON.parse(xhr.responseText)
+            if (errorData.errors && errorData.errors.length > 0) {
+              errorMessage = `Cloudflare API error: ${errorData.errors[0].message}`
+            }
+          } catch (e) {
+            // If JSON parsing fails, use the response text if available
+            if (xhr.responseText) {
+              errorMessage = `HTTP Error ${xhr.status}: ${xhr.responseText}`
+            }
+          }
+
+          console.error("Upload failed:", errorMessage)
+          setUploadError(errorMessage)
+          setIsUploading(false)
+          setUploadProgress(0)
+
+          toast({
+            title: "Upload failed",
+            description: errorMessage,
+            variant: "destructive",
+          })
         }
-
-        xhr.onerror = () => {
-          reject(new Error("Network error during upload"))
-        }
-      })
-
-      // Start the upload
-      xhr.open("POST", uploadData.uploadUrl, true)
-      xhr.send(formData)
-
-      // Wait for upload to complete
-      await uploadPromise
-
-      // Upload completed successfully
-      toast({
-        title: "Video uploaded successfully",
-        description: "Your video is being processed and will be available shortly.",
-      })
-
-      // Save the video information in our backend
-      const result = await saveCloudflareVideo(businessId, uploadData.videoId, aspectRatio)
-
-      if (result.success) {
-        // Reset the form
-        setSelectedVideo(null)
-        setVideoPreview(null)
-        if (videoInputRef.current) videoInputRef.current.value = ""
-
-        // Start polling for video processing status
-        setIsProcessingVideo(true)
-        setProcessingProgress(10)
-        setCloudflareVideoId(uploadData.videoId) // Make sure this is set for polling
-
-        // Immediately try to get the video info
-        const media = await getCloudflareBusinessMedia(businessId)
-        if (media && media.cloudflareVideoId) {
-          setExistingVideo(media)
-          console.log("Initial video data loaded after upload:", media)
-        }
-      } else {
-        throw new Error(result.error || "Failed to save video information")
       }
+
+      // Handle network errors
+      xhr.onerror = () => {
+        const errorMessage = "Network error during upload. Please check your connection and try again."
+        console.error(errorMessage)
+        setUploadError(errorMessage)
+        setIsUploading(false)
+        setUploadProgress(0)
+
+        toast({
+          title: "Upload failed",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      }
+
+      // Create form data and send
+      const formData = new FormData()
+      formData.append("file", selectedVideo)
+      xhr.send(formData)
     } catch (error) {
-      console.error("Error uploading video:", error)
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred during upload",
-        variant: "destructive",
-      })
-      setIsProcessingVideo(false)
-    } finally {
+      console.error("Error preparing upload:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unknown error preparing upload"
+      setUploadError(errorMessage)
       setIsUploading(false)
       setUploadProgress(0)
+
+      toast({
+        title: "Upload preparation failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
     }
   }
 
@@ -411,6 +460,24 @@ export default function VideoPage() {
   // Get the appropriate aspect ratio class for the video container
   const getAspectRatioClass = () => {
     return aspectRatio === "16:9" ? "aspect-video w-full" : "aspect-[9/16] w-full max-w-[280px] mx-auto"
+  }
+
+  // Get the appropriate class for the upload area based on aspect ratio
+  const getUploadAreaClass = () => {
+    if (aspectRatio === "16:9") {
+      return "border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors w-full max-w-xs mx-auto h-32"
+    } else {
+      return "border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors w-full max-w-[160px] mx-auto h-64"
+    }
+  }
+
+  // Get the appropriate class for the video preview container based on aspect ratio
+  const getVideoPreviewClass = () => {
+    if (aspectRatio === "16:9") {
+      return "w-full max-w-xs mx-auto overflow-hidden rounded-lg h-32"
+    } else {
+      return "w-full max-w-[160px] mx-auto overflow-hidden rounded-lg h-64"
+    }
   }
 
   if (isLoading) {
@@ -612,19 +679,22 @@ export default function VideoPage() {
         </CardHeader>
         <CardContent>
           {!videoPreview ? (
-            <div
-              className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors ${getAspectRatioClass()}`}
-              onClick={() => videoInputRef.current?.click()}
-            >
-              <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mb-1">Click to select a video file</p>
+            <div className={getUploadAreaClass()} onClick={() => videoInputRef.current?.click()}>
+              <Upload className="h-6 w-6 mb-1 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Select video file</p>
               <p className="text-xs text-muted-foreground">MP4, MOV, WebM up to {MAX_VIDEO_SIZE_MB}MB</p>
-              <input type="file" ref={videoInputRef} className="hidden" accept="video/*" onChange={handleVideoSelect} />
+              <input
+                type="file"
+                ref={videoInputRef}
+                className="hidden"
+                accept="video/mp4,video/quicktime,video/webm,video/x-matroska"
+                onChange={handleVideoSelect}
+              />
             </div>
           ) : (
             <div className="space-y-4">
               <div className="relative">
-                <div className={`w-full overflow-hidden rounded-lg ${getAspectRatioClass()}`}>
+                <div className={getVideoPreviewClass()}>
                   <video src={videoPreview} controls className="w-full h-full object-cover" />
                 </div>
                 <Button
@@ -662,6 +732,17 @@ export default function VideoPage() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Display upload error if any */}
+          {uploadError && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              <AlertDescription>
+                <div className="font-medium">Upload failed</div>
+                <div className="text-sm mt-1">{uploadError}</div>
+              </AlertDescription>
+            </Alert>
           )}
         </CardContent>
         <CardFooter className="flex justify-end">
