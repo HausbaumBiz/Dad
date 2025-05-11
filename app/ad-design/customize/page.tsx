@@ -12,7 +12,8 @@ import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
 import { getBusinessMedia, saveMediaSettings, type MediaItem } from "@/app/actions/media-actions"
-import { saveBusinessAdDesign } from "@/app/actions/business-actions"
+import { saveBusinessAdDesign, getBusinessAdDesign } from "@/app/actions/business-actions"
+import { getCurrentBusiness } from "@/app/actions/auth-actions"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -144,15 +145,27 @@ export default function CustomizeAdDesignPage() {
   useEffect(() => {
     const fetchBusinessData = async () => {
       try {
-        // In a real app, you would get this from the user session
-        // For now, we'll use a demo business ID
-        const id = "demo-business"
+        setIsLoading(true)
+
+        // Get the current business from the session
+        const business = await getCurrentBusiness()
+        console.log("Current business:", business)
+
+        let id = "demo-business" // Default fallback ID
+
+        if (business && business.id) {
+          id = business.id
+          console.log("Using business ID from session:", id)
+        } else {
+          console.log("No business found in session, using default ID:", id)
+        }
+
         setBusinessId(id)
 
         // Load saved media
         await loadSavedMedia(id)
 
-        // Load business data
+        // Load business data - this now includes loading the saved ad design
         await loadBusinessData(id)
 
         setIsLoading(false)
@@ -222,43 +235,107 @@ export default function CustomizeAdDesignPage() {
   // Modify the loadBusinessData function to parse phone number
   const loadBusinessData = async (id: string) => {
     try {
-      // In a real app, you would fetch the business data from your API
-      // For now, we'll use mock data
+      console.log("Loading business data for ID:", id)
 
-      // You could fetch business details here
-      // const businessDetails = await getBusinessDetails(id)
+      // Get the saved ad design data, which includes business information
+      const savedDesign = await getBusinessAdDesign(id)
+      console.log("Saved design data:", savedDesign)
 
-      // For now, we'll just set some default values if none are loaded
-      setFormData((prev) => {
+      if (savedDesign && savedDesign.businessInfo) {
+        // Extract business info from saved design
+        const businessInfo = savedDesign.businessInfo
+        console.log("Found saved business info:", businessInfo)
+
         // Parse phone number if it exists in format (555) 123-4567
         let phoneArea = "555"
         let phonePrefix = "123"
         let phoneLine = "4567"
 
-        const phoneMatch = prev.phone?.match(/$$(\d{3})$$\s*(\d{3})-(\d{4})/)
-        if (phoneMatch) {
-          phoneArea = phoneMatch[1]
-          phonePrefix = phoneMatch[2]
-          phoneLine = phoneMatch[3]
+        if (businessInfo.phone) {
+          const phoneMatch = businessInfo.phone.match(/$$(\d{3})$$\s*(\d{3})-(\d{4})/)
+          if (phoneMatch) {
+            phoneArea = phoneMatch[1]
+            phonePrefix = phoneMatch[2]
+            phoneLine = phoneMatch[3]
+          }
         }
 
-        return {
-          ...prev,
-          businessName: "Your Business Name", // Replace with actual data
-          streetAddress: "123 Main St", // Replace with actual data
-          city: "Your City", // Replace with actual data
-          state: "ST", // Replace with actual data
-          zipCode: "12345", // Replace with actual data
-          phoneArea,
-          phonePrefix,
-          phoneLine,
-          hours: "Your Business Hours", // Replace with actual data
-          website: "Your Business Website", // Replace with actual data
-          freeText: "Your Business Description", // Replace with actual data
+        // Load hidden fields if available
+        if (savedDesign.hiddenFields) {
+          setHiddenFields((prevFields) => ({
+            ...prevFields,
+            ...savedDesign.hiddenFields,
+          }))
         }
-      })
+
+        // Update form data with saved business information - ensure no undefined values
+        setFormData({
+          businessName: businessInfo.businessName || "Business Name",
+          streetAddress: businessInfo.streetAddress || "123 Business St",
+          city: businessInfo.city || "City",
+          state: businessInfo.state || "ST",
+          zipCode: businessInfo.zipCode || "12345",
+          phoneArea: phoneArea || "555",
+          phonePrefix: phonePrefix || "123",
+          phoneLine: phoneLine || "4567",
+          hours: businessInfo.hours || "Mon-Fri: 9AM-5PM\nSat: 10AM-3PM",
+          website: businessInfo.website || "www.businessname.com",
+          freeText:
+            businessInfo.freeText || "We offer professional services with 10+ years of experience in the industry.",
+          videoFile: null,
+          thumbnailFile: null,
+        })
+
+        // If we have a saved color scheme, use it
+        if (savedDesign.colorScheme) {
+          setSelectedColor(savedDesign.colorScheme)
+        }
+
+        // If we have a saved design ID, use it
+        if (savedDesign.designId) {
+          setSelectedDesign(Number(savedDesign.designId) || 5) // Provide fallback if NaN
+        }
+
+        return true
+      } else {
+        console.log("No saved business info found, using defaults")
+        // No saved data, use defaults
+        setFormData({
+          businessName: "Your Business Name",
+          streetAddress: "123 Main St",
+          city: "Your City",
+          state: "ST",
+          zipCode: "12345",
+          phoneArea: "555",
+          phonePrefix: "123",
+          phoneLine: "4567",
+          hours: "Your Business Hours",
+          website: "Your Business Website",
+          freeText: "Your Business Description",
+          videoFile: null,
+          thumbnailFile: null,
+        })
+        return false
+      }
     } catch (error) {
       console.error("Error loading business data:", error)
+      // Ensure we set default values even on error
+      setFormData({
+        businessName: "Your Business Name",
+        streetAddress: "123 Main St",
+        city: "Your City",
+        state: "ST",
+        zipCode: "12345",
+        phoneArea: "555",
+        phonePrefix: "123",
+        phoneLine: "4567",
+        hours: "Your Business Hours",
+        website: "Your Business Website",
+        freeText: "Your Business Description",
+        videoFile: null,
+        thumbnailFile: null,
+      })
+      return false
     }
   }
 
@@ -266,7 +343,7 @@ export default function CustomizeAdDesignPage() {
     const { name, value } = e.target
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: value || "", // Ensure we never set undefined
     }))
   }
 
@@ -294,7 +371,7 @@ export default function CustomizeAdDesignPage() {
 
     setFormData((prev) => ({
       ...prev,
-      [field]: truncatedValue,
+      [field]: truncatedValue || "", // Ensure we never set undefined
     }))
   }
 
@@ -424,20 +501,27 @@ export default function CustomizeAdDesignPage() {
         address: getFormattedAddress(), // Add the formatted address
       }
 
-      // Save business ad design data
-      await saveBusinessAdDesign(businessId, {
+      // Save business ad design data with all the necessary information
+      const result = await saveBusinessAdDesign(businessId, {
         designId: selectedDesign,
         colorScheme: selectedColor,
+        colorValues: colorValues, // Save the actual color values
         businessInfo: formattedData,
+        hiddenFields: hiddenFields, // Save visibility settings
+        updatedAt: new Date().toISOString(),
       })
 
-      toast({
-        title: "Success",
-        description: "Your ad design has been saved successfully!",
-      })
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Your ad design has been saved successfully!",
+        })
 
-      // Redirect to the workbench or another page
-      // router.push("/workbench")
+        // Redirect to the workbench or another page after successful save
+        // window.location.href = "/workbench"
+      } else {
+        throw new Error(result.error || "Failed to save ad design")
+      }
     } catch (error) {
       console.error("Error saving ad design:", error)
       toast({
@@ -555,7 +639,6 @@ export default function CustomizeAdDesignPage() {
     // Default to Design 5 (Modern Business Card design)
     return (
       <div className="mb-8">
-        
         <div className="overflow-hidden rounded-lg shadow-md">
           <Card className="max-w-md mx-auto">
             <div

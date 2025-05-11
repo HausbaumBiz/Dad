@@ -328,7 +328,7 @@ export async function loginBusiness(formData: FormData) {
   }
 }
 
-// Get the current business from the cookie
+// Update getCurrentBusiness to ensure we get the correct business ID
 export async function getCurrentBusiness() {
   try {
     // Check if KV environment variables are available
@@ -336,7 +336,7 @@ export async function getCurrentBusiness() {
       console.warn("KV environment variables are missing. Using mock data for development.")
       // Return mock data for development/preview
       return {
-        id: "mock-id",
+        id: "demo-business", // Use a consistent ID for development
         firstName: "Demo",
         lastName: "User",
         businessName: "Demo Business",
@@ -363,7 +363,8 @@ export async function getCurrentBusiness() {
       return null
     }
 
-    return business as Business
+    // Make sure the ID is included in the returned object
+    return { ...(business as Business), id: businessId }
   } catch (error) {
     console.error("Error getting current business:", error)
     // In case of error, return null instead of mock data to trigger proper error handling
@@ -416,11 +417,50 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
       return { success: false, error: "Missing business ID" }
     }
 
-    // Store design data in KV
-    await kv.hset(`${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`, {
-      ...designData,
-      updatedAt: new Date().toISOString(),
-    })
+    console.log("Saving business ad design:", designData)
+
+    // Define the keys we'll be using
+    const mainKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`
+    const colorsKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:colors`
+    const businessInfoKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:businessInfo`
+    const hiddenFieldsKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:hiddenFields`
+
+    // Delete existing keys to avoid type conflicts
+    await kv.del(mainKey)
+    await kv.del(colorsKey)
+    await kv.del(businessInfoKey)
+    await kv.del(hiddenFieldsKey)
+
+    // Store design data as JSON string instead of hash to avoid type conflicts
+    await kv.set(
+      mainKey,
+      JSON.stringify({
+        designId: designData.designId,
+        colorScheme: designData.colorScheme,
+        updatedAt: new Date().toISOString(),
+      }),
+    )
+
+    // Store the color values
+    if (designData.colorValues) {
+      await kv.set(
+        colorsKey,
+        JSON.stringify({
+          ...designData.colorValues,
+          colorScheme: designData.colorScheme,
+        }),
+      )
+    }
+
+    // Store the business information
+    if (designData.businessInfo) {
+      await kv.set(businessInfoKey, JSON.stringify(designData.businessInfo))
+    }
+
+    // Store the hidden fields settings
+    if (designData.hiddenFields) {
+      await kv.set(hiddenFieldsKey, JSON.stringify(designData.hiddenFields))
+    }
 
     revalidatePath(`/ad-design/customize`)
     revalidatePath(`/workbench`)
@@ -435,21 +475,130 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
   }
 }
 
-// Add this function to get the business ad design
+// Update the getBusinessAdDesign function to ensure proper data retrieval
 export async function getBusinessAdDesign(businessId: string) {
   try {
     if (!businessId) {
+      console.log("No business ID provided to getBusinessAdDesign")
       return null
     }
+
+    console.log(`Getting ad design for business ID: ${businessId}`)
+
+    // Define the keys we'll be using
+    const mainKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`
+    const colorsKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:colors`
+    const businessInfoKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:businessInfo`
+    const hiddenFieldsKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:hiddenFields`
 
     // Get the design data from KV
-    const designData = await kv.hgetall(`${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`)
+    let designData = null
+    try {
+      const designDataStr = await kv.get(mainKey)
+      console.log(`Main design data (${mainKey}):`, designDataStr)
+
+      if (designDataStr) {
+        designData = typeof designDataStr === "string" ? JSON.parse(designDataStr) : designDataStr
+      }
+    } catch (error) {
+      console.error("Error getting main design data:", error)
+    }
+
+    // Get the color values
+    let colorValues = null
+    try {
+      const colorValuesStr = await kv.get(colorsKey)
+      console.log(`Color values (${colorsKey}):`, colorValuesStr)
+
+      if (colorValuesStr) {
+        colorValues = typeof colorValuesStr === "string" ? JSON.parse(colorValuesStr) : colorValuesStr
+      }
+    } catch (error) {
+      console.error("Error getting color values:", error)
+    }
+
+    // Get the business information
+    let businessInfo = null
+    try {
+      const businessInfoStr = await kv.get(businessInfoKey)
+      console.log(`Business info (${businessInfoKey}):`, businessInfoStr)
+
+      if (businessInfoStr) {
+        businessInfo = typeof businessInfoStr === "string" ? JSON.parse(businessInfoStr) : businessInfoStr
+      }
+    } catch (error) {
+      console.error("Error getting business info:", error)
+    }
+
+    // Get the hidden fields settings
+    let hiddenFields = null
+    try {
+      const hiddenFieldsStr = await kv.get(hiddenFieldsKey)
+      console.log(`Hidden fields (${hiddenFieldsKey}):`, hiddenFieldsStr)
+
+      if (hiddenFieldsStr) {
+        hiddenFields = typeof hiddenFieldsStr === "string" ? JSON.parse(hiddenFieldsStr) : hiddenFieldsStr
+      }
+    } catch (error) {
+      console.error("Error getting hidden fields:", error)
+    }
+
+    // If we don't have any design data, try to get it from the old format
+    if (!designData) {
+      try {
+        // Try to get the data in the old format (as a single object)
+        const oldFormatData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`)
+        console.log("Trying old format data:", oldFormatData)
+
+        if (oldFormatData) {
+          const parsedData = typeof oldFormatData === "string" ? JSON.parse(oldFormatData) : oldFormatData
+
+          // Extract the components from the old format
+          designData = {
+            designId: parsedData.designId || 5,
+            colorScheme: parsedData.colorScheme || "blue",
+            updatedAt: parsedData.updatedAt || new Date().toISOString(),
+          }
+
+          businessInfo = parsedData.businessInfo || {}
+          colorValues = parsedData.colorValues || {}
+          hiddenFields = parsedData.hiddenFields || {}
+
+          console.log("Successfully retrieved data from old format")
+        }
+      } catch (error) {
+        console.error("Error getting data from old format:", error)
+      }
+    }
 
     if (!designData) {
+      console.log("No design data found for business ID:", businessId)
       return null
     }
 
-    return designData
+    // Ensure businessInfo has all required fields with default values
+    const defaultBusinessInfo = {
+      businessName: "",
+      streetAddress: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      phone: "",
+      hours: "",
+      website: "",
+      freeText: "",
+    }
+
+    // Combine all the data
+    const result = {
+      ...designData,
+      colorValues: colorValues || {},
+      businessInfo: { ...defaultBusinessInfo, ...(businessInfo || {}) },
+      hiddenFields: hiddenFields || {},
+    }
+
+    console.log("Final combined ad design data:", result)
+    return result
   } catch (error) {
     console.error("Error getting business ad design:", error)
     return null
