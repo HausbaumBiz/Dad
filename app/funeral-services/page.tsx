@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useState, useEffect } from "react"
 import { getBusinessesByCategory } from "@/app/actions/business-actions"
 import { Badge } from "@/components/ui/badge"
 
 export default function FuneralServicesPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
   const [isReviewsOpen, setIsReviewsOpen] = useState(false)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [debugInfo, setDebugInfo] = useState<string>("")
@@ -128,6 +131,12 @@ export default function FuneralServicesPage() {
   const handleOpenReviews = (providerName: string) => {
     setSelectedProvider(providerName)
     setIsReviewsOpen(true)
+  }
+
+  const handleOpenProfile = (providerId: string, providerName: string) => {
+    setSelectedProviderId(providerId)
+    setSelectedProvider(providerName)
+    setIsProfileOpen(true)
   }
 
   const filterOptions = [
@@ -276,7 +285,11 @@ export default function FuneralServicesPage() {
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider.name)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleOpenProfile(provider.id, provider.name)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -292,6 +305,13 @@ export default function FuneralServicesPage() {
         onClose={() => setIsReviewsOpen(false)}
         providerName={selectedProvider || ""}
         reviews={selectedProvider && providers.length > 0 ? [] : []}
+      />
+
+      <BusinessProfileDialog
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        businessId={selectedProviderId || ""}
+        businessName={selectedProvider || ""}
       />
 
       <Toaster />

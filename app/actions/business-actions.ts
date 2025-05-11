@@ -551,7 +551,12 @@ export async function getBusinessAdDesign(businessId: string) {
         console.log("Trying old format data:", oldFormatData)
 
         if (oldFormatData) {
-          const parsedData = typeof oldFormatData === "string" ? JSON.parse(oldFormatData) : oldFormatData
+          let parsedData
+          if (typeof oldFormatData === "string") {
+            parsedData = JSON.parse(oldFormatData)
+          } else {
+            parsedData = oldFormatData
+          }
 
           // Extract the components from the old format
           designData = {
