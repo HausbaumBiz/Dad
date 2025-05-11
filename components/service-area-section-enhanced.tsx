@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { Loader2, X, Search, AlertCircle } from "lucide-react"
+import { Loader2, X, Search, AlertCircle, Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
 import type { ZipCodeData } from "@/lib/zip-code-types"
@@ -104,7 +104,17 @@ export function ServiceAreaSectionEnhanced() {
   const handleSaveZipCodes = async () => {
     setIsSaving(true)
     try {
-      const result = await saveBusinessZipCodes(zipResults, isNationwide)
+      // Ensure zipResults is a valid array of ZipCodeData objects
+      const validZipCodes = zipResults.map((zip) => ({
+        zip: zip.zip || "",
+        city: zip.city || "Unknown City",
+        state: zip.state || "Unknown State",
+        latitude: zip.latitude || 0,
+        longitude: zip.longitude || 0,
+        distance: zip.distance,
+      }))
+
+      const result = await saveBusinessZipCodes(validZipCodes, isNationwide)
 
       if (result.success) {
         toast({
@@ -267,9 +277,15 @@ export function ServiceAreaSectionEnhanced() {
           </Label>
         </div>
 
-        <p className="mt-4 text-center text-gray-600">
-          You can view all your service area ZIP codes and add or remove ZIP codes on your User Account page.
-        </p>
+        <div className="mt-4 bg-blue-50 p-3 rounded-md border border-blue-100">
+          <div className="flex items-start">
+            <Info className="text-blue-500 mt-0.5 mr-2 h-5 w-5 flex-shrink-0" />
+            <p className="text-sm text-blue-700">
+              Your first ZIP code will be used as your primary location and will be displayed on your business listing.
+              We'll automatically fetch and store the city and state information for each ZIP code.
+            </p>
+          </div>
+        </div>
 
         <div className="mt-6 flex justify-end">
           <Button onClick={handleSaveZipCodes} disabled={isSaving}>

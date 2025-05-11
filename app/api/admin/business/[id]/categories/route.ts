@@ -56,6 +56,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json([])
     }
 
+    // Add debug logging to see what we're returning
+    console.log("Returning categories data:", categoriesData)
+
     return NextResponse.json(categoriesData)
   } catch (error) {
     console.error("Error fetching business categories:", error)

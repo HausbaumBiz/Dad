@@ -36,21 +36,74 @@ export default function FuneralServicesPage() {
             name: b.businessName,
             category: b.category,
             zipCode: b.zipCode,
+            city: b.city,
+            state: b.state,
+            allSubcategories: b.allSubcategories || [],
           })),
         })
 
-        // Transform business data to match the expected format
-        const formattedBusinesses = businesses.map((business) => ({
-          id: business.id,
-          name: business.businessName,
-          services: business.services || ["Funeral Services"],
-          rating: business.rating || 4.5,
-          reviews: business.reviews || Math.floor(Math.random() * 50) + 10,
-          location: business.zipCode ? `${business.city || "Local Area"}, ${business.state || "OH"}` : "Local Area",
-          zipCode: business.zipCode || "Not specified",
-          serviceArea: business.serviceArea || [],
-          reviewsData: business.reviewsData || [],
-        }))
+        // Get categories for each business
+        const formattedBusinesses = await Promise.all(
+          businesses.map(async (business) => {
+            // Use the city and state from the business record
+            const city = business.city || "Unknown City"
+            const state = business.state || "OH"
+
+            // First check if business has allSubcategories field
+            let services: string[] = []
+
+            if (
+              business.allSubcategories &&
+              Array.isArray(business.allSubcategories) &&
+              business.allSubcategories.length > 0
+            ) {
+              // Use allSubcategories directly
+              services = business.allSubcategories
+              console.log(`Using allSubcategories for ${business.businessName}:`, services)
+            } else {
+              // Fallback to fetching from API
+              try {
+                const response = await fetch(`/api/admin/business/${business.id}/categories`)
+                if (response.ok) {
+                  const categoriesData = await response.json()
+                  console.log(`Categories for ${business.businessName}:`, categoriesData)
+
+                  // The API returns the categories directly as an array
+                  if (Array.isArray(categoriesData) && categoriesData.length > 0) {
+                    services = categoriesData.map((cat) => {
+                      // Extract the name from the category object
+                      if (typeof cat === "string") {
+                        return cat
+                      } else if (cat && typeof cat === "object") {
+                        return cat.name || cat.id || "Funeral Service"
+                      }
+                      return "Funeral Service"
+                    })
+                  }
+                }
+              } catch (error) {
+                console.error(`Error fetching categories for business ${business.id}:`, error)
+              }
+            }
+
+            // If we still don't have any services, use default
+            if (services.length === 0) {
+              services = ["Funeral Services"]
+            }
+
+            return {
+              id: business.id,
+              name: business.businessName,
+              services: services,
+              rating: business.rating || 4.5,
+              reviews: business.reviews || Math.floor(Math.random() * 50) + 10,
+              location: `${city}, ${state}`,
+              zipCode: business.zipCode || "Not specified",
+              serviceArea: business.serviceArea || [],
+              reviewsData: business.reviewsData || [],
+            }
+          }),
+        )
 
         setProviders(formattedBusinesses)
         setDebugInfo(`Found ${businesses.length} funeral businesses in the database.`)

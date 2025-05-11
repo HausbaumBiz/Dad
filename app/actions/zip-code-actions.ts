@@ -1,25 +1,108 @@
 "use server"
 
 import { kv } from "@/lib/redis"
+import { revalidatePath } from "next/cache"
 import { getCurrentBusiness } from "./business-actions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
 
-// Save ZIP codes for a business
-export async function saveBusinessZipCodes(zipCodes: ZipCodeData[] | null | undefined, isNationwide: boolean) {
+// Get zip code details by zip code
+export async function getZipCodeDetails(zipCode: string): Promise<ZipCodeData | null> {
+  try {
+    if (!zipCode) return null
+
+    // Try to get from Redis first
+    const zipData = await kv.get(`zipcode:${zipCode}:details`)
+
+    if (zipData) {
+      return zipData as ZipCodeData
+    }
+
+    // If not in Redis, try to fetch from API
+    try {
+      const response = await fetch(`/api/zip-codes/search?zipCode=${zipCode}`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch zip code details: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data && data.zipCode) {
+        // Cache in Redis for future use
+        await kv.set(`zipcode:${zipCode}:details`, data.zipCode)
+        return data.zipCode
+      }
+    } catch (apiError) {
+      console.error(`Error fetching zip code details from API: ${apiError}`)
+    }
+
+    // Fallback to basic data
+    return {
+      zip: zipCode,
+      city: "Unknown City",
+      state: "Unknown State",
+      latitude: 0,
+      longitude: 0,
+    }
+  } catch (error) {
+    console.error(`Error getting zip code details for ${zipCode}:`, error)
+    return null
+  }
+}
+
+// Save business zip codes
+export async function saveBusinessZipCodes(
+  zipCodesInput: any,
+  isNationwide: boolean,
+): Promise<{
+  success: boolean
+  message?: string
+}> {
   try {
     const business = await getCurrentBusiness()
     if (!business) {
       return { success: false, message: "Not authenticated" }
     }
 
-    // Ensure zipCodes is an array
-    const zipCodesArray = Array.isArray(zipCodes) ? zipCodes : []
+    // Ensure we have a valid array to work with
+    let zipCodes: ZipCodeData[] = []
+
+    // Handle different input formats
+    if (zipCodesInput === null || zipCodesInput === undefined) {
+      zipCodes = []
+    } else if (Array.isArray(zipCodesInput)) {
+      // Filter out invalid entries and ensure each has required properties
+      zipCodes = zipCodesInput
+        .filter((item) => item && typeof item === "object")
+        .map((item) => ({
+          zip: String(item.zip || ""),
+          city: String(item.city || "Unknown City"),
+          state: String(item.state || "Unknown State"),
+          latitude: Number(item.latitude || 0),
+          longitude: Number(item.longitude || 0),
+          distance: item.distance !== undefined ? Number(item.distance) : undefined,
+        }))
+        .filter((item) => item.zip) // Only keep items with a zip code
+    } else if (typeof zipCodesInput === "object" && zipCodesInput !== null) {
+      // Handle case where a single object was passed
+      const item = zipCodesInput
+      if (item.zip) {
+        zipCodes = [
+          {
+            zip: String(item.zip),
+            city: String(item.city || "Unknown City"),
+            state: String(item.state || "Unknown State"),
+            latitude: Number(item.latitude || 0),
+            longitude: Number(item.longitude || 0),
+            distance: item.distance !== undefined ? Number(item.distance) : undefined,
+          },
+        ]
+      }
+    }
 
     // Extract just the ZIP code strings for set storage
-    const zipCodeStrings = zipCodesArray.map((z) => z.zip)
+    const zipCodeStrings = zipCodes.map((z) => z.zip)
 
     // Store the full ZIP code data as JSON for detailed information
-    await kv.set(`business:${business.id}:zipcodes`, JSON.stringify(zipCodesArray))
+    await kv.set(`business:${business.id}:zipcodes`, JSON.stringify(zipCodes))
 
     // Also store as a set for efficient lookups
     if (zipCodeStrings.length > 0) {
@@ -46,6 +129,32 @@ export async function saveBusinessZipCodes(zipCodes: ZipCodeData[] | null | unde
       // Remove from nationwide set if not nationwide
       await kv.srem("businesses:nationwide", business.id)
     }
+
+    // Update the business record with the primary location (first zip code)
+    if (zipCodes.length > 0) {
+      const primaryZip = zipCodes[0]
+
+      // Get the current business data
+      const businessData = await kv.get(`business:${business.id}`)
+      if (businessData) {
+        // Update with primary zip code location
+        const updatedBusiness = {
+          ...businessData,
+          zipCode: primaryZip.zip,
+          city: primaryZip.city,
+          state: primaryZip.state,
+        }
+
+        // Save the updated business data
+        await kv.set(`business:${business.id}`, updatedBusiness)
+      }
+    }
+
+    // Revalidate paths
+    revalidatePath("/business-focus")
+    revalidatePath("/workbench")
+    revalidatePath("/funeral-services")
+    revalidatePath(`/admin/businesses/${business.id}`)
 
     return { success: true, message: "ZIP codes saved successfully" }
   } catch (error) {
