@@ -1,26 +1,48 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
+import { CopyToClipboard } from "@/components/copy-to-clipboard"
+import type { Business } from "@/lib/definitions"
 import { getBusinesses } from "@/app/actions/business-actions"
-import { useState, useEffect } from "react"
 
 export default function BusinessesClientPage() {
-  const [businesses, setBusinesses] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchBusinesses = async () => {
-      const data = await getBusinesses()
-      setBusinesses(data)
-      setLoading(false)
+    async function loadBusinesses() {
+      try {
+        setIsLoading(true)
+        console.log("Fetching businesses...")
+        const data = await getBusinesses()
+        console.log(`Fetched ${data.length} businesses`)
+        setBusinesses(data)
+        setError(null)
+      } catch (err) {
+        console.error("Error loading businesses:", err)
+        setError("Failed to load businesses. Please try again.")
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    fetchBusinesses()
+    loadBusinesses()
   }, [])
 
-  if (loading) {
-    return <div className="container mx-auto py-8">Loading...</div>
+  if (isLoading) {
+    return <div className="text-center py-8">Loading businesses...</div>
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative my-4" role="alert">
+        <strong className="font-bold">Error: </strong>
+        <span className="block sm:inline">{error}</span>
+      </div>
+    )
   }
 
   return (
@@ -75,30 +97,10 @@ export default function BusinessesClientPage() {
                       </Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-500 font-mono">{business.id}</span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(business.id)
-                          // You could add a toast notification here
-                        }}
-                        className="ml-2 text-gray-400 hover:text-gray-600"
-                        title="Copy ID"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </button>
+                      <div className="flex items-center">
+                        <span className="text-sm font-mono">{business.id}</span>
+                        <CopyToClipboard text={business.id} className="ml-2 text-gray-400 hover:text-gray-600" />
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {business.firstName} {business.lastName}

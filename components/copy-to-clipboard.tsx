@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ClipboardCopy, Check } from "lucide-react"
+import { Copy, Check } from "lucide-react"
 
 interface CopyToClipboardProps {
   text: string
@@ -25,10 +25,10 @@ export function CopyToClipboard({ text, className = "" }: CopyToClipboardProps) 
     <button
       onClick={handleCopy}
       className={`inline-flex items-center justify-center ${className}`}
-      title="Copy to clipboard"
-      type="button"
+      title={copied ? "Copied!" : "Copy to clipboard"}
     >
-      {copied ? <Check className="h-4 w-4 text-green-500" /> : <ClipboardCopy className="h-4 w-4" />}
+      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      <span className="sr-only">{copied ? "Copied" : "Copy"}</span>
     </button>
   )
 }

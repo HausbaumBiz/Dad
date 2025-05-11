@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
-// Import the enhanced service area section
 import { ServiceAreaSectionEnhanced } from "@/components/service-area-section-enhanced"
 import { KeywordsSection } from "@/components/keywords-section"
 import { CategorySelector, type CategorySelection } from "@/components/category-selector"
@@ -71,9 +70,19 @@ export default function BusinessFocusPage() {
 
   // Function to save selected categories
   const handleSubmit = async () => {
+    if (selectedCategories.length === 0) {
+      toast({
+        title: "Warning",
+        description: "Please select at least one category before submitting",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsSaving(true)
     try {
       // Save to server
+      console.log(`Saving ${selectedCategories.length} categories for business...`)
       const result = await saveBusinessCategories(selectedCategories)
 
       if (result.success) {
@@ -82,7 +91,7 @@ export default function BusinessFocusPage() {
 
         toast({
           title: "Success",
-          description: "Your category selections have been saved",
+          description: `Your ${selectedCategories.length} category selections have been saved`,
         })
 
         // Redirect to workbench
@@ -115,7 +124,6 @@ export default function BusinessFocusPage() {
             </p>
           </div>
 
-          {/* Replace the ServiceAreaSection with ServiceAreaSectionEnhanced */}
           <ServiceAreaSectionEnhanced />
 
           <KeywordsSection />
@@ -192,7 +200,7 @@ export default function BusinessFocusPage() {
                 <Button
                   onClick={handleSubmit}
                   className="px-6 py-3 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-colors"
-                  disabled={isSaving}
+                  disabled={isSaving || selectedCategories.length === 0}
                 >
                   {isSaving ? (
                     <>

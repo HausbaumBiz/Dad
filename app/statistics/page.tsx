@@ -48,26 +48,36 @@ export default function StatisticsPage() {
   const [zipCodes, setZipCodes] = useState<ZipCodeData[]>([])
   const [isNationwide, setIsNationwide] = useState(false)
   const [isZipCodesLoading, setIsZipCodesLoading] = useState(true)
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
 
   // Load selected categories from server on component mount
   useEffect(() => {
     async function loadCategories() {
       setIsLoading(true)
       try {
+        console.log("Fetching business categories...")
         const result = await getBusinessCategories()
         if (result.success && result.data) {
+          console.log(`Loaded ${result.data.length} categories from database`)
           setSelectedCategories(result.data)
 
-          // Also update localStorage as a backup
-          localStorage.setItem("selectedCategories", JSON.stringify(result.data))
+          // Create a map of checked items for the CategorySelector
+          const checkedMap: Record<string, boolean> = {}
+          result.data.forEach((cat) => {
+            checkedMap[cat.fullPath] = true
+          })
+          setCheckedItems(checkedMap)
         } else {
+          console.warn("No categories found or error loading categories:", result.message)
           // Try to load from localStorage as fallback
           const savedCategories = localStorage.getItem("selectedCategories")
           if (savedCategories) {
             try {
-              setSelectedCategories(JSON.parse(savedCategories))
-            } catch (error) {
-              console.error("Error parsing saved categories from localStorage:", error)
+              const parsedCategories = JSON.parse(savedCategories)
+              console.log(`Loaded ${parsedCategories.length} categories from localStorage`)
+              setSelectedCategories(parsedCategories)
+            } catch (parseError) {
+              console.error("Error parsing saved categories from localStorage:", parseError)
             }
           }
         }
@@ -83,9 +93,11 @@ export default function StatisticsPage() {
         const savedCategories = localStorage.getItem("selectedCategories")
         if (savedCategories) {
           try {
-            setSelectedCategories(JSON.parse(savedCategories))
-          } catch (error) {
-            console.error("Error parsing saved categories from localStorage:", error)
+            const parsedCategories = JSON.parse(savedCategories)
+            console.log(`Loaded ${parsedCategories.length} categories from localStorage`)
+            setSelectedCategories(parsedCategories)
+          } catch (parseError) {
+            console.error("Error parsing saved categories from localStorage:", parseError)
           }
         }
       } finally {

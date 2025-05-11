@@ -1,24 +1,182 @@
 "use server"
 
-import { cookies } from "next/headers"
 import { kv } from "@/lib/redis"
 import { revalidatePath } from "next/cache"
-import bcrypt from "bcryptjs"
+import { cookies } from "next/headers"
 import crypto from "crypto"
+import bcrypt from "bcryptjs"
+import type { Business } from "@/lib/definitions"
+import {
+  saveBusinessToDb,
+  saveBusinessCategories,
+  saveBusinessServiceArea,
+  getBusinessesByCategory as getBusinessesByCategoryFromDb,
+  getBusinessesByZipCode as getBusinessesByZipCodeFromDb,
+  getBusinessesByCategoryAndZipCode as getBusinessesByCategoryAndZipCodeFromDb,
+  KEY_PREFIXES,
+  type CategoryData,
+} from "@/lib/db-schema"
 
-// Business type definition
-export type Business = {
-  id: string
-  firstName: string
-  lastName: string
-  businessName: string
-  zipCode: string
-  email: string
-  passwordHash: string
-  isEmailVerified: boolean
-  createdAt: string
-  updatedAt: string
-  phone?: string
+// Get all businesses
+export async function getBusinesses(): Promise<Business[]> {
+  try {
+    console.log("Fetching all businesses")
+
+    // Get all business IDs from the set
+    const businessIds = (await kv.smembers(KEY_PREFIXES.BUSINESSES_SET)) as string[]
+
+    console.log(`Found ${businessIds.length} business IDs`)
+
+    if (!businessIds || businessIds.length === 0) {
+      return []
+    }
+
+    // Fetch each business's data
+    const businessesPromises = businessIds.map(async (id) => {
+      try {
+        const business = (await kv.get(`${KEY_PREFIXES.BUSINESS}${id}`)) as Business | null
+        return business ? { ...business, id } : null
+      } catch (err) {
+        console.error(`Error fetching business ${id}:`, err)
+        return null
+      }
+    })
+
+    const businesses = (await Promise.all(businessesPromises)).filter(Boolean) as Business[]
+
+    console.log(`Successfully fetched ${businesses.length} businesses`)
+
+    // Sort by creation date (newest first)
+    return businesses.sort((a, b) => {
+      const dateA = new Date(a.createdAt || "").getTime()
+      const dateB = new Date(b.createdAt || "").getTime()
+      return dateB - dateA
+    })
+  } catch (error) {
+    console.error("Error fetching businesses:", error)
+    return []
+  }
+}
+
+// Get a business by ID
+export async function getBusinessById(id: string): Promise<Business | null> {
+  try {
+    if (!id) return null
+
+    const business = (await kv.get(`${KEY_PREFIXES.BUSINESS}${id}`)) as Business | null
+
+    if (!business) {
+      return null
+    }
+
+    return { ...business, id }
+  } catch (error) {
+    console.error(`Error fetching business with ID ${id}:`, error)
+    return null
+  }
+}
+
+// Delete a business
+export async function deleteBusiness(id: string): Promise<{ success: boolean; message: string }> {
+  console.log(`Starting deletion of business with ID: ${id}`)
+
+  try {
+    // Get the business first to get the email
+    const business = await getBusinessById(id)
+
+    if (!business) {
+      console.log(`Business with ID ${id} not found`)
+      return { success: false, message: "Business not found" }
+    }
+
+    console.log(`Found business: ${business.businessName} (${id})`)
+
+    // Remove business from email index
+    if (business.email) {
+      console.log(`Removing business from email index: ${business.email}`)
+      await kv.del(`${KEY_PREFIXES.BUSINESS_EMAIL}${business.email}`)
+    }
+
+    // Remove business from category index if it has one
+    if (business.category) {
+      console.log(`Removing business from category index: ${business.category}`)
+      await kv.srem(`${KEY_PREFIXES.CATEGORY}${business.category}`, id)
+    }
+
+    // Get business categories and remove from indexes
+    try {
+      const categoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${id}:categories`)
+      if (categoriesData) {
+        let categories: CategoryData[] = []
+
+        if (typeof categoriesData === "string") {
+          categories = JSON.parse(categoriesData)
+        } else if (Array.isArray(categoriesData)) {
+          categories = categoriesData
+        }
+
+        // Remove from category indexes
+        for (const category of categories) {
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${category.id}`, id)
+
+          if (category.parentId) {
+            await kv.srem(`${KEY_PREFIXES.CATEGORY}${category.parentId}:${category.id}`, id)
+          }
+
+          if (category.path) {
+            await kv.srem(`${KEY_PREFIXES.CATEGORY}path:${category.path}`, id)
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error removing business ${id} from category indexes:`, error)
+    }
+
+    // Get business zip codes and remove from indexes
+    try {
+      const zipCodes = await kv.smembers(`${KEY_PREFIXES.BUSINESS}${id}:zipcodes`)
+
+      // Remove business from each zip code's index
+      for (const zipCode of zipCodes) {
+        await kv.srem(`${KEY_PREFIXES.ZIPCODE}${zipCode}:businesses`, id)
+      }
+    } catch (error) {
+      console.error(`Error removing business ${id} from zip code indexes:`, error)
+    }
+
+    // Remove business from the set of all businesses
+    console.log(`Removing business from the set of all businesses`)
+    await kv.srem(KEY_PREFIXES.BUSINESSES_SET, id)
+
+    // Delete any associated data
+    console.log(`Deleting associated data for business ${id}`)
+    await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:adDesign`)
+    await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:categories`)
+    await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:zipcodes`)
+    await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:nationwide`)
+    await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:serviceArea`)
+
+    // Delete the business data
+    console.log(`Deleting business data for ${id}`)
+    await kv.del(`${KEY_PREFIXES.BUSINESS}${id}`)
+
+    // Revalidate paths
+    console.log(`Revalidating paths`)
+    revalidatePath("/admin/businesses")
+
+    console.log(`Business deleted successfully: ${business.businessName} (${id})`)
+
+    return {
+      success: true,
+      message: `Business ${business.businessName} successfully deleted`,
+    }
+  } catch (error) {
+    console.error(`Error deleting business with ID ${id}:`, error)
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete business",
+    }
+  }
 }
 
 // Register a new business
@@ -32,6 +190,7 @@ export async function registerBusiness(formData: FormData) {
     const email = (formData.get("email") as string).toLowerCase()
     const password = formData.get("password") as string
     const confirmPassword = formData.get("confirmPassword") as string
+    const category = (formData.get("category") as string) || ""
 
     // Validate form data
     if (!firstName || !lastName || !businessName || !zipCode || !email || !password || !confirmPassword) {
@@ -43,7 +202,7 @@ export async function registerBusiness(formData: FormData) {
     }
 
     // Check if business with this email already exists
-    const existingBusiness = await kv.get(`business:email:${email}`)
+    const existingBusiness = await kv.get(`${KEY_PREFIXES.BUSINESS_EMAIL}${email}`)
     if (existingBusiness) {
       return { success: false, message: `Email ${email} already registered` }
     }
@@ -67,14 +226,28 @@ export async function registerBusiness(formData: FormData) {
       isEmailVerified: true, // For simplicity, we're setting this to true by default
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      category,
     }
 
-    // Store business in KV store
-    await kv.set(`business:${id}`, business)
-    await kv.set(`business:email:${email}`, id)
+    // Save business using the new schema
+    await saveBusinessToDb(business)
 
-    // Add business ID to the set of all businesses
-    await kv.sadd("businesses", id)
+    // If category is provided, add as a standardized category
+    if (category) {
+      await saveBusinessCategories(id, [
+        {
+          id: category,
+          name: category,
+          path: category,
+        },
+      ])
+    }
+
+    // Add business's own zip code to its service area
+    await saveBusinessServiceArea(id, {
+      zipCodes: [zipCode],
+      isNationwide: false,
+    })
 
     // Set a cookie with the business ID
     cookies().set("businessId", id, {
@@ -111,19 +284,19 @@ export async function loginBusiness(formData: FormData) {
     }
 
     // Get business ID by email
-    const businessId = await kv.get(`business:email:${email}`)
+    const businessId = await kv.get(`${KEY_PREFIXES.BUSINESS_EMAIL}${email}`)
     if (!businessId) {
       return { success: false, message: "Invalid email or password" }
     }
 
     // Get business by ID
-    const business = (await kv.get(`business:${businessId}`)) as Business
+    const business = (await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)) as Business
     if (!business) {
       return { success: false, message: "Invalid email or password" }
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, business.passwordHash)
+    const isPasswordValid = await bcrypt.compare(password, business.passwordHash || "")
     if (!isPasswordValid) {
       return { success: false, message: "Invalid email or password" }
     }
@@ -182,7 +355,7 @@ export async function getCurrentBusiness() {
     }
 
     console.log(`Fetching business with ID: ${businessId}`)
-    const business = await kv.get(`business:${businessId}`)
+    const business = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
 
     if (!business) {
       console.log(`No business found with ID: ${businessId}`)
@@ -213,7 +386,7 @@ export async function logoutBusiness() {
 export async function checkBusinessEmailExists(email: string) {
   try {
     const normalizedEmail = email.toLowerCase()
-    const businessId = await kv.get(`business:email:${normalizedEmail}`)
+    const businessId = await kv.get(`${KEY_PREFIXES.BUSINESS_EMAIL}${normalizedEmail}`)
     return !!businessId
   } catch (error) {
     console.error("Error checking business email:", error)
@@ -221,45 +394,19 @@ export async function checkBusinessEmailExists(email: string) {
   }
 }
 
-// Get all businesses
-export async function getBusinesses() {
-  try {
-    // Get all business IDs from the set
-    const businessIds = (await kv.smembers("businesses")) as string[]
-
-    if (!businessIds || businessIds.length === 0) {
-      return []
-    }
-
-    // Fetch each business's data
-    const businessesPromises = businessIds.map(async (id) => {
-      const business = (await kv.get(`business:${id}`)) as Business
-      return business ? { ...business, id } : null
-    })
-
-    const businesses = (await Promise.all(businessesPromises)).filter(Boolean) as Business[]
-
-    // Sort by creation date (newest first)
-    return businesses.sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime()
-      const dateB = new Date(b.createdAt).getTime()
-      return dateB - dateA
-    })
-  } catch (error) {
-    console.error("Error fetching businesses:", error)
-    return []
-  }
+// Get businesses by category - using the new schema
+export async function getBusinessesByCategory(category: string) {
+  return getBusinessesByCategoryFromDb(category)
 }
 
-// Get a business by ID
-export async function getBusinessById(id: string) {
-  try {
-    const business = (await kv.get(`business:${id}`)) as Business
-    return business ? { ...business, id } : null
-  } catch (error) {
-    console.error(`Error fetching business with ID ${id}:`, error)
-    return null
-  }
+// Get businesses by zip code - using the new schema
+export async function getBusinessesByZipCode(zipCode: string) {
+  return getBusinessesByZipCodeFromDb(zipCode)
+}
+
+// Get businesses by category and zip code - using the new schema
+export async function getBusinessesByCategoryAndZipCode(category: string, zipCode: string) {
+  return getBusinessesByCategoryAndZipCodeFromDb(category, zipCode)
 }
 
 // Add this function to save the business ad design
@@ -270,7 +417,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
     }
 
     // Store design data in KV
-    await kv.hset(`business:${businessId}:adDesign`, {
+    await kv.hset(`${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`, {
       ...designData,
       updatedAt: new Date().toISOString(),
     })
@@ -296,7 +443,7 @@ export async function getBusinessAdDesign(businessId: string) {
     }
 
     // Get the design data from KV
-    const designData = await kv.hgetall(`business:${businessId}:adDesign`)
+    const designData = await kv.hgetall(`${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`)
 
     if (!designData) {
       return null

@@ -2,47 +2,48 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
-  // Get the pathname
+  // Get the pathname of the request
   const path = request.nextUrl.pathname
 
   // Define public paths that don't require authentication
   const isPublicPath =
-    path === "/" ||
     path === "/user-login" ||
     path === "/user-register" ||
     path === "/business-login" ||
     path === "/business-register" ||
+    path === "/" ||
     path.startsWith("/api/") ||
     path.startsWith("/_next/") ||
-    path.startsWith("/public/")
+    path.includes(".") // Static files
 
-  // Check if the path requires user authentication
-  const isUserPath = path.startsWith("/user-profile") || path.startsWith("/my-reviews")
+  // Check if path is admin-related
+  const isAdminPath = path.startsWith("/admin")
 
-  // Get the token from cookies
-  const userId = request.cookies.get("userId")?.value
+  // Get authentication status from cookies
+  const isAuthenticated = request.cookies.has("userId") || request.cookies.has("businessId")
 
-  // Redirect unauthenticated users to login
-  if (isUserPath && !userId) {
+  // For admin paths, we might want to check for admin privileges
+  // This is a simplified example - in a real app, you'd verify the user has admin role
+  const isAdmin = request.cookies.has("userId") && request.cookies.get("userId")?.value === "admin-user-id"
+
+  // Redirect logic
+  if (isAdminPath && !isAdmin) {
+    // If trying to access admin pages without admin privileges
     return NextResponse.redirect(new URL("/user-login", request.url))
   }
 
-  // Redirect authenticated users away from login/register pages
-  if ((path === "/user-login" || path === "/user-register") && userId) {
-    return NextResponse.redirect(new URL("/", request.url))
+  if (!isPublicPath && !isAuthenticated) {
+    // If trying to access protected pages without authentication
+    return NextResponse.redirect(new URL("/user-login", request.url))
   }
 
   return NextResponse.next()
 }
 
+// Configure the middleware to run on specific paths
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    // Match all paths except static files, api routes, and _next
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 }
