@@ -1,50 +1,56 @@
-/**
- * Utility functions for working with Cloudflare Images
- */
+// Make sure the getCloudflareImageUrl function is properly defined and exported
 
-// The correct Cloudflare account hash
-export const CLOUDFLARE_ACCOUNT_HASH = "Fx83XHJ2QHIeAJio-AnNbA"
+import { CLOUDFLARE_ACCOUNT_HASH } from "@/lib/cloudflare-images"
 
 /**
- * Generates a Cloudflare Images URL with the correct account hash
+ * Generate a Cloudflare image URL from an image ID
  * @param imageId The Cloudflare image ID
- * @param variant The variant name (default: "public")
- * @returns The complete Cloudflare Images URL
+ * @param variant The image variant (default: "public")
+ * @returns The full Cloudflare image URL
  */
 export function getCloudflareImageUrl(imageId: string, variant = "public"): string {
+  if (!imageId) return ""
+
+  // Use the CLOUDFLARE_ACCOUNT_HASH from the imported constant
+  // This ensures consistency across the application
   return `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_HASH}/${imageId}/${variant}`
 }
 
 /**
- * Checks if a URL is a Cloudflare Images URL
+ * Check if a URL is a Cloudflare image URL
  * @param url The URL to check
- * @returns True if the URL is a Cloudflare Images URL
+ * @returns True if the URL is a Cloudflare image URL
  */
 export function isCloudflareImageUrl(url: string): boolean {
+  if (!url) return false
   return url.includes("imagedelivery.net")
 }
 
 /**
- * Extracts the image ID from a Cloudflare Images URL
- * @param url The Cloudflare Images URL
+ * Extract the image ID from a Cloudflare image URL
+ * @param url The Cloudflare image URL
  * @returns The image ID or null if not found
  */
 export function extractImageIdFromUrl(url: string): string | null {
   if (!isCloudflareImageUrl(url)) return null
 
-  // URL format: https://imagedelivery.net/ACCOUNT_HASH/IMAGE_ID/VARIANT
-  const parts = url.split("/")
-  if (parts.length >= 5) {
-    return parts[4]
+  try {
+    // URL format: https://imagedelivery.net/ACCOUNT_HASH/IMAGE_ID/VARIANT
+    const parts = url.split("/")
+    if (parts.length >= 5) {
+      return parts[4] // The image ID is the 5th part (index 4)
+    }
+  } catch (error) {
+    console.error("Error extracting image ID from URL:", error)
   }
 
   return null
 }
 
 /**
- * Fixes a Cloudflare Images URL to use the correct account hash
- * @param url The original URL
- * @returns The fixed URL
+ * Fix a Cloudflare image URL if it's using an incorrect account hash
+ * @param url The Cloudflare image URL to fix
+ * @returns The fixed URL or the original if it's not a Cloudflare image URL
  */
 export function fixCloudflareImageUrl(url: string): string {
   if (!isCloudflareImageUrl(url)) return url
@@ -52,9 +58,5 @@ export function fixCloudflareImageUrl(url: string): string {
   const imageId = extractImageIdFromUrl(url)
   if (!imageId) return url
 
-  // Extract the variant (last part of the URL)
-  const parts = url.split("/")
-  const variant = parts[parts.length - 1]
-
-  return getCloudflareImageUrl(imageId, variant)
+  return getCloudflareImageUrl(imageId)
 }

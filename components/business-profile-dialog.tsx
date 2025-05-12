@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
 import { Loader2, ImageIcon, Ticket, Briefcase } from "lucide-react"
 import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
+import { BusinessCouponsDialog } from "./business-coupons-dialog"
 
 interface BusinessProfileDialogProps {
   isOpen: boolean
@@ -20,6 +21,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   const [adDesign, setAdDesign] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPhotoAlbumOpen, setIsPhotoAlbumOpen] = useState(false)
+  const [isCouponsOpen, setIsCouponsOpen] = useState(false)
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -28,9 +30,10 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   }, [isOpen, businessId])
 
   useEffect(() => {
-    // Close photo album dialog when main dialog is closed
+    // Close child dialogs when main dialog is closed
     if (!isOpen) {
       setIsPhotoAlbumOpen(false)
+      setIsCouponsOpen(false)
     }
   }, [isOpen])
 
@@ -270,7 +273,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     <Button
                       variant="outline"
                       className="flex flex-col items-center justify-center gap-1 h-auto py-3"
-                      onClick={() => window.open(`/business/${businessId}/coupons`, "_blank")}
+                      onClick={() => setIsCouponsOpen(true)}
                     >
                       <Ticket className="h-5 w-5" />
                       <span className="text-xs">Coupons</span>
@@ -303,6 +306,14 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       <BusinessPhotoAlbumDialog
         isOpen={isPhotoAlbumOpen}
         onClose={() => setIsPhotoAlbumOpen(false)}
+        businessId={businessId}
+        businessName={businessName}
+      />
+
+      {/* Coupons Dialog */}
+      <BusinessCouponsDialog
+        isOpen={isCouponsOpen}
+        onOpenChange={setIsCouponsOpen}
         businessId={businessId}
         businessName={businessName}
       />

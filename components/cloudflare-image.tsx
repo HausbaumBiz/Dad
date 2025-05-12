@@ -1,66 +1,74 @@
 "use client"
 
-import { useState } from "react"
 import Image from "next/image"
-import { isCloudflareImageUrl, fixCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { useState, useEffect } from "react"
+import { getCloudflareImageUrl } from "@/lib/cloudflare-images"
 
 interface CloudflareImageProps {
-  src: string
+  imageId: string
   alt: string
+  variant?: string
   width?: number
   height?: number
   className?: string
   priority?: boolean
-  onError?: () => void
 }
 
 export default function CloudflareImage({
-  src,
+  imageId,
   alt,
-  width = 500,
-  height = 300,
-  className = "",
+  variant = "public",
+  width,
+  height,
+  className,
   priority = false,
-  onError,
 }: CloudflareImageProps) {
-  const [error, setError] = useState(false)
-  const [imgSrc, setImgSrc] = useState(() => {
-    // If it's a Cloudflare image URL, make sure it uses the correct account hash
-    if (isCloudflareImageUrl(src)) {
-      return fixCloudflareImageUrl(src)
-    }
-    return src
-  })
+  const [imageUrl, setImageUrl] = useState<string>("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleError = () => {
-    console.error(`Failed to load image: ${imgSrc}`)
-    setError(true)
-    if (onError) onError()
+  useEffect(() => {
+    async function loadImageUrl() {
+      try {
+        if (!imageId) {
+          setError("No image ID provided")
+          setLoading(false)
+          return
+        }
+
+        const url = await getCloudflareImageUrl(imageId, variant)
+        setImageUrl(url)
+        setLoading(false)
+      } catch (err) {
+        console.error("Error loading Cloudflare image:", err)
+        setError("Failed to load image")
+        setLoading(false)
+      }
+    }
+
+    loadImageUrl()
+  }, [imageId, variant])
+
+  if (loading) {
+    return <div className="animate-pulse bg-gray-200 rounded" style={{ width, height }} />
   }
 
-  if (error) {
+  if (error || !imageUrl) {
     return (
-      <div
-        className={`flex items-center justify-center bg-gray-100 text-gray-500 ${className}`}
-        style={{ width: width || "100%", height: height || 300 }}
-      >
-        <div className="text-center p-4">
-          <p className="text-sm">Image not available</p>
-          <p className="text-xs mt-2 text-gray-400 break-all">{imgSrc}</p>
-        </div>
+      <div className="flex items-center justify-center bg-gray-100 text-gray-400 rounded" style={{ width, height }}>
+        {error || "Image not available"}
       </div>
     )
   }
 
   return (
     <Image
-      src={imgSrc || "/placeholder.svg"}
+      src={imageUrl || "/placeholder.svg"}
       alt={alt}
       width={width}
       height={height}
       className={className}
       priority={priority}
-      onError={handleError}
     />
   )
 }
