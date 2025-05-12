@@ -1,10 +1,16 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { MediaUploader } from "@/components/media-uploader"
+import { CloudflareImagesStatus } from "@/components/cloudflare-images-status"
+import { ArrowLeft, Upload, ImageIcon, X, RefreshCw } from "lucide-react"
+import Link from "next/link"
+import { useToast } from "@/components/ui/use-toast"
+import { getCurrentBusiness } from "@/app/actions/business-actions"
+import { getBusinessMedia, deletePhoto, type MediaItem, syncCloudflareImages } from "@/app/actions/media-actions"
+import { useRouter } from "next/navigation"
 import {
   Dialog,
   DialogContent,
@@ -15,14 +21,10 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { compressImage, formatFileSize, isValidImage, calculateCompressionSavings } from "@/lib/media-utils"
-import { useToast } from "@/components/ui/use-toast"
+import { formatFileSize, calculateCompressionSavings } from "@/lib/media-utils"
 import {
   ChevronLeft,
   ChevronRight,
-  Upload,
-  ImageIcon,
-  X,
   Loader2,
   Tag,
   GripVertical,
@@ -31,20 +33,21 @@ import {
   ArrowDown,
   List,
   Grid,
+  Trash2,
 } from "lucide-react"
-import { uploadPhoto, getBusinessMedia, deletePhoto, type MediaItem } from "@/app/actions/media-actions"
-import { getCurrentBusiness } from "@/app/actions/business-actions"
-import { Trash2 } from "lucide-react"
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd"
 import { useMobile } from "@/hooks/use-mobile"
 
 export default function PhotoAlbumPage() {
-  const [photos, setPhotos] = useState<MediaItem[]>([])
-  const [isCompressing, setIsCompressing] = useState(false)
+  const { toast } = useToast()
+  const router = useRouter()
+  const [businessId, setBusinessId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [photoAlbum, setPhotoAlbum] = useState<MediaItem[]>([])
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [photos, setPhotos] = useState<MediaItem[]>([])
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-  const [businessId, setBusinessId] = useState<string>("")
   const [businessName, setBusinessName] = useState<string>("")
   const [photoDetailOpen, setPhotoDetailOpen] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<MediaItem | null>(null)
@@ -53,70 +56,55 @@ export default function PhotoAlbumPage() {
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { toast } = useToast()
+  const [showUploader, setShowUploader] = useState(false)
   const isMobile = useMobile()
 
-  // Fetch the business ID and existing photos when the component mounts
+  // Load business ID and photo album on component mount
   useEffect(() => {
-    const fetchBusinessData = async () => {
+    async function loadBusiness() {
       try {
-        // Get current business data using the server action
-        const businessData = await getCurrentBusiness()
+        setIsLoading(true)
 
-        if (!businessData || !businessData.id) {
-          console.error("No business data found:", businessData)
+        // Get the current business from the session
+        const business = await getCurrentBusiness()
+
+        if (!business) {
+          // If no business is logged in, redirect to login
           toast({
-            title: "Not logged in",
-            description: "Please log in to manage your photo album.",
+            title: "Authentication required",
+            description: "Please log in to access your photo album",
             variant: "destructive",
           })
-          setIsLoading(false)
+          router.push("/business-login")
           return
         }
 
-        console.log("Business data retrieved:", businessData.id)
-        setBusinessId(businessData.id)
-        setBusinessName(businessData.businessName || "Your Business")
+        setBusinessId(business.id)
+        console.log(`Loaded business ID: ${business.id}`)
+        setBusinessName(business.businessName || "Your Business")
 
-        // Fetch existing photos for this business
-        try {
-          const mediaData = await getBusinessMedia(businessData.id)
-          if (mediaData) {
-            if (mediaData.photoAlbum) {
-              console.log(`Loaded ${mediaData.photoAlbum.length} photos from storage`)
-
-              // Sort photos by sortOrder if it exists, otherwise use the default order
-              const sortedPhotos = [...mediaData.photoAlbum].sort((a, b) => {
-                // If both have sortOrder, use it
-                if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
-                  return a.sortOrder - b.sortOrder
-                }
-                // If only one has sortOrder, the one with sortOrder comes first
-                if (a.sortOrder !== undefined) return -1
-                if (b.sortOrder !== undefined) return 1
-                // If neither has sortOrder, use the default order (by creation date)
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-              })
-
-              setPhotos(sortedPhotos)
+        // Load photo album
+        const media = await getBusinessMedia(business.id)
+        if (media && media.photoAlbum) {
+          const sortedPhotos = [...media.photoAlbum].sort((a, b) => {
+            // If both have sortOrder, use it
+            if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+              return a.sortOrder - b.sortOrder
             }
-          } else {
-            console.log("No media data found in storage")
-          }
-        } catch (mediaError) {
-          console.error("Error fetching media data:", mediaError)
-          toast({
-            title: "Error loading photos",
-            description: "Could not load your saved photos. Please try again later.",
-            variant: "destructive",
+            // If only one has sortOrder, the one with sortOrder comes first
+            if (a.sortOrder !== undefined) return -1
+            if (b.sortOrder !== undefined) return 1
+            // If neither has sortOrder, use the default order (by creation date)
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           })
+          setPhotoAlbum(sortedPhotos)
+          setPhotos(sortedPhotos)
         }
       } catch (error) {
-        console.error("Error fetching business data:", error)
+        console.error("Error loading business:", error)
         toast({
-          title: "Error loading photos",
-          description: "Could not load your saved photos. Please try again later.",
+          title: "Error loading data",
+          description: "There was a problem loading your business information",
           variant: "destructive",
         })
       } finally {
@@ -124,8 +112,8 @@ export default function PhotoAlbumPage() {
       }
     }
 
-    fetchBusinessData()
-  }, [toast])
+    loadBusiness()
+  }, [toast, router])
 
   // When edit mode is enabled and on mobile, switch to list view automatically
   useEffect(() => {
@@ -134,131 +122,60 @@ export default function PhotoAlbumPage() {
     }
   }, [isEditMode, isMobile])
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) {
-      console.log("No files selected")
-      return
-    }
-
-    if (!businessId) {
-      console.error("No business ID available")
+  const handleUploadComplete = (result: any) => {
+    if (result.success && result.photoAlbum) {
+      const sortedPhotos = [...result.photoAlbum].sort((a, b) => {
+        if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+          return a.sortOrder - b.sortOrder
+        }
+        return 0
+      })
+      setPhotoAlbum(sortedPhotos)
+      setPhotos(sortedPhotos)
+      setShowUploader(false)
       toast({
-        title: "Error",
-        description: "Business ID not found. Please try logging in again.",
+        title: "Upload successful",
+        description: "Your photo has been added to the album",
+      })
+    }
+  }
+
+  const handleSyncCloudflare = async () => {
+    if (!businessId) return
+
+    try {
+      setIsSyncing(true)
+      const result = await syncCloudflareImages(businessId)
+
+      if (result.success) {
+        const sortedPhotos = [...result.photoAlbum].sort((a, b) => {
+          if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
+            return a.sortOrder - b.sortOrder
+          }
+          return 0
+        })
+        setPhotoAlbum(sortedPhotos)
+        setPhotos(sortedPhotos)
+        toast({
+          title: "Sync successful",
+          description: "Your photo album has been synchronized with Cloudflare Images",
+        })
+      } else {
+        toast({
+          title: "Sync failed",
+          description: result.error || "Failed to sync with Cloudflare Images",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error syncing with Cloudflare:", error)
+      toast({
+        title: "Sync error",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       })
-      return
-    }
-
-    setIsCompressing(true)
-    toast({
-      title: "Compressing images",
-      description: "Please wait while we optimize your images...",
-      duration: 3000,
-    })
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-
-      if (!isValidImage(file)) {
-        toast({
-          title: "Invalid file type",
-          description: `${file.name} is not a valid image file.`,
-          variant: "destructive",
-        })
-        continue
-      }
-
-      console.log(`Processing file: ${file.name} (${formatFileSize(file.size)})`)
-
-      // Compress the image to target size (600KB = 0.6MB)
-      const compressedFile = await compressImage(file, 0.8, 1920)
-      console.log(`Compressed to: ${formatFileSize(compressedFile.size)}`)
-
-      // If still over 600KB, try more aggressive compression
-      let finalFile = compressedFile
-      if (compressedFile.size > 600 * 1024) {
-        finalFile = await compressImage(compressedFile, 0.7, 1200)
-        console.log(`Further compressed to: ${formatFileSize(finalFile.size)}`)
-
-        // If still over limit, try one final aggressive compression
-        if (finalFile.size > 600 * 1024) {
-          finalFile = await compressImage(finalFile, 0.6, 1000)
-          console.log(`Final compression: ${formatFileSize(finalFile.size)}`)
-        }
-      }
-
-      // Create FormData for upload
-      const formData = new FormData()
-      formData.append("businessId", businessId)
-      formData.append("photo", finalFile)
-
-      console.log(`Uploading to Blob storage with business ID: ${businessId}`)
-
-      // Upload to Blob storage
-      try {
-        const result = await uploadPhoto(formData)
-
-        if (result.success) {
-          console.log("Upload successful:", result)
-
-          // Add sortOrder to the new photo (place it at the beginning)
-          const newPhotoAlbum = result.photoAlbum.map((photo, index) => {
-            // If it's the newly added photo (it will be the last one)
-            if (index === result.photoAlbum.length - 1) {
-              return {
-                ...photo,
-                sortOrder: 0, // Place it at the beginning
-              }
-            }
-            // Increment the sortOrder of all other photos
-            return {
-              ...photo,
-              sortOrder: (photo.sortOrder !== undefined ? photo.sortOrder : index) + 1,
-            }
-          })
-
-          // Sort the photos by sortOrder
-          const sortedPhotos = [...newPhotoAlbum].sort((a, b) => {
-            if (a.sortOrder !== undefined && b.sortOrder !== undefined) {
-              return a.sortOrder - b.sortOrder
-            }
-            return 0
-          })
-
-          // Update the photos state
-          setPhotos(sortedPhotos)
-
-          // Save the updated order to Redis
-          await updatePhotoInRedis(businessId, sortedPhotos)
-
-          toast({
-            title: "Image uploaded successfully",
-            description: `${file.name} has been added to your album.`,
-          })
-        } else {
-          console.error("Upload failed:", result.error)
-          toast({
-            title: "Upload failed",
-            description: result.error || "Failed to upload image. Please try again.",
-            variant: "destructive",
-          })
-        }
-      } catch (uploadError) {
-        console.error("Exception during upload:", uploadError)
-        toast({
-          title: "Upload error",
-          description: "An unexpected error occurred during upload.",
-          variant: "destructive",
-        })
-      }
-    }
-
-    setIsCompressing(false)
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+    } finally {
+      setIsSyncing(false)
     }
   }
 
@@ -291,6 +208,7 @@ export default function PhotoAlbumPage() {
         })
 
         setPhotos(sortedPhotos)
+        setPhotoAlbum(sortedPhotos)
 
         // Save the updated order to Redis
         await updatePhotoInRedis(businessId, sortedPhotos)
@@ -352,6 +270,7 @@ export default function PhotoAlbumPage() {
 
         // Update the state
         setPhotos(updatedPhotos)
+        setPhotoAlbum(updatedPhotos)
 
         // Update in Redis
         await updatePhotoInRedis(businessId, updatedPhotos)
@@ -388,6 +307,7 @@ export default function PhotoAlbumPage() {
     }))
 
     setPhotos(updatedItems)
+    setPhotoAlbum(updatedItems)
 
     // Save the new order if not in edit mode
     if (!isEditMode) {
@@ -411,6 +331,7 @@ export default function PhotoAlbumPage() {
     }))
 
     setPhotos(updatedItems)
+    setPhotoAlbum(updatedItems)
   }
 
   // Move a photo down in the list
@@ -429,6 +350,7 @@ export default function PhotoAlbumPage() {
     }))
 
     setPhotos(updatedItems)
+    setPhotoAlbum(updatedItems)
   }
 
   // Save the photo order to Redis
@@ -496,10 +418,20 @@ export default function PhotoAlbumPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 flex justify-center items-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-lg">Loading your photo album...</p>
+      <div className="container max-w-6xl py-8">
+        <div className="flex items-center mb-6">
+          <Link href="/workbench" className="mr-4">
+            <Button variant="outline" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold">Photo Album</h1>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-400" />
+            <p className="text-gray-500">Loading...</p>
+          </div>
         </div>
       </div>
     )
@@ -507,14 +439,23 @@ export default function PhotoAlbumPage() {
 
   if (!businessId) {
     return (
-      <div className="container mx-auto py-8">
-        <Card className="w-full max-w-4xl mx-auto">
-          <CardHeader>
-            <CardTitle className="text-2xl">Photo Album</CardTitle>
-            <CardDescription>You need to be logged in to manage your photo album.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center py-8">
-            <Button onClick={() => (window.location.href = "/business-login")}>Log In</Button>
+      <div className="container max-w-6xl py-8">
+        <div className="flex items-center mb-6">
+          <Link href="/workbench" className="mr-4">
+            <Button variant="outline" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold">Photo Album</h1>
+        </div>
+        <Card>
+          <CardContent className="py-8">
+            <div className="text-center">
+              <p className="mb-4">You need to be logged in to access your photo album.</p>
+              <Button asChild>
+                <Link href="/business-login">Log In</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -522,55 +463,91 @@ export default function PhotoAlbumPage() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <Card className="w-full max-w-6xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl">{businessName}'s Photo Album</CardTitle>
-          <CardDescription>
-            Upload, organize, and manage your photos. Images will be automatically compressed and saved to your account.
-          </CardDescription>
-        </CardHeader>
+    <div className="container max-w-6xl py-8">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Link href="/workbench" className="mr-4">
+            <Button variant="outline" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold">{businessName}'s Photo Album</h1>
+        </div>
+        <Button onClick={handleSyncCloudflare} disabled={isSyncing} variant="outline">
+          {isSyncing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          Sync with Cloudflare
+        </Button>
+      </div>
 
-        <CardContent>
-          <div className="space-y-6">
-            <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-lg border-gray-300 hover:border-gray-400 transition-colors">
-              <ImageIcon className="h-12 w-12 text-gray-400 mb-4" />
-              <div className="space-y-2 text-center">
-                <p className="text-sm text-gray-500">Drag and drop your images, or click to browse</p>
-                <p className="text-xs text-gray-400">Supported formats: JPEG, PNG, GIF, WebP</p>
-              </div>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isCompressing}
-              >
-                {isCompressing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Compressing...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Photos
-                  </>
-                )}
+      {/* Cloudflare Images Status */}
+      <div className="mb-6">
+        <CloudflareImagesStatus />
+      </div>
+
+      {/* Photo Upload */}
+      <div className="mb-8">
+        {showUploader ? (
+          <div className="space-y-4">
+            <MediaUploader businessId={businessId} type="photo" onUploadComplete={handleUploadComplete} />
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setShowUploader(false)}>
+                Cancel
               </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                multiple
-              />
             </div>
-
-            {renderPhotoContent()}
           </div>
-        </CardContent>
+        ) : (
+          <div className="flex flex-col items-center p-6 border-2 border-dashed rounded-lg border-gray-300 hover:border-gray-400 transition-colors">
+            <ImageIcon className="h-12 w-12 text-gray-400 mb-4" />
+            <div className="space-y-2 text-center">
+              <p className="text-sm text-gray-500">Upload images to your photo album</p>
+              <p className="text-xs text-gray-400">Supported formats: JPEG, PNG, GIF, WebP</p>
+            </div>
+            <Button variant="outline" className="mt-4" onClick={() => setShowUploader(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Upload Photos
+            </Button>
+          </div>
+        )}
+      </div>
 
+      {/* Photo Album */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ImageIcon className="h-5 w-5" />
+            <div>
+              <CardTitle>Your Photos</CardTitle>
+              <CardDescription>Manage your business photos</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {photoAlbum.length === 0 ? (
+            <div className="text-center py-8">
+              <ImageIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <p className="text-gray-500 mb-2">No photos in your album yet</p>
+              <p className="text-sm text-gray-400">Upload photos to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <h3 className="text-lg font-medium">All Photos ({filteredPhotos.length})</h3>
+
+                {isEditMode && (
+                  <div className="text-sm text-gray-500">
+                    {viewMode === "grid" ? (
+                      <p>Drag photos to reorder them, then click "Save Order"</p>
+                    ) : (
+                      <p>Use the arrows to reorder photos, then click "Save Order"</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {isEditMode && viewMode === "list" ? renderListView() : renderGridView()}
+            </div>
+          )}
+        </CardContent>
         <CardFooter className="flex flex-col sm:flex-row gap-4 sm:justify-between">
           <Button variant="outline" onClick={() => window.history.back()}>
             Back
@@ -731,6 +708,16 @@ export default function PhotoAlbumPage() {
                       <span>{formatFileSize(selectedPhoto.size)}</span>
                     </div>
 
+                    {selectedPhoto.originalSize && selectedPhoto.originalSize > selectedPhoto.size && (
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-500">Compression</span>
+                        <span className="text-green-600">
+                          Saved {formatFileSize(selectedPhoto.originalSize - selectedPhoto.size)} (
+                          {calculateCompressionSavings(selectedPhoto.originalSize, selectedPhoto.size).percentage}%)
+                        </span>
+                      </div>
+                    )}
+
                     {selectedPhoto.createdAt && (
                       <div className="flex justify-between py-2 border-b">
                         <span className="text-gray-500">Uploaded</span>
@@ -784,36 +771,6 @@ export default function PhotoAlbumPage() {
     </div>
   )
 
-  function renderPhotoContent() {
-    if (filteredPhotos.length === 0) {
-      return (
-        <div className="text-center py-8 text-gray-500">
-          <p>No photos in your album yet. Upload some photos to get started!</p>
-        </div>
-      )
-    }
-
-    return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <h3 className="text-lg font-medium">All Photos ({filteredPhotos.length})</h3>
-
-          {isEditMode && (
-            <div className="text-sm text-gray-500">
-              {viewMode === "grid" ? (
-                <p>Drag photos to reorder them, then click "Save Order"</p>
-              ) : (
-                <p>Use the arrows to reorder photos, then click "Save Order"</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {isEditMode && viewMode === "list" ? renderListView() : renderGridView()}
-      </div>
-    )
-  }
-
   function renderGridView() {
     return (
       <DragDropContext onDragEnd={handleDragEnd}>
@@ -863,7 +820,7 @@ export default function PhotoAlbumPage() {
                           <p className="truncate">{photo.filename}</p>
                           <p className="text-gray-500">
                             {formatFileSize(photo.size)}
-                            {photo.originalSize && (
+                            {photo.originalSize && photo.originalSize > photo.size && (
                               <span className="text-green-600 ml-1">
                                 (-{calculateCompressionSavings(photo.originalSize, photo.size).percentage}%)
                               </span>

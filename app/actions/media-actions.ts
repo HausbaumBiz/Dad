@@ -1,11 +1,16 @@
 "use server"
 
-import { put, del, list } from "@vercel/blob"
 import { kv } from "@/lib/redis"
 import { revalidatePath } from "next/cache"
-// Image processing will be handled differently without Sharp
+import { v4 as uuidv4 } from "uuid"
+import {
+  uploadToCloudflareImages,
+  deleteFromCloudflareImages,
+  getCloudflareImageUrl,
+  listCloudflareImages,
+  cloudflareImageToMediaItem,
+} from "@/lib/cloudflare-images"
 
-// Types for media storage
 export type MediaItem = {
   id: string
   url: string
@@ -20,7 +25,7 @@ export type MediaItem = {
   folderId?: string
   tags?: string[]
   label?: string
-  sortOrder?: number // Added sortOrder field
+  sortOrder?: number
 }
 
 export type MediaFolder = {
@@ -41,730 +46,8 @@ export type BusinessMedia = {
   tags?: string[]
 }
 
-export type CompressionOptions = {
-  quality?: number
-  maxWidth?: number
-  maxHeight?: number
-  format?: "jpeg" | "png" | "webp" | "avif"
-}
-
-// Constants for file size limits
-const MAX_VIDEO_SIZE_MB = 50 // Reduced from 100MB to 50MB
-const MAX_IMAGE_SIZE_MB = 5 // Reduced from 10MB to 5MB
-const MB_IN_BYTES = 1024 * 1024
-
 /**
- * Process image data without using Sharp
- * This is a placeholder that will be replaced by server-side processing
- */
-async function processImageData(
-  buffer: Buffer,
-  contentType: string,
-  options: CompressionOptions = {},
-): Promise<{ buffer: Buffer; info: { width: number; height: number } }> {
-  // In a real implementation, this would be handled by a server API
-  // For now, we'll just return the original buffer with estimated dimensions
-  return {
-    buffer,
-    info: {
-      width: options.maxWidth || 1920,
-      height: options.maxHeight || 1080,
-    },
-  }
-}
-
-/**
- * Compress an image buffer using browser-compatible methods
- * This replaces the Sharp-based implementation
- */
-async function compressImageBuffer(
-  buffer: Buffer,
-  contentType: string,
-  options: CompressionOptions = {},
-): Promise<{ buffer: Buffer; info: { width: number; height: number } }> {
-  // Use the processImageData function instead of Sharp
-  return processImageData(buffer, contentType, options)
-}
-
-// Define the type for the business media
-interface BusinessMediaUpdated {
-  businessId: string
-  videoUrl?: string
-  videoId?: string
-  videoContentType?: string
-  thumbnailUrl?: string
-  thumbnailId?: string
-  aspectRatio?: string
-}
-
-// Upload a thumbnail image
-export async function uploadThumbnail(formData: FormData): Promise<{
-  success: boolean
-  url?: string
-  id?: string
-  error?: string
-}> {
-  try {
-    const businessId = formData.get("businessId") as string
-    const thumbnail = formData.get("thumbnail") as File
-    const aspectRatio = (formData.get("aspectRatio") as string) || "16:9"
-
-    if (!businessId || !thumbnail) {
-      return {
-        success: false,
-        error: "Missing required fields",
-      }
-    }
-
-    // Check if there's an existing thumbnail for this business
-    const existingMedia = await getBusinessMedia(businessId)
-    if (existingMedia?.thumbnailId) {
-      // Delete the existing thumbnail
-      try {
-        await del(existingMedia.thumbnailId)
-      } catch (error) {
-        console.error("Error deleting existing thumbnail:", error)
-        // Continue with the upload even if deletion fails
-      }
-    }
-
-    // Upload the new thumbnail
-    const blob = await put(`thumbnails/${businessId}/${thumbnail.name}`, thumbnail, {
-      access: "public",
-    })
-
-    // Store the thumbnail info in Redis
-    const mediaKey = `business:${businessId}:media`
-    await kv.hset(mediaKey, {
-      thumbnailUrl: blob.url,
-      thumbnailId: blob.url,
-      aspectRatio,
-    })
-
-    revalidatePath("/video")
-
-    return {
-      success: true,
-      url: blob.url,
-      id: blob.url,
-    }
-  } catch (error) {
-    console.error("Error uploading thumbnail:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
-  }
-}
-
-// Upload a video
-export async function uploadVideo(formData: FormData): Promise<{
-  success: boolean
-  url?: string
-  id?: string
-  contentType?: string
-  error?: string
-}> {
-  try {
-    const businessId = formData.get("businessId") as string
-    const video = formData.get("video") as File
-    const aspectRatio = (formData.get("aspectRatio") as string) || "16:9"
-
-    if (!businessId || !video) {
-      return {
-        success: false,
-        error: "Missing required fields",
-      }
-    }
-
-    // Check file size
-    const fileSizeMB = video.size / (1024 * 1024)
-    if (fileSizeMB > 50) {
-      return {
-        success: false,
-        error: `Video file size (${fileSizeMB.toFixed(2)}MB) exceeds the 50MB limit.`,
-      }
-    }
-
-    // Check if there's an existing video for this business
-    const existingMedia = await getBusinessMedia(businessId)
-    if (existingMedia?.videoId) {
-      // Delete the existing video
-      try {
-        await del(existingMedia.videoId)
-      } catch (error) {
-        console.error("Error deleting existing video:", error)
-        // Continue with the upload even if deletion fails
-      }
-    }
-
-    // Upload the new video with proper error handling
-    try {
-      console.log(`Attempting to upload video for business ${businessId}`)
-
-      const blob = await put(`videos/${businessId}/${video.name}`, video, {
-        access: "public",
-      })
-
-      console.log("Video upload successful:", blob)
-
-      // Store the video info in Redis
-      const mediaKey = `business:${businessId}:media`
-      await kv.hset(mediaKey, {
-        videoUrl: blob.url,
-        videoId: blob.url,
-        videoContentType: video.type,
-        aspectRatio,
-      })
-
-      revalidatePath("/video")
-
-      return {
-        success: true,
-        url: blob.url,
-        id: blob.url,
-        contentType: video.type,
-      }
-    } catch (uploadError) {
-      console.error("Upload error details:", uploadError)
-
-      // Convert the error to a string to avoid JSON parsing issues
-      let errorMessage = "Unknown upload error"
-
-      // Handle Response object errors (like "Request Entity Too Large")
-      if (uploadError instanceof Response) {
-        const status = uploadError.status
-        const statusText = uploadError.statusText
-
-        try {
-          // Try to get the text content without parsing as JSON
-          const errorText = await uploadError.text()
-          console.error(`Response error (${status}): ${errorText}`)
-
-          // Check for specific error messages
-          if (errorText.includes("Request Entity Too Large") || status === 413) {
-            errorMessage = `File is too large for upload. Please reduce the file size to under 50MB or use chunked upload.`
-          } else {
-            errorMessage = `Upload failed with status ${status}: ${statusText}`
-          }
-        } catch (textError) {
-          console.error("Error getting response text:", textError)
-          errorMessage = `Upload failed with status ${status}: ${statusText}`
-        }
-      } else if (uploadError instanceof Error) {
-        errorMessage = uploadError.message
-
-        // Check for specific error messages in the error object
-        if (errorMessage.includes("too large") || errorMessage.includes("exceeds") || errorMessage.includes("413")) {
-          errorMessage = `File is too large for upload. Please reduce the file size to under 50MB or use chunked upload.`
-        }
-      }
-
-      // Return a properly formatted error response
-      return {
-        success: false,
-        error: errorMessage,
-      }
-    }
-  } catch (error) {
-    console.error("Error in uploadVideo function:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error during video upload",
-    }
-  }
-}
-
-// Get business media
-export async function getBusinessMedia(businessId: string): Promise<BusinessMediaUpdated | null> {
-  try {
-    const mediaKey = `business:${businessId}:media`
-    const media = await kv.hgetall(mediaKey)
-
-    if (!media) {
-      return null
-    }
-
-    return media as BusinessMediaUpdated
-  } catch (error) {
-    console.error("Error getting business media:", error)
-    return null
-  }
-}
-
-// Delete a thumbnail
-export async function deleteThumbnail(businessId: string): Promise<{
-  success: boolean
-  error?: string
-}> {
-  try {
-    const existingMedia = await getBusinessMedia(businessId)
-    if (!existingMedia?.thumbnailId) {
-      return {
-        success: false,
-        error: "No thumbnail found",
-      }
-    }
-
-    // Delete the thumbnail from Blob storage
-    await del(existingMedia.thumbnailId)
-
-    // Update Redis
-    const mediaKey = `business:${businessId}:media`
-    await kv.hdel(mediaKey, "thumbnailUrl", "thumbnailId")
-
-    revalidatePath("/video")
-
-    return {
-      success: true,
-    }
-  } catch (error) {
-    console.error("Error deleting thumbnail:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
-  }
-}
-
-/**
- * Upload a video to Vercel Blob storage
- */
-// export async function uploadVideo(formData: FormData) {
-//   try {
-//     console.log("Starting uploadVideo server action")
-//     console.log("FormData keys:", [...formData.keys()])
-
-//     const businessId = formData.get("businessId")
-//     if (!businessId || typeof businessId !== "string") {
-//       console.error("Missing or invalid businessId:", businessId)
-//       return { success: false, error: "Missing or invalid businessId" }
-//     }
-
-//     const videoFile = formData.get("video")
-//     if (!videoFile) {
-//       console.error("Missing video file in formData")
-//       return { success: false, error: "Missing video file" }
-//     }
-
-//     // Check if the video is a File or Blob
-//     if (!(videoFile instanceof Blob)) {
-//       console.error("Video is not a Blob:", typeof videoFile)
-//       return { success: false, error: "Invalid video format" }
-//     }
-
-//     const designId = formData.get("designId") || "default-design"
-
-//     // Log file details
-//     console.log(`Video file details - Size: ${videoFile.size} bytes, Type: ${videoFile.type}`)
-
-//     // Check file size
-//     const fileSizeMB = videoFile.size / MB_IN_BYTES
-//     if (fileSizeMB > MAX_VIDEO_SIZE_MB) {
-//       return {
-//         success: false,
-//         error: `Video file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is ${MAX_VIDEO_SIZE_MB}MB.`,
-//       }
-//     }
-
-//     // Generate a unique filename with timestamp
-//     const timestamp = Date.now()
-//     const randomString = Math.random().toString(36).substring(2, 10)
-//     const extension = "mp4" // Default to mp4 if we can't determine the extension
-//     const filename = `${businessId}/videos/${timestamp}-${randomString}.${extension}`
-
-//     // Ensure we have a valid content type
-//     const contentType = videoFile.type || `video/${extension}`
-
-//     console.log(`Generated filename: ${filename}`)
-
-//     try {
-//       // Upload to Vercel Blob with proper error handling
-//       let blob
-//       try {
-//         console.log(`Attempting to upload video: ${filename}, size: ${videoFile.size} bytes, type: ${contentType}`)
-
-//         // Convert the Blob to an ArrayBuffer and then to a Buffer
-//         const arrayBuffer = await videoFile.arrayBuffer()
-//         const buffer = Buffer.from(arrayBuffer)
-
-//         console.log(`Successfully converted video to buffer, size: ${buffer.length} bytes`)
-
-//         // Create a blob options object with no null values
-//         const blobOptions = {
-//           access: "public",
-//           addRandomSuffix: false,
-//           contentType: contentType || "video/mp4", // Ensure we always have a content type
-//         }
-
-//         console.log("Blob upload options:", blobOptions)
-
-//         // Use the buffer for upload instead of the file directly
-//         blob = await put(filename, buffer, blobOptions)
-//         console.log("Video upload successful:", blob)
-//       } catch (blobError) {
-//         console.error("Blob upload error details:", blobError)
-
-//         // Add more detailed error logging
-//         if (blobError instanceof Error) {
-//           console.error("Error name:", blobError.name)
-//           console.error("Error message:", blobError.message)
-//           console.error("Error stack:", blobError.stack)
-//         }
-
-//         // Check if the error is related to the Vercel Blob token
-//         if (
-//           blobError instanceof Error &&
-//           (blobError.message.includes("token") ||
-//             blobError.message.includes("unauthorized") ||
-//             blobError.message.includes("permission"))
-//         ) {
-//           return {
-//             success: false,
-//             error: "Blob storage authentication failed. Please check your BLOB_READ_WRITE_TOKEN environment variable.",
-//           }
-//         }
-
-//         // Try to get more details about the error
-//         if (blobError instanceof Error) {
-//           console.error("Error name:", blobError.name)
-//           console.error("Error message:", blobError.message)
-//           console.error("Error stack:", blobError.stack)
-//         }
-
-//         // Check if the error is a Response object
-//         if (
-//           blobError instanceof Response ||
-//           (typeof blobError === "object" && blobError !== null && "text" in blobError)
-//         ) {
-//           const status = blobError instanceof Response ? blobError.status : "unknown"
-//           const statusText = blobError instanceof Response ? blobError.statusText : "unknown"
-//           console.error(`Response status: ${status} ${statusText}`)
-
-//           try {
-//             // Try to get the response text without parsing as JSON
-//             const errorText = await (blobError as Response).text()
-//             console.error("Response error text:", errorText)
-
-//             // Check if it contains "Request Entity Too Large"
-//             if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
-//               return {
-//                 success: false,
-//                 error: `File is too large for upload. Please reduce the file size to under ${MAX_VIDEO_SIZE_MB}MB.`,
-//               }
-//             }
-
-//             // For other error messages
-//             return {
-//               success: false,
-//               error: `Upload failed: ${errorText.substring(0, 100)}...`,
-//             }
-//           } catch (textError) {
-//             console.error("Error getting response text:", textError)
-//             return {
-//               success: false,
-//               error: `Upload failed with status ${status}: ${statusText}`,
-//             }
-//           }
-//         }
-
-//         // Check for null args error
-//         if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
-//           return {
-//             success: false,
-//             error:
-//               "Upload failed: One or more required parameters were missing. Please try again with a different file.",
-//           }
-//         }
-
-//         // Handle other types of errors
-//         return {
-//           success: false,
-//           error:
-//             blobError instanceof Error
-//               ? `Blob upload failed: ${blobError.message}`
-//               : "Unknown error during blob upload",
-//         }
-//       }
-
-//       // Get existing media data or initialize new object
-//       const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [] }
-
-//       // If there's an existing video, delete it to save storage
-//       if (existingMedia.videoId) {
-//         try {
-//           await del(existingMedia.videoId)
-//         } catch (deleteError) {
-//           console.error("Error deleting previous video:", deleteError)
-//           // Continue even if deletion fails
-//         }
-//       }
-
-//       // Store reference in KV
-//       await kv.hset(`business:${businessId}:media`, {
-//         videoUrl: blob.url,
-//         videoContentType: blob.contentType,
-//         videoId: filename,
-//         designId: designId,
-//       })
-
-//       revalidatePath(`/ad-design/customize`)
-//       revalidatePath(`/video`)
-
-//       return {
-//         success: true,
-//         url: blob.url,
-//         contentType: blob.contentType,
-//         size: blob.size,
-//         id: filename,
-//       }
-//     } catch (uploadError) {
-//       console.error("Error in Vercel Blob upload:", uploadError)
-
-//       // Try to extract more detailed error information
-//       let errorMessage = "Failed to upload video to storage"
-
-//       if (uploadError instanceof Error) {
-//         errorMessage = uploadError.message
-//       } else if (typeof uploadError === "object" && uploadError !== null) {
-//         errorMessage = JSON.stringify(uploadError)
-//       }
-
-//       return {
-//         success: false,
-//         error: errorMessage,
-//       }
-//     }
-//   } catch (error) {
-//     console.error("Error in uploadVideo function:", error)
-//     // Log more details about the error
-//     if (error instanceof Error) {
-//       console.error("Error name:", error.name)
-//       console.error("Error message:", error.message)
-//       console.error("Error stack:", error.stack)
-//     } else {
-//       console.error("Non-Error object thrown:", error)
-//     }
-//     return {
-//       success: false,
-//       error: error instanceof Error ? error.message : "Failed to upload video",
-//     }
-//   }
-// }
-
-/**
- * Upload a thumbnail image to Vercel Blob storage with compression
- */
-// export async function uploadThumbnail(formData: FormData) {
-//   try {
-//     const businessId = formData.get("businessId") as string
-//     const file = formData.get("thumbnail") as File
-
-//     if (!file || !businessId) {
-//       return { success: false, error: "Missing required fields" }
-//     }
-
-//     // Check file size
-//     const fileSizeMB = file.size / MB_IN_BYTES
-//     if (fileSizeMB > MAX_IMAGE_SIZE_MB) {
-//       return {
-//         success: false,
-//         error: `Thumbnail file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is ${MAX_IMAGE_SIZE_MB}MB.`,
-//       }
-//     }
-
-//     // Get the original file size
-//     const originalSize = file.size
-
-//     // Generate a unique filename
-//     const format = "jpeg" // Default format
-//     const filename = `${businessId}/thumbnails/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${format}`
-
-//     // Ensure we have a valid content type
-//     const contentType = file.type || "image/jpeg"
-
-//     try {
-//       // Upload to Vercel Blob directly without compression
-//       let blob
-//       try {
-//         // Convert the File to a Buffer
-//         const arrayBuffer = await file.arrayBuffer()
-//         const buffer = Buffer.from(arrayBuffer)
-
-//         // Create a blob options object with no null values
-//         const blobOptions = {
-//           access: "public",
-//           addRandomSuffix: false,
-//           contentType: contentType,
-//         }
-
-//         blob = await put(filename, buffer, blobOptions)
-//       } catch (blobError) {
-//         console.error("Blob upload error details:", blobError)
-
-//         // Handle Response object error (Request Entity Too Large)
-//         if (
-//           blobError instanceof Response ||
-//           (typeof blobError === "object" && blobError !== null && "text" in blobError)
-//         ) {
-//           try {
-//             // Try to get the response text
-//             const errorText = await (blobError as Response).text()
-
-//             // Check if it contains "Request Entity Too Large"
-//             if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
-//               return {
-//                 success: false,
-//                 error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
-//               }
-//             }
-
-//             return {
-//               success: false,
-//               error: `Blob upload failed: ${errorText.substring(0, 100)}...`,
-//             }
-//           } catch (textError) {
-//             // If we can't get the text, return a generic error
-//             return {
-//               success: false,
-//               error: "File upload failed. The file may be too large or in an unsupported format.",
-//             }
-//           }
-//         }
-
-//         // Check for null args error
-//         if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
-//           return {
-//             success: false,
-//             error:
-//               "Upload failed: One or more required parameters were missing. Please try again with a different file.",
-//           }
-//         }
-
-//         // Handle other types of errors
-//         return {
-//           success: false,
-//           error:
-//             blobError instanceof Error
-//               ? `Blob upload failed: ${blobError.message}`
-//               : "Unknown error during blob upload",
-//         }
-//       }
-
-//       // Calculate compression savings (in this case, none)
-//       const compressionSavings = 0
-
-//       // Get existing media data
-//       const existingMedia = (await getBusinessMedia(businessId)) || { photoAlbum: [] }
-
-//       // If there's an existing thumbnail, delete it
-//       if (existingMedia.thumbnailId) {
-//         try {
-//           await del(existingMedia.thumbnailId)
-//         } catch (deleteError) {
-//           console.error("Error deleting previous thumbnail:", deleteError)
-//         }
-//       }
-
-//       // Store reference in KV
-//       await kv.hset(`business:${businessId}:media`, {
-//         thumbnailUrl: blob.url,
-//         thumbnailId: filename,
-//         thumbnailWidth: 800, // Estimated width
-//         thumbnailHeight: 600, // Estimated height
-//         thumbnailOriginalSize: originalSize,
-//         thumbnailCompressionSavings: compressionSavings,
-//       })
-
-//       revalidatePath(`/ad-design/customize`)
-//       revalidatePath(`/video`)
-
-//       return {
-//         success: true,
-//         url: blob.url,
-//         contentType: blob.contentType,
-//         size: blob.size,
-//         originalSize,
-//         compressionSavings,
-//         width: 800, // Estimated width
-//         height: 600, // Estimated height
-//         id: filename,
-//       }
-//     } catch (uploadError) {
-//       console.error("Error in Vercel Blob upload:", uploadError)
-
-//       // Try to extract more detailed error information
-//       let errorMessage = "Failed to upload thumbnail to storage"
-
-//       if (uploadError instanceof Error) {
-//         errorMessage = uploadError.message
-//       } else if (typeof uploadError === "object" && uploadError !== null) {
-//         errorMessage = JSON.stringify(uploadError)
-//       }
-
-//       return {
-//         success: false,
-//         error: errorMessage,
-//       }
-//     }
-//   } catch (error) {
-//     console.error("Error uploading thumbnail:", error)
-//     return {
-//       success: false,
-//       error: error instanceof Error ? error.message : "Failed to upload thumbnail",
-//     }
-//   }
-// }
-
-/**
- * Delete a thumbnail for a business
- */
-// export async function deleteThumbnail(businessId: string) {
-//   try {
-//     if (!businessId) {
-//       return { success: false, error: "Missing business ID" }
-//     }
-
-//     // Get existing media data
-//     const existingMedia = await getBusinessMedia(businessId)
-
-//     if (!existingMedia || !existingMedia.thumbnailId) {
-//       return { success: false, error: "No thumbnail found" }
-//     }
-
-//     // Delete the thumbnail from Blob storage
-//     try {
-//       await del(existingMedia.thumbnailId)
-//     } catch (deleteError) {
-//       console.error("Error deleting thumbnail from Blob storage:", deleteError)
-//       // Continue with removing from the record even if blob deletion fails
-//     }
-
-//     // Update the business media record to remove thumbnail references
-//     await kv.hset(`business:${businessId}:media`, {
-//       thumbnailUrl: null,
-//       thumbnailId: null,
-//       thumbnailWidth: null,
-//       thumbnailHeight: null,
-//       thumbnailOriginalSize: null,
-//       thumbnailCompressionSavings: null,
-//     })
-
-//     revalidatePath(`/video`)
-//     revalidatePath(`/ad-design/customize`)
-
-//     return { success: true }
-//   } catch (error) {
-//     console.error("Error deleting thumbnail:", error)
-//     return {
-//       success: false,
-//       error: error instanceof Error ? error.message : "Failed to delete thumbnail",
-//     }
-//   }
-// }
-
-/**
- * Upload a photo to the business's photo album with compression
+ * Upload a photo to the business's photo album using Cloudflare Images
  */
 export async function uploadPhoto(formData: FormData) {
   try {
@@ -777,169 +60,41 @@ export async function uploadPhoto(formData: FormData) {
       return { success: false, error: "Missing required fields" }
     }
 
-    // Check file size
-    const fileSizeMB = file.size / MB_IN_BYTES
-    if (fileSizeMB > MAX_IMAGE_SIZE_MB) {
-      return {
-        success: false,
-        error: `Photo file is too large (${fileSizeMB.toFixed(2)}MB). Maximum allowed size is ${MAX_IMAGE_SIZE_MB}MB.`,
-      }
+    // Prepare metadata for Cloudflare Images
+    const metadata = {
+      businessId,
+      originalSize: file.size,
+      folderId: folderId || undefined,
+      tags: tags ? JSON.parse(tags) : undefined,
     }
 
-    // Get the original file size
-    const originalSize = file.size
+    // Upload to Cloudflare Images
+    const result = await uploadToCloudflareImages(file, metadata, file.name)
 
-    // Generate a unique filename
-    const format = "jpeg" // Default format
-    const filename = `${businessId}/photos/${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${format}`
+    if (!result || !result.success) {
+      return { success: false, error: "Failed to upload to Cloudflare Images" }
+    }
 
-    // Ensure we have a valid content type
-    const contentType = file.type || "image/jpeg"
+    // Convert Cloudflare image to our MediaItem format
+    const newPhoto = cloudflareImageToMediaItem(result.result)
 
-    try {
-      // Upload to Vercel Blob directly without compression
-      let blob
-      try {
-        // Convert the File to a Buffer
-        const arrayBuffer = await file.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
 
-        // Create a blob options object with no null values
-        const blobOptions = {
-          access: "public",
-          addRandomSuffix: false,
-          contentType: contentType,
-        }
+    // Add the new photo to the album
+    const updatedPhotoAlbum = [...(existingMedia?.photoAlbum || []), newPhoto]
 
-        blob = await put(filename, buffer, blobOptions)
-      } catch (blobError) {
-        console.error("Blob upload error details:", blobError)
+    // Store in Redis
+    await kv.hset(`business:${businessId}:media`, {
+      photoAlbum: JSON.stringify(updatedPhotoAlbum),
+    })
 
-        // Handle Response object error (Request Entity Too Large)
-        if (
-          blobError instanceof Response ||
-          (typeof blobError === "object" && blobError !== null && "text" in blobError)
-        ) {
-          try {
-            // Try to get the response text
-            const errorText = await (blobError as Response).text()
+    revalidatePath(`/photo-album`)
 
-            // Check if it contains "Request Entity Too Large"
-            if (errorText.includes("Request Entity Too Large") || errorText.includes("Request En")) {
-              return {
-                success: false,
-                error: `File is too large for upload. Please reduce the file size to under ${MAX_IMAGE_SIZE_MB}MB.`,
-              }
-            }
-
-            return {
-              success: false,
-              error: `Blob upload failed: ${errorText.substring(0, 100)}...`,
-            }
-          } catch (textError) {
-            // If we can't get the text, return a generic error
-            return {
-              success: false,
-              error: "File upload failed. The file may be too large or in an unsupported format.",
-            }
-          }
-        }
-
-        // Check for null args error
-        if (blobError instanceof Error && blobError.message.includes("null args are not supported")) {
-          return {
-            success: false,
-            error:
-              "Upload failed: One or more required parameters were missing. Please try again with a different file.",
-          }
-        }
-
-        // Handle other types of errors
-        return {
-          success: false,
-          error:
-            blobError instanceof Error
-              ? `Blob upload failed: ${blobError.message}`
-              : "Unknown error during blob upload",
-        }
-      }
-
-      // Calculate compression savings (in this case, none)
-      const compressionSavings = 0
-
-      // Parse tags if provided
-      let parsedTags: string[] = []
-      if (tags) {
-        try {
-          parsedTags = JSON.parse(tags)
-        } catch (e) {
-          console.error("Error parsing tags:", e)
-        }
-      }
-
-      // Create a media item
-      const newPhoto: MediaItem = {
-        id: filename,
-        url: blob.url,
-        filename: file.name,
-        contentType: blob.contentType,
-        size: blob.size,
-        originalSize,
-        compressionSavings,
-        width: 1200, // Estimated width
-        height: 800, // Estimated height
-        createdAt: new Date().toISOString(),
-        folderId: folderId || undefined,
-        tags: parsedTags.length > 0 ? parsedTags : undefined,
-      }
-
-      // Get existing media data
-      const existingMedia = (await getBusinessMediaOriginal(businessId)) || { photoAlbum: [], folders: [], tags: [] }
-
-      // Add the new photo to the album
-      const updatedPhotoAlbum = [...(existingMedia.photoAlbum || []), newPhoto]
-
-      // Update tags in the business media if new tags were added
-      const updatedTags = existingMedia.tags || []
-      if (parsedTags.length > 0) {
-        // Add any new tags that don't already exist
-        parsedTags.forEach((tag) => {
-          if (!updatedTags.includes(tag)) {
-            updatedTags.push(tag)
-          }
-        })
-      }
-
-      // Store reference in KV - ENSURE we stringify the photoAlbum array and tags array
-      await kv.hset(`business:${businessId}:media`, {
-        photoAlbum: JSON.stringify(updatedPhotoAlbum),
-        tags: JSON.stringify(updatedTags),
-      })
-
-      revalidatePath(`/photo-album`)
-
-      return {
-        success: true,
-        photo: newPhoto,
-        photoAlbum: updatedPhotoAlbum,
-        tags: updatedTags,
-      }
-    } catch (uploadError) {
-      console.error("Error in Vercel Blob upload:", uploadError)
-
-      // Try to extract more detailed error information
-      let errorMessage = "Failed to upload photo to storage"
-
-      if (uploadError instanceof Error) {
-        errorMessage = uploadError.message
-      } else if (typeof uploadError === "object" && uploadError !== null) {
-        errorMessage = JSON.stringify(uploadError)
-      }
-
-      return {
-        success: false,
-        error: errorMessage,
-      }
+    return {
+      success: true,
+      photo: newPhoto,
+      photoAlbum: updatedPhotoAlbum,
     }
   } catch (error) {
     console.error("Error uploading photo:", error)
@@ -951,7 +106,7 @@ export async function uploadPhoto(formData: FormData) {
 }
 
 /**
- * Delete a photo from the business's photo album
+ * Delete a photo from the business's photo album and Cloudflare Images
  */
 export async function deletePhoto(businessId: string, photoId: string) {
   try {
@@ -960,7 +115,7 @@ export async function deletePhoto(businessId: string, photoId: string) {
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
+    const existingMedia = await getBusinessMedia(businessId)
 
     if (!existingMedia || !existingMedia.photoAlbum) {
       return { success: false, error: "No photo album found" }
@@ -973,18 +128,20 @@ export async function deletePhoto(businessId: string, photoId: string) {
       return { success: false, error: "Photo not found" }
     }
 
+    // Delete from Cloudflare Images
     try {
-      // Delete from Vercel Blob
-      await del(photoId)
-    } catch (deleteError) {
-      console.error("Error deleting photo from Blob storage:", deleteError)
-      // Continue with removing from the album even if blob deletion fails
+      const deleteResult = await deleteFromCloudflareImages(photoId)
+      if (!deleteResult) {
+        console.warn(`Failed to delete photo ${photoId} from Cloudflare Images, but continuing with local deletion`)
+      }
+    } catch (error) {
+      console.warn("Error deleting from Cloudflare Images:", error)
     }
 
     // Remove from the photo album
     const updatedPhotoAlbum = existingMedia.photoAlbum.filter((photo) => photo.id !== photoId)
 
-    // Update the KV store - ENSURE we stringify the photoAlbum array
+    // Update the KV store
     await kv.hset(`business:${businessId}:media`, {
       photoAlbum: JSON.stringify(updatedPhotoAlbum),
     })
@@ -1007,7 +164,7 @@ export async function deletePhoto(businessId: string, photoId: string) {
 /**
  * Get all media for a business
  */
-export async function getBusinessMediaOriginal(businessId: string): Promise<BusinessMedia | null> {
+export async function getBusinessMedia(businessId: string): Promise<BusinessMedia | null> {
   try {
     if (!businessId) {
       return null
@@ -1024,36 +181,14 @@ export async function getBusinessMediaOriginal(businessId: string): Promise<Busi
     let photoAlbum: MediaItem[] = []
     if (mediaData.photoAlbum) {
       try {
-        // Check if photoAlbum is already an object (not a string)
-        if (typeof mediaData.photoAlbum === "object" && !Array.isArray(mediaData.photoAlbum)) {
-          // If it's an object but not an array, convert it to an empty array
-          console.warn("Photo album is an object but not an array, initializing empty array")
-          photoAlbum = []
-
-          // Fix the data in Redis by storing an empty array
-          await kv.hset(`business:${businessId}:media`, {
-            photoAlbum: JSON.stringify([]),
-          })
-        } else if (typeof mediaData.photoAlbum === "string") {
-          // Normal case - parse the JSON string
-          photoAlbum = JSON.parse(mediaData.photoAlbum as string)
+        if (typeof mediaData.photoAlbum === "string") {
+          photoAlbum = JSON.parse(mediaData.photoAlbum)
         } else if (Array.isArray(mediaData.photoAlbum)) {
-          // If it's already an array, use it directly
           photoAlbum = mediaData.photoAlbum
-
-          // Fix the data in Redis by storing it properly
-          await kv.hset(`business:${businessId}:media`, {
-            photoAlbum: JSON.stringify(mediaData.photoAlbum),
-          })
         }
       } catch (error) {
         console.error("Error parsing photo album:", error)
         photoAlbum = []
-
-        // Fix the data in Redis by storing an empty array
-        await kv.hset(`business:${businessId}:media`, {
-          photoAlbum: JSON.stringify([]),
-        })
       }
     }
 
@@ -1061,36 +196,14 @@ export async function getBusinessMediaOriginal(businessId: string): Promise<Busi
     let folders: MediaFolder[] = []
     if (mediaData.folders) {
       try {
-        // Check if folders is already an object (not a string)
-        if (typeof mediaData.folders === "object" && !Array.isArray(mediaData.folders)) {
-          // If it's an object but not an array, convert it to an empty array
-          console.warn("Folders is an object but not an array, initializing empty array")
-          folders = []
-
-          // Fix the data in Redis by storing an empty array
-          await kv.hset(`business:${businessId}:media`, {
-            folders: JSON.stringify([]),
-          })
-        } else if (typeof mediaData.folders === "string") {
-          // Normal case - parse the JSON string
-          folders = JSON.parse(mediaData.folders as string)
+        if (typeof mediaData.folders === "string") {
+          folders = JSON.parse(mediaData.folders)
         } else if (Array.isArray(mediaData.folders)) {
-          // If it's already an array, use it directly
           folders = mediaData.folders
-
-          // Fix the data in Redis by storing it properly
-          await kv.hset(`business:${businessId}:media`, {
-            folders: JSON.stringify(mediaData.folders),
-          })
         }
       } catch (error) {
         console.error("Error parsing folders:", error)
         folders = []
-
-        // Fix the data in Redis by storing an empty array
-        await kv.hset(`business:${businessId}:media`, {
-          folders: JSON.stringify([]),
-        })
       }
     }
 
@@ -1098,57 +211,14 @@ export async function getBusinessMediaOriginal(businessId: string): Promise<Busi
     let tags: string[] = []
     if (mediaData.tags) {
       try {
-        // Check if tags is already an object (not a string)
-        if (typeof mediaData.tags === "object" && !Array.isArray(mediaData.tags)) {
-          // If it's an object but not an array, convert it to an empty array
-          console.warn("Tags is an object but not an array, initializing empty array")
-          tags = []
-
-          // Fix the data in Redis by storing an empty array
-          await kv.hset(`business:${businessId}:media`, {
-            tags: JSON.stringify([]),
-          })
-        } else if (typeof mediaData.tags === "string") {
-          // Check if the string is empty or just whitespace
-          if (!mediaData.tags.trim()) {
-            console.warn("Tags string is empty, initializing empty array")
-            tags = []
-
-            // Fix the data in Redis by storing an empty array
-            await kv.hset(`business:${businessId}:media`, {
-              tags: JSON.stringify([]),
-            })
-          } else {
-            // Normal case - parse the JSON string
-            try {
-              tags = JSON.parse(mediaData.tags as string)
-            } catch (parseError) {
-              console.error("Error parsing tags JSON:", parseError, "Raw value:", mediaData.tags)
-              tags = []
-
-              // Fix the data in Redis by storing an empty array
-              await kv.hset(`business:${businessId}:media`, {
-                tags: JSON.stringify([]),
-              })
-            }
-          }
+        if (typeof mediaData.tags === "string") {
+          tags = JSON.parse(mediaData.tags)
         } else if (Array.isArray(mediaData.tags)) {
-          // If it's already an array, use it directly
           tags = mediaData.tags
-
-          // Fix the data in Redis by storing it properly
-          await kv.hset(`business:${businessId}:media`, {
-            tags: JSON.stringify(mediaData.tags),
-          })
         }
       } catch (error) {
-        console.error("Error processing tags:", error)
+        console.error("Error parsing tags:", error)
         tags = []
-
-        // Fix the data in Redis by storing an empty array
-        await kv.hset(`business:${businessId}:media`, {
-          tags: JSON.stringify([]),
-        })
       }
     }
 
@@ -1172,155 +242,39 @@ export async function getBusinessMediaOriginal(businessId: string): Promise<Busi
 }
 
 /**
- * Create a new folder
+ * Sync photos from Cloudflare Images to local storage
  */
-export async function createFolder(businessId: string, folderName: string, parentId?: string) {
+export async function syncCloudflareImages(businessId: string) {
   try {
-    if (!businessId || !folderName) {
-      return { success: false, error: "Missing required fields" }
+    // Get images from Cloudflare with the businessId metadata
+    const result = await listCloudflareImages()
+
+    if (!result || !result.success) {
+      return { success: false, error: "Failed to list Cloudflare Images" }
     }
 
-    // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
+    // Filter images for this business
+    const businessImages = result.result.images.filter((image) => image.meta?.businessId === businessId)
 
-    if (!existingMedia) {
-      return { success: false, error: "No media data found" }
-    }
+    // Convert to MediaItem format
+    const photoAlbum = businessImages.map(cloudflareImageToMediaItem)
 
-    // Create a new folder
-    const newFolder: MediaFolder = {
-      id: `folder_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
-      name: folderName,
-      createdAt: new Date().toISOString(),
-      parentId: parentId,
-    }
-
-    // Add the new folder to the list
-    const updatedFolders = [...(existingMedia.folders || []), newFolder]
-
-    // Ensure we're storing the folders as a JSON string
+    // Update Redis
     await kv.hset(`business:${businessId}:media`, {
-      folders: JSON.stringify(updatedFolders),
+      photoAlbum: JSON.stringify(photoAlbum),
     })
 
     revalidatePath(`/photo-album`)
 
     return {
       success: true,
-      folder: newFolder,
-      folders: updatedFolders,
+      photoAlbum,
     }
   } catch (error) {
-    console.error("Error creating folder:", error)
+    console.error("Error syncing Cloudflare Images:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to create folder",
-    }
-  }
-}
-
-/**
- * Rename a folder
- */
-export async function renameFolder(businessId: string, folderId: string, newName: string) {
-  try {
-    if (!businessId || !folderId || !newName) {
-      return { success: false, error: "Missing required fields" }
-    }
-
-    // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
-
-    if (!existingMedia || !existingMedia.folders) {
-      return { success: false, error: "No folders found" }
-    }
-
-    // Find the folder to rename
-    const folderIndex = existingMedia.folders.findIndex((folder) => folder.id === folderId)
-
-    if (folderIndex === -1) {
-      return { success: false, error: "Folder not found" }
-    }
-
-    // Update the folder name
-    const updatedFolders = [...existingMedia.folders]
-    updatedFolders[folderIndex] = {
-      ...updatedFolders[folderIndex],
-      name: newName,
-    }
-
-    // Store in KV
-    await kv.hset(`business:${businessId}:media`, {
-      folders: JSON.stringify(updatedFolders),
-    })
-
-    revalidatePath(`/photo-album`)
-
-    return {
-      success: true,
-      folders: updatedFolders,
-    }
-  } catch (error) {
-    console.error("Error renaming folder:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to rename folder",
-    }
-  }
-}
-
-/**
- * Delete a folder
- */
-export async function deleteFolder(businessId: string, folderId: string) {
-  try {
-    if (!businessId || !folderId) {
-      return { success: false, error: "Missing required fields" }
-    }
-
-    // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
-
-    if (!existingMedia || !existingMedia.folders) {
-      return { success: false, error: "No folders found" }
-    }
-
-    // Find the folder to delete
-    const folderIndex = existingMedia.folders.findIndex((folder) => folder.id === folderId)
-
-    if (folderIndex === -1) {
-      return { success: false, error: "Folder not found" }
-    }
-
-    // Remove the folder
-    const updatedFolders = existingMedia.folders.filter((folder) => folder.id !== folderId)
-
-    // Update photos to remove the folder reference
-    const updatedPhotoAlbum = existingMedia.photoAlbum.map((photo) => {
-      if (photo.folderId === folderId) {
-        return { ...photo, folderId: undefined }
-      }
-      return photo
-    })
-
-    // Store in KV
-    await kv.hset(`business:${businessId}:media`, {
-      folders: JSON.stringify(updatedFolders),
-      photoAlbum: JSON.stringify(updatedPhotoAlbum),
-    })
-
-    revalidatePath(`/photo-album`)
-
-    return {
-      success: true,
-      folders: updatedFolders,
-      photoAlbum: updatedPhotoAlbum,
-    }
-  } catch (error) {
-    console.error("Error deleting folder:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to delete folder",
+      error: error instanceof Error ? error.message : "Failed to sync Cloudflare Images",
     }
   }
 }
@@ -1334,13 +288,10 @@ export async function movePhotoToFolder(businessId: string, photoId: string, fol
       return { success: false, error: "Missing required fields" }
     }
 
-    console.log(`Moving photo ${photoId} to folder ${folderId || "root"} for business ${businessId}`)
-
     // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
+    const existingMedia = await getBusinessMedia(businessId)
 
     if (!existingMedia || !existingMedia.photoAlbum) {
-      console.error("No photo album found for business", businessId)
       return { success: false, error: "No photo album found" }
     }
 
@@ -1348,7 +299,6 @@ export async function movePhotoToFolder(businessId: string, photoId: string, fol
     const photoIndex = existingMedia.photoAlbum.findIndex((photo) => photo.id === photoId)
 
     if (photoIndex === -1) {
-      console.error(`Photo ${photoId} not found in album`)
       return { success: false, error: "Photo not found" }
     }
 
@@ -1358,8 +308,6 @@ export async function movePhotoToFolder(businessId: string, photoId: string, fol
       ...updatedPhotoAlbum[photoIndex],
       folderId: folderId || undefined,
     }
-
-    console.log(`Updating photo album in Redis for business ${businessId}`)
 
     // Store in KV
     await kv.hset(`business:${businessId}:media`, {
@@ -1391,7 +339,7 @@ export async function addTagsToPhoto(businessId: string, photoId: string, tags: 
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
+    const existingMedia = await getBusinessMedia(businessId)
 
     if (!existingMedia || !existingMedia.photoAlbum) {
       return { success: false, error: "No photo album found" }
@@ -1456,7 +404,7 @@ export async function removeTagFromPhoto(businessId: string, photoId: string, ta
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
+    const existingMedia = await getBusinessMedia(businessId)
 
     if (!existingMedia || !existingMedia.photoAlbum) {
       return { success: false, error: "No photo album found" }
@@ -1499,55 +447,214 @@ export async function removeTagFromPhoto(businessId: string, photoId: string, ta
   }
 }
 
-/**
- * Delete all media for a business
- */
-export async function deleteAllBusinessMedia(businessId: string) {
+export async function createFolder(
+  businessId: string,
+  name: string,
+  parentId: string | null,
+): Promise<{ success: boolean; folders: MediaFolder[]; error?: string }> {
   try {
-    if (!businessId) {
-      return { success: false, error: "Missing business ID" }
+    const folderId = uuidv4()
+    const newFolder: MediaFolder = {
+      id: folderId,
+      name,
+      createdAt: new Date().toISOString(),
+      parentId: parentId || undefined,
     }
 
     // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
+    const existingMedia = await getBusinessMedia(businessId)
+    const existingFolders = existingMedia?.folders || []
+
+    // Add the new folder
+    const updatedFolders = [...existingFolders, newFolder]
+
+    // Save to Redis
+    await kv.hset(`business:${businessId}:media`, {
+      folders: JSON.stringify(updatedFolders),
+    })
+
+    revalidatePath("/photo-album")
+
+    return { success: true, folders: updatedFolders }
+  } catch (error) {
+    console.error("Error creating folder:", error)
+    return { success: false, folders: [], error: "Failed to create folder" }
+  }
+}
+
+export async function renameFolder(
+  businessId: string,
+  folderId: string,
+  name: string,
+): Promise<{ success: boolean; folders: MediaFolder[]; error?: string }> {
+  try {
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+    const existingFolders = existingMedia?.folders || []
+
+    // Find the folder to rename
+    const folderIndex = existingFolders.findIndex((folder) => folder.id === folderId)
+
+    if (folderIndex === -1) {
+      return { success: false, folders: [], error: "Folder not found" }
+    }
+
+    // Update the folder
+    existingFolders[folderIndex] = { ...existingFolders[folderIndex], name }
+
+    // Save to Redis
+    await kv.hset(`business:${businessId}:media`, {
+      folders: JSON.stringify(existingFolders),
+    })
+
+    revalidatePath("/photo-album")
+
+    return { success: true, folders: existingFolders }
+  } catch (error) {
+    console.error("Error renaming folder:", error)
+    return { success: false, folders: [], error: "Failed to rename folder" }
+  }
+}
+
+export async function deleteFolder(
+  businessId: string,
+  folderId: string,
+): Promise<{ success: boolean; folders: MediaFolder[]; error?: string }> {
+  try {
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+    const existingFolders = existingMedia?.folders || []
+
+    // Filter out the folder to delete
+    const updatedFolders = existingFolders.filter((folder) => folder.id !== folderId)
+
+    // Save to Redis
+    await kv.hset(`business:${businessId}:media`, {
+      folders: JSON.stringify(updatedFolders),
+    })
+
+    revalidatePath("/photo-album")
+
+    return { success: true, folders: updatedFolders }
+  } catch (error) {
+    console.error("Error deleting folder:", error)
+    return { success: false, folders: [], error: "Failed to delete folder" }
+  }
+}
+
+export async function createTag(
+  businessId: string,
+  tag: string,
+): Promise<{ success: boolean; tags: string[]; error?: string }> {
+  try {
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+    const existingTags = existingMedia?.tags || []
+
+    // Add the new tag
+    const updatedTags = [...existingTags, tag]
+
+    // Save to Redis
+    await kv.hset(`business:${businessId}:media`, {
+      tags: JSON.stringify(updatedTags),
+    })
+
+    revalidatePath("/photo-album")
+
+    return { success: true, tags: updatedTags }
+  } catch (error) {
+    console.error("Error creating tag:", error)
+    return { success: false, tags: [], error: "Failed to create tag" }
+  }
+}
+
+export async function deleteTag(
+  businessId: string,
+  tag: string,
+): Promise<{ success: boolean; tags: string[]; error?: string }> {
+  try {
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
+    const existingTags = existingMedia?.tags || []
+
+    // Filter out the tag to delete
+    const updatedTags = existingTags.filter((t) => t !== tag)
+
+    // Save to Redis
+    await kv.hset(`business:${businessId}:media`, {
+      tags: JSON.stringify(updatedTags),
+    })
+
+    revalidatePath("/photo-album")
+
+    return { success: true, tags: updatedTags }
+  } catch (error) {
+    console.error("Error deleting tag:", error)
+    return { success: false, tags: [], error: "Failed to delete tag" }
+  }
+}
+
+export async function saveMediaSettings(
+  businessId: string,
+  settings: any,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Save to Redis
+    await kv.hset(`business:${businessId}:mediaSettings`, settings)
+
+    revalidatePath("/photo-album")
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error saving media settings:", error)
+    return { success: false, error: "Failed to save media settings" }
+  }
+}
+
+export async function listBusinessBlobs(
+  businessId: string,
+): Promise<{ success: boolean; blobs: any[]; error?: string }> {
+  try {
+    // List images from Cloudflare Images
+    const result = await listCloudflareImages()
+
+    if (!result || !result.success) {
+      return { success: false, blobs: [], error: "Failed to list Cloudflare Images" }
+    }
+
+    // Filter images for this business
+    const businessImages = result.result.images.filter((image) => image.meta?.businessId === businessId)
+
+    return { success: true, blobs: businessImages }
+  } catch (error) {
+    console.error("Error listing Cloudflare Images:", error)
+    return { success: false, blobs: [], error: "Failed to list Cloudflare Images" }
+  }
+}
+
+export async function deleteAllBusinessMedia(businessId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Get existing media data
+    const existingMedia = await getBusinessMedia(businessId)
 
     if (!existingMedia) {
-      return { success: true, message: "No media to delete" }
+      return { success: true }
     }
 
-    // Delete video if exists
-    if (existingMedia.videoId) {
-      try {
-        await del(existingMedia.videoId)
-      } catch (error) {
-        console.error("Error deleting video:", error)
-      }
-    }
-
-    // Delete thumbnail if exists
-    if (existingMedia.thumbnailId) {
-      try {
-        await del(existingMedia.thumbnailId)
-      } catch (error) {
-        console.error("Error deleting thumbnail:", error)
-      }
-    }
-
-    // Delete all photos
+    // Delete all photos from Cloudflare Images
     if (existingMedia.photoAlbum && existingMedia.photoAlbum.length > 0) {
       for (const photo of existingMedia.photoAlbum) {
         try {
-          await del(photo.id)
+          await deleteFromCloudflareImages(photo.id)
         } catch (error) {
-          console.error(`Error deleting photo ${photo.id}:`, error)
+          console.warn(`Failed to delete photo ${photo.id} from Cloudflare Images`)
         }
       }
     }
 
-    // Delete the media record from KV
+    // Clear all media data from Redis
     await kv.del(`business:${businessId}:media`)
 
-    revalidatePath(`/ad-design/customize`)
     revalidatePath(`/photo-album`)
 
     return { success: true }
@@ -1560,189 +667,78 @@ export async function deleteAllBusinessMedia(businessId: string) {
   }
 }
 
-/**
- * Create a new tag
- */
-export async function createTag(businessId: string, tagName: string) {
+// Add these functions for video and thumbnail uploads
+export async function uploadVideo(formData: FormData) {
   try {
-    if (!businessId || !tagName) {
+    const businessId = formData.get("businessId") as string
+    const file = formData.get("video") as File
+    const designId = formData.get("designId") as string | undefined
+
+    if (!file || !businessId) {
       return { success: false, error: "Missing required fields" }
     }
 
-    // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
+    // For videos, we'll continue to use Cloudflare Stream instead of Cloudflare Images
+    // This would be implemented based on your Cloudflare Stream integration
+    console.log(`Uploading video for business ${businessId}`)
 
-    if (!existingMedia) {
-      return { success: false, error: "No media data found" }
+    return {
+      success: false,
+      error: "Video upload not implemented for Cloudflare Images",
+    }
+  } catch (error) {
+    console.error("Error uploading video:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to upload video",
+    }
+  }
+}
+
+export async function uploadThumbnail(formData: FormData) {
+  try {
+    const businessId = formData.get("businessId") as string
+    const file = formData.get("thumbnail") as File
+
+    if (!file || !businessId) {
+      return { success: false, error: "Missing required fields" }
     }
 
-    // Check if tag already exists
-    const existingTags = existingMedia.tags || []
-    if (existingTags.includes(tagName)) {
-      return { success: false, error: "Tag already exists" }
+    // Prepare metadata for Cloudflare Images
+    const metadata = {
+      businessId,
+      originalSize: file.size,
+      type: "thumbnail",
     }
 
-    // Add the new tag
-    const updatedTags = [...existingTags, tagName]
+    // Upload to Cloudflare Images
+    const result = await uploadToCloudflareImages(file, metadata, file.name)
 
-    // Store in KV
+    if (!result || !result.success) {
+      return { success: false, error: "Failed to upload to Cloudflare Images" }
+    }
+
+    // Get the thumbnail URL
+    const thumbnailUrl = getCloudflareImageUrl(result.result.id)
+
+    // Update the media data
     await kv.hset(`business:${businessId}:media`, {
-      tags: JSON.stringify(updatedTags),
+      thumbnailUrl: thumbnailUrl,
+      thumbnailId: result.result.id,
     })
 
     revalidatePath(`/photo-album`)
 
     return {
       success: true,
-      tags: updatedTags,
+      thumbnailUrl: thumbnailUrl,
+      thumbnailId: result.result.id,
     }
   } catch (error) {
-    console.error("Error creating tag:", error)
+    console.error("Error uploading thumbnail:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to create tag",
+      error: error instanceof Error ? error.message : "Failed to upload thumbnail",
     }
-  }
-}
-
-/**
- * Delete a tag
- */
-export async function deleteTag(businessId: string, tagName: string) {
-  try {
-    if (!businessId || !tagName) {
-      return { success: false, error: "Missing required fields" }
-    }
-
-    // Get existing media data
-    const existingMedia = await getBusinessMediaOriginal(businessId)
-
-    if (!existingMedia) {
-      return { success: false, error: "No media data found" }
-    }
-
-    // Remove the tag from the list
-    const existingTags = existingMedia.tags || []
-    const updatedTags = existingTags.filter((tag) => tag !== tagName)
-
-    // Remove the tag from all photos
-    const updatedPhotoAlbum = existingMedia.photoAlbum.map((photo) => {
-      if (photo.tags && photo.tags.includes(tagName)) {
-        const newTags = photo.tags.filter((tag) => tag !== tagName)
-        return {
-          ...photo,
-          tags: newTags.length > 0 ? newTags : undefined,
-        }
-      }
-      return photo
-    })
-
-    // Store in KV
-    await kv.hset(`business:${businessId}:media`, {
-      tags: JSON.stringify(updatedTags),
-      photoAlbum: JSON.stringify(updatedPhotoAlbum),
-    })
-
-    revalidatePath(`/photo-album`)
-
-    return {
-      success: true,
-      tags: updatedTags,
-      photoAlbum: updatedPhotoAlbum,
-    }
-  } catch (error) {
-    console.error("Error deleting tag:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to delete tag",
-    }
-  }
-}
-
-/**
- * List all blobs for a business (useful for admin purposes)
- */
-export async function listBusinessBlobs(businessId: string) {
-  try {
-    if (!businessId) {
-      return { success: false, error: "Missing business ID" }
-    }
-
-    // List all blobs with the business ID prefix
-    const { blobs } = await list({ prefix: `${businessId}/` })
-
-    return {
-      success: true,
-      blobs,
-    }
-  } catch (error) {
-    console.error("Error listing business blobs:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to list blobs",
-    }
-  }
-}
-
-/**
- * Save business media settings (like which fields to hide)
- */
-export async function saveMediaSettings(businessId: string, settings: any) {
-  try {
-    if (!businessId) {
-      return { success: false, error: "Missing business ID" }
-    }
-
-    // Store settings in KV - ENSURE we stringify the settings object
-    await kv.hset(`business:${businessId}:media`, {
-      settings: JSON.stringify(settings),
-    })
-
-    revalidatePath(`/ad-design/customize`)
-
-    return { success: true }
-  } catch (error) {
-    console.error("Error saving media settings:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to save media settings",
-    }
-  }
-}
-
-/**
- * Get business media settings
- */
-export async function getMediaSettings(businessId: string) {
-  try {
-    if (!businessId) {
-      return null
-    }
-
-    // Get the media data from KV
-    const mediaData = await kv.hgetall(`business:${businessId}:media`)
-
-    if (!mediaData || !mediaData.settings) {
-      return null
-    }
-
-    // Parse the settings JSON
-    try {
-      // Check if settings is already an object (not a string)
-      if (typeof mediaData.settings === "object" && mediaData.settings !== null) {
-        // If it's already an object, use it directly
-        return mediaData.settings
-      } else if (typeof mediaData.settings === "string") {
-        // Normal case - parse the JSON string
-        return JSON.parse(mediaData.settings as string)
-      }
-      return null
-    } catch (error) {
-      console.error("Error parsing media settings:", error)
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting media settings:", error)
-    return null
   }
 }
