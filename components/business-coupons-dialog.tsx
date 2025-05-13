@@ -1,13 +1,47 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getCouponIds, getCouponMetadata, getCouponTerms, getCouponImageId } from "@/app/actions/coupon-image-actions"
-import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import {
+  getCouponIds,
+  getCouponMetadata,
+  getCouponImageId,
+  getGlobalCouponTerms,
+} from "@/app/actions/coupon-image-actions"
+import { CLOUDFLARE_ACCOUNT_HASH } from "@/lib/cloudflare-images"
 import Image from "next/image"
-import { Loader2, X, Info, Download, ExternalLink } from "lucide-react"
+import {
+  Loader2,
+  X,
+  Info,
+  Download,
+  ExternalLink,
+  ImageOff,
+  RefreshCw,
+  Bug,
+  Copy,
+  Check,
+  Maximize2,
+} from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
+import { useMobile } from "@/hooks/use-mobile"
+
+// Define a valid placeholder image URL
+const PLACEHOLDER_IMAGE = "/placeholder.svg?text=No+Image+Available"
+
+// Define alternative URL formats for troubleshooting
+const URL_FORMATS = {
+  DEFAULT: "default",
+  DIRECT: "direct",
+  PUBLIC: "public",
+  VARIANT: "variant",
+  CUSTOM: "custom",
+}
+
+// Default URL format to use (since public URL works)
+const DEFAULT_URL_FORMAT = URL_FORMATS.PUBLIC
 
 interface BusinessCouponsDialogProps {
   businessId: string
@@ -22,13 +56,21 @@ export function BusinessCouponsDialog({
   onOpenChange,
   businessName = "",
 }: BusinessCouponsDialogProps) {
+  const isMobile = useMobile()
   const [loading, setLoading] = useState(true)
   const [coupons, setCoupons] = useState<any[]>([])
   const [selectedCoupon, setSelectedCoupon] = useState<any | null>(null)
-  const [selectedCouponTerms, setSelectedCouponTerms] = useState<string>("")
+  const [globalTerms, setGlobalTerms] = useState<string>("")
   const [showTerms, setShowTerms] = useState(false)
   const [showFullImage, setShowFullImage] = useState(false)
+  const [showFullSizeImage, setShowFullSizeImage] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
+  const [showDebugInfo, setShowDebugInfo] = useState(false)
+  const [urlFormat, setUrlFormat] = useState<string>(DEFAULT_URL_FORMAT)
+  const [isCopied, setIsCopied] = useState(false)
+  const [debugImageId, setDebugImageId] = useState<string>("")
+  const imageRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -36,10 +78,21 @@ export function BusinessCouponsDialog({
     }
   }, [isOpen, businessId])
 
+  // Reset copy state after 2 seconds
+  useEffect(() => {
+    if (isCopied) {
+      const timer = setTimeout(() => {
+        setIsCopied(false)
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [isCopied])
+
   const loadCoupons = async () => {
     setLoading(true)
     setError(null)
     setCoupons([])
+    setImageErrors({})
 
     try {
       console.log(`Loading coupons for business ID: ${businessId}`)
@@ -85,8 +138,15 @@ export function BusinessCouponsDialog({
           console.log("Image ID result:", imageIdResult)
 
           if (metadataResult.success && metadataResult.metadata && imageIdResult.success && imageIdResult.imageId) {
-            const imageUrl = getCloudflareImageUrl(imageIdResult.imageId)
-            console.log(`Image URL for coupon ${couponId}:`, imageUrl)
+            // Generate the image URL using the direct format that works
+            const imageUrl = getImageUrlByFormat(imageIdResult.imageId, DEFAULT_URL_FORMAT)
+            console.log(`Generated image URL for coupon ${couponId}:`, imageUrl)
+
+            // Check if this is the specific image ID we're looking for
+            if (imageIdResult.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300") {
+              console.log("Found the specific image ID we're looking for!")
+              setDebugImageId(imageIdResult.imageId)
+            }
 
             couponData.push({
               id: couponId,
@@ -106,7 +166,7 @@ export function BusinessCouponsDialog({
         }
       }
 
-      console.log(`Successfully loaded ${couponData.length} coupons:`, couponData)
+      console.log(`Successfully loaded ${couponData.length} coupons`)
 
       // Sort coupons by expiration date (newest first)
       couponData.sort((a, b) => {
@@ -117,6 +177,19 @@ export function BusinessCouponsDialog({
       })
 
       setCoupons(couponData)
+
+      // Load global terms and conditions
+      try {
+        const termsResult = await getGlobalCouponTerms(businessId)
+        if (termsResult.success && termsResult.terms) {
+          setGlobalTerms(termsResult.terms)
+        } else {
+          setGlobalTerms("Global terms and conditions not available.")
+        }
+      } catch (termsError) {
+        console.error("Error loading global terms:", termsError)
+        setGlobalTerms("Error loading global terms and conditions.")
+      }
     } catch (error) {
       console.error("Error loading coupons:", error)
       setError("Failed to load coupons")
@@ -125,28 +198,36 @@ export function BusinessCouponsDialog({
     }
   }
 
-  const handleCouponClick = async (coupon: any) => {
+  const handleCouponClick = (coupon: any) => {
     setSelectedCoupon(coupon)
     setShowFullImage(true)
+    setShowFullSizeImage(false)
 
-    try {
-      const termsResult = await getCouponTerms(businessId, coupon.id)
-      if (termsResult.success && termsResult.terms) {
-        setSelectedCouponTerms(termsResult.terms)
-      } else {
-        setSelectedCouponTerms("Terms and conditions not available.")
-      }
-    } catch (error) {
-      console.error("Error loading coupon terms:", error)
-      setSelectedCouponTerms("Error loading terms and conditions.")
+    // If this is the specific image we're troubleshooting, show debug info
+    if (coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300") {
+      setDebugImageId(coupon.imageId)
     }
   }
 
   const handleViewTerms = () => {
-    if (selectedCoupon) {
-      setShowFullImage(false)
-      setShowTerms(true)
-    }
+    setShowFullImage(false)
+    setShowFullSizeImage(false)
+    setShowTerms(true)
+  }
+
+  // Function to handle image errors
+  const handleImageError = (couponId: string) => {
+    console.log(`Image failed to load for coupon ${couponId}`)
+    setImageErrors((prev) => ({ ...prev, [couponId]: true }))
+  }
+
+  // Function to retry loading a specific image
+  const retryLoadImage = async (couponId: string) => {
+    setImageErrors((prev) => {
+      const newErrors = { ...prev }
+      delete newErrors[couponId]
+      return newErrors
+    })
   }
 
   // Function to format terms with bold headings
@@ -216,6 +297,130 @@ export function BusinessCouponsDialog({
     printWindow.document.close()
   }
 
+  // Function to get a valid image source or placeholder
+  const getValidImageSrc = (url: string | undefined | null): string => {
+    // Check if url is a string and not empty
+    if (typeof url !== "string" || url === "") {
+      return PLACEHOLDER_IMAGE
+    }
+
+    // Check if the string contains only whitespace
+    if (url.trim() === "") {
+      return PLACEHOLDER_IMAGE
+    }
+
+    return url
+  }
+
+  // Function to generate different URL formats for troubleshooting
+  const getImageUrlByFormat = (imageId: string, format: string): string => {
+    if (!imageId) return PLACEHOLDER_IMAGE
+    if (!CLOUDFLARE_ACCOUNT_HASH) return PLACEHOLDER_IMAGE
+
+    switch (format) {
+      case URL_FORMATS.DIRECT:
+        return `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_HASH}/${imageId}/public`
+      case URL_FORMATS.PUBLIC:
+        return `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_HASH}/${imageId}/public`
+      case URL_FORMATS.VARIANT:
+        return `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_HASH}/${imageId}/thumbnail`
+      case URL_FORMATS.CUSTOM:
+        return `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_HASH}/${imageId}/custom`
+      case URL_FORMATS.DEFAULT:
+      default:
+        return `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_HASH}/${imageId}/public`
+    }
+  }
+
+  // Function to copy URL to clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setIsCopied(true)
+        toast({
+          title: "URL copied to clipboard",
+          description: "The image URL has been copied to your clipboard.",
+        })
+      })
+      .catch((err) => {
+        console.error("Failed to copy: ", err)
+        toast({
+          title: "Failed to copy",
+          description: "Could not copy the URL to clipboard.",
+          variant: "destructive",
+        })
+      })
+  }
+
+  // Function to check image dimensions
+  const checkImageDimensions = () => {
+    if (imageRef.current) {
+      const { naturalWidth, naturalHeight } = imageRef.current
+      toast({
+        title: "Image Dimensions",
+        description: `Width: ${naturalWidth}px, Height: ${naturalHeight}px`,
+      })
+    }
+  }
+
+  // Function to render coupon image or fallback
+  const renderCouponImage = (coupon: any, aspectRatio: string) => {
+    // Check if we've already had an error for this coupon
+    if (imageErrors[coupon.id]) {
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 text-gray-400">
+          <ImageOff className="h-8 w-8 mb-2" />
+          <span className="text-sm text-center px-2 mb-2">Image not available</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              retryLoadImage(coupon.id)
+            }}
+            className="flex items-center gap-1 text-xs"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      )
+    }
+
+    // Check if we have a valid URL for this image
+    if (!coupon.imageUrl) {
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 text-gray-400">
+          <ImageOff className="h-8 w-8 mb-2" />
+          <span className="text-sm text-center px-2">Image URL not found</span>
+        </div>
+      )
+    }
+
+    // Log the image URL for debugging
+    console.log(`Rendering image for coupon ${coupon.id} with URL: ${coupon.imageUrl}`)
+
+    // Render the image with error handling
+    return (
+      <>
+        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
+        </div>
+        <Image
+          src={getValidImageSrc(coupon.imageUrl) || "/placeholder.svg"}
+          alt={coupon.title || "Coupon"}
+          fill
+          className="object-cover"
+          sizes={aspectRatio === "4/3" ? "(max-width: 768px) 100vw, 50vw" : aspectRatio === "5/2.5" ? "100vw" : "100vw"}
+          priority
+          unoptimized
+          onError={() => handleImageError(coupon.id)}
+        />
+      </>
+    )
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -244,10 +449,11 @@ export function BusinessCouponsDialog({
             </div>
           ) : (
             <Tabs defaultValue="all" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="all">All Coupons</TabsTrigger>
                 <TabsTrigger value="small">Small Coupons</TabsTrigger>
                 <TabsTrigger value="large">Large Coupons</TabsTrigger>
+                <TabsTrigger value="terms">Terms & Conditions</TabsTrigger>
               </TabsList>
 
               <TabsContent value="all" className="mt-4">
@@ -262,26 +468,7 @@ export function BusinessCouponsDialog({
                             className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                             onClick={() => handleCouponClick(coupon)}
                           >
-                            <div className="relative aspect-[4/3] w-full bg-gray-100">
-                              {coupon.imageUrl ? (
-                                <Image
-                                  src={coupon.imageUrl || "/placeholder.svg"}
-                                  alt={coupon.title || "Coupon"}
-                                  fill
-                                  className="object-cover"
-                                  sizes="(max-width: 768px) 100vw, 50vw"
-                                  priority
-                                  onError={(e) => {
-                                    console.error(`Error loading image for coupon ${coupon.id}:`, e)
-                                    e.currentTarget.src = "/placeholder.svg?text=Coupon+Image+Not+Available"
-                                  }}
-                                />
-                              ) : (
-                                <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                                  Image not available
-                                </div>
-                              )}
-                            </div>
+                            <div className="relative aspect-[4/3] w-full">{renderCouponImage(coupon, "4/3")}</div>
                             <div className="absolute bottom-2 right-2">
                               <Button
                                 variant="outline"
@@ -295,6 +482,11 @@ export function BusinessCouponsDialog({
                                 <Info className="h-4 w-4" />
                               </Button>
                             </div>
+                            {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
+                              <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                                Fixed Image
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -311,25 +503,9 @@ export function BusinessCouponsDialog({
                             className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                             onClick={() => handleCouponClick(coupon)}
                           >
-                            <div className="relative aspect-[16/9] w-full bg-gray-100">
-                              {coupon.imageUrl ? (
-                                <Image
-                                  src={coupon.imageUrl || "/placeholder.svg"}
-                                  alt={coupon.title || "Coupon"}
-                                  fill
-                                  className="object-cover"
-                                  sizes="(max-width: 768px) 100vw, 100vw"
-                                  priority
-                                  onError={(e) => {
-                                    console.error(`Error loading image for coupon ${coupon.id}:`, e)
-                                    e.currentTarget.src = "/placeholder.svg?text=Coupon+Image+Not+Available"
-                                  }}
-                                />
-                              ) : (
-                                <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                                  Image not available
-                                </div>
-                              )}
+                            {/* Changed aspect ratio for large coupons to make them fit better */}
+                            <div className="relative aspect-[5/2.5] w-full max-h-[200px]">
+                              {renderCouponImage(coupon, "5/2.5")}
                             </div>
                             <div className="absolute bottom-2 right-2">
                               <Button
@@ -344,6 +520,11 @@ export function BusinessCouponsDialog({
                                 <Info className="h-4 w-4" />
                               </Button>
                             </div>
+                            {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
+                              <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                                Fixed Image
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -365,26 +546,7 @@ export function BusinessCouponsDialog({
                         className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                         onClick={() => handleCouponClick(coupon)}
                       >
-                        <div className="relative aspect-[4/3] w-full bg-gray-100">
-                          {coupon.imageUrl ? (
-                            <Image
-                              src={coupon.imageUrl || "/placeholder.svg"}
-                              alt={coupon.title || "Coupon"}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 100vw, 50vw"
-                              priority
-                              onError={(e) => {
-                                console.error(`Error loading image for coupon ${coupon.id}:`, e)
-                                e.currentTarget.src = "/placeholder.svg?text=Coupon+Image+Not+Available"
-                              }}
-                            />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                              Image not available
-                            </div>
-                          )}
-                        </div>
+                        <div className="relative aspect-[4/3] w-full">{renderCouponImage(coupon, "4/3")}</div>
                         <div className="absolute bottom-2 right-2">
                           <Button
                             variant="outline"
@@ -417,25 +579,9 @@ export function BusinessCouponsDialog({
                         className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                         onClick={() => handleCouponClick(coupon)}
                       >
-                        <div className="relative aspect-[16/9] w-full bg-gray-100">
-                          {coupon.imageUrl ? (
-                            <Image
-                              src={coupon.imageUrl || "/placeholder.svg"}
-                              alt={coupon.title || "Coupon"}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 100vw, 100vw"
-                              priority
-                              onError={(e) => {
-                                console.error(`Error loading image for coupon ${coupon.id}:`, e)
-                                e.currentTarget.src = "/placeholder.svg?text=Coupon+Image+Not+Available"
-                              }}
-                            />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                              Image not available
-                            </div>
-                          )}
+                        {/* Changed aspect ratio for large coupons to make them fit better */}
+                        <div className="relative aspect-[5/2.5] w-full max-h-[200px]">
+                          {renderCouponImage(coupon, "5/2.5")}
                         </div>
                         <div className="absolute bottom-2 right-2">
                           <Button
@@ -454,6 +600,18 @@ export function BusinessCouponsDialog({
                     ))}
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="terms" className="mt-4">
+                <div className="bg-white p-6 rounded-lg border">
+                  <h3 className="text-lg font-medium mb-4">Global Terms & Conditions</h3>
+                  <div
+                    className="text-sm whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{
+                      __html: formatTermsWithBoldHeadings(globalTerms),
+                    }}
+                  />
+                </div>
               </TabsContent>
             </Tabs>
           )}
@@ -478,23 +636,165 @@ export function BusinessCouponsDialog({
             >
               <X className="h-4 w-4" />
             </Button>
+
+            {/* Debug button */}
+            {selectedCoupon?.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute top-2 left-2 z-10 bg-green-100 hover:bg-green-200 text-green-800 border-green-300"
+                onClick={() => setShowDebugInfo(!showDebugInfo)}
+              >
+                <Bug className="mr-2 h-4 w-4" />
+                {showDebugInfo ? "Hide Debug" : "Debug"}
+              </Button>
+            )}
           </div>
 
           {selectedCoupon?.imageUrl && (
             <div className="relative w-full">
-              <div className="relative w-full" style={{ minHeight: "300px" }}>
-                <Image
-                  src={selectedCoupon.imageUrl || "/placeholder.svg"}
-                  alt={selectedCoupon.title || "Coupon"}
-                  fill
-                  className="object-contain"
-                  sizes="100vw"
-                  priority
-                  onError={(e) => {
-                    console.error(`Error loading image for coupon ${selectedCoupon.id}:`, e)
-                    e.currentTarget.src = "/placeholder.svg?text=Coupon+Image+Not+Available"
-                  }}
-                />
+              {/* Debug panel */}
+              {showDebugInfo && selectedCoupon?.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
+                <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
+                  <h3 className="text-lg font-medium text-green-800 mb-2">Image Information</h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Image ID:</p>
+                      <div className="flex items-center mt-1">
+                        <code className="bg-white px-2 py-1 rounded text-sm flex-1 overflow-x-auto">
+                          {selectedCoupon.imageId}
+                        </code>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="ml-2 h-8 w-8 text-green-600"
+                          onClick={() => copyToClipboard(selectedCoupon.imageId)}
+                        >
+                          {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Current URL Format:</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <select
+                          className="bg-white border border-green-200 rounded px-2 py-1 text-sm"
+                          value={urlFormat}
+                          onChange={(e) => setUrlFormat(e.target.value)}
+                        >
+                          <option value={URL_FORMATS.PUBLIC}>Public (Working)</option>
+                          <option value={URL_FORMATS.DIRECT}>Direct (Working)</option>
+                          <option value={URL_FORMATS.DEFAULT}>Default</option>
+                          <option value={URL_FORMATS.VARIANT}>Thumbnail</option>
+                          <option value={URL_FORMATS.CUSTOM}>Custom</option>
+                        </select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => {
+                            // Force reload with new URL format
+                            setImageErrors((prev) => {
+                              const newErrors = { ...prev }
+                              delete newErrors[selectedCoupon.id]
+                              return newErrors
+                            })
+                          }}
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Try Format
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Generated URL:</p>
+                      <div className="flex items-center mt-1">
+                        <code className="bg-white px-2 py-1 rounded text-sm flex-1 overflow-x-auto">
+                          {getImageUrlByFormat(selectedCoupon.imageId, urlFormat)}
+                        </code>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="ml-2 h-8 w-8 text-green-600"
+                          onClick={() => copyToClipboard(getImageUrlByFormat(selectedCoupon.imageId, urlFormat))}
+                        >
+                          {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(getImageUrlByFormat(selectedCoupon.imageId, urlFormat), "_blank")}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open Direct URL
+                      </Button>
+
+                      <Button variant="outline" size="sm" onClick={checkImageDimensions}>
+                        Check Dimensions
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Force reload image
+                          setImageErrors({})
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Reload All Images
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="relative w-full" style={{ minHeight: "200px" }}>
+                {imageErrors[selectedCoupon.id] ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 text-gray-400">
+                    <ImageOff className="h-12 w-12 mb-2" />
+                    <span className="text-center px-4 mb-3">The coupon image could not be loaded.</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => retryLoadImage(selectedCoupon.id)}
+                      className="flex items-center gap-1"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Retry Loading Image
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
+                    </div>
+
+                    {/* Container with max-height to ensure large coupons fit */}
+                    <div
+                      className={`relative ${selectedCoupon.size === "large" ? "max-h-[280px] md:max-h-[380px]" : ""} w-full flex items-center justify-center`}
+                    >
+                      <Image
+                        ref={imageRef}
+                        src={getImageUrlByFormat(selectedCoupon.imageId, urlFormat) || "/placeholder.svg"}
+                        alt={selectedCoupon.title || "Coupon"}
+                        width={800}
+                        height={selectedCoupon.size === "large" ? 360 : 600}
+                        className={`object-contain max-w-full ${selectedCoupon.size === "large" ? "max-h-[280px] md:max-h-[380px]" : ""}`}
+                        priority
+                        unoptimized
+                        onError={() => handleImageError(selectedCoupon.id)}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="flex justify-center gap-2 mt-4 pb-2">
@@ -503,16 +803,25 @@ export function BusinessCouponsDialog({
                   Terms & Conditions
                 </Button>
 
-                <Button variant="outline" size="sm" onClick={printCoupon}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Print Coupon
-                </Button>
+                {!imageErrors[selectedCoupon.id] && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={printCoupon}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Print Coupon
+                    </Button>
 
-                {selectedCoupon.imageUrl && (
-                  <Button variant="outline" size="sm" onClick={() => window.open(selectedCoupon.imageUrl, "_blank")}>
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Open Full Size
-                  </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowFullSizeImage(true)
+                        setShowFullImage(false)
+                      }}
+                    >
+                      <Maximize2 className="mr-2 h-4 w-4" />
+                      Full Size View
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -520,29 +829,59 @@ export function BusinessCouponsDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Terms and Conditions Dialog */}
-      <Dialog open={showTerms} onOpenChange={setShowTerms}>
-        <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Terms & Conditions</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => {
-                  setShowTerms(false)
-                  setShowFullImage(true)
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogTitle>
-          </DialogHeader>
+      {/* Full Size Image Dialog (for large coupons) */}
+      <Dialog open={showFullSizeImage} onOpenChange={setShowFullSizeImage}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-1 overflow-auto">
+          <div className="relative w-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 z-10 h-8 w-8 bg-white/80 hover:bg-white rounded-full"
+              onClick={() => {
+                setShowFullSizeImage(false)
+                setShowFullImage(true)
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {selectedCoupon?.imageUrl && (
+            <div className="relative w-full flex items-center justify-center p-2">
+              <Image
+                src={getImageUrlByFormat(selectedCoupon.imageId, urlFormat) || "/placeholder.svg"}
+                alt={selectedCoupon.title || "Coupon"}
+                width={1200}
+                height={800}
+                className="object-contain max-w-full max-h-[85vh]"
+                priority
+                unoptimized
+                onError={() => handleImageError(selectedCoupon.id)}
+              />
+            </div>
+          )}
+
+          <div className="flex justify-center gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={printCoupon}>
+              <Download className="mr-2 h-4 w-4" />
+              Print Coupon
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowFullSizeImage(false)
+                setShowFullImage(true)
+              }}
+            >
+              <X className="mr-2 h-4 w-4" />
+            </Button>
+          </div>
           <div
             className="text-sm whitespace-pre-wrap"
             dangerouslySetInnerHTML={{
-              __html: formatTermsWithBoldHeadings(selectedCouponTerms),
+              __html: formatTermsWithBoldHeadings(globalTerms),
             }}
           />
         </DialogContent>

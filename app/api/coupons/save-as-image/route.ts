@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { uploadToCloudflareImages } from "@/lib/cloudflare-images"
 import {
-  saveCouponTerms,
+  saveGlobalCouponTerms,
   saveCouponMetadata,
   saveCouponImageId,
   saveCouponIds,
@@ -13,7 +13,7 @@ import { deleteFromCloudflareImages } from "@/lib/cloudflare-images"
 // Update the POST handler to handle coupon IDs more safely and prevent duplicates
 export async function POST(request: NextRequest) {
   try {
-    const { coupon, businessId, imageBase64 } = await request.json()
+    const { coupon, businessId, imageBase64, globalTerms } = await request.json()
 
     if (!coupon || !businessId || !imageBase64) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
@@ -63,11 +63,12 @@ export async function POST(request: NextRequest) {
 
     cloudflareImageId = uploadResult.result.id
 
-    // Save the terms to Redis
-    const termsResult = await saveCouponTerms(businessId, coupon.id, coupon.terms)
-
-    if (!termsResult.success) {
-      return NextResponse.json({ success: false, error: "Failed to save coupon terms" }, { status: 500 })
+    // Save the global terms to Redis if provided
+    if (globalTerms) {
+      const termsResult = await saveGlobalCouponTerms(businessId, globalTerms)
+      if (!termsResult.success) {
+        console.warn("Failed to save global terms, but continuing with coupon save")
+      }
     }
 
     // Save the coupon metadata (without terms)

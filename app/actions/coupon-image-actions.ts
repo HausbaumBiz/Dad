@@ -3,50 +3,41 @@
 import { redis } from "@/lib/redis"
 import type { Coupon } from "./coupon-actions"
 
-// Type for coupon terms storage
-interface CouponTerms {
-  couponId: string
-  businessId: string
-  terms: string
-}
-
 /**
- * Save coupon terms to Redis
+ * Save global coupon terms to Redis
  */
-export async function saveCouponTerms(
+export async function saveGlobalCouponTerms(
   businessId: string,
-  couponId: string,
   terms: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const key = `business:${businessId}:coupon:${couponId}:terms`
+    const key = `business:${businessId}:global:terms`
     await redis.set(key, terms)
     return { success: true }
   } catch (error) {
-    console.error("Error saving coupon terms:", error)
-    return { success: false, error: "Failed to save coupon terms" }
+    console.error("Error saving global coupon terms:", error)
+    return { success: false, error: "Failed to save global terms" }
   }
 }
 
 /**
- * Get coupon terms from Redis
+ * Get global coupon terms from Redis
  */
-export async function getCouponTerms(
+export async function getGlobalCouponTerms(
   businessId: string,
-  couponId: string,
 ): Promise<{ success: boolean; terms?: string; error?: string }> {
   try {
-    const key = `business:${businessId}:coupon:${couponId}:terms`
+    const key = `business:${businessId}:global:terms`
     const terms = await redis.get(key)
 
     if (!terms) {
-      return { success: false, error: "Terms not found" }
+      return { success: false, error: "Global terms not found" }
     }
 
     return { success: true, terms: terms as string }
   } catch (error) {
-    console.error("Error getting coupon terms:", error)
-    return { success: false, error: "Failed to retrieve coupon terms" }
+    console.error("Error getting global coupon terms:", error)
+    return { success: false, error: "Failed to retrieve global terms" }
   }
 }
 
@@ -265,7 +256,6 @@ export async function deleteCouponData(
   try {
     // Delete all keys related to this coupon
     const keys = [
-      `business:${businessId}:coupon:${couponId}:terms`,
       `business:${businessId}:coupon:${couponId}:metadata`,
       `business:${businessId}:coupon:${couponId}:imageId`,
     ]

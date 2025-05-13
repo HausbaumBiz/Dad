@@ -1,7 +1,5 @@
 "use client"
 
-import { DialogTrigger } from "@/components/ui/dialog"
-
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
@@ -26,13 +24,11 @@ import {
 } from "@/components/ui/dialog"
 import { saveBusinessCoupons, getBusinessCoupons, type Coupon } from "@/app/actions/coupon-actions"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
-import { saveCouponTerms } from "@/app/actions/coupon-image-actions"
+import { saveGlobalCouponTerms, getGlobalCouponTerms } from "@/app/actions/coupon-image-actions"
 import { toast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import html2canvas from "html2canvas"
-
-// Add this import at the top with the other imports
-import { useEffect as useEffectOriginal } from "react"
+import { X } from "lucide-react"
 
 // Function to format terms with bold headings
 const formatTermsWithBoldHeadings = (terms: string) => {
@@ -67,8 +63,7 @@ export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([])
   // Find the line where coupons state is defined and add this new state below it
   const [couponDimensions, setCouponDimensions] = useState<{ [key: string]: { width: number; height: number } }>({})
-  const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null)
-  const [termsText, setTermsText] = useState("")
+  const [globalTerms, setGlobalTerms] = useState("")
   const [savingTerms, setSavingTerms] = useState(false)
   const [loading, setLoading] = useState(true)
   const [businessId, setBusinessId] = useState<string | null>(null)
@@ -80,6 +75,7 @@ export default function CouponsPage() {
   const [deletingCoupon, setDeletingCoupon] = useState<string | null>(null)
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false)
   const [couponToDelete, setCouponToDelete] = useState<string | null>(null)
+  const [showTermsDialog, setShowTermsDialog] = useState(false)
   // Track which coupons have been updated vs newly created
   const [updatedCoupons, setUpdatedCoupons] = useState<Set<string>>(new Set())
 
@@ -87,16 +83,7 @@ export default function CouponsPage() {
   const smallCouponRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const largeCouponRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
 
-  const [formData, setFormData] = useState<Omit<Coupon, "id">>({
-    title: "",
-    description: "",
-    code: "",
-    discount: "",
-    startDate: new Date().toISOString().split("T")[0],
-    expirationDate: "",
-    size: "small",
-    businessName: "",
-    terms: `By redeeming this coupon, you agree to comply with and be bound by the following terms and conditions. Please read these terms carefully before using the coupon.
+  const defaultTerms = `By redeeming this coupon, you agree to comply with and be bound by the following terms and conditions. Please read these terms carefully before using the coupon.
 
 Eligibility
 This coupon is valid only for customers who meet the eligibility criteria specified on the coupon or associated promotional materials.
@@ -137,7 +124,17 @@ Fraudulent Use
 Any fraudulent or unauthorized use of the coupon is prohibited and may result in cancellation of the coupon without compensation.
 
 Acceptance of Terms
-By using this coupon, you acknowledge that you have read, understood, and agree to be bound by these terms and conditions.`,
+By using this coupon, you acknowledge that you have read, understood, and agree to be bound by these terms and conditions.`
+
+  const [formData, setFormData] = useState<Omit<Coupon, "id" | "terms">>({
+    title: "",
+    description: "",
+    code: "",
+    discount: "",
+    startDate: new Date().toISOString().split("T")[0],
+    expirationDate: "",
+    size: "small",
+    businessName: "",
   })
 
   useEffect(() => {
@@ -148,6 +145,14 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
           setBusinessId(business.id)
           setBusinessName(business.businessName || "")
           setFormData((prev) => ({ ...prev, businessName: business.businessName || "" }))
+
+          // Load global terms
+          const termsResult = await getGlobalCouponTerms(business.id)
+          if (termsResult.success && termsResult.terms) {
+            setGlobalTerms(termsResult.terms)
+          } else {
+            setGlobalTerms(defaultTerms)
+          }
         } else {
           toast({
             title: "Not logged in",
@@ -157,6 +162,7 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
         }
       } catch (error) {
         console.error("Error loading business data:", error)
+        setGlobalTerms(defaultTerms)
       } finally {
         loadCoupons()
       }
@@ -167,15 +173,15 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
 
   useEffect(() => {
     // When a coupon is selected, update the terms text
-    if (selectedCoupon) {
-      setTermsText(selectedCoupon.terms)
-    } else {
-      setTermsText("")
-    }
-  }, [selectedCoupon])
+    // if (selectedCoupon) {
+    //   setTermsText(selectedCoupon.terms)
+    // } else {
+    //   setTermsText("")
+    // }
+  }, [])
 
   // Add this useEffect after the other useEffect hooks
-  useEffectOriginal(() => {
+  useEffect(() => {
     // Function to measure and log dimensions
     const measureCoupons = () => {
       const newDimensions: { [key: string]: { width: number; height: number } } = {}
@@ -185,7 +191,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
         if (element) {
           const width = element.offsetWidth
           const height = element.offsetHeight
-          console.log(`Small coupon ${id} dimensions:`, { width, height })
           newDimensions[id] = { width, height }
         }
       })
@@ -195,7 +200,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
         if (element) {
           const width = element.offsetWidth
           const height = element.offsetHeight
-          console.log(`Large coupon ${id} dimensions:`, { width, height })
           newDimensions[id] = { width, height }
         }
       })
@@ -220,7 +224,10 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
     try {
       const result = await getBusinessCoupons()
       if (result.success && result.coupons) {
-        setCoupons(result.coupons)
+        // Remove terms from coupons since we're using global terms
+        const couponsWithoutTerms = result.coupons.map(({ terms, ...rest }) => rest)
+        setCoupons(couponsWithoutTerms)
+
         // Mark all loaded coupons as "updated" since they already exist in the database
         const existingIds = new Set(result.coupons.map((coupon) => coupon.id))
         setUpdatedCoupons(existingIds)
@@ -245,7 +252,7 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
   }
 
   const handleTermsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setTermsText(e.target.value)
+    setGlobalTerms(e.target.value)
   }
 
   const handleSizeChange = (value: "small" | "large") => {
@@ -256,7 +263,7 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
     e.preventDefault()
     const newCouponId = Date.now().toString()
     setCoupons((prev) => [...prev, { ...formData, id: newCouponId }])
-    // Reset form fields except for business name and terms
+    // Reset form fields except for business name
     setFormData((prev) => ({
       ...prev,
       title: "",
@@ -322,9 +329,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
       }
 
       // Update the local state
-      if (selectedCoupon?.id === id) {
-        setSelectedCoupon(null)
-      }
       setCoupons((prev) => prev.filter((coupon) => coupon.id !== id))
 
       // Remove from updatedCoupons set if it exists
@@ -413,9 +417,10 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          coupon,
+          coupon: { ...coupon, terms: "" }, // Don't send terms with each coupon
           businessId,
           imageBase64,
+          globalTerms, // Send global terms instead
         }),
       })
 
@@ -494,12 +499,12 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
     return successCount === coupons.length
   }
 
-  // Function to save terms and conditions to Redis
+  // Function to save global terms and conditions to Redis
   const saveTermsToRedis = async () => {
-    if (!selectedCoupon || !businessId) {
+    if (!businessId) {
       toast({
         title: "Error",
-        description: "No coupon selected or business ID not found",
+        description: "Business ID not found",
         variant: "destructive",
       })
       return
@@ -508,28 +513,23 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
     setSavingTerms(true)
 
     try {
-      const result = await saveCouponTerms(businessId, selectedCoupon.id, termsText)
+      const result = await saveGlobalCouponTerms(businessId, globalTerms)
 
       if (result.success) {
-        // Update the coupon in the local state
-        setCoupons((prev) => prev.map((c) => (c.id === selectedCoupon.id ? { ...c, terms: termsText } : c)))
-
-        // Mark this coupon as updated
-        setUpdatedCoupons((prev) => new Set(prev).add(selectedCoupon.id))
-
         toast({
           title: "Success",
-          description: "Terms and conditions saved successfully",
+          description: "Global terms and conditions saved successfully",
         })
+        setShowTermsDialog(false)
       } else {
         toast({
           title: "Error",
-          description: result.error || "Failed to save terms and conditions",
+          description: result.error || "Failed to save global terms and conditions",
           variant: "destructive",
         })
       }
     } catch (error) {
-      console.error("Error saving terms:", error)
+      console.error("Error saving global terms:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -551,8 +551,16 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
     }
 
     try {
-      // First save the coupons to Redis (original functionality)
-      const result = await saveBusinessCoupons(businessId, coupons)
+      // First save the global terms
+      await saveGlobalCouponTerms(businessId, globalTerms)
+
+      // Then save the coupons to Redis (without terms)
+      const couponsWithoutTerms = coupons.map(({ terms, ...rest }) => ({
+        ...rest,
+        terms: "", // Empty terms since we're using global terms
+      }))
+
+      const result = await saveBusinessCoupons(businessId, couponsWithoutTerms)
 
       if (result.success) {
         // Now save the coupons as images
@@ -687,6 +695,46 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
           </DialogContent>
         </Dialog>
 
+        {/* Terms and Conditions Dialog */}
+        <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+          <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Global Terms & Conditions</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowTermsDialog(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">
+                These terms and conditions will apply to all coupons. Any updates will replace the previous version.
+              </p>
+              <Textarea
+                value={globalTerms}
+                onChange={handleTermsChange}
+                placeholder="Enter global terms and conditions for all coupons"
+                rows={12}
+              />
+              <div className="flex justify-end">
+                <Button onClick={saveTermsToRedis} disabled={savingTerms}>
+                  {savingTerms ? (
+                    <>
+                      <span className="mr-2">Saving...</span>
+                      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Global Terms
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {loading ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
@@ -788,38 +836,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="terms">Default Terms & Conditions</Label>
-                      <div className="text-xs text-gray-500 mb-1">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <button type="button" className="text-teal-600 hover:underline">
-                              Preview formatted terms
-                            </button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Terms & Conditions Preview</DialogTitle>
-                            </DialogHeader>
-                            <div
-                              className="text-sm whitespace-pre-wrap"
-                              dangerouslySetInnerHTML={{
-                                __html: formatTermsWithBoldHeadings(formData.terms),
-                              }}
-                            />
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                      <Textarea
-                        id="terms"
-                        name="terms"
-                        value={formData.terms}
-                        onChange={handleChange}
-                        placeholder="Terms and conditions for the coupon"
-                        rows={4}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
                       <Label>Coupon Size</Label>
                       <RadioGroup
                         value={formData.size}
@@ -854,8 +870,12 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
             {/* Coupon Display Section */}
             <div className="lg:col-span-7">
               <Card className="mb-6">
-                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
+                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b flex justify-between items-center">
                   <CardTitle className="text-teal-700">Your Coupons</CardTitle>
+                  <Button variant="outline" onClick={() => setShowTermsDialog(true)}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Edit Global Terms
+                  </Button>
                 </CardHeader>
                 <CardContent className="pt-6">
                   {coupons.length === 0 ? (
@@ -872,13 +892,8 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                             {smallCoupons.map((coupon) => (
                               <div key={coupon.id} className="relative">
                                 <div
-                                  className={`bg-white border-2 ${
-                                    selectedCoupon?.id === coupon.id
-                                      ? "border-teal-500"
-                                      : "border-dashed border-gray-300"
-                                  } rounded-lg p-4 hover:shadow-md transition-shadow`}
+                                  className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow"
                                   ref={(el) => (smallCouponRefs.current[coupon.id] = el)}
-                                  onClick={() => setSelectedCoupon(coupon)}
                                   style={{
                                     margin: 0,
                                     display: "inline-block",
@@ -957,13 +972,8 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                             {largeCoupons.map((coupon) => (
                               <div key={coupon.id} className="relative">
                                 <div
-                                  className={`bg-white border-2 ${
-                                    selectedCoupon?.id === coupon.id
-                                      ? "border-teal-500"
-                                      : "border-dashed border-gray-300"
-                                  } rounded-lg p-6 hover:shadow-md transition-shadow`}
+                                  className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 hover:shadow-md transition-shadow"
                                   ref={(el) => (largeCouponRefs.current[coupon.id] = el)}
-                                  onClick={() => setSelectedCoupon(coupon)}
                                   style={{
                                     margin: 0,
                                     display: "inline-block",
@@ -1050,79 +1060,13 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                         ) : (
                           <>
                             <Save className="mr-2 h-4 w-4" />
-                            Save All Coupons as Images
+                            Save All Coupons
                           </>
                         )}
                       </Button>
                       <p className="text-xs text-gray-500 text-center">
-                        Click on a coupon to select it and edit its terms and conditions below
+                        All coupons will use the same global terms and conditions
                       </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Terms and Conditions Section */}
-              <Card>
-                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                  <CardTitle className="flex items-center text-teal-700">
-                    <FileText className="mr-2 h-5 w-5" />
-                    Terms and Conditions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  {selectedCoupon ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-medium">
-                          Editing Terms for: <span className="text-teal-600">{selectedCoupon.title}</span>
-                        </h3>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              Preview Formatted
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Terms & Conditions Preview</DialogTitle>
-                            </DialogHeader>
-                            <div
-                              className="text-sm whitespace-pre-wrap"
-                              dangerouslySetInnerHTML={{
-                                __html: formatTermsWithBoldHeadings(termsText),
-                              }}
-                            />
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-
-                      <Textarea
-                        value={termsText}
-                        onChange={handleTermsChange}
-                        placeholder="Enter terms and conditions for this coupon"
-                        rows={8}
-                      />
-
-                      <div className="flex justify-end">
-                        <Button onClick={saveTermsToRedis} disabled={savingTerms}>
-                          {savingTerms ? (
-                            <>
-                              <span className="mr-2">Saving...</span>
-                              <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
-                            </>
-                          ) : (
-                            <>
-                              <Save className="mr-2 h-4 w-4" />
-                              Save Terms to Database
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <p>Select a coupon above to edit its terms and conditions</p>
                     </div>
                   )}
                 </CardContent>
