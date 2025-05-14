@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, ExternalLink, RefreshCw, Trash2, ArrowLeft } from "lucide-react"
+import { Loader2, RefreshCw, Trash2, ArrowLeft } from "lucide-react"
 import { getBusinessJobs, cleanupDemoJobs } from "@/app/actions/job-actions"
 import type { JobListing } from "@/app/actions/job-actions"
 import Image from "next/image"
@@ -287,17 +287,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
           </div>
         </div>
 
-        {/* External link */}
-        <div className="mt-6 flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-1"
-            onClick={() => window.open(`/job-listings?job=${selectedJob.id}`, "_blank")}
-          >
-            Open in new tab <ExternalLink className="h-3.5 w-3.5 ml-1" />
-          </Button>
-        </div>
+        {/* External link section has been removed */}
       </div>
     )
   }

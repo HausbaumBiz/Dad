@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Trash2, CheckCircle, Save, FileText, AlertTriangle } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -81,8 +80,6 @@ export default function CouponsPage() {
 
   // Refs for coupon elements
   const smallCouponRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
-  const largeCouponRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
-
   const defaultTerms = `By redeeming this coupon, you agree to comply with and be bound by the following terms and conditions. Please read these terms carefully before using the coupon.
 
 Eligibility
@@ -126,6 +123,7 @@ Any fraudulent or unauthorized use of the coupon is prohibited and may result in
 Acceptance of Terms
 By using this coupon, you acknowledge that you have read, understood, and agree to be bound by these terms and conditions.`
 
+  // Find the form data state initialization and update it to always use "small" size
   const [formData, setFormData] = useState<Omit<Coupon, "id" | "terms">>({
     title: "",
     description: "",
@@ -133,7 +131,7 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
     discount: "",
     startDate: new Date().toISOString().split("T")[0],
     expirationDate: "",
-    size: "small",
+    size: "small", // Always set to "small"
     businessName: "",
   })
 
@@ -195,26 +193,21 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
         }
       })
 
-      // Measure large coupons
-      Object.entries(largeCouponRefs.current).forEach(([id, element]) => {
-        if (element) {
-          const width = element.offsetWidth
-          const height = element.offsetHeight
-          newDimensions[id] = { width, height }
-        }
-      })
-
       setCouponDimensions(newDimensions)
     }
 
-    // Wait a bit for the DOM to fully render
-    const timer = setTimeout(measureCoupons, 500)
+    // Wait longer for the DOM to fully render
+    const timer = setTimeout(measureCoupons, 1000)
+
+    // Also run it again after a longer delay to catch any late renders
+    const secondTimer = setTimeout(measureCoupons, 2000)
 
     // Also measure on window resize
     window.addEventListener("resize", measureCoupons)
 
     return () => {
       clearTimeout(timer)
+      clearTimeout(secondTimer)
       window.removeEventListener("resize", measureCoupons)
     }
   }, [coupons])
@@ -224,9 +217,12 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
     try {
       const result = await getBusinessCoupons()
       if (result.success && result.coupons) {
-        // Remove terms from coupons since we're using global terms
-        const couponsWithoutTerms = result.coupons.map(({ terms, ...rest }) => rest)
-        setCoupons(couponsWithoutTerms)
+        // Remove terms from coupons and convert any large coupons to small
+        const processedCoupons = result.coupons.map(({ terms, ...rest }) => ({
+          ...rest,
+          size: "small", // Force all coupons to be small
+        }))
+        setCoupons(processedCoupons)
 
         // Mark all loaded coupons as "updated" since they already exist in the database
         const existingIds = new Set(result.coupons.map((coupon) => coupon.id))
@@ -253,10 +249,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
 
   const handleTermsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setGlobalTerms(e.target.value)
-  }
-
-  const handleSizeChange = (value: "small" | "large") => {
-    setFormData((prev) => ({ ...prev, size: value }))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -365,21 +357,141 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
   // Simplified generateAndSaveCouponImage function to fix the iframe error
   const generateAndSaveCouponImage = async (coupon: Coupon) => {
     try {
-      // Get the coupon element reference
-      const couponRef =
-        coupon.size === "small" ? smallCouponRefs.current[coupon.id] : largeCouponRefs.current[coupon.id]
-
-      if (!couponRef || !businessId) {
-        console.error("Missing coupon reference or business ID")
+      // Ensure we have a business ID
+      if (!businessId) {
+        console.error("Missing business ID, cannot save coupon image")
+        toast({
+          title: "Error",
+          description: "Business ID not found. Please log in again.",
+          variant: "destructive",
+        })
         return false
       }
 
+      // Get the coupon element reference
+      const couponRef = smallCouponRefs.current[coupon.id]
+
+      // If the coupon reference is missing, we'll create a fallback element
+      if (!couponRef) {
+        console.warn(`Coupon reference not found for ID: ${coupon.id}, creating fallback element`)
+
+        // Create a fallback coupon element
+        const fallbackCoupon = document.createElement("div")
+        fallbackCoupon.className = "bg-white border-2 border-dashed border-gray-300 rounded-lg p-4"
+        fallbackCoupon.style.width = "300px"
+        fallbackCoupon.style.padding = "16px"
+        fallbackCoupon.style.boxSizing = "border-box"
+        fallbackCoupon.style.position = "relative" // Ensure proper positioning
+
+        // Add business name
+        const businessNameEl = document.createElement("h4")
+        businessNameEl.className = "font-bold text-lg text-teal-700 text-center mb-2"
+        businessNameEl.textContent = coupon.businessName
+        fallbackCoupon.appendChild(businessNameEl)
+
+        // Add title
+        const titleEl = document.createElement("div")
+        titleEl.className = "font-bold text-xl text-center"
+        titleEl.textContent = coupon.title
+        fallbackCoupon.appendChild(titleEl)
+
+        // Add discount
+        const discountEl = document.createElement("div")
+        discountEl.className = "text-2xl font-extrabold text-red-600 text-center mb-3"
+        discountEl.textContent = coupon.discount
+        fallbackCoupon.appendChild(discountEl)
+
+        // Add description
+        const descEl = document.createElement("div")
+        descEl.className = "text-sm mb-3"
+        descEl.textContent = coupon.description
+        fallbackCoupon.appendChild(descEl)
+
+        // Add code if present
+        if (coupon.code) {
+          const codeContainer = document.createElement("div")
+          codeContainer.className = "text-center mb-2"
+
+          const codeSpan = document.createElement("span")
+          codeSpan.className = "inline-block bg-gray-100 px-2 py-1 rounded font-mono text-sm"
+          codeSpan.textContent = `Code: ${coupon.code}`
+
+          codeContainer.appendChild(codeSpan)
+          fallbackCoupon.appendChild(codeContainer)
+        }
+
+        // Add validity dates - ensure this is visible and properly positioned
+        const datesEl = document.createElement("div")
+        datesEl.className = "text-xs text-gray-600 mt-2"
+        datesEl.textContent = `Valid: ${formatDate(coupon.startDate)} - ${formatDate(coupon.expirationDate)}`
+        datesEl.style.position = "relative" // Ensure it's in the flow
+        datesEl.style.bottom = "0" // Position at bottom
+        datesEl.style.width = "100%" // Full width
+        datesEl.style.textAlign = "center" // Center text
+        datesEl.style.paddingTop = "8px" // Add some space above
+        fallbackCoupon.appendChild(datesEl)
+
+        // Add to document temporarily
+        document.body.appendChild(fallbackCoupon)
+
+        // Use the fallback element with improved settings
+        const canvas = await html2canvas(fallbackCoupon, {
+          scale: 2,
+          backgroundColor: "#FFFFFF",
+          logging: false,
+          useCORS: true,
+          allowTaint: true,
+          windowHeight: fallbackCoupon.offsetHeight + 50, // Add extra height
+          windowWidth: fallbackCoupon.offsetWidth + 50, // Add extra width
+          y: 0, // Start from the top
+          x: 0, // Start from the left
+          scrollY: 0, // No scrolling
+          scrollX: 0, // No scrolling
+        })
+
+        // Remove the temporary element
+        document.body.removeChild(fallbackCoupon)
+
+        // Convert canvas to base64 image
+        const imageBase64 = canvas.toDataURL("image/png")
+
+        // Send to API to save
+        const response = await fetch("/api/coupons/save-as-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            coupon: { ...coupon, terms: "" },
+            businessId,
+            imageBase64,
+            globalTerms,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`API error (${response.status}): ${errorText}`)
+          return false
+        }
+
+        const result = await response.json()
+
+        if (result.success && result.updated) {
+          setUpdatedCoupons((prev) => new Set(prev).add(coupon.id))
+        }
+
+        return result.success
+      }
+
+      // If we have a valid coupon reference, proceed with the normal flow
       // Create a wrapper div to ensure borders are captured
       const wrapper = document.createElement("div")
       wrapper.style.display = "inline-block"
       wrapper.style.position = "absolute"
       wrapper.style.left = "-9999px"
       wrapper.style.top = "-9999px"
+      wrapper.style.padding = "16px" // Add padding to ensure nothing gets cut off
 
       // Clone the coupon element
       const clone = couponRef.cloneNode(true) as HTMLElement
@@ -389,19 +501,26 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
       clone.style.boxSizing = "border-box"
       clone.style.display = "block"
       clone.style.width = `${couponRef.offsetWidth}px`
-      clone.style.height = `${couponRef.offsetHeight}px`
+      clone.style.height = `${couponRef.offsetHeight + 10}px` // Add extra height to ensure date is captured
+      clone.style.padding = "8px" // Add padding inside
 
       // Add the clone to the wrapper
       wrapper.appendChild(clone)
       document.body.appendChild(wrapper)
 
-      // Use html2canvas with simplified settings
+      // Use html2canvas with improved settings
       const canvas = await html2canvas(clone, {
         scale: 2, // Higher scale for better quality
         backgroundColor: "#FFFFFF",
         logging: false,
         useCORS: true,
         allowTaint: true,
+        windowHeight: clone.offsetHeight + 50, // Add extra height
+        windowWidth: clone.offsetWidth + 50, // Add extra width
+        y: 0, // Start from the top
+        x: 0, // Start from the left
+        scrollY: 0, // No scrolling
+        scrollX: 0, // No scrolling
       })
 
       // Remove the temporary elements
@@ -602,7 +721,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
 
   // Filter coupons by size
   const smallCoupons = coupons.filter((coupon) => coupon.size === "small")
-  const largeCoupons = coupons.filter((coupon) => coupon.size === "large")
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -835,28 +953,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>Coupon Size</Label>
-                      <RadioGroup
-                        value={formData.size}
-                        onValueChange={(value) => handleSizeChange(value as "small" | "large")}
-                        className="flex space-x-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="small" id="small" />
-                          <Label htmlFor="small" className="cursor-pointer">
-                            Small
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="large" id="large" />
-                          <Label htmlFor="large" className="cursor-pointer">
-                            Large
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-
                     <div className="pt-4">
                       <Button type="submit" className="w-full">
                         Create Coupon
@@ -887,7 +983,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                       {/* Small Coupons (2 per row) */}
                       {smallCoupons.length > 0 && (
                         <div>
-                          <h3 className="text-lg font-medium mb-4">Small Coupons</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {smallCoupons.map((coupon) => (
                               <div key={coupon.id} className="relative">
@@ -919,7 +1014,7 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                                     </div>
                                   )}
 
-                                  <div className="text-xs text-gray-600 mt-2">
+                                  <div className="text-xs text-gray-600 mt-2 font-semibold">
                                     Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
                                   </div>
                                 </div>
@@ -965,85 +1060,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                       )}
 
                       {/* Large Coupons (1 per row) */}
-                      {largeCoupons.length > 0 && (
-                        <div>
-                          <h3 className="text-lg font-medium mb-4">Large Coupons</h3>
-                          <div className="space-y-4">
-                            {largeCoupons.map((coupon) => (
-                              <div key={coupon.id} className="relative">
-                                <div
-                                  className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 hover:shadow-md transition-shadow"
-                                  ref={(el) => (largeCouponRefs.current[coupon.id] = el)}
-                                  style={{
-                                    margin: 0,
-                                    display: "inline-block",
-                                    boxSizing: "border-box",
-                                  }}
-                                >
-                                  <div className="flex flex-col md:flex-row md:items-center">
-                                    <div className="md:w-1/3 text-center mb-4 md:mb-0">
-                                      <h4 className="font-bold text-xl text-teal-700 mb-2">{coupon.businessName}</h4>
-                                      <div className="text-3xl font-extrabold text-red-600">{coupon.discount}</div>
-                                      <div className="font-bold text-xl mt-1">{coupon.title}</div>
-                                    </div>
-
-                                    <div className="md:w-2/3 md:pl-6 md:border-l border-gray-200">
-                                      <div className="text-lg mb-3">{coupon.description}</div>
-
-                                      {coupon.code && (
-                                        <div className="mb-3">
-                                          <span className="inline-block bg-gray-100 px-3 py-1 rounded font-mono">
-                                            Code: {coupon.code}
-                                          </span>
-                                        </div>
-                                      )}
-
-                                      <div className="text-sm text-gray-600 mt-4">
-                                        Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Status indicator for new/updated coupons */}
-                                {updatedCoupons.has(coupon.id) ? (
-                                  <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded">
-                                    Saved
-                                  </div>
-                                ) : (
-                                  <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded">
-                                    New
-                                  </div>
-                                )}
-
-                                {/* Dimensions display */}
-                                {couponDimensions[coupon.id] && (
-                                  <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                                    {couponDimensions[coupon.id].width} × {couponDimensions[coupon.id].height}px
-                                  </div>
-                                )}
-
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="absolute top-2 right-2 h-8 w-8 text-gray-500 hover:text-red-500 bg-white/80 hover:bg-white rounded-full shadow-sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    confirmDeleteCoupon(coupon.id)
-                                  }}
-                                  disabled={deletingCoupon === coupon.id}
-                                >
-                                  {deletingCoupon === coupon.id ? (
-                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-transparent" />
-                                  ) : (
-                                    <Trash2 size={16} />
-                                  )}
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
 
