@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { type JobListing, getBusinessJobs, removeJobListing } from "@/app/actions/job-actions"
 import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
+import { getCurrentBusiness } from "@/app/actions/auth-actions"
 
 export default function StatisticsPage() {
   const router = useRouter()
@@ -49,6 +50,7 @@ export default function StatisticsPage() {
   const [isNationwide, setIsNationwide] = useState(false)
   const [isZipCodesLoading, setIsZipCodesLoading] = useState(true)
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
+  const [businessId, setBusinessId] = useState<string | null>("demo-business")
 
   // Load selected categories from server on component mount
   useEffect(() => {
@@ -157,15 +159,30 @@ export default function StatisticsPage() {
     loadZipCodes()
   }, [])
 
+  // Load job listings from server on component mount
   useEffect(() => {
     async function loadJobListings() {
       setIsJobsLoading(true)
       try {
-        // For now, use a hardcoded business ID - in a real application,
-        // this would come from the authenticated user's session
-        const businessId = "demo-business"
+        // First try to get the logged-in business ID
+        let currentBusinessId = businessId
+        try {
+          const loggedInBusiness = await getCurrentBusiness()
+          if (loggedInBusiness && loggedInBusiness.id) {
+            currentBusinessId = loggedInBusiness.id
+            console.log(`Using logged-in business ID for job listings: ${currentBusinessId}`)
+          }
+        } catch (error) {
+          console.error("Error getting logged-in business:", error)
+          // Continue with the current businessId from state
+        }
 
-        const jobs = await getBusinessJobs(businessId)
+        // If still no business ID, use a default
+        if (!currentBusinessId) {
+          currentBusinessId = "demo-business"
+        }
+
+        const jobs = await getBusinessJobs(currentBusinessId)
         setJobListings(jobs)
       } catch (error) {
         console.error("Error loading job listings:", error)
@@ -248,11 +265,15 @@ export default function StatisticsPage() {
 
     setIsRemovingJob(true)
     try {
-      // For now, use a hardcoded business ID - in a real application,
-      // this would come from the authenticated user's session
-      const businessId = "demo-business"
+      // Find the job in the current job listings to get its business ID
+      const jobToDelete = jobListings.find((job) => job.id === jobToRemove)
 
-      const result = await removeJobListing(businessId, jobToRemove)
+      if (!jobToDelete) {
+        throw new Error("Job listing not found")
+      }
+
+      // Use the business ID from the job itself instead of a hardcoded value
+      const result = await removeJobListing(jobToDelete.businessId, jobToRemove)
 
       if (result.success) {
         // Update local state
@@ -261,7 +282,7 @@ export default function StatisticsPage() {
 
         toast({
           title: "Success",
-          description: "Job listing removed successfully",
+          description: "Job listing removed successfully from all locations",
         })
       } else {
         throw new Error(result.message || "Failed to remove job listing")
@@ -831,10 +852,17 @@ export default function StatisticsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Job Listing</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove this job listing? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Are you sure you want to remove this job listing?</AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="mb-5">
+            <p className="text-sm text-muted-foreground mb-2">This will:</p>
+            <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+              <li>Delete the job from your business profile</li>
+              <li>Remove it from the job listings page</li>
+              <li>Remove it from the ad-box popup</li>
+            </ul>
+            <p className="text-sm text-muted-foreground mt-2 font-medium">This action cannot be undone.</p>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRemovingJob}>Cancel</AlertDialogCancel>
             <AlertDialogAction

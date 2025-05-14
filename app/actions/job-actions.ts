@@ -165,6 +165,9 @@ export async function saveJobListing(
     revalidatePath(`/business/${businessId}`)
     revalidatePath("/funeral-services")
 
+    // Add revalidation for the statistics page to show the new job listing
+    revalidatePath("/statistics")
+
     return {
       success: true,
       message: logoUrl
@@ -271,28 +274,79 @@ export async function removeJobListing(
   jobId: string,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // Get the key for the specific job
+    if (!businessId || !jobId) {
+      console.error("Missing required parameters to remove job listing:", { businessId, jobId })
+      return {
+        success: false,
+        message: "Missing business ID or job ID",
+      }
+    }
+
+    console.log(`Removing job listing ${jobId} for business ${businessId}`)
+
+    // Get the job details before deletion (for any needed cleanup)
     const jobKey = `job:${businessId}:${jobId}`
+    const jobData = await kv.get(jobKey)
+    let job: JobListing | null = null
+
+    if (jobData) {
+      try {
+        if (typeof jobData === "string") {
+          job = JSON.parse(jobData) as JobListing
+        } else if (typeof jobData === "object") {
+          job = jobData as JobListing
+        }
+      } catch (error) {
+        console.error("Error parsing job data:", error)
+      }
+    }
 
     // Delete the job from Redis
+    console.log(`Deleting job from Redis key: ${jobKey}`)
     await kv.del(jobKey)
 
     // Update the job index for this business
     const jobsKey = `jobs:${businessId}`
+    console.log(`Updating job index at key: ${jobsKey}`)
+
     const existingJobs = (await kv.get<string[]>(jobsKey)) || []
     const updatedJobs = existingJobs.filter((id) => id !== jobId)
+
+    // Log what we're doing for debugging
+    console.log(`Before removal: ${existingJobs.length} jobs, After removal: ${updatedJobs.length} jobs`)
+
     await kv.set(jobsKey, updatedJobs)
 
-    // Revalidate paths that might display this job
+    // Clean up any Cloudflare image resources if they exist
+    if (job && job.logoId) {
+      try {
+        // Clean up logo image if needed
+        console.log(`Job had a logo with ID: ${job.logoId} - cleanup would happen here`)
+        // Note: Actual Cloudflare image deletion would be implemented here if required
+      } catch (cleanupError) {
+        console.error("Error cleaning up job logo:", cleanupError)
+        // Continue with job deletion even if image cleanup fails
+      }
+    }
+
+    // Revalidate all paths that might display this job
+    console.log("Revalidating paths...")
     revalidatePath("/job-listings")
     revalidatePath("/ad-design/customize")
     revalidatePath("/statistics")
     revalidatePath(`/business/${businessId}`)
     revalidatePath("/funeral-services")
 
+    // Also revalidate any pop-up dialog paths
+    revalidatePath("/") // Homepage where popups might appear
+
+    // If there are specific paths where the business-jobs-dialog component appears, add them here
+    revalidatePath(`/business/${businessId}/jobs`)
+    revalidatePath(`/business-portal`)
+
     return {
       success: true,
-      message: "Job listing removed successfully!",
+      message: "Job listing completely removed from all locations!",
     }
   } catch (error) {
     console.error("Error removing job listing:", error)

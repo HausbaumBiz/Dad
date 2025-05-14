@@ -1473,19 +1473,22 @@ export default function JobListingPage() {
               <Check className="h-8 w-8 text-green-600" />
             </div>
             <DialogTitle className="text-xl font-semibold mb-2">Your Job Listing has been added</DialogTitle>
-            <p className="text-gray-600 mb-6">Your job listing has been successfully saved and added to your Ad-Box.</p>
+            <p className="text-gray-600 mb-6">
+              Your job listing has been successfully saved and added to your business profile.
+            </p>
 
             {/* Add additional information to the success dialog */}
             <div className="bg-blue-50 p-4 rounded-lg text-sm mb-6 text-left w-full">
               <div className="flex items-start">
                 <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
                 <div>
-                  <p className="font-medium text-blue-700 mb-1">Important Information</p>
-                  <p className="text-blue-600">
-                    This job listing has been added to business ID: <strong>{businessId}</strong>
-                  </p>
-                  <p className="text-blue-600 mt-1">
-                    To view this job in the business profile popup, make sure the same business ID is used.
+                  <p className="font-medium text-blue-700 mb-1">Where to find your job listing:</p>
+                  <ul className="list-disc pl-5 text-blue-600 space-y-1">
+                    <li>In your business profile pop-up under "Job Opportunities"</li>
+                    <li>On your Statistics page under "Your Job Listings"</li>
+                  </ul>
+                  <p className="text-blue-600 mt-2">
+                    Business ID: <strong>{businessId}</strong>
                   </p>
                 </div>
               </div>
