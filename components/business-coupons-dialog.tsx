@@ -449,10 +449,8 @@ export function BusinessCouponsDialog({
             </div>
           ) : (
             <Tabs defaultValue="all" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="all">All Coupons</TabsTrigger>
-                <TabsTrigger value="small">Small Coupons</TabsTrigger>
-                <TabsTrigger value="large">Large Coupons</TabsTrigger>
                 <TabsTrigger value="terms">Terms & Conditions</TabsTrigger>
               </TabsList>
 
@@ -531,75 +529,6 @@ export function BusinessCouponsDialog({
                     </div>
                   )}
                 </div>
-              </TabsContent>
-
-              <TabsContent value="small" className="mt-4">
-                {smallCoupons.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No small coupons available.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {smallCoupons.map((coupon) => (
-                      <div
-                        key={coupon.id}
-                        className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => handleCouponClick(coupon)}
-                      >
-                        <div className="relative aspect-[4/3] w-full">{renderCouponImage(coupon, "4/3")}</div>
-                        <div className="absolute bottom-2 right-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCouponClick(coupon)
-                            }}
-                          >
-                            <Info className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="large" className="mt-4">
-                {largeCoupons.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No large coupons available.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {largeCoupons.map((coupon) => (
-                      <div
-                        key={coupon.id}
-                        className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => handleCouponClick(coupon)}
-                      >
-                        {/* Changed aspect ratio for large coupons to make them fit better */}
-                        <div className="relative aspect-[5/2.5] w-full max-h-[200px]">
-                          {renderCouponImage(coupon, "5/2.5")}
-                        </div>
-                        <div className="absolute bottom-2 right-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCouponClick(coupon)
-                            }}
-                          >
-                            <Info className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </TabsContent>
 
               <TabsContent value="terms" className="mt-4">
