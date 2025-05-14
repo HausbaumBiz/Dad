@@ -98,7 +98,7 @@ export async function deleteFromCloudflareImages(imageId: string): Promise<boole
   }
 }
 
-// Update the uploadToCloudflareImages function to properly handle base64 strings
+// Update the uploadToCloudflareImages function to properly handle errors and responses
 export async function uploadToCloudflareImages(
   imageData: any,
   metadata: Record<string, any>,
@@ -109,51 +109,117 @@ export async function uploadToCloudflareImages(
       return { success: false, error: "Cloudflare credentials not configured" }
     }
 
+    // Check if we have valid image data
+    if (!imageData) {
+      return { success: false, error: "No image data provided" }
+    }
+
+    // Create FormData for the upload
     const formData = new FormData()
 
     // Handle base64 string input
     if (typeof imageData === "string" && imageData.includes("base64")) {
-      // Convert base64 to blob
-      const base64Response = await fetch(imageData)
-      const blob = await base64Response.blob()
-      formData.append("file", blob, filename)
+      try {
+        // Convert base64 to blob
+        const base64Response = await fetch(imageData)
+        const blob = await base64Response.blob()
+
+        // Check file size - Cloudflare has a 10MB limit
+        if (blob.size > 10 * 1024 * 1024) {
+          return { success: false, error: "Image exceeds 10MB size limit" }
+        }
+
+        formData.append("file", blob, filename)
+      } catch (error) {
+        console.error("Error processing base64 image:", error)
+        return { success: false, error: "Failed to process base64 image" }
+      }
     }
-    // Handle buffer input
-    else if (imageData instanceof Blob) {
+    // Handle File or Blob input
+    else if (imageData instanceof Blob || imageData instanceof File) {
+      // Check file size - Cloudflare has a 10MB limit
+      if (imageData.size > 10 * 1024 * 1024) {
+        return { success: false, error: "Image exceeds 10MB size limit" }
+      }
+
       formData.append("file", imageData, filename)
     } else {
       return { success: false, error: "Invalid image data format" }
     }
 
+    // Add metadata if provided
     if (Object.keys(metadata).length > 0) {
       formData.append("metadata", JSON.stringify(metadata))
     }
 
+    console.log(`Uploading image to Cloudflare: ${filename}`)
+
+    // Make the API request
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/images/v1`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+        // Note: Do NOT set Content-Type here, the browser will set it with the correct boundary for FormData
       },
-      body: formData as any,
+      body: formData,
     })
 
+    // Check for HTTP errors
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`Cloudflare upload error (${response.status}):`, errorText)
-      return { success: false, error: `Failed to upload image: ${response.statusText}` }
+      const statusCode = response.status
+      let errorMessage = `HTTP error ${statusCode}`
+
+      try {
+        // Try to get error details from response
+        const errorText = await response.text()
+        console.error(`Cloudflare upload error (${statusCode}):`, errorText)
+
+        // Try to parse as JSON if possible
+        try {
+          const errorJson = JSON.parse(errorText)
+          if (errorJson.errors && errorJson.errors.length > 0) {
+            errorMessage = `${errorMessage}: ${errorJson.errors[0].message}`
+          } else if (errorJson.error) {
+            errorMessage = `${errorMessage}: ${errorJson.error}`
+          }
+        } catch (parseError) {
+          // If not JSON, use the text
+          errorMessage = `${errorMessage}: ${errorText.substring(0, 100)}`
+        }
+      } catch (textError) {
+        // If we can't get the response text
+        errorMessage = `${errorMessage}: Could not read error details`
+      }
+
+      return { success: false, error: errorMessage }
     }
 
-    const result = await response.json()
+    // Parse the successful response
+    let result
+    try {
+      result = await response.json()
+    } catch (error) {
+      console.error("Error parsing Cloudflare response:", error)
+      return { success: false, error: "Failed to parse Cloudflare response" }
+    }
 
+    // Check for API-level errors
     if (!result.success) {
-      console.error("Cloudflare upload error:", result.errors)
-      return { success: false, error: result.errors?.[0]?.message || "Upload failed" }
+      console.error("Cloudflare API error:", result.errors)
+      return {
+        success: false,
+        error: result.errors?.[0]?.message || "Upload failed in Cloudflare API",
+      }
     }
 
+    console.log("Image uploaded successfully to Cloudflare")
     return { success: true, result: result.result }
   } catch (error) {
     console.error("Error uploading to Cloudflare Images:", error)
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error during upload",
+    }
   }
 }
 

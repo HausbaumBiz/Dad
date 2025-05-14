@@ -106,3 +106,44 @@ export interface CloudflareStreamVideo {
   playbackURL?: string
   thumbnailURL?: string
 }
+
+export interface JobListing {
+  id: string
+  businessId: string
+  createdAt: string
+  updatedAt: string
+
+  // Basic job details
+  jobTitle: string
+  jobDescription: string
+  qualifications: string
+  businessName: string
+  businessDescription: string
+  businessAddress: string
+  workHours: string
+  contactEmail: string
+  contactName: string
+
+  // Pay details
+  payType: "hourly" | "salary" | "other" | null
+  hourlyMin?: string
+  hourlyMax?: string
+  salaryMin?: string
+  salaryMax?: string
+  otherPay?: string
+
+  // Logo
+  logoUrl?: string
+  logoId?: string // Add this field
+
+  // Categories
+  categories: string[]
+
+  // Benefits
+  benefits: Record<string, JobBenefit>
+}
+
+export interface JobBenefit {
+  label: string
+  value: boolean
+}

@@ -8,6 +8,7 @@ import { getBusinessAdDesign } from "@/app/actions/business-actions"
 import { Loader2, ImageIcon, Ticket, Briefcase } from "lucide-react"
 import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
 import { BusinessCouponsDialog } from "./business-coupons-dialog"
+import { BusinessJobsDialog } from "./business-jobs-dialog"
 
 interface BusinessProfileDialogProps {
   isOpen: boolean
@@ -22,6 +23,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   const [error, setError] = useState<string | null>(null)
   const [isPhotoAlbumOpen, setIsPhotoAlbumOpen] = useState(false)
   const [isCouponsOpen, setIsCouponsOpen] = useState(false)
+  const [isJobsOpen, setIsJobsOpen] = useState(false)
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -34,6 +36,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     if (!isOpen) {
       setIsPhotoAlbumOpen(false)
       setIsCouponsOpen(false)
+      setIsJobsOpen(false)
     }
   }, [isOpen])
 
@@ -259,7 +262,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     </button>
                   )}
 
-                  {/* New buttons for Photo Album, Coupons, and Job Opportunities */}
+                  {/* Buttons for Photo Album, Coupons, and Job Opportunities */}
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     <Button
                       variant="outline"
@@ -282,7 +285,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     <Button
                       variant="outline"
                       className="flex flex-col items-center justify-center gap-1 h-auto py-3"
-                      onClick={() => window.open(`/business/${businessId}/jobs`, "_blank")}
+                      onClick={() => setIsJobsOpen(true)}
                     >
                       <Briefcase className="h-5 w-5" />
                       <span className="text-xs">Job Opportunities</span>
@@ -314,6 +317,14 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       <BusinessCouponsDialog
         isOpen={isCouponsOpen}
         onOpenChange={setIsCouponsOpen}
+        businessId={businessId}
+        businessName={businessName}
+      />
+
+      {/* Jobs Dialog */}
+      <BusinessJobsDialog
+        isOpen={isJobsOpen}
+        onClose={() => setIsJobsOpen(false)}
         businessId={businessId}
         businessName={businessName}
       />

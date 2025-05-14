@@ -134,6 +134,7 @@ export default function FuneralServicesPage() {
   }
 
   const handleOpenProfile = (providerId: string, providerName: string) => {
+    console.log(`Opening profile for business ID: ${providerId}, name: ${providerName}`)
     setSelectedProviderId(providerId)
     setSelectedProvider(providerName)
     setIsProfileOpen(true)

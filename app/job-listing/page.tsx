@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Check, X, Upload, Eye } from "lucide-react"
+import { Check, X, Upload, Eye, Info, Edit } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -12,11 +12,12 @@ import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { saveJobListing } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
+import { getCurrentBusiness } from "@/app/actions/auth-actions"
 
 export default function JobListingPage() {
   const [payType, setPayType] = useState<string | null>(null)
   const [benefits, setBenefits] = useState<Record<string, boolean>>({})
-  const [benefitDetails, setBenefitDetails] = useState<Record<string, string>>({})
+  const [benefitDetails, setBenefitDetail] = useState<Record<string, string>>({})
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
@@ -24,9 +25,44 @@ export default function JobListingPage() {
   const [isSaving, setIsSaving] = useState(false)
   // Add state for confirmation dialog
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
+  // Add state for business ID dialog
+  const [isBusinessIdDialogOpen, setIsBusinessIdDialogOpen] = useState(false)
+  const [businessId, setBusinessId] = useState<string>("demo-business") // Default business ID
+  const [savedJobId, setSavedJobId] = useState<string | null>(null) // To store the saved job ID
+  const [showDebugInfo, setShowDebugInfo] = useState(false) // For debugging
 
   const formRef = useRef<HTMLFormElement>(null)
   const router = useRouter()
+
+  // Load business ID from localStorage on mount
+  useEffect(() => {
+    // Load business ID from localStorage on mount and check for logged-in business
+    const fetchBusinessId = async () => {
+      try {
+        // First try to get the logged-in business
+        const loggedInBusiness = await getCurrentBusiness()
+
+        if (loggedInBusiness && loggedInBusiness.id) {
+          console.log("Using logged-in business ID:", loggedInBusiness.id)
+          setBusinessId(loggedInBusiness.id)
+          return
+        }
+
+        // Fall back to localStorage if no logged-in business
+        const storedBusinessId = localStorage.getItem("hausbaum_business_id")
+        if (storedBusinessId) {
+          console.log("Loaded business ID from localStorage:", storedBusinessId)
+          setBusinessId(storedBusinessId)
+        } else {
+          console.log("No business ID found in localStorage, using default:", businessId)
+        }
+      } catch (error) {
+        console.error("Error loading business ID:", error)
+      }
+    }
+
+    fetchBusinessId()
+  }, [])
 
   const [formValues, setFormValues] = useState({
     jobTitle: "Marketing Specialist",
@@ -69,7 +105,7 @@ export default function JobListingPage() {
 
   // Function to update benefit details
   const updateBenefitDetail = (benefit: string, detail: string) => {
-    setBenefitDetails((prev) => ({
+    setBenefitDetail((prev) => ({
       ...prev,
       [benefit]: detail,
     }))
@@ -112,7 +148,28 @@ export default function JobListingPage() {
     }))
   }
 
-  // Update the handleSaveJobListing function to show confirmation dialog instead of redirecting
+  // Function to save the business ID
+  const saveBusinessId = () => {
+    try {
+      // Save to localStorage for persistence
+      localStorage.setItem("hausbaum_business_id", businessId)
+      console.log("Saved business ID to localStorage:", businessId)
+      setIsBusinessIdDialogOpen(false)
+      toast({
+        title: "Business ID Saved",
+        description: `Using business ID: ${businessId}`,
+      })
+    } catch (error) {
+      console.error("Error saving business ID to localStorage:", error)
+      toast({
+        title: "Error Saving Business ID",
+        description: "Could not save business ID to localStorage",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Update the handleSaveJobListing function to show confirmation dialog
   const handleSaveJobListing = async () => {
     if (selectedCategories.length === 0) {
       toast({
@@ -126,6 +183,25 @@ export default function JobListingPage() {
     setIsSaving(true)
 
     try {
+      // First try to get the logged-in business ID
+      let currentBusinessId = businessId
+      try {
+        const loggedInBusiness = await getCurrentBusiness()
+        if (loggedInBusiness && loggedInBusiness.id) {
+          currentBusinessId = loggedInBusiness.id
+          console.log(`Using logged-in business ID for job listing: ${currentBusinessId}`)
+        }
+      } catch (error) {
+        console.error("Error getting logged-in business:", error)
+        // Continue with the current businessId from state
+      }
+
+      // If still no business ID, use the one from state
+      if (!currentBusinessId) {
+        currentBusinessId = businessId || "demo-business"
+        console.log(`Using business ID from state for job listing: ${currentBusinessId}`)
+      }
+
       // Create FormData object
       const formData = new FormData()
 
@@ -173,15 +249,16 @@ export default function JobListingPage() {
         formData.append("logo", logoFile)
       }
 
-      // For now, use a hardcoded business ID - in a real application,
-      // this would come from the authenticated user's session
-      const businessId = "demo-business"
-
-      // Call the server action
-      const result = await saveJobListing(formData, businessId)
+      // Call the server action with the current business ID
+      const result = await saveJobListing(formData, currentBusinessId)
 
       if (result.success) {
-        // Show confirmation dialog instead of redirecting
+        // Store the job ID for debugging
+        if (result.jobId) {
+          setSavedJobId(result.jobId)
+        }
+
+        // Show confirmation dialog
         setIsConfirmationOpen(true)
       } else {
         toast({
@@ -332,6 +409,23 @@ export default function JobListingPage() {
       <main className="flex-1">
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Job Listing Workbench</h1>
+
+          {/* Add business ID display and edit button */}
+          <div className="flex justify-center items-center gap-2 mb-4">
+            <div className="text-sm text-gray-600">
+              Current Business ID: <span className="font-medium">{businessId}</span>
+              <span className="ml-2 text-xs text-green-600">(Using logged-in business)</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBusinessIdDialogOpen(true)}
+              className="flex items-center gap-1 text-xs"
+            >
+              <Edit className="h-3 w-3" /> Change
+            </Button>
+          </div>
+
           <p className="text-center text-gray-600 mb-8">
             To create a job listing, please complete the form, save your submission, and select the categories where you
             would like it to appear.
@@ -1120,6 +1214,51 @@ export default function JobListingPage() {
             </div>
           </div>
 
+          {/* At the bottom of the form, add debug toggle button */}
+          {process.env.NODE_ENV !== "production" && (
+            <div className="mt-6 flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowDebugInfo(!showDebugInfo)} className="text-xs">
+                {showDebugInfo ? "Hide Debug Info" : "Show Debug Info"}
+              </Button>
+            </div>
+          )}
+
+          {/* Debug information section */}
+          {process.env.NODE_ENV !== "production" && showDebugInfo && (
+            <div className="mt-4 p-4 bg-gray-100 rounded-lg text-xs">
+              <h3 className="font-medium mb-2">Debug Information</h3>
+              <div className="space-y-2">
+                <div>
+                  <span className="font-medium">Business ID:</span> {businessId}
+                </div>
+                {savedJobId && (
+                  <div>
+                    <span className="font-medium">Last Saved Job ID:</span> {savedJobId}
+                  </div>
+                )}
+                <div>
+                  <span className="font-medium">Job Redis Key:</span> job:{businessId}:{savedJobId || "jobId"}
+                </div>
+                <div>
+                  <span className="font-medium">Jobs Index Key:</span> jobs:{businessId}
+                </div>
+                <div className="mt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.open(`/api/debug/business-jobs?businessId=${businessId}`, "_blank")
+                      }
+                    }}
+                  >
+                    View Jobs in Redis
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
             <div className="p-8">
               <h2 className="text-2xl font-bold mb-6">Select Job Categories</h2>
@@ -1335,10 +1474,72 @@ export default function JobListingPage() {
             </div>
             <DialogTitle className="text-xl font-semibold mb-2">Your Job Listing has been added</DialogTitle>
             <p className="text-gray-600 mb-6">Your job listing has been successfully saved and added to your Ad-Box.</p>
+
+            {/* Add additional information to the success dialog */}
+            <div className="bg-blue-50 p-4 rounded-lg text-sm mb-6 text-left w-full">
+              <div className="flex items-start">
+                <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
+                <div>
+                  <p className="font-medium text-blue-700 mb-1">Important Information</p>
+                  <p className="text-blue-600">
+                    This job listing has been added to business ID: <strong>{businessId}</strong>
+                  </p>
+                  <p className="text-blue-600 mt-1">
+                    To view this job in the business profile popup, make sure the same business ID is used.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <Button onClick={() => setIsConfirmationOpen(false)} className="min-w-[100px]">
               OK
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Business ID Dialog */}
+      <Dialog open={isBusinessIdDialogOpen} onOpenChange={setIsBusinessIdDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set Business ID</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 mb-4">
+              Enter the business ID that will be used for your job listings. This ID is used to connect jobs to
+              businesses.
+            </p>
+            <div className="space-y-4">
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="businessId" className="text-sm font-medium">
+                  Business ID
+                </label>
+                <input
+                  id="businessId"
+                  value={businessId}
+                  onChange={(e) => setBusinessId(e.target.value)}
+                  className="border rounded-md p-2"
+                />
+              </div>
+
+              {/* Quick select buttons */}
+              <div className="flex flex-wrap gap-2">
+                <p className="text-sm font-medium w-full">Quick select:</p>
+                <Button size="sm" variant="outline" onClick={() => setBusinessId("demo-business")}>
+                  demo-business
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setBusinessId("memorial-gardens")}>
+                  memorial-gardens
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setBusinessId("sunset-funeral-home")}>
+                  sunset-funeral-home
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={saveBusinessId}>Save</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
