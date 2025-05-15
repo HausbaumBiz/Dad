@@ -5,10 +5,13 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
-import { Loader2, ImageIcon, Ticket, Briefcase } from "lucide-react"
+import { Loader2, ImageIcon, Ticket, Briefcase, AlertCircle } from "lucide-react"
 import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
 import { BusinessCouponsDialog } from "./business-coupons-dialog"
 import { BusinessJobsDialog } from "./business-jobs-dialog"
+import { getCloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
+import type { CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface BusinessProfileDialogProps {
   isOpen: boolean
@@ -24,10 +27,22 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   const [isPhotoAlbumOpen, setIsPhotoAlbumOpen] = useState(false)
   const [isCouponsOpen, setIsCouponsOpen] = useState(false)
   const [isJobsOpen, setIsJobsOpen] = useState(false)
+  const [businessVideo, setBusinessVideo] = useState<CloudflareBusinessMedia | null>(null)
+  const [videoLoading, setVideoLoading] = useState(false)
+  const [videoError, setVideoError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [showDebug, setShowDebug] = useState(false)
+
+  // Debug toggle function
+  const toggleDebug = () => {
+    setShowDebug((prev) => !prev)
+  }
 
   useEffect(() => {
     if (isOpen && businessId) {
+      console.log(`BusinessProfileDialog opened for business ID: ${businessId}`)
       loadBusinessAdDesign()
+      loadBusinessVideo()
     }
   }, [isOpen, businessId])
 
@@ -59,6 +74,50 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       setError("Failed to load business profile")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadBusinessVideo = async () => {
+    try {
+      setVideoLoading(true)
+      setVideoError(null)
+
+      console.log(`Loading video for business ID: ${businessId}`)
+      const videoData = await getCloudflareBusinessMedia(businessId)
+
+      console.log("Video data response:", videoData)
+
+      // Update debug info
+      setDebugInfo({
+        businessId,
+        videoData,
+        timestamp: new Date().toISOString(),
+        hasVideoId: videoData?.cloudflareVideoId ? true : false,
+        isReadyToStream: videoData?.cloudflareVideoReadyToStream || false,
+        aspectRatio: videoData?.videoAspectRatio || "unknown",
+      })
+
+      if (videoData && videoData.cloudflareVideoId) {
+        console.log("Loaded business video:", videoData)
+        setBusinessVideo(videoData)
+      } else {
+        console.log("No video found for this business")
+        setBusinessVideo(null)
+        setVideoError("No video found for this business")
+      }
+    } catch (err) {
+      console.error("Error loading business video:", err)
+      setBusinessVideo(null)
+      setVideoError(err instanceof Error ? err.message : "Unknown error loading video")
+
+      // Update debug info with error
+      setDebugInfo((prev) => ({
+        ...prev,
+        error: err instanceof Error ? err.message : "Unknown error",
+        errorStack: err instanceof Error ? err.stack : undefined,
+      }))
+    } finally {
+      setVideoLoading(false)
     }
   }
 
@@ -101,10 +160,105 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     return hours.split("\n")
   }
 
+  // Function to manually retry loading the video
+  const retryLoadVideo = () => {
+    loadBusinessVideo()
+  }
+
+  // Function to get Cloudflare Stream public URL
+  const getCloudflareStreamUrl = (videoId: string) => {
+    const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID
+    return `https://customer-${accountId}.cloudflarestream.com/${videoId}/manifest/video.m3u8`
+  }
+
+  // Function to get Cloudflare Stream iframe embed URL
+  const getCloudflareStreamEmbedUrl = (videoId: string) => {
+    return `https://iframe.cloudflarestream.com/${videoId}`
+  }
+
+  // Function to get Cloudflare Stream thumbnail URL
+  const getCloudflareStreamThumbnailUrl = (videoId: string, time = 0) => {
+    const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID
+    return `https://customer-${accountId}.cloudflarestream.com/${videoId}/thumbnails/thumbnail.jpg?time=${time}s`
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="sm:max-w-lg">
+          {/* Debug button - only in development */}
+          {process.env.NODE_ENV !== "production" && (
+            <div className="absolute top-2 right-12 z-50">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleDebug}
+                className="h-7 px-2 text-xs bg-yellow-50 hover:bg-yellow-100 border-yellow-200"
+              >
+                {showDebug ? "Hide Debug" : "Debug"}
+              </Button>
+            </div>
+          )}
+
+          {/* Debug information panel */}
+          {showDebug && debugInfo && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-xs overflow-auto max-h-40">
+              <h4 className="font-medium text-yellow-800 mb-1">Debug Information:</h4>
+              <div className="grid grid-cols-2 gap-1">
+                <div className="font-medium">Business ID:</div>
+                <div>{debugInfo.businessId || "Not set"}</div>
+
+                <div className="font-medium">Has Video ID:</div>
+                <div>{debugInfo.hasVideoId ? "Yes" : "No"}</div>
+
+                <div className="font-medium">Ready to Stream:</div>
+                <div>{debugInfo.isReadyToStream ? "Yes" : "No"}</div>
+
+                <div className="font-medium">Aspect Ratio:</div>
+                <div>{debugInfo.aspectRatio}</div>
+
+                <div className="font-medium">Timestamp:</div>
+                <div>{debugInfo.timestamp}</div>
+
+                {debugInfo.hasVideoId && (
+                  <>
+                    <div className="font-medium">Video ID:</div>
+                    <div>{debugInfo.videoData?.cloudflareVideoId}</div>
+
+                    <div className="font-medium">Account ID:</div>
+                    <div>{process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID || "Not set"}</div>
+                  </>
+                )}
+              </div>
+
+              {debugInfo.error && (
+                <div className="mt-2 text-red-600">
+                  <div className="font-medium">Error:</div>
+                  <div>{debugInfo.error}</div>
+                  {debugInfo.errorStack && (
+                    <details>
+                      <summary className="cursor-pointer">Stack Trace</summary>
+                      <pre className="text-xs mt-1 p-1 bg-red-50">{debugInfo.errorStack}</pre>
+                    </details>
+                  )}
+                </div>
+              )}
+
+              <details>
+                <summary className="cursor-pointer mt-2 text-yellow-700">Full Video Data</summary>
+                <pre className="text-xs mt-1 p-1 bg-yellow-100 overflow-auto">
+                  {JSON.stringify(debugInfo.videoData, null, 2)}
+                </pre>
+              </details>
+
+              <div className="mt-2">
+                <Button variant="outline" size="sm" onClick={retryLoadVideo} className="h-6 px-2 text-xs">
+                  Retry Load Video
+                </Button>
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex justify-center items-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -231,6 +385,67 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
                 {/* Footer with buttons */}
                 <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
+                  {/* Business Video */}
+                  {businessVideo && businessVideo.cloudflareVideoId && (
+                    <div className="mb-3">
+                      <p className="text-sm font-medium text-gray-500 mb-2">Business Video</p>
+
+                      {/* Using iframe embed for maximum compatibility */}
+                      <div
+                        className={`relative ${businessVideo.videoAspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-video"} w-full overflow-hidden rounded-md`}
+                      >
+                        <iframe
+                          src={getCloudflareStreamEmbedUrl(businessVideo.cloudflareVideoId)}
+                          className="absolute top-0 left-0 w-full h-full"
+                          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          title={`${businessName} Video`}
+                        ></iframe>
+                      </div>
+
+                      {/* Fallback for debugging */}
+                      {showDebug && (
+                        <div className="mt-2 text-xs">
+                          <p>Direct video URL (for debugging):</p>
+                          <a
+                            href={getCloudflareStreamUrl(businessVideo.cloudflareVideoId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 break-all"
+                          >
+                            {getCloudflareStreamUrl(businessVideo.cloudflareVideoId)}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {videoLoading && (
+                    <div className="flex justify-center items-center py-2 mb-2">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                      <span className="text-sm">Loading video...</span>
+                    </div>
+                  )}
+
+                  {videoError && !videoLoading && !businessVideo && (
+                    <Alert className="mb-3 bg-yellow-50 border-yellow-200">
+                      <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription className="text-yellow-700 text-sm">
+                        {videoError}
+                        {process.env.NODE_ENV !== "production" && (
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={retryLoadVideo}
+                            className="p-0 h-auto text-xs text-yellow-700 underline ml-2"
+                          >
+                            Retry
+                          </Button>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
                     <button
                       onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
@@ -258,7 +473,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     </button>
                   )}
 
-                  {/* Buttons for Photo Album, Coupons, and Job Opportunities */}
+                  {/* Buttons for Photo Album, Coupons, and Jobs */}
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     <Button
                       variant="outline"
