@@ -12,19 +12,7 @@ import {
 } from "@/app/actions/coupon-image-actions"
 import { CLOUDFLARE_ACCOUNT_HASH } from "@/lib/cloudflare-images"
 import Image from "next/image"
-import {
-  Loader2,
-  X,
-  Info,
-  Download,
-  ExternalLink,
-  ImageOff,
-  RefreshCw,
-  Bug,
-  Copy,
-  Check,
-  Maximize2,
-} from "lucide-react"
+import { Loader2, X, Info, Download, ExternalLink, ImageOff, RefreshCw, Bug, Copy, Check } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useMobile } from "@/hooks/use-mobile"
 
@@ -71,6 +59,8 @@ export function BusinessCouponsDialog({
   const [isCopied, setIsCopied] = useState(false)
   const [debugImageId, setDebugImageId] = useState<string>("")
   const imageRef = useRef<HTMLImageElement>(null)
+  const [activeTab, setActiveTab] = useState<string>("all")
+  const [isDownloading, setIsDownloading] = useState(false)
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -212,7 +202,7 @@ export function BusinessCouponsDialog({
   const handleViewTerms = () => {
     setShowFullImage(false)
     setShowFullSizeImage(false)
-    setShowTerms(true)
+    setActiveTab("terms") // Set the active tab to terms
   }
 
   // Function to handle image errors
@@ -295,6 +285,81 @@ export function BusinessCouponsDialog({
       </html>
     `)
     printWindow.document.close()
+  }
+
+  // Function to download the coupon image
+  const downloadCoupon = async () => {
+    if (!selectedCoupon?.imageUrl) return
+
+    try {
+      setIsDownloading(true)
+
+      // First try to use the Web Share API if available (better for mobile)
+      if (navigator.share && navigator.canShare) {
+        try {
+          // Fetch the image
+          const response = await fetch(selectedCoupon.imageUrl)
+          const blob = await response.blob()
+
+          // Create a file from the blob
+          const file = new File([blob], `coupon-${selectedCoupon.id}.jpg`, { type: "image/jpeg" })
+
+          // Check if we can share this file
+          const shareData = {
+            files: [file],
+            title: selectedCoupon.title || "Coupon",
+            text: `${selectedCoupon.title || "Coupon"} - Valid: ${formatDate(selectedCoupon.startDate)} - ${formatDate(selectedCoupon.expirationDate)}`,
+          }
+
+          if (navigator.canShare(shareData)) {
+            await navigator.share(shareData)
+            toast({
+              title: "Coupon shared",
+              description: "You can save the image from the share menu.",
+            })
+            setIsDownloading(false)
+            return
+          }
+        } catch (shareError) {
+          console.log("Share API failed, falling back to download:", shareError)
+          // Continue to fallback method
+        }
+      }
+
+      // Fallback to traditional download method
+      const response = await fetch(selectedCoupon.imageUrl)
+      const blob = await response.blob()
+
+      // Create a download link
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = downloadUrl
+      link.download = `coupon-${selectedCoupon.id}.jpg`
+
+      // Append to the document, click it, and remove it
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      // Clean up the URL object
+      setTimeout(() => {
+        window.URL.revokeObjectURL(downloadUrl)
+      }, 100)
+
+      toast({
+        title: "Coupon downloaded",
+        description: "The coupon has been saved to your device.",
+      })
+    } catch (error) {
+      console.error("Error downloading coupon:", error)
+      toast({
+        title: "Download failed",
+        description: "Could not download the coupon. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   // Function to get a valid image source or placeholder
@@ -448,7 +513,7 @@ export function BusinessCouponsDialog({
               <p>No coupons available for this business.</p>
             </div>
           ) : (
-            <Tabs defaultValue="all" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="all">All Coupons</TabsTrigger>
                 <TabsTrigger value="terms">Terms & Conditions</TabsTrigger>
@@ -733,24 +798,21 @@ export function BusinessCouponsDialog({
                 </Button>
 
                 {!imageErrors[selectedCoupon.id] && (
-                  <>
-                    <Button variant="outline" size="sm" onClick={printCoupon}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={isMobile ? downloadCoupon : printCoupon}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : isMobile ? (
                       <Download className="mr-2 h-4 w-4" />
-                      Print Coupon
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowFullSizeImage(true)
-                        setShowFullImage(false)
-                      }}
-                    >
-                      <Maximize2 className="mr-2 h-4 w-4" />
-                      Full Size View
-                    </Button>
-                  </>
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    {isMobile ? "Download Coupon" : "Print Coupon"}
+                  </Button>
                 )}
               </div>
             </div>
@@ -791,9 +853,18 @@ export function BusinessCouponsDialog({
           )}
 
           <div className="flex justify-center gap-2 mt-2">
-            <Button variant="outline" size="sm" onClick={printCoupon}>
-              <Download className="mr-2 h-4 w-4" />
-              Print Coupon
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={isMobile ? downloadCoupon : printCoupon}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              {isMobile ? "Download Coupon" : "Print Coupon"}
             </Button>
 
             <Button
