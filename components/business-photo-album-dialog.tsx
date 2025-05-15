@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { ImageIcon, ChevronLeft, ChevronRight, X, Loader2 } from "lucide-react"
+import { ImageIcon, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { getBusinessMedia, type MediaItem } from "@/app/actions/media-actions"
 
 interface BusinessPhotoAlbumDialogProps {
@@ -86,9 +86,6 @@ export function BusinessPhotoAlbumDialog({ isOpen, onClose, businessId, business
                   Back to Grid
                 </Button>
               )}
-              <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-                <X className="h-4 w-4" />
-              </Button>
             </div>
           </div>
         </DialogHeader>

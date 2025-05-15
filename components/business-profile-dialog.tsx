@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
@@ -105,10 +105,6 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">{businessName} Profile</DialogTitle>
-          </DialogHeader>
-
           {loading ? (
             <div className="flex justify-center items-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -288,7 +284,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                       onClick={() => setIsJobsOpen(true)}
                     >
                       <Briefcase className="h-5 w-5" />
-                      <span className="text-xs">Job Opportunities</span>
+                      <span className="text-xs">Jobs</span>
                     </Button>
                   </div>
                 </div>
