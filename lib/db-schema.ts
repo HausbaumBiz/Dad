@@ -26,12 +26,26 @@ export const CATEGORY_MAPPINGS = {
   "funeral-services": "Mortuary Services",
   funeral_services: "Mortuary Services",
   funeralServices: "Mortuary Services",
-  // Add these mappings for Arts & Entertainment
+
+  // Arts & Entertainment mappings
   artDesignEntertainment: "Arts & Entertainment",
   "art-design-entertainment": "Arts & Entertainment",
   "arts-entertainment": "Arts & Entertainment",
   "arts-&-entertainment": "Arts & Entertainment",
   "art-design-and-entertainment": "Arts & Entertainment",
+
+  // Automotive mappings
+  automotive: "Automotive Services",
+  "automotive-services": "Automotive Services",
+  automotiveServices: "Automotive Services",
+  "auto-services": "Automotive Services",
+  autoServices: "Automotive Services",
+  "automotive/motorcycle/rv": "Automotive Services",
+  "automotive-motorcycle-rv": "Automotive Services",
+  "Automotive/Motorcycle/RV, etc": "Automotive Services", // Added this exact format
+  "automotive/motorcycle/rv, etc": "Automotive Services", // Added lowercase version
+  "Automotive/Motorcycle/RV etc": "Automotive Services", // Added without comma
+  "automotive/motorcycle/rv etc": "Automotive Services", // Added lowercase without comma
 }
 
 // Standardized category object structure

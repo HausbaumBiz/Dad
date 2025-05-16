@@ -40,7 +40,7 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
     )
 
     // Remove business from indexes for removed categories
-    for (const removedCat of removedCategories) {
+    for (const removedCat of removedCategories as any) {
       const categoryKey = removedCat.category.toLowerCase().replace(/\s+/g, "-")
 
       // Remove from primary category index
@@ -61,6 +61,30 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
         ]
 
         for (const format of mortuaryFormats) {
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
+        }
+      }
+
+      // Handle special case for Automotive Services
+      if (
+        removedCat.category === "Automotive Services" ||
+        removedCat.category.includes("Automotive") ||
+        removedCat.category.includes("Auto")
+      ) {
+        const autoFormats = [
+          "automotiveServices",
+          "automotive-services",
+          "automotive_services",
+          "auto-services",
+          "auto_services",
+          "autoServices",
+          "Automotive Services",
+          "Auto Services",
+          "automotive",
+        ]
+
+        for (const format of autoFormats) {
           await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
           await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
         }
@@ -107,6 +131,60 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
         cat.category === "Arts & Entertainment" ||
         (cat.category.toLowerCase().includes("art") && cat.category.toLowerCase().includes("entertainment")),
     )
+
+    // Check for category conflicts - don't add to arts category if it's an automotive business
+    const hasAutomotiveSubcategory = categories.some((cat) => {
+      const subcategoryLower = cat.subcategory.toLowerCase()
+      return (
+        subcategoryLower.includes("auto") ||
+        subcategoryLower.includes("car") ||
+        subcategoryLower.includes("vehicle") ||
+        subcategoryLower.includes("motorcycle") ||
+        subcategoryLower.includes("rv") ||
+        subcategoryLower.includes("repair") ||
+        subcategoryLower.includes("mechanic") ||
+        subcategoryLower.includes("body shop") ||
+        subcategoryLower.includes("tire") ||
+        subcategoryLower.includes("oil change")
+      )
+    })
+
+    // If it has both arts and automotive subcategories, prioritize automotive
+    if (hasArtsCategory && hasAutomotiveSubcategory) {
+      console.log(`Business ${business.id} has both arts and automotive categories, prioritizing automotive`)
+
+      // Remove from arts category
+      const artsFormats = [
+        "artDesignEntertainment",
+        "Art, Design and Entertainment",
+        "arts-entertainment",
+        "Arts & Entertainment",
+        "art-design-entertainment",
+        "art-design-and-entertainment",
+        "arts-&-entertainment",
+      ]
+
+      for (const format of artsFormats) {
+        await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
+        await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
+      }
+
+      // Make sure it's in automotive category
+      const autoFormats = [
+        "automotive",
+        "automotiveServices",
+        "automotive-services",
+        "Automotive Services",
+        "Automotive/Motorcycle/RV",
+        "auto-services",
+        "autoServices",
+      ]
+
+      for (const format of autoFormats) {
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
+      }
+    }
 
     if (hasArtsCategory) {
       console.log(`Business ${business.id} has Arts & Entertainment category, adding to special indexes`)
@@ -155,29 +233,90 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
       }
     }
 
-    // Check for arts subcategories even if the main category is different
-    const hasArtsSubcategory = categories.some((cat) => {
+    // Special handling for Automotive/Motorcycle/RV category
+    const hasAutomotiveCategory = categories.some(
+      (cat) =>
+        cat.category === "Automotive Services" ||
+        cat.category === "Automotive/Motorcycle/RV" ||
+        cat.category.toLowerCase().includes("automotive") ||
+        cat.category.toLowerCase().includes("auto services") ||
+        cat.category.toLowerCase().includes("motorcycle") ||
+        cat.category.toLowerCase().includes("rv"),
+    )
+
+    if (hasAutomotiveCategory) {
+      console.log(`Business ${business.id} has Automotive category, adding to special indexes`)
+
+      // Add to automotive-services category explicitly with multiple formats
+      const autoFormats = [
+        "automotive",
+        "automotiveServices",
+        "automotive-services",
+        "Automotive Services",
+        "Automotive/Motorcycle/RV",
+        "auto-services",
+        "autoServices",
+      ]
+
+      for (const format of autoFormats) {
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
+      }
+    } else {
+      // Remove from automotive category if it was previously there but isn't now
+      if (
+        oldAllCategories.some(
+          (cat) =>
+            cat === "Automotive Services" ||
+            cat === "Automotive/Motorcycle/RV" ||
+            cat.toLowerCase().includes("automotive") ||
+            cat.toLowerCase().includes("auto services"),
+        )
+      ) {
+        console.log(`Business ${business.id} no longer has Automotive category, removing from automotive indexes`)
+
+        const autoFormats = [
+          "automotive",
+          "automotiveServices",
+          "automotive-services",
+          "Automotive Services",
+          "Automotive/Motorcycle/RV",
+          "auto-services",
+          "autoServices",
+        ]
+
+        for (const format of autoFormats) {
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
+        }
+      }
+    }
+
+    // Check for automotive subcategories even if the main category is different
+    const hasAutomotiveSubcategory2 = categories.some((cat) => {
       const subcategoryLower = cat.subcategory.toLowerCase()
       return (
-        subcategoryLower.includes("art") ||
-        subcategoryLower.includes("design") ||
-        subcategoryLower.includes("music") ||
-        subcategoryLower.includes("photo") ||
-        subcategoryLower.includes("entertainment") ||
-        subcategoryLower.includes("creative") ||
-        subcategoryLower.includes("gallery") ||
-        subcategoryLower.includes("studio")
+        subcategoryLower.includes("auto") ||
+        subcategoryLower.includes("car") ||
+        subcategoryLower.includes("vehicle") ||
+        subcategoryLower.includes("motorcycle") ||
+        subcategoryLower.includes("rv") ||
+        subcategoryLower.includes("repair") ||
+        subcategoryLower.includes("mechanic") ||
+        subcategoryLower.includes("body shop") ||
+        subcategoryLower.includes("tire") ||
+        subcategoryLower.includes("oil change")
       )
     })
 
-    if (hasArtsSubcategory && !hasArtsCategory) {
-      console.log(`Business ${business.id} has arts-related subcategory, adding to arts category indexes`)
+    if (hasAutomotiveSubcategory2 && !hasAutomotiveCategory) {
+      console.log(`Business ${business.id} has automotive-related subcategory, adding to automotive category indexes`)
 
-      // Add to arts-entertainment category explicitly
-      await kv.sadd(`${KEY_PREFIXES.CATEGORY}arts-entertainment`, business.id)
-      await kv.sadd(`${KEY_PREFIXES.CATEGORY}arts-entertainment:businesses`, business.id)
-      await kv.sadd(`${KEY_PREFIXES.CATEGORY}artDesignEntertainment`, business.id)
-      await kv.sadd(`${KEY_PREFIXES.CATEGORY}artDesignEntertainment:businesses`, business.id)
+      // Add to automotive-services category explicitly
+      await kv.sadd(`${KEY_PREFIXES.CATEGORY}automotive-services`, business.id)
+      await kv.sadd(`${KEY_PREFIXES.CATEGORY}automotive-services:businesses`, business.id)
+      await kv.sadd(`${KEY_PREFIXES.CATEGORY}automotive`, business.id)
+      await kv.sadd(`${KEY_PREFIXES.CATEGORY}automotive:businesses`, business.id)
     }
 
     // Save using the new schema
@@ -232,12 +371,13 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
       revalidatePath(`/admin/businesses/${business.id}`)
       revalidatePath("/arts-entertainment")
       revalidatePath("/funeral-services")
+      revalidatePath("/automotive-services")
 
       // Revalidate all category paths
       if (oldAllCategories.length > 0 || allCategories.length > 0) {
         const allCategoryPaths = [...new Set([...oldAllCategories, ...allCategories])]
         for (const cat of allCategoryPaths) {
-          const path = cat.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "and")
+          const path = cat.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "and").replace(/\//g, "-")
           revalidatePath(`/${path}`)
         }
       }
