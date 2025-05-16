@@ -185,7 +185,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           {/* Debug button - only in development */}
           {process.env.NODE_ENV !== "production" && (
             <div className="absolute top-2 right-12 z-50">

@@ -519,7 +519,7 @@ export function BusinessCouponsDialog({
                 <TabsTrigger value="terms">Terms & Conditions</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="all" className="mt-4">
+              <TabsContent value="all" className="mt-4 overflow-y-auto">
                 <div className="space-y-6">
                   {smallCoupons.length > 0 && (
                     <div>

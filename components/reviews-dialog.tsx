@@ -31,7 +31,7 @@ export function ReviewsDialog({ isOpen, onClose, providerName, reviews }: Review
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">{providerName} Reviews</DialogTitle>
             <DialogDescription>See what others are saying about this service provider.</DialogDescription>
