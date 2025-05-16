@@ -16,11 +16,77 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
 
     console.log(`Saving ${categories.length} categories for business ${business.id}`)
 
+    // Get current categories to identify what needs to be removed
+    const currentCategoriesResult = await getBusinessCategories()
+    const currentCategories = currentCategoriesResult.success ? currentCategoriesResult.data || [] : []
+
+    // Get current business data to check for category changes
+    const oldPrimaryCategory = business.category
+    const oldPrimarySubcategory = business.subcategory
+    const oldAllCategories = business.allCategories || []
+
+    console.log(`Previous primary category: ${oldPrimaryCategory}`)
+    console.log(`New categories: ${categories.map((c) => c.category).join(", ")}`)
+
     // Extract all unique categories and subcategories
     const allCategories = [...new Set(categories.map((cat) => cat.category))]
     const allSubcategories = [...new Set(categories.map((cat) => cat.subcategory))]
 
     console.log(`Found ${allCategories.length} unique categories and ${allSubcategories.length} unique subcategories`)
+
+    // Find categories that have been removed
+    const removedCategories = currentCategories.filter(
+      (oldCat) => !categories.some((newCat) => newCat.fullPath === oldCat.fullPath),
+    )
+
+    // Remove business from indexes for removed categories
+    for (const removedCat of removedCategories) {
+      const categoryKey = removedCat.category.toLowerCase().replace(/\s+/g, "-")
+
+      // Remove from primary category index
+      await kv.srem(`${KEY_PREFIXES.CATEGORY}${categoryKey}`, business.id)
+      await kv.srem(`${KEY_PREFIXES.CATEGORY}${categoryKey}:businesses`, business.id)
+
+      // Handle special case for Mortuary Services / Funeral Services
+      if (removedCat.category === "Mortuary Services" || removedCat.category.includes("Funeral")) {
+        const mortuaryFormats = [
+          "mortuaryServices",
+          "mortuary-services",
+          "mortuary_services",
+          "funeral-services",
+          "funeral_services",
+          "funeralServices",
+          "Mortuary Services",
+          "Funeral Services",
+        ]
+
+        for (const format of mortuaryFormats) {
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
+        }
+      }
+
+      // Remove from path index
+      if (removedCat.fullPath) {
+        await kv.srem(`${KEY_PREFIXES.CATEGORY}path:${removedCat.fullPath}`, business.id)
+      }
+
+      console.log(`Removed business ${business.id} from category ${removedCat.category}`)
+    }
+
+    // If primary category has changed, remove business from all old category variations
+    if (oldPrimaryCategory && !allCategories.includes(oldPrimaryCategory)) {
+      const oldCategoryKey = oldPrimaryCategory.toLowerCase().replace(/\s+/g, "-")
+
+      // Remove from primary index
+      await kv.srem(`${KEY_PREFIXES.CATEGORY}${oldCategoryKey}`, business.id)
+      await kv.srem(`${KEY_PREFIXES.CATEGORY}${oldCategoryKey}:businesses`, business.id)
+
+      // Remove from legacy index
+      await kv.srem(`${KEY_PREFIXES.CATEGORY}${oldPrimaryCategory}`, business.id)
+
+      console.log(`Removed business ${business.id} from old primary category ${oldPrimaryCategory}`)
+    }
 
     // Save all categories and subcategories as separate lists
     await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}:allCategories`, JSON.stringify(allCategories))
@@ -33,6 +99,86 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
       parentId: cat.category.toLowerCase().replace(/\s+/g, "-"),
       path: cat.fullPath,
     }))
+
+    // Special handling for Art, Design and Entertainment category
+    const hasArtsCategory = categories.some(
+      (cat) =>
+        cat.category === "Art, Design and Entertainment" ||
+        cat.category === "Arts & Entertainment" ||
+        (cat.category.toLowerCase().includes("art") && cat.category.toLowerCase().includes("entertainment")),
+    )
+
+    if (hasArtsCategory) {
+      console.log(`Business ${business.id} has Arts & Entertainment category, adding to special indexes`)
+
+      // Add to arts-entertainment category explicitly with multiple formats
+      const artsFormats = [
+        "artDesignEntertainment",
+        "Art, Design and Entertainment",
+        "arts-entertainment",
+        "Arts & Entertainment",
+        "art-design-entertainment",
+        "art-design-and-entertainment",
+        "arts-&-entertainment",
+      ]
+
+      for (const format of artsFormats) {
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
+      }
+    } else {
+      // Remove from arts category if it was previously there but isn't now
+      if (
+        oldAllCategories.some(
+          (cat) =>
+            cat === "Art, Design and Entertainment" ||
+            cat === "Arts & Entertainment" ||
+            (cat.toLowerCase().includes("art") && cat.toLowerCase().includes("entertainment")),
+        )
+      ) {
+        console.log(`Business ${business.id} no longer has Arts category, removing from arts indexes`)
+
+        const artsFormats = [
+          "artDesignEntertainment",
+          "Art, Design and Entertainment",
+          "arts-entertainment",
+          "Arts & Entertainment",
+          "art-design-entertainment",
+          "art-design-and-entertainment",
+          "arts-&-entertainment",
+        ]
+
+        for (const format of artsFormats) {
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
+        }
+      }
+    }
+
+    // Check for arts subcategories even if the main category is different
+    const hasArtsSubcategory = categories.some((cat) => {
+      const subcategoryLower = cat.subcategory.toLowerCase()
+      return (
+        subcategoryLower.includes("art") ||
+        subcategoryLower.includes("design") ||
+        subcategoryLower.includes("music") ||
+        subcategoryLower.includes("photo") ||
+        subcategoryLower.includes("entertainment") ||
+        subcategoryLower.includes("creative") ||
+        subcategoryLower.includes("gallery") ||
+        subcategoryLower.includes("studio")
+      )
+    })
+
+    if (hasArtsSubcategory && !hasArtsCategory) {
+      console.log(`Business ${business.id} has arts-related subcategory, adding to arts category indexes`)
+
+      // Add to arts-entertainment category explicitly
+      await kv.sadd(`${KEY_PREFIXES.CATEGORY}arts-entertainment`, business.id)
+      await kv.sadd(`${KEY_PREFIXES.CATEGORY}arts-entertainment:businesses`, business.id)
+      await kv.sadd(`${KEY_PREFIXES.CATEGORY}artDesignEntertainment`, business.id)
+      await kv.sadd(`${KEY_PREFIXES.CATEGORY}artDesignEntertainment:businesses`, business.id)
+    }
 
     // Save using the new schema
     const success = await saveBusinessCategoriesToDb(business.id, categoryData)
@@ -55,11 +201,12 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
       )
 
       // Update the business object with all categories and subcategories
+      // Ensure the primary category and subcategory are updated
       const updatedBusiness = {
         ...business,
-        // Set primary category/subcategory if not already set
-        category: business.category || (categories.length > 0 ? categories[0].category : ""),
-        subcategory: business.subcategory || (categories.length > 0 ? categories[0].subcategory : ""),
+        // Always update the primary category/subcategory to the first selected category
+        category: categories.length > 0 ? categories[0].category : "",
+        subcategory: categories.length > 0 ? categories[0].subcategory : "",
         // Add all categories and subcategories to the business object
         allCategories,
         allSubcategories,
@@ -74,13 +221,26 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
       for (const category of allCategories) {
         const categoryKey = category.toLowerCase().replace(/\s+/g, "-")
         await kv.sadd(`${KEY_PREFIXES.CATEGORY}${categoryKey}:businesses`, business.id)
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${categoryKey}`, business.id)
       }
 
+      // Revalidate all potentially affected paths
       revalidatePath("/business-focus")
       revalidatePath("/statistics")
       revalidatePath("/workbench")
       revalidatePath("/admin/businesses")
       revalidatePath(`/admin/businesses/${business.id}`)
+      revalidatePath("/arts-entertainment")
+      revalidatePath("/funeral-services")
+
+      // Revalidate all category paths
+      if (oldAllCategories.length > 0 || allCategories.length > 0) {
+        const allCategoryPaths = [...new Set([...oldAllCategories, ...allCategories])]
+        for (const cat of allCategoryPaths) {
+          const path = cat.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "and")
+          revalidatePath(`/${path}`)
+        }
+      }
 
       return { success: true, message: `Saved ${categories.length} categories` }
     } else {

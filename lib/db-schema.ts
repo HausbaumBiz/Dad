@@ -26,6 +26,12 @@ export const CATEGORY_MAPPINGS = {
   "funeral-services": "Mortuary Services",
   funeral_services: "Mortuary Services",
   funeralServices: "Mortuary Services",
+  // Add these mappings for Arts & Entertainment
+  artDesignEntertainment: "Arts & Entertainment",
+  "art-design-entertainment": "Arts & Entertainment",
+  "arts-entertainment": "Arts & Entertainment",
+  "arts-&-entertainment": "Arts & Entertainment",
+  "art-design-and-entertainment": "Arts & Entertainment",
 }
 
 // Standardized category object structure

@@ -31,16 +31,28 @@ export function ServiceAreaSectionEnhanced() {
       try {
         const result = await getBusinessZipCodes()
         if (result.success && result.data) {
-          setZipResults(result.data.zipCodes)
-          setIsNationwide(result.data.isNationwide)
+          setZipResults(result.data.zipCodes || [])
+          setIsNationwide(result.data.isNationwide || false)
+        } else if (!result.success) {
+          console.error("Failed to load ZIP codes:", result.message)
+          toast({
+            title: "Warning",
+            description: "Could not load your saved service area. You may need to set it up again.",
+            variant: "destructive",
+          })
         }
       } catch (error) {
         console.error("Error loading ZIP codes:", error)
+        toast({
+          title: "Error",
+          description: "There was a problem loading your service area data.",
+          variant: "destructive",
+        })
       }
     }
 
     loadZipCodes()
-  }, [])
+  }, [toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

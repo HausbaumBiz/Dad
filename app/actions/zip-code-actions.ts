@@ -175,42 +175,56 @@ export async function getBusinessZipCodes(): Promise<{
       return { success: false, message: "Not authenticated" }
     }
 
-    // Get nationwide flag
-    const isNationwide = (await kv.get(`business:${business.id}:nationwide`)) || false
+    // Get nationwide flag - use exists first to check type safety
+    let isNationwide = false
+    try {
+      isNationwide = Boolean(await kv.get(`business:${business.id}:nationwide`))
+    } catch (error) {
+      console.log("Error getting nationwide flag, defaulting to false:", error)
+    }
 
-    // Try to get ZIP codes from JSON storage first (has full details)
-    let zipCodesData = await kv.get(`business:${business.id}:zipcodes`)
     let parsedZipCodes: ZipCodeData[] = []
 
-    if (zipCodesData) {
-      // Parse JSON data if it exists
-      if (typeof zipCodesData === "string") {
-        try {
-          parsedZipCodes = JSON.parse(zipCodesData)
-        } catch (parseError) {
-          console.error("Error parsing ZIP codes JSON:", parseError)
-          // If JSON parsing fails, we'll try the set approach below
-          zipCodesData = null
+    // Try to get ZIP codes from JSON storage first (has full details)
+    try {
+      const zipCodesData = await kv.get(`business:${business.id}:zipcodes`)
+
+      if (zipCodesData) {
+        // Parse JSON data if it exists
+        if (typeof zipCodesData === "string") {
+          try {
+            parsedZipCodes = JSON.parse(zipCodesData)
+          } catch (parseError) {
+            console.error("Error parsing ZIP codes JSON:", parseError)
+          }
+        } else if (Array.isArray(zipCodesData)) {
+          parsedZipCodes = zipCodesData as ZipCodeData[]
         }
-      } else if (Array.isArray(zipCodesData)) {
-        parsedZipCodes = zipCodesData as ZipCodeData[]
       }
+    } catch (jsonError) {
+      console.log("Error getting ZIP codes from JSON storage:", jsonError)
+      // Continue to try the set approach
     }
 
     // If we couldn't get ZIP codes from JSON, try the set approach
-    if (!zipCodesData || parsedZipCodes.length === 0) {
+    if (parsedZipCodes.length === 0) {
       try {
-        const zipCodeStrings = await kv.smembers(`business:${business.id}:zipcodes:set`)
-        if (zipCodeStrings && zipCodeStrings.length > 0) {
-          // Convert simple strings to ZipCodeData objects
-          parsedZipCodes = zipCodeStrings.map((zip) => ({
-            zip,
-            // These fields will be empty but that's OK for now
-            city: "",
-            state: "",
-            latitude: 0,
-            longitude: 0,
-          }))
+        // Check if the key exists and is a set before using smembers
+        const keyType = await kv.type(`business:${business.id}:zipcodes:set`)
+
+        if (keyType === "set") {
+          const zipCodeStrings = await kv.smembers(`business:${business.id}:zipcodes:set`)
+          if (zipCodeStrings && zipCodeStrings.length > 0) {
+            // Convert simple strings to ZipCodeData objects
+            parsedZipCodes = zipCodeStrings.map((zip) => ({
+              zip,
+              // These fields will be empty but that's OK for now
+              city: "",
+              state: "",
+              latitude: 0,
+              longitude: 0,
+            }))
+          }
         }
       } catch (setError) {
         console.error("Error getting ZIP codes from set:", setError)
@@ -221,7 +235,7 @@ export async function getBusinessZipCodes(): Promise<{
       success: true,
       data: {
         zipCodes: parsedZipCodes,
-        isNationwide: Boolean(isNationwide),
+        isNationwide: isNationwide,
       },
     }
   } catch (error) {
@@ -241,42 +255,56 @@ export async function getBusinessZipCodesById(businessId: string): Promise<{
       return { success: false, message: "Business ID is required" }
     }
 
-    // Get nationwide flag
-    const isNationwide = (await kv.get(`business:${businessId}:nationwide`)) || false
+    // Get nationwide flag - use exists first to check type safety
+    let isNationwide = false
+    try {
+      isNationwide = Boolean(await kv.get(`business:${businessId}:nationwide`))
+    } catch (error) {
+      console.log("Error getting nationwide flag, defaulting to false:", error)
+    }
 
-    // Try to get ZIP codes from JSON storage first (has full details)
-    let zipCodesData = await kv.get(`business:${businessId}:zipcodes`)
     let parsedZipCodes: ZipCodeData[] = []
 
-    if (zipCodesData) {
-      // Parse JSON data if it exists
-      if (typeof zipCodesData === "string") {
-        try {
-          parsedZipCodes = JSON.parse(zipCodesData)
-        } catch (parseError) {
-          console.error("Error parsing ZIP codes JSON:", parseError)
-          // If JSON parsing fails, we'll try the set approach below
-          zipCodesData = null
+    // Try to get ZIP codes from JSON storage first (has full details)
+    try {
+      const zipCodesData = await kv.get(`business:${businessId}:zipcodes`)
+
+      if (zipCodesData) {
+        // Parse JSON data if it exists
+        if (typeof zipCodesData === "string") {
+          try {
+            parsedZipCodes = JSON.parse(zipCodesData)
+          } catch (parseError) {
+            console.error("Error parsing ZIP codes JSON:", parseError)
+          }
+        } else if (Array.isArray(zipCodesData)) {
+          parsedZipCodes = zipCodesData as ZipCodeData[]
         }
-      } else if (Array.isArray(zipCodesData)) {
-        parsedZipCodes = zipCodesData as ZipCodeData[]
       }
+    } catch (jsonError) {
+      console.log("Error getting ZIP codes from JSON storage:", jsonError)
+      // Continue to try the set approach
     }
 
     // If we couldn't get ZIP codes from JSON, try the set approach
-    if (!zipCodesData || parsedZipCodes.length === 0) {
+    if (parsedZipCodes.length === 0) {
       try {
-        const zipCodeStrings = await kv.smembers(`business:${businessId}:zipcodes:set`)
-        if (zipCodeStrings && zipCodeStrings.length > 0) {
-          // Convert simple strings to ZipCodeData objects
-          parsedZipCodes = zipCodeStrings.map((zip) => ({
-            zip,
-            // These fields will be empty but that's OK for now
-            city: "",
-            state: "",
-            latitude: 0,
-            longitude: 0,
-          }))
+        // Check if the key exists and is a set before using smembers
+        const keyType = await kv.type(`business:${businessId}:zipcodes:set`)
+
+        if (keyType === "set") {
+          const zipCodeStrings = await kv.smembers(`business:${businessId}:zipcodes:set`)
+          if (zipCodeStrings && zipCodeStrings.length > 0) {
+            // Convert simple strings to ZipCodeData objects
+            parsedZipCodes = zipCodeStrings.map((zip) => ({
+              zip,
+              // These fields will be empty but that's OK for now
+              city: "",
+              state: "",
+              latitude: 0,
+              longitude: 0,
+            }))
+          }
         }
       } catch (setError) {
         console.error("Error getting ZIP codes from set:", setError)
@@ -287,7 +315,7 @@ export async function getBusinessZipCodesById(businessId: string): Promise<{
       success: true,
       data: {
         zipCodes: parsedZipCodes,
-        isNationwide: Boolean(isNationwide),
+        isNationwide: isNationwide,
       },
     }
   } catch (error) {

@@ -1,17 +1,21 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
-// Import the ReviewsDialog component
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
+import { Loader2 } from "lucide-react"
 
 export default function ArtsEntertainmentPage() {
+  const { toast } = useToast()
   const filterOptions = [
     {
       id: "arts1",
@@ -36,35 +40,119 @@ export default function ArtsEntertainmentPage() {
   // Add state variables for tracking the selected provider and dialog open state
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
+  const [businesses, setBusinesses] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>({})
 
-  // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([
-    {
-      id: 1,
-      name: "Creative Visions Studio",
-      services: ["Photographers and Videographers", "Graphic Designers"],
-      rating: 4.9,
-      reviews: 87,
-      location: "North Canton, OH",
-    },
-    {
-      id: 2,
-      name: "Harmony Music Productions",
-      services: ["Musicians and Singers", "Recording Studios"],
-      rating: 4.8,
-      reviews: 64,
-      location: "Canton, OH",
-    },
-    {
-      id: 3,
-      name: "Modern Space Interiors",
-      services: ["Interior Designers"],
-      rating: 4.7,
-      reviews: 52,
-      location: "Akron, OH",
-    },
-  ])
+  // Fetch businesses in this category
+  useEffect(() => {
+    async function fetchBusinesses() {
+      setIsLoading(true)
+      try {
+        // Try multiple category formats to ensure we find all relevant businesses
+        const categoryFormats = [
+          "artDesignEntertainment",
+          "Art, Design and Entertainment",
+          "arts-entertainment",
+          "Arts & Entertainment",
+          "art-design-entertainment",
+          "art-design-and-entertainment",
+          "arts-&-entertainment",
+        ]
+
+        let allBusinesses: any[] = []
+        const debugResults: Record<string, any> = {}
+
+        // Fetch businesses for each category format
+        for (const format of categoryFormats) {
+          console.log(`Fetching businesses for category format: ${format}`)
+          try {
+            const result = await getBusinessesByCategory(format)
+            debugResults[format] = {
+              count: result?.length || 0,
+              businesses: result?.map((b) => ({ id: b.id, name: b.businessName })) || [],
+            }
+
+            if (result && result.length > 0) {
+              console.log(`Found ${result.length} businesses for format: ${format}`)
+              allBusinesses = [...allBusinesses, ...result]
+            }
+          } catch (error) {
+            console.error(`Error fetching businesses for format ${format}:`, error)
+            debugResults[format] = { error: error.message }
+          }
+        }
+
+        // Also try to fetch businesses directly from the Redis set
+        try {
+          const directResult = await fetch("/api/debug/arts-businesses")
+          const directData = await directResult.json()
+          debugResults["direct_redis"] = directData
+
+          if (directData.businesses && directData.businesses.length > 0) {
+            allBusinesses = [...allBusinesses, ...directData.businesses]
+          }
+        } catch (error) {
+          console.error("Error fetching businesses directly:", error)
+          debugResults["direct_redis"] = { error: error.message }
+        }
+
+        // Remove duplicates by ID
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setDebugInfo({
+          categoryFormats,
+          results: debugResults,
+          totalFound: allBusinesses.length,
+          uniqueCount: uniqueBusinesses.length,
+        })
+
+        if (uniqueBusinesses.length === 0) {
+          toast({
+            title: "No businesses found",
+            description:
+              "We couldn't find any businesses in the Arts & Entertainment category. This might be a technical issue.",
+            variant: "destructive",
+          })
+        }
+
+        setBusinesses(uniqueBusinesses)
+      } catch (error) {
+        console.error("Error fetching businesses:", error)
+        toast({
+          title: "Error loading businesses",
+          description: "There was a problem loading businesses. Please try again later.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchBusinesses()
+  }, [toast])
+
+  // Filter businesses based on selected subcategory
+  const filteredBusinesses = selectedFilter
+    ? businesses.filter((business) => {
+        // Check if business has categories with the selected subcategory
+        if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+          return business.allSubcategories.some((sub: string) =>
+            sub.toLowerCase().includes(selectedFilter.toLowerCase()),
+          )
+        }
+        // Also check the subcategory field
+        if (business.subcategory) {
+          return business.subcategory.toLowerCase().includes(selectedFilter.toLowerCase())
+        }
+        return false
+      })
+    : businesses
 
   // Add mock reviews data specific to arts and entertainment services
   const mockReviews = [
@@ -166,6 +254,17 @@ export default function ArtsEntertainmentPage() {
     setIsReviewsDialogOpen(true)
   }
 
+  // Add a handler function for opening the profile dialog
+  const handleOpenProfile = (provider: any) => {
+    setSelectedProvider(provider)
+    setIsProfileDialogOpen(true)
+  }
+
+  // Handle filter change
+  const handleFilterChange = (value: string) => {
+    setSelectedFilter(value === selectedFilter ? null : value)
+  }
+
   return (
     <CategoryLayout title="Arts & Entertainment" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -197,70 +296,107 @@ export default function ArtsEntertainmentPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 
-      <div className="space-y-6">
-        {providers.map((provider) => (
-          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">{provider.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <p>Loading businesses...</p>
+        </div>
+      ) : filteredBusinesses.length > 0 ? (
+        <div className="space-y-6">
+          {filteredBusinesses.map((business) => (
+            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">{business.businessName}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{business.city || business.zipCode}</p>
 
-                  <div className="flex items-center mt-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-4 h-4 ${i < Math.floor(business.rating || 4.5) ? "text-yellow-400" : "text-gray-300"}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {business.rating || 4.5} ({business.reviews || 12} reviews)
+                      </span>
                     </div>
-                    <span className="text-sm text-gray-600 ml-2">
-                      {provider.rating} ({provider.reviews} reviews)
-                    </span>
+
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-700">Services:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
+                          business.allSubcategories.map((service: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            {business.subcategory || "Arts & Entertainment"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700">Services:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
+                      Reviews
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleOpenProfile(business)}
+                    >
+                      View Profile
+                    </Button>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No businesses found in this category. Check back later!</p>
 
-                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                    Reviews
-                  </Button>
-                  <Button variant="outline" className="mt-2 w-full md:w-auto">
-                    View Profile
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+          {/* Debug information - only visible in development */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="mt-8 p-4 border border-gray-300 rounded text-left bg-gray-50">
+              <h3 className="font-bold mb-2">Debug Information:</h3>
+              <pre className="text-xs overflow-auto max-h-96">{JSON.stringify(debugInfo, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      )}
 
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.name}
-          reviews={mockReviews.find((p) => p.providerName === selectedProvider.name)?.reviews || []}
+          providerName={selectedProvider.businessName || selectedProvider.name}
+          reviews={mockReviews.find((p) => p.providerName === selectedProvider.businessName)?.reviews || []}
+        />
+      )}
+
+      {selectedProvider && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedProvider.id}
         />
       )}
 

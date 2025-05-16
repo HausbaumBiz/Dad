@@ -196,13 +196,10 @@ export function CategorySelector({
                 <h3 className="text-xl font-semibold text-left">{category.title}</h3>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-6 py-4 bg-gray-50">
-              <div className="space-y-4">
-                {Array.isArray(category.subcategories) &&
-                  category.subcategories.map((subcategory, index) =>
-                    renderSubcategory(category.id, category.title, subcategory, index),
-                  )}
-              </div>
+            <AccordionContent>
+              {category.subcategories.map((subcategory, subIndex) =>
+                renderSubcategory(category.id, category.title, subcategory, subIndex),
+              )}
             </AccordionContent>
           </AccordionItem>
         </Accordion>

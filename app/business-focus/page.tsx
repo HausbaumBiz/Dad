@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -8,6 +8,7 @@ import { ServiceAreaSectionEnhanced } from "@/components/service-area-section-en
 import { KeywordsSection } from "@/components/keywords-section"
 import { CategorySelector, type CategorySelection } from "@/components/category-selector"
 import { SuggestCategoryModal } from "@/components/suggest-category-modal"
+import { CategoryChangeWarning } from "@/components/category-change-warning"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, Loader2 } from "lucide-react"
@@ -18,11 +19,30 @@ export default function BusinessFocusPage() {
   const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState<CategorySelection[]>([])
+  const [initialCategories, setInitialCategories] = useState<CategorySelection[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
+
+  // Detect category changes
+  const initialCategoryNames = useMemo(() => initialCategories.map((cat) => cat.category), [initialCategories])
+
+  const selectedCategoryNames = useMemo(() => selectedCategories.map((cat) => cat.category), [selectedCategories])
+
+  const hasChanges = useMemo(() => {
+    // Check if initial categories are loaded (to avoid false positives)
+    if (initialCategories.length === 0 && isLoading) return false
+
+    // If lengths are different, there are changes
+    if (initialCategoryNames.length !== selectedCategoryNames.length) return true
+
+    // Check for removed categories
+    const removedCategories = initialCategoryNames.filter((cat) => !selectedCategoryNames.includes(cat))
+
+    return removedCategories.length > 0
+  }, [initialCategoryNames, selectedCategoryNames, initialCategories.length, isLoading])
 
   // Load saved categories on component mount
   useEffect(() => {
@@ -32,6 +52,7 @@ export default function BusinessFocusPage() {
         const result = await getBusinessCategories()
         if (result.success && result.data) {
           setSelectedCategories(result.data)
+          setInitialCategories(result.data)
 
           // Create a map of checked items for the CategorySelector
           const checkedMap: Record<string, boolean> = {}
@@ -94,6 +115,9 @@ export default function BusinessFocusPage() {
           description: `Your ${selectedCategories.length} category selections have been saved`,
         })
 
+        // Update initialCategories to match the new selection
+        setInitialCategories(selectedCategories)
+
         // Redirect to workbench
         router.push("/workbench")
       } else {
@@ -141,6 +165,13 @@ export default function BusinessFocusPage() {
               </p>
               <p>When finished making your selections, press the submit button at the bottom of the page.</p>
             </div>
+
+            {/* Show category change warning */}
+            <CategoryChangeWarning
+              hasChanges={hasChanges}
+              oldCategories={initialCategoryNames}
+              newCategories={selectedCategoryNames}
+            />
 
             <div className="mb-6 relative">
               <div className="flex">
