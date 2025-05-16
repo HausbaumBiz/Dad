@@ -117,7 +117,19 @@ export default function StatisticsPage() {
       try {
         const result = await getBusinessKeywords()
         if (result.success && result.data) {
-          setKeywords(result.data)
+          // Ensure data is an array before setting it
+          if (Array.isArray(result.data)) {
+            setKeywords(result.data)
+          } else {
+            console.warn("Keywords data is not an array:", result.data)
+            setKeywords([])
+          }
+        } else {
+          // Set empty array if there was an error or no data
+          setKeywords([])
+          if (result.message) {
+            console.warn("Warning getting keywords:", result.message)
+          }
         }
       } catch (error) {
         console.error("Error loading keywords:", error)
@@ -126,6 +138,8 @@ export default function StatisticsPage() {
           description: "Failed to load your keywords",
           variant: "destructive",
         })
+        // Set empty array on error
+        setKeywords([])
       } finally {
         setIsKeywordsLoading(false)
       }

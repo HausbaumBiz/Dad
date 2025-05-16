@@ -110,8 +110,58 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const businesses = (await Promise.all(businessesPromises)).filter(Boolean)
-    console.log(`API: Successfully fetched ${businesses.length} businesses for category ${category}`)
+    const allBusinesses = (await Promise.all(businessesPromises)).filter(Boolean)
+
+    // Extra validation: filter out businesses that clearly don't belong to this category
+    const businesses = allBusinesses.filter((business) => {
+      // For Elder Care category, filter out businesses that are clearly Legal Services
+      if (
+        (category === "elder-care" || category === "homecare") &&
+        (business.category === "Lawyers" ||
+          business.category === "Legal Services" ||
+          (business.allCategories &&
+            business.allCategories.some(
+              (cat) =>
+                cat === "Lawyers" ||
+                cat === "Legal Services" ||
+                cat.toLowerCase().includes("lawyer") ||
+                cat.toLowerCase().includes("legal"),
+            )))
+      ) {
+        console.log(`API: Filtered out legal business ${business.id} from elder care results`)
+        return false
+      }
+
+      // For Legal Services category, filter out businesses that are clearly Elder Care
+      if (
+        (category === "legal-services" || category === "lawyers") &&
+        (business.category === "Elder Care" ||
+          business.category === "Homecare" ||
+          (business.allCategories &&
+            business.allCategories.some(
+              (cat) =>
+                cat === "Elder Care" ||
+                cat === "Homecare" ||
+                cat.toLowerCase().includes("elder") ||
+                cat.toLowerCase().includes("care"),
+            ))) &&
+        !business.allSubcategories?.some(
+          (sub) =>
+            sub.toLowerCase().includes("lawyer") ||
+            sub.toLowerCase().includes("legal") ||
+            sub.toLowerCase().includes("attorney"),
+        )
+      ) {
+        console.log(`API: Filtered out elder care business ${business.id} from legal results`)
+        return false
+      }
+
+      return true
+    })
+
+    console.log(
+      `API: Successfully fetched ${businesses.length} businesses for category ${category} (filtered from ${allBusinesses.length})`,
+    )
 
     return NextResponse.json({ businesses })
   } catch (error) {
