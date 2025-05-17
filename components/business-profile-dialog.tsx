@@ -194,7 +194,7 @@ export function BusinessProfileDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg lg:max-w-3xl xl:max-w-4xl max-h-[90vh] lg:max-h-[85vh] overflow-y-auto">
           {/* Enhanced mobile close button */}
           {isMobile && (
             <div className="absolute right-4 top-4 z-10">

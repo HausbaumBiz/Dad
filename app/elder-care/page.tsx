@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -36,6 +35,7 @@ export default function ElderCarePage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
+  // Fetch businesses only once when component mounts
   useEffect(() => {
     const fetchBusinesses = async () => {
       setIsLoading(true)
@@ -84,7 +84,7 @@ export default function ElderCarePage() {
     }
 
     fetchBusinesses()
-  }, [])
+  }, []) // Empty dependency array means this runs once on mount
 
   // Mock reviews data
   const [reviewsData, setReviewsData] = useState<Record<string, any[]>>({})
@@ -123,21 +123,32 @@ export default function ElderCarePage() {
     setIsProfileDialogOpen(true)
   }
 
-  // Filter providers based on selected filters
+  // Filter providers based on selected filters - do this at render time
   const filteredProviders =
     selectedFilters.length > 0
       ? providers.filter((provider) => {
           const services = provider.allSubcategories || provider.services || []
-          return selectedFilters.some((filter) =>
-            services.some((service: string) => service.toLowerCase().includes(filter.toLowerCase())),
-          )
+          return selectedFilters.some((filter) => {
+            const filterOption = filterOptions.find((option) => option.id === filter)
+            return (
+              filterOption &&
+              services.some((service: string) => service.toLowerCase().includes(filterOption.value.toLowerCase()))
+            )
+          })
         })
       : providers
 
-  // Handle filter change
-  const handleFilterChange = (filters: string[]) => {
-    setSelectedFilters(filters)
-  }
+  // Simple filter button component to avoid using external CategoryFilter
+  const FilterButton = ({
+    id,
+    label,
+    isActive,
+    onClick,
+  }: { id: string; label: string; isActive: boolean; onClick: () => void }) => (
+    <Button variant={isActive ? "default" : "outline"} size="sm" onClick={onClick} className="rounded-full">
+      {label}
+    </Button>
+  )
 
   return (
     <CategoryLayout title="Elder Care Services" backLink="/" backText="Categories">
@@ -170,7 +181,37 @@ export default function ElderCarePage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} />
+      {/* Filter section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-medium">Filter by Service</h2>
+          {selectedFilters.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedFilters([])}
+              className="h-8 px-2 text-sm text-gray-500"
+            >
+              Clear filters
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {filterOptions.map((option) => (
+            <FilterButton
+              key={option.id}
+              id={option.id}
+              label={option.label}
+              isActive={selectedFilters.includes(option.id)}
+              onClick={() => {
+                setSelectedFilters((prev) =>
+                  prev.includes(option.id) ? prev.filter((id) => id !== option.id) : [...prev, option.id],
+                )
+              }}
+            />
+          ))}
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
