@@ -20,7 +20,7 @@ export function SuggestCategoryModal({ isOpen, onClose }: SuggestCategoryModalPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex justify-center mb-4">
             <div className="relative w-40 h-20">

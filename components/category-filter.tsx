@@ -1,81 +1,80 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { X } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { toast } from "@/components/ui/use-toast"
 
-interface CategoryFilterOption {
+interface FilterOption {
   id: string
   label: string
   value: string
 }
 
 interface CategoryFilterProps {
-  options: CategoryFilterOption[]
-  onChange?: (value: string[]) => void
-  activeFilters?: string[]
+  options: FilterOption[]
+  title?: string
 }
 
-export function CategoryFilter({ options, onChange, activeFilters = [] }: CategoryFilterProps) {
-  const [selectedFilters, setSelectedFilters] = useState<string[]>(activeFilters)
+export function CategoryFilter({
+  options,
+  title = "Filter Your Search Further or Browse the Entire Category",
+}: CategoryFilterProps) {
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
-  // Update local state when activeFilters prop changes
-  useEffect(() => {
-    setSelectedFilters(activeFilters)
-  }, [activeFilters])
-
-  const handleFilterClick = (filterId: string) => {
-    let newFilters: string[]
-
-    if (selectedFilters.includes(filterId)) {
-      // Remove filter if already selected
-      newFilters = selectedFilters.filter((id) => id !== filterId)
+  const handleCheckboxChange = (value: string, checked: boolean) => {
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, value])
     } else {
-      // Add filter if not already selected
-      newFilters = [...selectedFilters, filterId]
-    }
-
-    setSelectedFilters(newFilters)
-
-    if (onChange) {
-      onChange(newFilters)
+      setSelectedFilters((prev) => prev.filter((item) => item !== value))
     }
   }
 
-  const clearFilters = () => {
-    setSelectedFilters([])
-    if (onChange) {
-      onChange([])
+  const applyFilters = () => {
+    if (selectedFilters.length === 0) {
+      toast({
+        title: "No filters selected",
+        description: "Please select at least one filter option",
+        variant: "destructive",
+      })
+      return
     }
+
+    toast({
+      title: "Filters applied",
+      description: `Selected filters: ${selectedFilters.join(", ")}`,
+    })
+
+    // In a real application, this would filter the results or navigate to a filtered view
+    console.log("Applied filters:", selectedFilters)
   }
 
   return (
-    <div className="mb-8">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-medium">Filter by Service</h2>
-        {selectedFilters.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-sm text-gray-500">
-            <X className="h-4 w-4 mr-1" />
-            Clear filters
-          </Button>
-        )}
-      </div>
-      <ScrollArea className="whitespace-nowrap pb-2 -mx-1 px-1">
-        <div className="flex space-x-2">
+    <Card className="mb-8">
+      <CardContent className="p-6">
+        <h3 className="text-xl font-semibold mb-4">{title}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2">
           {options.map((option) => (
-            <Button
-              key={option.id}
-              variant={selectedFilters.includes(option.id) ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleFilterClick(option.id)}
-              className="rounded-full"
-            >
-              {option.label}
-            </Button>
+            <div key={option.id} className="flex items-start space-x-2 py-1">
+              <Checkbox
+                id={option.id}
+                onCheckedChange={(checked) => handleCheckboxChange(option.value, checked === true)}
+              />
+              <Label
+                htmlFor={option.id}
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                {option.label}
+              </Label>
+            </div>
           ))}
         </div>
-      </ScrollArea>
-    </div>
+        <Button onClick={applyFilters} className="mt-6">
+          Apply Filters
+        </Button>
+      </CardContent>
+    </Card>
   )
 }

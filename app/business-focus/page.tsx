@@ -118,75 +118,8 @@ export default function BusinessFocusPage() {
         // Update initialCategories to match the new selection
         setInitialCategories(selectedCategories)
 
-        // Check if any Pet Care categories were selected
-        const hasPetCareCategory = selectedCategories.some(
-          (cat) => cat.category === "Pet Care" || cat.fullPath.startsWith("petCare/"),
-        )
-
-        // Check if any Weddings and Special Events categories were selected
-        const hasWeddingsEventsCategory = selectedCategories.some(
-          (cat) => cat.category === "Weddings and Special Events" || cat.fullPath.startsWith("weddingsEvents/"),
-        )
-
-        // Check if any Athletics, Fitness & Dance categories were selected
-        const hasAthleticsCategory = selectedCategories.some(
-          (cat) =>
-            cat.category === "Athletics, Fitness & Dance Instruction" ||
-            cat.fullPath.startsWith("athletics/") ||
-            cat.subcategory === "Personal Trainers" ||
-            cat.subcategory === "Group Fitness Classes" ||
-            cat.subcategory === "Dance",
-        )
-
-        // Check if any Language Lessons/School Subject Tutoring categories were selected
-        const hasLanguageTutoringCategory = selectedCategories.some(
-          (cat) =>
-            cat.category === "Language Lessons & School Subject Tutoring" ||
-            cat.fullPath.startsWith("languageTutoring/") ||
-            cat.subcategory === "Spanish" ||
-            cat.subcategory === "French" ||
-            cat.subcategory === "Math - Elementary" ||
-            cat.subcategory === "Math - High School" ||
-            cat.subcategory === "Test Prep",
-        )
-
-        // Check if any Music categories were selected
-        const hasMusicCategory = selectedCategories.some(
-          (cat) =>
-            cat.category === "Music" ||
-            cat.fullPath.startsWith("music/") ||
-            cat.subcategory === "Piano Lessons" ||
-            cat.subcategory === "Guitar Lessons" ||
-            cat.subcategory === "Violin Lessons" ||
-            cat.subcategory === "Instrument Repair",
-        )
-
-        // Check if any Real Estate categories were selected
-        const hasRealEstateCategory = selectedCategories.some(
-          (cat) =>
-            cat.category === "Home Buying and Selling" ||
-            cat.fullPath.startsWith("realestate/") ||
-            cat.subcategory === "Real Estate Agent" ||
-            cat.subcategory === "Real Estate Appraising" ||
-            cat.subcategory === "Home Inspection",
-        )
-
-        // Redirect based on selected categories
-        if (hasRealEstateCategory) {
-          router.push("/real-estate")
-        } else if (hasMusicCategory) {
-          router.push("/music-lessons")
-        } else if (hasLanguageTutoringCategory) {
-          router.push("/education-tutoring")
-        } else if (hasAthleticsCategory) {
-          router.push("/fitness-athletics")
-        } else if (hasWeddingsEventsCategory) {
-          router.push("/weddings-events")
-        } else if (hasPetCareCategory) {
-          router.push("/pet-care")
-        } else {
-          router.push("/workbench")
-        }
+        // Redirect to workbench
+        router.push("/workbench")
       } else {
         throw new Error(result.message || "Failed to save categories")
       }

@@ -1,13 +1,13 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
+import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 
 export default function ElderCarePage() {
   const filterOptions = [
@@ -24,131 +24,114 @@ export default function ElderCarePage() {
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<string>("")
-  const [selectedProviderId, setSelectedProviderId] = useState<string>("")
 
-  // State for business profile dialog
-  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-
-  // State for providers
-  const [providers, setProviders] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
-
-  // Fetch businesses only once when component mounts
-  useEffect(() => {
-    const fetchBusinesses = async () => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const response = await fetch("/api/businesses/by-category?category=elder-care")
-        if (!response.ok) {
-          throw new Error("Failed to fetch elder care businesses")
-        }
-        const data = await response.json()
-
-        // Additional validation to filter out any legal services businesses
-        const filteredBusinesses = (data.businesses || []).filter((business: any) => {
-          if (!business) return false
-
-          // Filter out any businesses that are clearly legal services
-          const isLegalBusiness =
-            business.category === "Lawyers" ||
-            business.category === "Legal Services" ||
-            (business.allCategories &&
-              business.allCategories.some(
-                (cat: string) =>
-                  cat === "Lawyers" ||
-                  cat === "Legal Services" ||
-                  cat.toLowerCase().includes("lawyer") ||
-                  cat.toLowerCase().includes("legal"),
-              ))
-
-          return !isLegalBusiness
-        })
-
-        setProviders(filteredBusinesses)
-
-        // Log if we filtered out any businesses
-        if (filteredBusinesses.length !== (data.businesses || []).length) {
-          console.log(
-            `Filtered out ${(data.businesses || []).length - filteredBusinesses.length} businesses that don't belong in Elder Care`,
-          )
-        }
-      } catch (err) {
-        console.error("Error fetching elder care businesses:", err)
-        setError("Failed to load elder care businesses. Please try again.")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchBusinesses()
-  }, []) // Empty dependency array means this runs once on mount
+  // Mock service providers - in a real app, these would come from an API
+  const [providers] = useState([
+    {
+      id: 1,
+      name: "Caring Hearts Home Care",
+      services: ["Non-Medical Elder Care", "Respite Care"],
+      rating: 4.9,
+      reviews: 87,
+      location: "North Canton, OH",
+    },
+    {
+      id: 2,
+      name: "Golden Years Assisted Living",
+      services: ["Assisted Living Facilities", "Memory Care"],
+      rating: 4.7,
+      reviews: 64,
+      location: "Canton, OH",
+    },
+    {
+      id: 3,
+      name: "Compassionate Care Services",
+      services: ["Hospice Care", "Non-Medical Elder Care"],
+      rating: 4.8,
+      reviews: 92,
+      location: "Akron, OH",
+    },
+  ])
 
   // Mock reviews data
-  const [reviewsData, setReviewsData] = useState<Record<string, any[]>>({})
-
-  const fetchReviewsForProvider = async (providerId: string) => {
-    try {
-      const response = await fetch(`/api/businesses/${providerId}/reviews`)
-      if (response.ok) {
-        const data = await response.json()
-        setReviewsData((prev) => ({
-          ...prev,
-          [providerId]: data.reviews || [],
-        }))
-      }
-    } catch (err) {
-      console.error("Error fetching reviews:", err)
-    }
+  const mockReviews = {
+    "Caring Hearts Home Care": [
+      {
+        id: 1,
+        userName: "Margaret J.",
+        rating: 5,
+        comment:
+          "The caregivers from Caring Hearts have been a blessing for my father. They are attentive, compassionate, and truly care about his well-being. I can finally rest easy knowing he's in good hands.",
+        date: "March 15, 2023",
+      },
+      {
+        id: 2,
+        userName: "Robert T.",
+        rating: 5,
+        comment:
+          "We've tried several home care services for my mother, and Caring Hearts is by far the best. Their staff is reliable, professional, and they've become like family to us.",
+        date: "February 3, 2023",
+      },
+      {
+        id: 3,
+        userName: "Susan M.",
+        rating: 4,
+        comment:
+          "Very satisfied with the level of care provided. The only reason for 4 stars instead of 5 is occasional scheduling issues, but the care itself is excellent.",
+        date: "January 22, 2023",
+      },
+    ],
+    "Golden Years Assisted Living": [
+      {
+        id: 1,
+        userName: "David L.",
+        rating: 5,
+        comment:
+          "Golden Years has provided exceptional care for my mother who has dementia. The memory care unit is well-staffed with trained professionals who truly understand her needs.",
+        date: "April 10, 2023",
+      },
+      {
+        id: 2,
+        userName: "Patricia H.",
+        rating: 4,
+        comment:
+          "The facility is clean and well-maintained. Staff is friendly and attentive. My only suggestion would be more varied activities for residents.",
+        date: "March 5, 2023",
+      },
+    ],
+    "Compassionate Care Services": [
+      {
+        id: 1,
+        userName: "Jennifer W.",
+        rating: 5,
+        comment:
+          "During my father's final months, Compassionate Care provided dignity, comfort, and support not just for him but for our entire family. I cannot thank them enough.",
+        date: "May 2, 2023",
+      },
+      {
+        id: 2,
+        userName: "Michael B.",
+        rating: 5,
+        comment:
+          "The hospice nurses were angels during a difficult time. They explained everything clearly and made sure my grandmother was comfortable and pain-free.",
+        date: "April 18, 2023",
+      },
+      {
+        id: 3,
+        userName: "Karen D.",
+        rating: 5,
+        comment:
+          "Exceptional care and support. The staff was available 24/7 and responded quickly to any concerns we had.",
+        date: "March 30, 2023",
+      },
+    ],
   }
 
   // Handler for opening reviews dialog
-  const handleOpenReviews = (providerId: string, providerName: string) => {
+  const handleOpenReviews = (providerName: string) => {
     setSelectedProvider(providerName)
-    setSelectedProviderId(providerId)
     setIsReviewsDialogOpen(true)
-
-    // Fetch reviews if we don't have them yet
-    if (!reviewsData[providerId]) {
-      fetchReviewsForProvider(providerId)
-    }
   }
-
-  // Handler for opening business profile dialog
-  const handleOpenProfile = (providerId: string, providerName: string) => {
-    setSelectedProvider(providerName)
-    setSelectedProviderId(providerId)
-    setIsProfileDialogOpen(true)
-  }
-
-  // Filter providers based on selected filters - do this at render time
-  const filteredProviders =
-    selectedFilters.length > 0
-      ? providers.filter((provider) => {
-          const services = provider.allSubcategories || provider.services || []
-          return selectedFilters.some((filter) => {
-            const filterOption = filterOptions.find((option) => option.id === filter)
-            return (
-              filterOption &&
-              services.some((service: string) => service.toLowerCase().includes(filterOption.value.toLowerCase()))
-            )
-          })
-        })
-      : providers
-
-  // Simple filter button component to avoid using external CategoryFilter
-  const FilterButton = ({
-    id,
-    label,
-    isActive,
-    onClick,
-  }: { id: string; label: string; isActive: boolean; onClick: () => void }) => (
-    <Button variant={isActive ? "default" : "outline"} size="sm" onClick={onClick} className="rounded-full">
-      {label}
-    </Button>
-  )
 
   return (
     <CategoryLayout title="Elder Care Services" backLink="/" backText="Categories">
@@ -181,158 +164,70 @@ export default function ElderCarePage() {
         </div>
       </div>
 
-      {/* Filter section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-medium">Filter by Service</h2>
-          {selectedFilters.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedFilters([])}
-              className="h-8 px-2 text-sm text-gray-500"
-            >
-              Clear filters
-            </Button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {filterOptions.map((option) => (
-            <FilterButton
-              key={option.id}
-              id={option.id}
-              label={option.label}
-              isActive={selectedFilters.includes(option.id)}
-              onClick={() => {
-                setSelectedFilters((prev) =>
-                  prev.includes(option.id) ? prev.filter((id) => id !== option.id) : [...prev, option.id],
-                )
-              }}
-            />
-          ))}
-        </div>
-      </div>
+      <CategoryFilter options={filterOptions} />
 
-      {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <p>{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-2 bg-red-100 hover:bg-red-200 text-red-800 font-semibold py-1 px-3 rounded text-sm"
-          >
-            Try Again
-          </button>
-        </div>
-      ) : filteredProviders.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-100">
-          {selectedFilters.length > 0 ? (
-            <>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Providers Match Your Filters</h3>
-              <p className="text-gray-600 mb-6">Try adjusting your filters to see more results.</p>
-              <Button variant="outline" onClick={() => setSelectedFilters([])}>
-                Clear Filters
-              </Button>
-            </>
-          ) : (
-            <>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Elder Care Providers Found</h3>
-              <p className="text-gray-600 mb-6">There are currently no elder care providers registered in this area.</p>
-              <p className="text-sm text-gray-500">
-                Are you an elder care provider?
-                <a href="/business-register" className="text-primary hover:underline ml-1">
-                  Register your business
-                </a>
-              </p>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {filteredProviders.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{provider.businessName || provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">
-                      {provider.city && provider.state
-                        ? `${provider.city}, ${provider.state}`
-                        : provider.location || "Location not specified"}
-                    </p>
+      <div className="space-y-6">
+        {providers.map((provider) => (
+          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row justify-between">
+                <div>
+                  <h3 className="text-xl font-semibold">{provider.name}</h3>
+                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
 
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || "No ratings"} ({provider.reviewCount || 0} reviews)
-                      </span>
+                  <div className="flex items-center mt-2">
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <svg
+                          key={i}
+                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
                     </div>
-
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {(provider.allSubcategories || provider.services || []).map((service: string, idx: number) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                    <span className="text-sm text-gray-600 ml-2">
+                      {provider.rating} ({provider.reviews} reviews)
+                    </span>
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button
-                      className="w-full md:w-auto"
-                      onClick={() => handleOpenReviews(provider.id, provider.businessName || provider.name)}
-                    >
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(provider.id, provider.businessName || provider.name)}
-                    >
-                      View Profile
-                    </Button>
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-gray-700">Services:</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {provider.services.map((service, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                        >
+                          {service}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+
+                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider.name)}>
+                    Reviews
+                  </Button>
+                  <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    View Profile
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Reviews Dialog */}
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider}
-        reviews={reviewsData[selectedProviderId] || []}
-      />
-
-      {/* Business Profile Dialog */}
-      <BusinessProfileDialog
-        isOpen={isProfileDialogOpen}
-        onClose={() => setIsProfileDialogOpen(false)}
-        businessId={selectedProviderId}
-        businessName={selectedProvider}
+        reviews={selectedProvider ? mockReviews[selectedProvider as keyof typeof mockReviews] || [] : []}
       />
 
       <Toaster />

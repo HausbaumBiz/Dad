@@ -42,31 +42,21 @@ export async function getBusinessKeywords(): Promise<{
     }
 
     // Handle the case where Redis might return an object or a string
-    let parsedKeywords: string[] = []
+    let parsedKeywords: string[]
 
     if (typeof keywordsData === "string") {
       try {
-        // Parse the JSON string into an array
-        const parsed = JSON.parse(keywordsData)
-        // Ensure the parsed result is an array
-        if (Array.isArray(parsed)) {
-          parsedKeywords = parsed
-        } else {
-          console.warn("Parsed keywords is not an array:", parsed)
-          // Return empty array if parsed result is not an array
-          parsedKeywords = []
-        }
+        parsedKeywords = JSON.parse(keywordsData)
       } catch (parseError) {
         console.error("Error parsing keywords JSON:", parseError)
         return { success: false, message: "Invalid keyword data format" }
       }
     } else if (Array.isArray(keywordsData)) {
       // Data is already an array
-      parsedKeywords = keywordsData
+      parsedKeywords = keywordsData as string[]
     } else {
-      console.error("Unexpected data format:", typeof keywordsData, keywordsData)
-      // Return empty array for unexpected data format
-      parsedKeywords = []
+      console.error("Unexpected data format:", typeof keywordsData)
+      return { success: false, message: "Unexpected data format" }
     }
 
     return { success: true, data: parsedKeywords }

@@ -1,16 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { toast } from "@/components/ui/use-toast"
+import { useState } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2 } from "lucide-react"
 
 export default function EducationTutoringPage() {
   const filterOptions = [
@@ -30,93 +27,121 @@ export default function EducationTutoringPage() {
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
-    id: number | string
+    id: number
     name: string
     reviews: any[]
   } | null>(null)
 
-  // State for business profile dialog
-  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
-  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
-
-  // State for businesses
-  const [providers, setProviders] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [activeFilters, setActiveFilters] = useState<string[]>([])
-
-  // Fetch businesses on component mount
-  useEffect(() => {
-    async function fetchBusinesses() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const response = await fetch(`/api/businesses/by-category?category=education-tutoring`)
-        if (!response.ok) {
-          throw new Error(`Failed to fetch businesses: ${response.status}`)
-        }
-        const data = await response.json()
-        console.log("Fetched education-tutoring businesses:", data)
-        setProviders(data.businesses || [])
-      } catch (err) {
-        console.error("Error fetching businesses:", err)
-        setError("Failed to load businesses. Please try again later.")
-        toast({
-          title: "Error",
-          description: "Failed to load businesses. Please try again later.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchBusinesses()
-  }, [])
+  // Mock service providers - in a real app, these would come from an API
+  const [providers] = useState([
+    {
+      id: 1,
+      name: "Academic Excellence Tutoring",
+      services: ["Math - Elementary", "Math - High School", "Test Prep"],
+      rating: 4.9,
+      reviews: 112,
+      location: "North Canton, OH",
+      reviewsData: [
+        {
+          id: 1,
+          userName: "Karen M.",
+          rating: 5,
+          comment:
+            "My son's math grades improved from a C to an A after just two months of tutoring. The tutors are patient and know how to explain complex concepts in simple terms.",
+          date: "2023-04-10",
+        },
+        {
+          id: 2,
+          userName: "James P.",
+          rating: 5,
+          comment:
+            "The SAT prep course was excellent. My daughter's score improved by 150 points! Highly recommend for any student preparing for college entrance exams.",
+          date: "2023-03-22",
+        },
+        {
+          id: 3,
+          userName: "Melissa T.",
+          rating: 4,
+          comment:
+            "Good tutoring service for elementary math. My child enjoys the sessions and is gaining confidence in her abilities.",
+          date: "2023-02-15",
+        },
+      ],
+    },
+    {
+      id: 2,
+      name: "Language Learning Center",
+      services: ["Spanish", "French", "English as a Second Language"],
+      rating: 4.8,
+      reviews: 87,
+      location: "Canton, OH",
+      reviewsData: [
+        {
+          id: 1,
+          userName: "Daniel R.",
+          rating: 5,
+          comment:
+            "The Spanish classes here are fantastic. The instructor uses immersive techniques that make learning fun and effective.",
+          date: "2023-04-05",
+        },
+        {
+          id: 2,
+          userName: "Sophie L.",
+          rating: 4,
+          comment:
+            "I've been taking French lessons for 6 months and can already hold basic conversations. The small class sizes ensure you get plenty of speaking practice.",
+          date: "2023-03-18",
+        },
+        {
+          id: 3,
+          userName: "Wei C.",
+          rating: 5,
+          comment:
+            "As a non-native English speaker, the ESL program has been invaluable. My confidence in speaking and writing English has improved dramatically.",
+          date: "2023-02-27",
+        },
+      ],
+    },
+    {
+      id: 3,
+      name: "Reading Success",
+      services: ["Reading Tutors (Adult and Children)"],
+      rating: 4.7,
+      reviews: 64,
+      location: "Akron, OH",
+      reviewsData: [
+        {
+          id: 1,
+          userName: "Amanda J.",
+          rating: 5,
+          comment:
+            "My 7-year-old struggled with reading, but after working with Ms. Sarah, he's reading at grade level and actually enjoys it now!",
+          date: "2023-04-12",
+        },
+        {
+          id: 2,
+          userName: "Robert M.",
+          rating: 4,
+          comment:
+            "As an adult who always struggled with reading comprehension, I finally found help here. The tutors are respectful and the methods are effective.",
+          date: "2023-03-30",
+        },
+        {
+          id: 3,
+          userName: "Tina B.",
+          rating: 5,
+          comment:
+            "The reading program here is excellent. They use a combination of phonics and whole language approaches that really work for my daughter.",
+          date: "2023-02-15",
+        },
+      ],
+    },
+  ])
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
   }
-
-  const handleOpenProfile = (business: any) => {
-    console.log("Opening profile for business:", business)
-    if (!business || !business.id) {
-      console.error("Cannot open profile: Missing business ID")
-      toast({
-        title: "Error",
-        description: "Cannot open business profile. Missing business ID.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setSelectedBusinessId(business.id)
-    setSelectedBusinessName(business.name || business.businessName || "Business")
-    setIsProfileDialogOpen(true)
-  }
-
-  const handleFilterChange = (values: string[]) => {
-    setActiveFilters(values)
-  }
-
-  // Filter businesses based on active filters
-  const filteredProviders =
-    activeFilters.length > 0
-      ? providers.filter((provider) => {
-          // Check if provider has any of the selected services/subcategories
-          return (
-            provider.allSubcategories?.some((sub: string) =>
-              activeFilters.some((filter) => sub.toLowerCase() === filter.toLowerCase()),
-            ) ||
-            // Also check services array if it exists
-            provider.services?.some((service: string) =>
-              activeFilters.some((filter) => service.toLowerCase() === filter.toLowerCase()),
-            )
-          )
-        })
-      : providers
 
   return (
     <CategoryLayout title="Language Lessons & School Subject Tutoring" backLink="/" backText="Categories">
@@ -149,114 +174,70 @@ export default function EducationTutoringPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} activeFilters={activeFilters} />
+      <CategoryFilter options={filterOptions} />
 
-      {isLoading ? (
-        <div className="flex justify-center items-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2">Loading education and tutoring providers...</span>
-        </div>
-      ) : error ? (
-        <div className="text-center py-12">
-          <h3 className="text-xl font-medium text-red-600 mb-2">Error loading providers</h3>
-          <p className="text-gray-500">{error}</p>
-        </div>
-      ) : filteredProviders.length > 0 ? (
-        <div className="space-y-6">
-          {filteredProviders.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">
-                      {provider.name || provider.businessName || "Education Provider"}
-                    </h3>
-                    <p className="text-gray-600 text-sm mt-1">
-                      {provider.location || provider.address || "Location not specified"}
-                    </p>
+      <div className="space-y-6">
+        {providers.map((provider) => (
+          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row justify-between">
+                <div>
+                  <h3 className="text-xl font-semibold">{provider.name}</h3>
+                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
 
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${
-                              i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"
-                            }`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || "No rating"} ({provider.reviews || 0} reviews)
-                      </span>
+                  <div className="flex items-center mt-2">
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <svg
+                          key={i}
+                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
                     </div>
-
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {(provider.services || provider.allSubcategories || []).map((service: string, idx: number) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                    <span className="text-sm text-gray-600 ml-2">
+                      {provider.rating} ({provider.reviews} reviews)
+                    </span>
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button
-                      className="w-full md:w-auto"
-                      onClick={() => handleOpenReviews(provider)}
-                      disabled={!provider.reviewsData || provider.reviewsData.length === 0}
-                    >
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
+                  <div className="mt-3">
+                    <p className="text-sm font-medium text-gray-700">Services:</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {provider.services.map((service, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                        >
+                          {service}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <h3 className="text-xl font-medium text-gray-900 mb-2">No education or tutoring providers found</h3>
-          <p className="text-gray-500">
-            {activeFilters.length > 0
-              ? "Try adjusting your filters to see more results."
-              : "Check back soon or be the first to list your services!"}
-          </p>
-        </div>
-      )}
+
+                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                    Reviews
+                  </Button>
+                  <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    View Profile
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.name || selectedProvider.businessName || "Provider"}
-          reviews={selectedProvider.reviewsData || []}
-        />
-      )}
-
-      {selectedBusinessId && (
-        <BusinessProfileDialog
-          isOpen={isProfileDialogOpen}
-          onClose={() => setIsProfileDialogOpen(false)}
-          businessId={selectedBusinessId}
-          businessName={selectedBusinessName}
+          providerName={selectedProvider.name}
+          reviews={selectedProvider.reviewsData}
         />
       )}
 
