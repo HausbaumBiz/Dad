@@ -12,7 +12,7 @@ import {
 } from "@/app/actions/coupon-image-actions"
 import { CLOUDFLARE_ACCOUNT_HASH } from "@/lib/cloudflare-images"
 import Image from "next/image"
-import { Loader2, X, Info, Download, ExternalLink, ImageOff, RefreshCw, Copy, Check } from "lucide-react"
+import { Loader2, X, Info, Download, ExternalLink, ImageOff, RefreshCw, Bug, Copy, Check } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useMobile } from "@/hooks/use-mobile"
 
@@ -61,6 +61,25 @@ export function BusinessCouponsDialog({
   const imageRef = useRef<HTMLImageElement>(null)
   const [activeTab, setActiveTab] = useState<string>("all")
   const [isDownloading, setIsDownloading] = useState(false)
+
+  // Prevent body scrolling when dialog is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden"
+      document.body.style.position = "fixed"
+      document.body.style.width = "100%"
+    } else {
+      document.body.style.overflow = ""
+      document.body.style.position = ""
+      document.body.style.width = ""
+    }
+
+    return () => {
+      document.body.style.overflow = ""
+      document.body.style.position = ""
+      document.body.style.width = ""
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -635,17 +654,32 @@ export function BusinessCouponsDialog({
       {/* Full Image Dialog */}
       <Dialog open={showFullImage} onOpenChange={setShowFullImage} className="coupon-dialog">
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-1 sm:p-2 dialog-content">
-          {/* Only keep one close button */}
-          <div className="absolute top-2 right-2 z-10">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full p-1 bg-white hover:bg-gray-100 shadow-sm"
-              onClick={() => setShowFullImage(false)}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </Button>
+          <div className="relative w-full">
+            {/* Only one close button */}
+            <div className="absolute top-2 right-2 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full p-1 bg-white hover:bg-gray-100 shadow-sm"
+                onClick={() => setShowFullImage(false)}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </div>
+
+            {/* Debug button */}
+            {selectedCoupon?.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute top-2 left-2 z-10 bg-green-100 hover:bg-green-200 text-green-800 border-green-300"
+                onClick={() => setShowDebugInfo(!showDebugInfo)}
+              >
+                <Bug className="mr-2 h-4 w-4" />
+                {showDebugInfo ? "Hide Debug" : "Debug"}
+              </Button>
+            )}
           </div>
 
           {selectedCoupon?.imageUrl && (
@@ -827,20 +861,22 @@ export function BusinessCouponsDialog({
       {/* Full Size Image Dialog (for large coupons) */}
       <Dialog open={showFullSizeImage} onOpenChange={setShowFullSizeImage} className="coupon-dialog">
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-1 overflow-auto dialog-content">
-          {/* Only keep one close button */}
-          <div className="absolute top-2 right-2 z-10">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full p-1 bg-white hover:bg-gray-100 shadow-sm"
-              onClick={() => {
-                setShowFullSizeImage(false)
-                setShowFullImage(true)
-              }}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </Button>
+          <div className="relative w-full">
+            {/* Only one close button */}
+            <div className="absolute top-2 right-2 z-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full p-1 bg-white hover:bg-gray-100 shadow-sm"
+                onClick={() => {
+                  setShowFullSizeImage(false)
+                  setShowFullImage(true)
+                }}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </div>
           </div>
 
           {selectedCoupon?.imageUrl && (

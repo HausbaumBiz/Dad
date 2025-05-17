@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, ArrowLeft, X } from "lucide-react"
@@ -367,18 +367,11 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       <DialogContent className="jobs-dialog jobs-dialog-content w-full p-0 m-0">
         {/* Custom close button that matches photo album style */}
         <div className="absolute right-1 top-1 z-10">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full p-1 bg-white hover:bg-gray-100 shadow-sm"
-            onClick={onClose}
-          >
+          <DialogClose className="rounded-full p-1 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
             <X className="h-3 w-3" />
             <span className="sr-only">Close</span>
-          </Button>
+          </DialogClose>
         </div>
-
-        {/* Remove the DialogClose component to avoid duplicate close buttons */}
 
         <DialogHeader className="pr-5 jobs-dialog-header mb-1 p-2 w-full">
           <DialogTitle className="text-sm sm:text-base font-semibold truncate dialog-title">

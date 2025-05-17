@@ -2,56 +2,55 @@
 
 import { useEffect } from "react"
 
-/**
- * This component adds a global fix for dialog overlays to prevent horizontal scrolling
- * It should be added to the layout.tsx file
- */
 export function DialogOverlayFix() {
   useEffect(() => {
-    // Function to add the overlay fix class
-    const addOverlayFix = () => {
-      // Find all dialog overlays
-      const overlays = document.querySelectorAll("[data-radix-portal]")
+    // Function to handle dialog open/close
+    const handleDialogState = () => {
+      // Find all open dialogs
+      const openDialogs = document.querySelectorAll('[role="dialog"]')
 
-      overlays.forEach((overlay) => {
-        // Add the fix class
-        overlay.classList.add("dialog-overlay-fix")
-      })
+      if (openDialogs.length > 0) {
+        // If any dialog is open, prevent body scrolling
+        document.body.style.overflow = "hidden"
+        document.body.style.position = "fixed"
+        document.body.style.width = "100%"
+        document.body.style.touchAction = "none"
+      } else {
+        // If no dialogs are open, restore body scrolling
+        document.body.style.overflow = ""
+        document.body.style.position = ""
+        document.body.style.width = ""
+        document.body.style.touchAction = ""
+      }
     }
 
-    // Create a mutation observer to watch for dialog overlays being added to the DOM
+    // Create a MutationObserver to watch for dialog changes
     const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.addedNodes.length) {
-          addOverlayFix()
+      for (const mutation of mutations) {
+        if (mutation.type === "childList" || mutation.type === "attributes") {
+          handleDialogState()
         }
-      })
+      }
     })
 
-    // Start observing the body for changes
-    observer.observe(document.body, { childList: true, subtree: true })
+    // Start observing the document body
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-state"],
+    })
 
-    // Add the initial fix
-    addOverlayFix()
-
-    // Add the CSS for the fix
-    const style = document.createElement("style")
-    style.textContent = `
-      .dialog-overlay-fix {
-        max-width: 100vw !important;
-        width: 100vw !important;
-        overflow-x: hidden !important;
-        left: 0 !important;
-        right: 0 !important;
-        position: fixed !important;
-      }
-    `
-    document.head.appendChild(style)
+    // Initial check
+    handleDialogState()
 
     // Cleanup
     return () => {
       observer.disconnect()
-      document.head.removeChild(style)
+      document.body.style.overflow = ""
+      document.body.style.position = ""
+      document.body.style.width = ""
+      document.body.style.touchAction = ""
     }
   }, [])
 
