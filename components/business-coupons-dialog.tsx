@@ -489,7 +489,7 @@ export function BusinessCouponsDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto coupon-dialog dialog-content">
+        <DialogContent className="coupons-dialog-content w-full p-0 m-0" closeButton={false}>
           {/* Custom close button that matches photo album style */}
           <div className="absolute right-4 top-4 z-10">
             <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">

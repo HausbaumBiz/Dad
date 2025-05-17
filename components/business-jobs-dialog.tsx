@@ -258,11 +258,6 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       return (
         <div className="text-center py-4 text-gray-500 text-xs w-full">
           <p>{error}</p>
-          <div className="mt-2 flex justify-center">
-            <Button variant="outline" onClick={onClose} size="sm" className="h-7 text-xs">
-              Close
-            </Button>
-          </div>
         </div>
       )
     }
@@ -271,9 +266,6 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       return (
         <div className="text-center py-4 text-gray-500 text-xs w-full">
           <p>No job listings available for this business.</p>
-          <Button variant="outline" className="mt-2" onClick={onClose} size="sm" className="h-7 text-xs">
-            Close
-          </Button>
         </div>
       )
     }
@@ -364,7 +356,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="jobs-dialog jobs-dialog-content w-full p-0 m-0">
+      <DialogContent className="jobs-dialog jobs-dialog-content w-full p-0 m-0" closeButton={false}>
         {/* Custom close button that matches photo album style */}
         <div className="absolute right-1 top-1 z-10">
           <DialogClose className="rounded-full p-1 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">

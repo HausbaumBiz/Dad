@@ -76,7 +76,7 @@ export function BusinessPhotoAlbumDialog({ isOpen, onClose, businessId, business
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-4xl p-0 overflow-hidden">
+      <DialogContent className="photo-album-dialog-content w-full p-0 m-0" closeButton={false}>
         <DialogHeader className="p-4 border-b photo-album-header">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-semibold truncate dialog-title">

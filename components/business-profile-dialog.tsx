@@ -181,7 +181,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="business-profile-dialog-content w-full p-0 m-0" closeButton={false}>
           {/* Debug button removed */}
 
           {/* Debug information panel removed */}

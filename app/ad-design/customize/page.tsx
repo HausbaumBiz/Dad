@@ -6,8 +6,8 @@ import type React from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Play, Pause } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { Play, Pause, X } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
@@ -1303,10 +1303,18 @@ export default function CustomizeAdDesignPage() {
 
       {/* Savings Dialog */}
       <Dialog open={isSavingsDialogOpen} onOpenChange={setIsSavingsDialogOpen}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-3xl" closeButton={false}>
           <DialogHeader>
             <DialogTitle>Available Coupons</DialogTitle>
           </DialogHeader>
+
+          {/* Custom close button */}
+          <div className="absolute right-4 top-4">
+            <DialogClose className="rounded-full h-6 w-6 inline-flex items-center justify-center text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </div>
 
           <div className="space-y-6">
             {isCouponsLoading ? (
@@ -1435,11 +1443,20 @@ export default function CustomizeAdDesignPage() {
 
       {/* Now let's add the Jobs Dialog component */}
 
+      {/* Jobs Dialog */}
       <Dialog open={isJobsDialogOpen} onOpenChange={setIsJobsDialogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto" closeButton={false}>
           <DialogHeader>
             <DialogTitle>Job Opportunities</DialogTitle>
           </DialogHeader>
+
+          {/* Custom close button */}
+          <div className="absolute right-4 top-4">
+            <DialogClose className="rounded-full h-6 w-6 inline-flex items-center justify-center text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </div>
 
           <div className="space-y-6">
             {isJobsLoading ? (
@@ -1541,10 +1558,19 @@ export default function CustomizeAdDesignPage() {
 
       {/* Terms and Conditions Dialog */}
       <Dialog open={openDialogId !== null} onOpenChange={() => setOpenDialogId(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" closeButton={false}>
           <DialogHeader>
             <DialogTitle>Terms and Conditions</DialogTitle>
           </DialogHeader>
+
+          {/* Custom close button */}
+          <div className="absolute right-4 top-4">
+            <DialogClose className="rounded-full h-6 w-6 inline-flex items-center justify-center text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </div>
+
           {savedCoupons
             .filter((coupon) => coupon.id === openDialogId)
             .map((coupon) => (
