@@ -488,7 +488,7 @@ export function BusinessCouponsDialog({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <Dialog open={isOpen} onOpenChange={onOpenChange} className="coupon-dialog">
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto coupon-dialog dialog-content">
           {/* Custom close button that matches photo album style */}
           <div className="absolute right-4 top-4 z-10">
@@ -521,105 +521,107 @@ export function BusinessCouponsDialog({
               <p>No coupons available for this business.</p>
             </div>
           ) : (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="all" className="tabs-trigger">
-                  All Coupons
-                </TabsTrigger>
-                <TabsTrigger value="terms" className="tabs-trigger">
-                  Terms & Conditions
-                </TabsTrigger>
-              </TabsList>
+            <div className="coupon-dialog-scrollable">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 tabs-list">
+                  <TabsTrigger value="all" className="tabs-trigger">
+                    All Coupons
+                  </TabsTrigger>
+                  <TabsTrigger value="terms" className="tabs-trigger">
+                    Terms & Conditions
+                  </TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="all" className="mt-4">
-                <div className="space-y-6 coupon-content">
-                  {smallCoupons.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-medium mb-3">Small Coupons</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 coupon-grid">
-                        {smallCoupons.map((coupon) => (
-                          <div
-                            key={coupon.id}
-                            className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                            onClick={() => handleCouponClick(coupon)}
-                          >
-                            <div className="relative aspect-[4/3] w-full">{renderCouponImage(coupon, "4/3")}</div>
-                            <div className="absolute bottom-2 right-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleCouponClick(coupon)
-                                }}
-                              >
-                                <Info className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
-                              <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                                Fixed Image
+                <TabsContent value="all" className="mt-4 tabs-content">
+                  <div className="space-y-6 coupon-content">
+                    {smallCoupons.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-3">Small Coupons</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 coupon-grid">
+                          {smallCoupons.map((coupon) => (
+                            <div
+                              key={coupon.id}
+                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow coupon-card"
+                              onClick={() => handleCouponClick(coupon)}
+                            >
+                              <div className="relative aspect-[4/3] w-full">{renderCouponImage(coupon, "4/3")}</div>
+                              <div className="absolute bottom-2 right-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleCouponClick(coupon)
+                                  }}
+                                >
+                                  <Info className="h-4 w-4" />
+                                </Button>
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
+                                <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                                  Fixed Image
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {largeCoupons.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="text-lg font-medium mb-3">Large Coupons</h3>
-                      <div className="space-y-4">
-                        {largeCoupons.map((coupon) => (
-                          <div
-                            key={coupon.id}
-                            className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                            onClick={() => handleCouponClick(coupon)}
-                          >
-                            {/* Changed aspect ratio for large coupons to make them fit better */}
-                            <div className="relative aspect-[5/2.5] w-full max-h-[200px]">
-                              {renderCouponImage(coupon, "5/2.5")}
-                            </div>
-                            <div className="absolute bottom-2 right-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleCouponClick(coupon)
-                                }}
-                              >
-                                <Info className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
-                              <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                                Fixed Image
+                    {largeCoupons.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-medium mb-3">Large Coupons</h3>
+                        <div className="space-y-4">
+                          {largeCoupons.map((coupon) => (
+                            <div
+                              key={coupon.id}
+                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow coupon-card"
+                              onClick={() => handleCouponClick(coupon)}
+                            >
+                              {/* Changed aspect ratio for large coupons to make them fit better */}
+                              <div className="relative aspect-[5/2.5] w-full max-h-[200px]">
+                                {renderCouponImage(coupon, "5/2.5")}
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              <div className="absolute bottom-2 right-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleCouponClick(coupon)
+                                  }}
+                                >
+                                  <Info className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
+                                <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                                  Fixed Image
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
+                    )}
+                  </div>
+                </TabsContent>
 
-              <TabsContent value="terms" className="mt-4">
-                <div className="bg-white p-6 rounded-lg border">
-                  <h3 className="text-lg font-medium mb-4">Global Terms & Conditions</h3>
-                  <div
-                    className="text-sm whitespace-pre-wrap text-sm-content"
-                    dangerouslySetInnerHTML={{
-                      __html: formatTermsWithBoldHeadings(globalTerms),
-                    }}
-                  />
-                </div>
-              </TabsContent>
-            </Tabs>
+                <TabsContent value="terms" className="mt-4 tabs-content">
+                  <div className="bg-white p-6 rounded-lg border terms-container">
+                    <h3 className="text-lg font-medium mb-4">Global Terms & Conditions</h3>
+                    <div
+                      className="text-sm whitespace-pre-wrap text-sm-content"
+                      dangerouslySetInnerHTML={{
+                        __html: formatTermsWithBoldHeadings(globalTerms),
+                      }}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
           )}
 
           <DialogFooter>
@@ -631,8 +633,8 @@ export function BusinessCouponsDialog({
       </Dialog>
 
       {/* Full Image Dialog */}
-      <Dialog open={showFullImage} onOpenChange={setShowFullImage}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-1 sm:p-2">
+      <Dialog open={showFullImage} onOpenChange={setShowFullImage} className="coupon-dialog">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-1 sm:p-2 dialog-content">
           <div className="relative w-full">
             {/* Custom close button that matches photo album style */}
             <div className="absolute top-2 right-2 z-10">
@@ -833,8 +835,8 @@ export function BusinessCouponsDialog({
       </Dialog>
 
       {/* Full Size Image Dialog (for large coupons) */}
-      <Dialog open={showFullSizeImage} onOpenChange={setShowFullSizeImage}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-1 overflow-auto">
+      <Dialog open={showFullSizeImage} onOpenChange={setShowFullSizeImage} className="coupon-dialog">
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-1 overflow-auto dialog-content">
           <div className="relative w-full">
             {/* Custom close button that matches photo album style */}
             <div className="absolute top-2 right-2 z-10">

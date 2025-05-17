@@ -36,6 +36,43 @@
     font-size: 0.875rem !important;
   }
 
+  /* FULL SCREEN COUPON DIALOG - Aggressive fix for width issues */
+  .coupon-dialog {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100vh !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    overflow-x: hidden !important;
+    inset: 0 !important;
+  }
+
+  .coupon-dialog .dialog-content {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100vh !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0.5rem !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    animation: none !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+
   /* FULL SCREEN JOBS DIALOG - Aggressive fix for width issues */
   .jobs-dialog {
     position: fixed !important;
@@ -85,6 +122,7 @@
   }
 
   /* Fix for dialog content scrolling */
+  .coupon-dialog-scrollable,
   .jobs-dialog-scrollable {
     max-height: calc(100vh - 50px) !important;
     overflow-y: auto !important;
@@ -94,6 +132,125 @@
     box-sizing: border-box !important;
     padding-left: 0.25rem !important;
     padding-right: 0.25rem !important;
+  }
+
+  /* Adjust coupon grid for mobile */
+  .coupon-grid {
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Adjust coupon card for mobile */
+  .coupon-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  /* Fix layout issues in coupons and jobs dialogs */
+  .coupon-image-container,
+  .job-details-container {
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Make coupon images fit within small screens */
+  .coupon-image {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 45vh !important;
+    object-fit: contain !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Typography improvements for mobile readability */
+  .dialog-title {
+    font-size: 1rem !important;
+    line-height: 1.3 !important;
+    letter-spacing: -0.01em !important;
+    width: calc(100% - 32px) !important;
+    max-width: calc(100% - 32px) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  /* Improve readability of body text */
+  .job-content p,
+  .coupon-content p {
+    font-size: 0.8125rem !important;
+    line-height: 1.4 !important;
+    letter-spacing: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+  }
+
+  /* Adjust tabs for mobile */
+  .tabs-list {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .tabs-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0 !important;
+  }
+
+  /* Adjust terms and conditions container */
+  .terms-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0.5rem !important;
+  }
+
+  /* Adjust whitespace for better readability */
+  .whitespace-pre-wrap {
+    font-size: 0.8125rem !important;
+    line-height: 1.4 !important;
+    letter-spacing: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    white-space: pre-line !important; /* Change from pre-wrap to pre-line */
+  }
+
+  /* Fix card width issues */
+  .coupon-dialog .card,
+  .jobs-dialog-scrollable .card {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* Fix dialog header width */
+  .coupon-dialog-header,
+  .jobs-dialog-header {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding-right: 2rem !important;
+  }
+
+  /* Fix for nested elements in cards */
+  .coupon-card > div,
+  .job-card > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   /* Adjust job card for mobile */
@@ -133,30 +290,6 @@
     word-wrap: break-word !important;
   }
 
-  /* Typography improvements for mobile readability */
-  .dialog-title {
-    font-size: 1rem !important;
-    line-height: 1.3 !important;
-    letter-spacing: -0.01em !important;
-    width: calc(100% - 32px) !important;
-    max-width: calc(100% - 32px) !important;
-    box-sizing: border-box !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-  }
-
-  /* Improve readability of body text */
-  .job-content p,
-  .coupon-content p {
-    font-size: 0.8125rem !important;
-    line-height: 1.4 !important;
-    letter-spacing: 0 !important;
-    max-width: 100% !important;
-    overflow-wrap: break-word !important;
-    word-wrap: break-word !important;
-  }
-
   /* Make job titles more readable */
   .job-card h3 {
     font-size: 1rem !important;
@@ -184,17 +317,6 @@
     max-width: 100% !important;
     overflow-wrap: break-word !important;
     word-wrap: break-word !important;
-  }
-
-  /* Adjust whitespace for better readability */
-  .whitespace-pre-wrap {
-    font-size: 0.8125rem !important;
-    line-height: 1.4 !important;
-    letter-spacing: 0 !important;
-    max-width: 100% !important;
-    overflow-wrap: break-word !important;
-    word-wrap: break-word !important;
-    white-space: pre-line !important; /* Change from pre-wrap to pre-line */
   }
 
   /* Make section headings clearer */
@@ -247,30 +369,6 @@
     flex-wrap: wrap !important;
     width: 100% !important;
     max-width: 100% !important;
-  }
-
-  /* Fix card width issues */
-  .jobs-dialog-scrollable .card {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-
-  /* Fix dialog header width */
-  .jobs-dialog-header {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    padding-right: 2rem !important;
-  }
-
-  /* Fix for nested elements in job cards */
-  .job-card > div {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
   }
 }
 
@@ -341,6 +439,24 @@
     box-sizing: border-box !important;
   }
 
+  /* Make coupon dialog take full screen on very small devices - Aggressive fix */
+  .coupon-dialog .dialog-content {
+    width: 100% !important;
+    height: 100vh !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0.375rem !important;
+    border-radius: 0 !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    transform: none !important;
+    inset: 0 !important;
+  }
+
   /* Make job dialog take full screen on very small devices - Aggressive fix */
   .jobs-dialog-content {
     width: 100% !important;
@@ -383,6 +499,36 @@
     padding: 0.125rem 0.375rem !important;
     min-height: 28px !important;
     height: 28px !important;
+  }
+
+  /* Fix coupon image container */
+  .coupon-image-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0 !important;
+  }
+
+  /* Fix coupon tabs */
+  .coupon-dialog .tabs-list {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .coupon-dialog .tabs-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0 !important;
+  }
+
+  /* Fix coupon terms container */
+  .coupon-dialog .bg-white {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0.5rem !important;
   }
 }
 
