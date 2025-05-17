@@ -1,26 +1,35 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
-import { Loader2, ImageIcon, Ticket, Briefcase, AlertCircle } from "lucide-react"
+import { Loader2, ImageIcon, Ticket, Briefcase, AlertCircle, X } from "lucide-react"
 import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
 import { BusinessCouponsDialog } from "./business-coupons-dialog"
 import { BusinessJobsDialog } from "./business-jobs-dialog"
 import { getCloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import type { CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useMobile } from "@/hooks/use-mobile"
 
 interface BusinessProfileDialogProps {
   isOpen: boolean
   onClose: () => void
   businessId: string
   businessName: string
+  business?: any // Optional full business object
 }
 
-export function BusinessProfileDialog({ isOpen, onClose, businessId, businessName }: BusinessProfileDialogProps) {
+export function BusinessProfileDialog({
+  isOpen,
+  onClose,
+  businessId,
+  businessName,
+  business,
+}: BusinessProfileDialogProps) {
+  const isMobile = useMobile()
   const [loading, setLoading] = useState(true)
   const [adDesign, setAdDesign] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -40,11 +49,11 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
   useEffect(() => {
     if (isOpen && businessId) {
-      console.log(`BusinessProfileDialog opened for business ID: ${businessId}`)
+      console.log(`BusinessProfileDialog opened for business ID: ${businessId}, name: ${businessName}`)
       loadBusinessAdDesign()
       loadBusinessVideo()
     }
-  }, [isOpen, businessId])
+  }, [isOpen, businessId, businessName])
 
   useEffect(() => {
     // Close child dialogs when main dialog is closed
@@ -186,9 +195,19 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          {/* Enhanced mobile close button */}
+          {isMobile && (
+            <div className="absolute right-4 top-4 z-10">
+              <DialogClose className="rounded-full p-3 bg-gray-100 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                <X className="h-6 w-6" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
+            </div>
+          )}
+
           {/* Debug button - only in development */}
           {process.env.NODE_ENV !== "production" && (
-            <div className="absolute top-2 right-12 z-50">
+            <div className="absolute top-2 right-16 z-50">
               <Button
                 variant="outline"
                 size="sm"
@@ -207,6 +226,9 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
               <div className="grid grid-cols-2 gap-1">
                 <div className="font-medium">Business ID:</div>
                 <div>{debugInfo.businessId || "Not set"}</div>
+
+                <div className="font-medium">Business Name:</div>
+                <div>{businessName || "Not set"}</div>
 
                 <div className="font-medium">Has Video ID:</div>
                 <div>{debugInfo.hasVideoId ? "Yes" : "No"}</div>
@@ -509,6 +531,15 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
             <div className="text-center py-8 text-gray-500">
               <p>No profile information available for this business.</p>
               <Button variant="outline" className="mt-4" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+          )}
+
+          {/* Mobile-friendly bottom close button */}
+          {isMobile && (
+            <div className="mt-6 flex justify-center">
+              <Button variant="outline" size="lg" className="w-full py-3 text-base font-medium" onClick={onClose}>
                 Close
               </Button>
             </div>

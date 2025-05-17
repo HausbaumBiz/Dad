@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -490,8 +490,18 @@ export function BusinessCouponsDialog({
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          {/* Enhanced mobile close button */}
+          {isMobile && (
+            <div className="absolute right-4 top-4 z-10">
+              <DialogClose className="rounded-full p-3 bg-gray-100 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                <X className="h-6 w-6" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
+            </div>
+          )}
+
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">
+            <DialogTitle className="text-xl font-bold pr-8">
               {businessName ? `${businessName} - Coupons` : "Available Coupons"}
             </DialogTitle>
           </DialogHeader>
@@ -610,11 +620,27 @@ export function BusinessCouponsDialog({
             </Tabs>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-          </DialogFooter>
+          {/* Mobile-friendly bottom close button */}
+          {isMobile && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full py-3 text-base font-medium"
+                onClick={() => onOpenChange(false)}
+              >
+                Close
+              </Button>
+            </div>
+          )}
+
+          {!isMobile && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -622,13 +648,15 @@ export function BusinessCouponsDialog({
       <Dialog open={showFullImage} onOpenChange={setShowFullImage}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-1 sm:p-2">
           <div className="relative w-full">
+            {/* Enhanced mobile close button */}
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-2 right-2 z-10 h-8 w-8 bg-white/80 hover:bg-white rounded-full"
+              className="absolute right-2 top-2 z-10 h-10 w-10 bg-white/80 hover:bg-white rounded-full shadow-md"
               onClick={() => setShowFullImage(false)}
             >
-              <X className="h-4 w-4" />
+              <X className="h-6 w-6" />
+              <span className="sr-only">Close</span>
             </Button>
 
             {/* Debug button */}
@@ -815,6 +843,20 @@ export function BusinessCouponsDialog({
                   </Button>
                 )}
               </div>
+
+              {/* Mobile-friendly bottom close button */}
+              {isMobile && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full py-3 text-base font-medium"
+                    onClick={() => setShowFullImage(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
@@ -824,16 +866,18 @@ export function BusinessCouponsDialog({
       <Dialog open={showFullSizeImage} onOpenChange={setShowFullSizeImage}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-1 overflow-auto">
           <div className="relative w-full">
+            {/* Enhanced mobile close button */}
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-2 right-2 z-10 h-8 w-8 bg-white/80 hover:bg-white rounded-full"
+              className="absolute right-2 top-2 z-10 h-10 w-10 bg-white/80 hover:bg-white rounded-full shadow-md"
               onClick={() => {
                 setShowFullSizeImage(false)
                 setShowFullImage(true)
               }}
             >
-              <X className="h-4 w-4" />
+              <X className="h-6 w-6" />
+              <span className="sr-only">Close</span>
             </Button>
           </div>
 
@@ -876,10 +920,29 @@ export function BusinessCouponsDialog({
               }}
             >
               <X className="mr-2 h-4 w-4" />
+              Back
             </Button>
           </div>
+
+          {/* Mobile-friendly bottom close button */}
+          {isMobile && (
+            <div className="mt-4 flex justify-center">
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full py-3 text-base font-medium"
+                onClick={() => {
+                  setShowFullSizeImage(false)
+                  setShowFullImage(false)
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          )}
+
           <div
-            className="text-sm whitespace-pre-wrap"
+            className="text-sm whitespace-pre-wrap mt-4"
             dangerouslySetInnerHTML={{
               __html: formatTermsWithBoldHeadings(globalTerms),
             }}

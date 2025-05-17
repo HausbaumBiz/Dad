@@ -1,13 +1,16 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { toast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { Loader2 } from "lucide-react"
 
 export default function FitnessAthleticsPage() {
   const filterOptions = [
@@ -30,117 +33,101 @@ export default function FitnessAthleticsPage() {
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
-    id: number
+    id: string | number
     name: string
     reviews: any[]
   } | null>(null)
 
-  // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([
-    {
-      id: 1,
-      name: "Elite Sports Training",
-      services: ["Baseball/Softball", "Basketball", "Football"],
-      rating: 4.9,
-      reviews: 112,
-      location: "North Canton, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "Michael J.",
-          rating: 5,
-          comment:
-            "Coach Tom helped my son improve his batting average significantly. Highly recommend their baseball training program!",
-          date: "2023-03-15",
-        },
-        {
-          id: 2,
-          userName: "Sarah W.",
-          rating: 5,
-          comment:
-            "The basketball training here is top-notch. My daughter's skills have improved tremendously in just a few months.",
-          date: "2023-02-22",
-        },
-        {
-          id: 3,
-          userName: "David R.",
-          rating: 4,
-          comment:
-            "Great football training program. The coaches are experienced and really know how to motivate the kids.",
-          date: "2023-01-10",
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Peak Performance Fitness",
-      services: ["Personal Trainers", "Group Fitness Classes"],
-      rating: 4.8,
-      reviews: 87,
-      location: "Canton, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "Jennifer L.",
-          rating: 5,
-          comment: "My personal trainer, Alex, has been amazing! I've lost 15 pounds and feel stronger than ever.",
-          date: "2023-04-05",
-        },
-        {
-          id: 2,
-          userName: "Robert K.",
-          rating: 5,
-          comment:
-            "The group fitness classes are energetic and challenging. The instructors keep you motivated throughout.",
-          date: "2023-03-18",
-        },
-        {
-          id: 3,
-          userName: "Lisa M.",
-          rating: 4,
-          comment:
-            "Great facility with knowledgeable trainers. The only reason for 4 stars is that it can get crowded during peak hours.",
-          date: "2023-02-27",
-        },
-      ],
-    },
-    {
-      id: 3,
-      name: "Dance & Movement Studio",
-      services: ["Dance", "Gymnastics"],
-      rating: 4.7,
-      reviews: 64,
-      location: "Akron, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "Emma S.",
-          rating: 5,
-          comment: "My daughter loves her ballet classes here! The instructors are patient and encouraging.",
-          date: "2023-04-12",
-        },
-        {
-          id: 2,
-          userName: "Thomas B.",
-          rating: 4,
-          comment: "The gymnastics program is excellent. My son has gained so much confidence since starting here.",
-          date: "2023-03-30",
-        },
-        {
-          id: 3,
-          userName: "Olivia P.",
-          rating: 5,
-          comment:
-            "We've tried several dance studios in the area, and this one is by far the best. Professional yet nurturing environment.",
-          date: "2023-02-15",
-        },
-      ],
-    },
-  ])
+  // State for business profile dialog
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+
+  // State for businesses
+  const [businesses, setBusinesses] = useState<any[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activeFilters, setActiveFilters] = useState<string[]>([])
+
+  // Fetch businesses on component mount
+  useEffect(() => {
+    async function fetchBusinesses() {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const response = await fetch(`/api/businesses/by-category?category=fitness-athletics`)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch businesses: ${response.status}`)
+        }
+        const data = await response.json()
+        console.log("Fetched fitness-athletics businesses:", data.businesses)
+        setBusinesses(data.businesses || [])
+        setFilteredBusinesses(data.businesses || [])
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError("Failed to load businesses. Please try again later.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchBusinesses()
+  }, [])
+
+  // Handle filter changes
+  const handleFilterChange = (selectedFilters: string[]) => {
+    setActiveFilters(selectedFilters)
+
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(businesses)
+      return
+    }
+
+    const filtered = businesses.filter((business) => {
+      // Check if business has any of the selected subcategories
+      return selectedFilters.some((filter) => {
+        const subcategory = filterOptions.find((option) => option.id === filter)?.value
+        return (
+          business.allSubcategories?.includes(subcategory) ||
+          business.subcategories?.includes(subcategory) ||
+          business.services?.includes(subcategory)
+        )
+      })
+    })
+
+    setFilteredBusinesses(filtered)
+  }
 
   const handleOpenReviews = (provider: any) => {
-    setSelectedProvider(provider)
+    console.log("Opening reviews for provider:", provider)
+    setSelectedProvider({
+      id: provider.id,
+      name: provider.name || provider.businessName || "Business",
+      reviews: provider.reviews || [],
+    })
     setIsReviewsDialogOpen(true)
+  }
+
+  const handleOpenProfile = (business: any) => {
+    console.log("Opening profile for business:", business)
+
+    if (!business || !business.id) {
+      console.error("Cannot open profile: Business ID is missing")
+      toast({
+        title: "Error",
+        description: "Could not open business profile. Business ID is missing.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Set the business ID and name for the dialog
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.name || business.businessName || "Business")
+
+    // Open the dialog
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -174,72 +161,124 @@ export default function FitnessAthleticsPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onChange={handleFilterChange} activeFilters={activeFilters} />
 
-      <div className="space-y-6">
-        {providers.map((provider) => (
-          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">{provider.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Loading fitness and athletics providers...</span>
+        </div>
+      ) : error ? (
+        <div className="text-center py-10">
+          <h3 className="text-lg font-medium text-red-600 mb-2">Error</h3>
+          <p className="text-gray-500">{error}</p>
+        </div>
+      ) : filteredBusinesses.length > 0 ? (
+        <div className="space-y-6">
+          {filteredBusinesses.map((business) => (
+            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">
+                      {business.name || business.businessName || "Fitness Business"}
+                    </h3>
+                    <p className="text-gray-600 text-sm mt-1">
+                      {business.location || (business.city && business.state)
+                        ? `${business.city}, ${business.state}`
+                        : "Location not specified"}
+                    </p>
 
-                  <div className="flex items-center mt-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-4 h-4 ${
+                              i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"
+                            }`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {business.rating || "No rating"} ({business.reviews?.length || 0} reviews)
+                      </span>
                     </div>
-                    <span className="text-sm text-gray-600 ml-2">
-                      {provider.rating} ({provider.reviews} reviews)
-                    </span>
+
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-700">Services:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {(business.services || business.allSubcategories || [])
+                          .slice(0, 3)
+                          .map((service: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        {(business.services || business.allSubcategories || []).length > 3 && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            +{(business.services || business.allSubcategories || []).length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700">Services:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Button
+                      className="w-full md:w-auto"
+                      onClick={() => handleOpenReviews(business)}
+                      disabled={!business.reviews || business.reviews.length === 0}
+                    >
+                      Reviews
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleOpenProfile(business)}
+                    >
+                      View Profile
+                    </Button>
                   </div>
                 </div>
-
-                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                    Reviews
-                  </Button>
-                  <Button variant="outline" className="mt-2 w-full md:w-auto">
-                    View Profile
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-10">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No fitness or athletics providers listed yet</h3>
+          <p className="text-gray-500">
+            {activeFilters.length > 0
+              ? "No providers match your selected filters. Try adjusting your filters or check back later."
+              : "Check back soon for fitness trainers, coaches, and athletic programs in your area."}
+          </p>
+        </div>
+      )}
 
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.name}
-          reviews={selectedProvider.reviewsData}
+          reviews={selectedProvider.reviews || []}
         />
       )}
+
+      {/* BusinessProfileDialog with correct props */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusinessId}
+        businessName={selectedBusinessName}
+      />
 
       <Toaster />
     </CategoryLayout>

@@ -1,10 +1,18 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { MapPin } from "lucide-react"
+import { MapPin, X } from "lucide-react"
+import { useMobile } from "@/hooks/use-mobile"
 
 interface ZipCodeDialogProps {
   isOpen: boolean
@@ -15,6 +23,7 @@ interface ZipCodeDialogProps {
 export function ZipCodeDialog({ isOpen, onClose, onSubmit }: ZipCodeDialogProps) {
   const [zipCode, setZipCode] = useState("")
   const [error, setError] = useState("")
+  const isMobile = useMobile()
 
   const handleSubmit = () => {
     if (!zipCode.trim()) {
@@ -36,8 +45,18 @@ export function ZipCodeDialog({ isOpen, onClose, onSubmit }: ZipCodeDialogProps)
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        {/* Enhanced mobile close button */}
+        {isMobile && (
+          <div className="absolute right-4 top-4 z-10">
+            <DialogClose className="rounded-full p-3 bg-gray-100 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+              <X className="h-6 w-6" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </div>
+        )}
+
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Enter Your Zip Code</DialogTitle>
+          <DialogTitle className="text-xl font-semibold pr-8">Enter Your Zip Code</DialogTitle>
           <DialogDescription className="text-gray-600">
             To help you find local services in your area, we need your zip code.
           </DialogDescription>
@@ -66,6 +85,15 @@ export function ZipCodeDialog({ isOpen, onClose, onSubmit }: ZipCodeDialogProps)
           </Button>
           <Button onClick={handleSubmit}>Continue</Button>
         </div>
+
+        {/* Mobile-friendly bottom close button */}
+        {isMobile && (
+          <div className="mt-6 flex justify-center">
+            <Button variant="outline" size="lg" className="w-full py-3 text-base font-medium" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
