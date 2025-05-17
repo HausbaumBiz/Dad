@@ -2,10 +2,11 @@
 @media (max-width: 640px) {
   /* Make dialog content take up more screen space on mobile */
   .radix-dialog-content {
-    width: calc(100% - 1rem) !important;
-    max-width: calc(100% - 1rem) !important;
-    padding: 0.75rem !important;
-    max-height: 85vh !important;
+    width: calc(100% - 2rem) !important;
+    max-width: calc(100% - 2rem) !important;
+    padding: 1rem !important;
+    max-height: 90vh !important;
+    margin: 1rem !important;
   }
 
   /* Ensure images in dialogs don't overflow */
@@ -16,7 +17,7 @@
 
   /* Make buttons in dialogs more tappable */
   .radix-dialog-content button {
-    min-height: 40px;
+    min-height: 44px;
   }
 
   /* Adjust spacing in AdBox for mobile */
@@ -33,57 +34,195 @@
     font-size: 0.875rem !important;
   }
 
-  /* Reduce padding in card content on mobile */
-  .card-content {
+  /* Specific adjustments for coupon and jobs dialogs */
+  .coupon-dialog .dialog-content,
+  .jobs-dialog .dialog-content {
+    padding: 0.75rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 0.5rem !important;
+    height: auto !important;
+    max-height: 90vh !important;
+  }
+
+  /* Adjust grid layouts for small screens */
+  .coupon-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Adjust card padding */
+  .job-card {
     padding: 0.75rem !important;
   }
 
-  /* Make dialog headers more compact */
-  .dialog-header {
-    margin-bottom: 0.5rem !important;
-    padding-right: 2rem !important;
+  /* Fix layout issues in coupons and jobs dialogs */
+  .coupon-image-container,
+  .job-details-container {
+    flex-direction: column !important;
   }
 
-  /* Adjust tabs for mobile */
-  .tabs-list {
-    height: 2.25rem !important;
+  /* Make coupon images fit within small screens */
+  .coupon-image {
+    width: 100% !important;
+    max-height: 45vh !important;
+    object-fit: contain !important;
   }
 
-  .tabs-trigger {
-    padding: 0 0.75rem !important;
-    height: 2rem !important;
+  /* Typography improvements for mobile readability */
+  .dialog-title {
+    font-size: 1.25rem !important;
+    line-height: 1.3 !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  /* Improve readability of body text */
+  .job-content p,
+  .coupon-content p {
+    font-size: 0.9375rem !important;
+    line-height: 1.5 !important;
+    letter-spacing: 0.01em !important;
+  }
+
+  /* Make job titles more readable */
+  .job-card h3 {
+    font-size: 1.125rem !important;
+    line-height: 1.3 !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  /* Adjust secondary text */
+  .job-card .text-gray-600,
+  .coupon-dialog .text-gray-600 {
     font-size: 0.875rem !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Improve readability of job descriptions */
+  .job-card .line-clamp-2 {
+    font-size: 0.875rem !important;
+    line-height: 1.4 !important;
+    margin-top: 0.5rem !important;
+  }
+
+  /* Adjust whitespace for better readability */
+  .whitespace-pre-wrap {
+    font-size: 0.9375rem !important;
+    line-height: 1.6 !important;
+    letter-spacing: 0.01em !important;
+  }
+
+  /* Make section headings clearer */
+  h3.text-sm.font-medium.text-gray-700 {
+    font-size: 1rem !important;
+    line-height: 1.4 !important;
+    margin-bottom: 0.5rem !important;
+    font-weight: 600 !important;
+  }
+
+  /* Adjust spacing between paragraphs for better readability */
+  .bg-gray-50 p {
+    margin-bottom: 0.75rem !important;
+  }
+
+  .bg-gray-50 p:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  /* Improve readability of terms and conditions */
+  .text-sm.whitespace-pre-wrap {
+    font-size: 0.875rem !important;
+    line-height: 1.6 !important;
+    letter-spacing: 0.01em !important;
+  }
+
+  /* Make strong text in terms more visible */
+  .text-sm.whitespace-pre-wrap strong {
+    font-size: 0.9375rem !important;
+    font-weight: 600 !important;
+    color: #333 !important;
+  }
+
+  /* Adjust tab text for better visibility */
+  .tabs-trigger {
+    font-size: 0.9375rem !important;
+    font-weight: 500 !important;
+  }
+
+  /* Improve readability of badge/tag text */
+  .rounded-full.text-xs,
+  .rounded-full.text-sm {
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
   }
 }
 
 /* Photo album dialog specific fixes */
 @media (max-width: 480px) {
   /* Ensure title doesn't overlap with close button */
-  .photo-album-header .dialog-title {
+  .photo-album-header .dialog-title,
+  .coupon-dialog-header .dialog-title,
+  .jobs-dialog-header .dialog-title {
     max-width: 75%;
     padding-right: 1rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 1.125rem !important;
   }
 
   /* Make close button more visible against various backgrounds */
-  .photo-album-close-button {
+  .photo-album-close-button,
+  .dialog-close-button {
     background-color: rgba(255, 255, 255, 0.9) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
-  /* Adjust spacing for nested dialogs */
-  .nested-dialog-content {
+  /* Better touch targets for buttons */
+  .coupon-action-button,
+  .job-action-button {
+    min-height: 44px !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.9375rem !important;
+  }
+
+  /* Adjust spacing for dialog content */
+  .coupon-content,
+  .job-content {
     padding: 0.5rem !important;
+  }
+
+  /* Further typography refinements for very small screens */
+  .job-details-container h2 {
+    font-size: 1.25rem !important;
+    line-height: 1.3 !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  .job-details-container .text-lg {
+    font-size: 1rem !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Improve readability of contact information */
+  .job-details-container .font-medium {
+    font-weight: 600 !important;
+  }
+
+  /* Adjust line height for better readability in small spaces */
+  .bg-gray-50 {
+    line-height: 1.5 !important;
+    padding: 0.75rem !important;
   }
 }
 
 /* Standardized close button for all dialogs */
 .dialog-close-button {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: 1rem;
+  right: 1rem;
   z-index: 10;
   background-color: white;
   border-radius: 9999px;
@@ -101,18 +240,36 @@
   padding-right: 2.5rem;
 }
 
-/* Responsive image containers */
-.responsive-image-container {
-  position: relative;
-  width: 100%;
-  height: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* Additional typography improvements for all screen sizes */
+@media (max-width: 768px) {
+  /* Improve readability of all dialog content */
+  .radix-dialog-content {
+    font-size: 16px !important; /* Base font size for better readability */
+  }
 
-.responsive-image {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  /* Adjust line heights for better readability */
+  .radix-dialog-content p {
+    line-height: 1.5 !important;
+  }
+
+  /* Improve contrast for better readability */
+  .text-gray-600 {
+    color: #4b5563 !important; /* Slightly darker gray for better contrast */
+  }
+
+  /* Ensure proper spacing between text elements */
+  .space-y-6 > * {
+    margin-top: 1.25rem !important;
+    margin-bottom: 0 !important;
+  }
+
+  .space-y-6 > *:first-child {
+    margin-top: 0 !important;
+  }
+
+  /* Improve readability of buttons */
+  button {
+    font-weight: 500 !important;
+    letter-spacing: 0.01em !important;
+  }
 }
