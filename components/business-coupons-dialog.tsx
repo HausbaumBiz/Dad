@@ -632,16 +632,8 @@ export function BusinessCouponsDialog({
 
       {/* Full Image Dialog */}
       <Dialog open={showFullImage} onOpenChange={setShowFullImage}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-1 sm:p-2">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-1 sm:p-2 w-[95vw] mx-auto">
           <div className="relative w-full">
-            {/* Custom close button that matches photo album style */}
-            <div className="absolute top-2 right-2 z-10">
-              <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </DialogClose>
-            </div>
-
             {/* Debug button */}
             {selectedCoupon?.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
               <Button
@@ -782,17 +774,15 @@ export function BusinessCouponsDialog({
                       <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
                     </div>
 
-                    {/* Container with max-height to ensure large coupons fit */}
-                    <div
-                      className={`relative ${selectedCoupon.size === "large" ? "max-h-[280px] md:max-h-[380px]" : ""} w-full flex items-center justify-center`}
-                    >
+                    {/* Container with improved mobile responsiveness */}
+                    <div className="relative w-full flex items-center justify-center py-2">
                       <Image
                         ref={imageRef}
                         src={getImageUrlByFormat(selectedCoupon.imageId, urlFormat) || "/placeholder.svg"}
                         alt={selectedCoupon.title || "Coupon"}
                         width={800}
                         height={selectedCoupon.size === "large" ? 360 : 600}
-                        className={`object-contain max-w-full ${selectedCoupon.size === "large" ? "max-h-[280px] md:max-h-[380px]" : ""} coupon-image`}
+                        className="object-contain max-w-full max-h-[calc(70vh-100px)] w-auto h-auto"
                         priority
                         unoptimized
                         onError={() => handleImageError(selectedCoupon.id)}
@@ -835,21 +825,7 @@ export function BusinessCouponsDialog({
       {/* Full Size Image Dialog (for large coupons) */}
       <Dialog open={showFullSizeImage} onOpenChange={setShowFullSizeImage}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-1 overflow-auto">
-          <div className="relative w-full">
-            {/* Custom close button that matches photo album style */}
-            <div className="absolute top-2 right-2 z-10">
-              <DialogClose
-                className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
-                onClick={() => {
-                  setShowFullSizeImage(false)
-                  setShowFullImage(true)
-                }}
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </DialogClose>
-            </div>
-          </div>
+          <div className="relative w-full">{/* We'll use the built-in close button from DialogContent */}</div>
 
           {selectedCoupon?.imageUrl && (
             <div className="relative w-full flex items-center justify-center p-2">
