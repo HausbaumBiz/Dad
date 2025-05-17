@@ -14,7 +14,38 @@ export function middleware(request: NextRequest) {
     path === "/" ||
     path.startsWith("/api/") ||
     path.startsWith("/_next/") ||
-    path.includes(".") // Static files
+    path.includes(".") || // Static files
+    // Allow all category pages to be public
+    path === "/home-improvement" ||
+    path === "/automotive-services" ||
+    path === "/elder-care" ||
+    path === "/pet-care" ||
+    path === "/weddings-events" ||
+    path === "/fitness-athletics" ||
+    path === "/education-tutoring" ||
+    path === "/music-lessons" ||
+    path === "/real-estate" ||
+    path === "/food-dining" ||
+    path === "/retail-stores" ||
+    path === "/legal-services" ||
+    path === "/funeral-services" ||
+    path === "/personal-assistants" ||
+    path === "/travel-vacation" ||
+    path === "/tailoring-clothing" ||
+    path === "/arts-entertainment" ||
+    path === "/tech-it-services" ||
+    path === "/beauty-wellness" ||
+    path === "/physical-rehabilitation" ||
+    path === "/medical-practitioners" ||
+    path === "/mental-health" ||
+    path === "/financial-services" ||
+    path === "/child-care" ||
+    path === "/penny-saver" ||
+    path === "/job-listings" ||
+    // Allow subcategory pages to be public too
+    path.startsWith("/home-improvement/") ||
+    // More efficient way to handle all category pages
+    path.match(/^\/[a-z-]+\/?$/) !== null
 
   // Check if path is admin-related
   const isAdminPath = path.startsWith("/admin")
