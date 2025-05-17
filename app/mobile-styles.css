@@ -1,0 +1,35 @@
+/* Mobile-specific styles */
+@media (max-width: 640px) {
+  /* Make dialog content take up more screen space on mobile */
+  .radix-dialog-content {
+    width: calc(100% - 2rem) !important;
+    max-width: calc(100% - 2rem) !important;
+    padding: 1rem !important;
+    max-height: 80vh !important;
+  }
+
+  /* Ensure images in dialogs don't overflow */
+  .radix-dialog-content img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Make buttons in dialogs more tappable */
+  .radix-dialog-content button {
+    min-height: 44px;
+  }
+
+  /* Adjust spacing in AdBox for mobile */
+  .adbox-container {
+    padding: 0.75rem !important;
+  }
+
+  /* Make text more readable on small screens */
+  .adbox-container h3 {
+    font-size: 1.25rem !important;
+  }
+
+  .adbox-container p {
+    font-size: 0.875rem !important;
+  }
+}
