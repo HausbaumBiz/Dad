@@ -2,11 +2,11 @@
 @media (max-width: 640px) {
   /* Make dialog content take up more screen space on mobile */
   .radix-dialog-content {
-    width: calc(100% - 2rem) !important;
-    max-width: calc(100% - 2rem) !important;
+    width: calc(100% - 1rem) !important;
+    max-width: calc(100% - 1rem) !important;
     padding: 1rem !important;
-    max-height: 90vh !important;
-    margin: 1rem !important;
+    max-height: 95vh !important;
+    margin: 0.5rem !important;
   }
 
   /* Ensure images in dialogs don't overflow */
@@ -43,17 +43,52 @@
     margin: 0 !important;
     border-radius: 0.5rem !important;
     height: auto !important;
-    max-height: 90vh !important;
+    max-height: 95vh !important;
+  }
+
+  /* Jobs dialog specific adjustments */
+  .jobs-dialog {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .jobs-dialog .dialog-content {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0.75rem !important;
+    border-radius: 0 !important;
+  }
+
+  /* Adjust job card for mobile */
+  .job-card {
+    padding: 0.75rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  /* Make job logo smaller on mobile */
+  .job-logo-container {
+    width: 64px !important;
+    height: 64px !important;
+    min-width: 64px !important;
+  }
+
+  /* Adjust job details layout for mobile */
+  .job-details-container {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Adjust job content spacing */
+  .job-content {
+    padding: 0 !important;
   }
 
   /* Adjust grid layouts for small screens */
   .coupon-grid {
     grid-template-columns: 1fr !important;
-  }
-
-  /* Adjust card padding */
-  .job-card {
-    padding: 0.75rem !important;
   }
 
   /* Fix layout issues in coupons and jobs dialogs */
@@ -129,33 +164,25 @@
     margin-bottom: 0 !important;
   }
 
-  /* Improve readability of terms and conditions */
-  .text-sm.whitespace-pre-wrap {
-    font-size: 0.875rem !important;
-    line-height: 1.6 !important;
-    letter-spacing: 0.01em !important;
+  /* Adjust job details sections for mobile */
+  .job-details-section {
+    margin-top: 1rem !important;
+    padding: 0 !important;
   }
 
-  /* Make strong text in terms more visible */
-  .text-sm.whitespace-pre-wrap strong {
-    font-size: 0.9375rem !important;
-    font-weight: 600 !important;
-    color: #333 !important;
+  /* Adjust job description container */
+  .job-description-container {
+    padding: 0.75rem !important;
   }
 
-  /* Adjust tab text for better visibility */
-  .tabs-trigger {
-    font-size: 0.9375rem !important;
-    font-weight: 500 !important;
+  /* Adjust job benefits display */
+  .job-benefits-container {
+    gap: 0.25rem !important;
   }
 
-  /* Improve readability of badge/tag text */
-  .rounded-full.text-xs,
-  .rounded-full.text-sm {
-    font-size: 0.75rem !important;
-    line-height: 1.2 !important;
-    padding-top: 0.25rem !important;
-    padding-bottom: 0.25rem !important;
+  /* Adjust job categories display */
+  .job-categories-container {
+    gap: 0.25rem !important;
   }
 }
 
@@ -215,6 +242,40 @@
   .bg-gray-50 {
     line-height: 1.5 !important;
     padding: 0.75rem !important;
+  }
+
+  /* Make job dialog take full screen on very small devices */
+  .jobs-dialog .dialog-content {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0.5rem !important;
+    border-radius: 0 !important;
+  }
+
+  /* Adjust job logo size for very small screens */
+  .job-logo-container {
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+  }
+
+  /* Reduce padding in job cards */
+  .job-card {
+    padding: 0.5rem !important;
+  }
+
+  /* Adjust spacing in job details */
+  .job-details-section {
+    margin-top: 0.75rem !important;
+  }
+
+  /* Make back button smaller */
+  .back-button {
+    padding: 0.25rem 0.5rem !important;
+    min-height: 36px !important;
   }
 }
 
