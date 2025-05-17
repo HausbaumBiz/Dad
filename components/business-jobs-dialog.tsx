@@ -8,6 +8,7 @@ import { Loader2, ArrowLeft, X } from "lucide-react"
 import { getBusinessJobs } from "@/app/actions/job-actions"
 import type { JobListing } from "@/app/actions/job-actions"
 import Image from "next/image"
+import { useMobile } from "@/hooks/use-mobile"
 
 interface BusinessJobsDialogProps {
   isOpen: boolean
@@ -17,6 +18,7 @@ interface BusinessJobsDialogProps {
 }
 
 export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }: BusinessJobsDialogProps) {
+  const isMobile = useMobile()
   const [loading, setLoading] = useState(true)
   const [jobs, setJobs] = useState<JobListing[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -117,7 +119,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
           {/* Logo - Updated for better aspect ratio */}
           <div className="flex-shrink-0 flex items-center justify-center">
             {selectedJob.logoUrl ? (
-              <div className="relative w-32 h-32 rounded-md overflow-hidden border flex items-center justify-center bg-white">
+              <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-md overflow-hidden border flex items-center justify-center bg-white">
                 <Image
                   src={selectedJob.logoUrl || "/placeholder.svg"}
                   alt={`${selectedJob.businessName} logo`}
@@ -128,7 +130,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
                 />
               </div>
             ) : (
-              <div className="w-32 h-32 bg-gray-100 rounded-md flex items-center justify-center">
+              <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 rounded-md flex items-center justify-center">
                 <span className="text-gray-400 text-sm text-center">No logo</span>
               </div>
             )}
@@ -136,8 +138,8 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
 
           {/* Job header */}
           <div className="flex-1">
-            <h2 className="text-2xl font-bold">{selectedJob.jobTitle}</h2>
-            <p className="text-lg text-gray-600">{selectedJob.businessName}</p>
+            <h2 className="text-xl sm:text-2xl font-bold">{selectedJob.jobTitle}</h2>
+            <p className="text-base sm:text-lg text-gray-600">{selectedJob.businessName}</p>
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -191,7 +193,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
         <div className="mt-6">
           <h3 className="text-sm font-medium text-gray-700 mb-2">Job Description</h3>
           <div className="bg-gray-50 p-4 rounded-md">
-            <p className="whitespace-pre-wrap">{selectedJob.jobDescription}</p>
+            <p className="whitespace-pre-wrap text-sm sm:text-base">{selectedJob.jobDescription}</p>
           </div>
         </div>
 
@@ -200,7 +202,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
           <div className="mt-6">
             <h3 className="text-sm font-medium text-gray-700 mb-2">Qualifications</h3>
             <div className="bg-gray-50 p-4 rounded-md">
-              <p className="whitespace-pre-wrap">{selectedJob.qualifications}</p>
+              <p className="whitespace-pre-wrap text-sm sm:text-base">{selectedJob.qualifications}</p>
             </div>
           </div>
         )}
@@ -210,7 +212,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
           <div className="mt-6">
             <h3 className="text-sm font-medium text-gray-700 mb-2">About {selectedJob.businessName}</h3>
             <div className="bg-gray-50 p-4 rounded-md">
-              <p className="whitespace-pre-wrap">{selectedJob.businessDescription}</p>
+              <p className="whitespace-pre-wrap text-sm sm:text-base">{selectedJob.businessDescription}</p>
             </div>
           </div>
         )}
@@ -272,15 +274,15 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
     }
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {jobs.map((job) => (
           <Card key={job.id} className="overflow-hidden">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex flex-col md:flex-row gap-4">
                 {/* Logo - Updated for better aspect ratio */}
                 <div className="flex-shrink-0 flex items-center justify-center">
                   {job.logoUrl ? (
-                    <div className="relative w-24 h-24 rounded-md overflow-hidden border flex items-center justify-center bg-white">
+                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden border flex items-center justify-center bg-white">
                       <Image
                         src={job.logoUrl || "/placeholder.svg"}
                         alt={`${job.businessName} logo`}
@@ -291,7 +293,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
                       />
                     </div>
                   ) : (
-                    <div className="w-24 h-24 bg-gray-100 rounded-md flex items-center justify-center">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-md flex items-center justify-center">
                       <span className="text-gray-400 text-xs text-center">No logo</span>
                     </div>
                   )}
@@ -299,23 +301,23 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
 
                 {/* Job details */}
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold">{job.jobTitle}</h3>
-                  <p className="text-gray-600 text-sm">{job.businessName}</p>
+                  <h3 className="text-lg sm:text-xl font-semibold">{job.jobTitle}</h3>
+                  <p className="text-gray-600 text-xs sm:text-sm">{job.businessName}</p>
 
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-2 sm:mt-3 space-y-1 sm:space-y-2">
                     <div>
-                      <span className="text-sm font-medium text-gray-700">Pay: </span>
-                      <span className="text-sm">{formatPayRange(job)}</span>
+                      <span className="text-xs sm:text-sm font-medium text-gray-700">Pay: </span>
+                      <span className="text-xs sm:text-sm">{formatPayRange(job)}</span>
                     </div>
 
                     <div>
-                      <span className="text-sm font-medium text-gray-700">Hours: </span>
-                      <span className="text-sm">{job.workHours || "Not specified"}</span>
+                      <span className="text-xs sm:text-sm font-medium text-gray-700">Hours: </span>
+                      <span className="text-xs sm:text-sm">{job.workHours || "Not specified"}</span>
                     </div>
 
                     {job.categories && job.categories.length > 0 && (
                       <div>
-                        <span className="text-sm font-medium text-gray-700">Categories: </span>
+                        <span className="text-xs sm:text-sm font-medium text-gray-700">Categories: </span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {job.categories.map((category, idx) => (
                             <span
@@ -332,7 +334,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
                     {/* Benefits */}
                     {job.benefits && Object.keys(job.benefits).length > 0 && (
                       <div>
-                        <span className="text-sm font-medium text-gray-700">Benefits: </span>
+                        <span className="text-xs sm:text-sm font-medium text-gray-700">Benefits: </span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {getActiveBenefits(job).map((benefit, idx) => (
                             <span
@@ -348,18 +350,18 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
                   </div>
 
                   {/* Job description preview */}
-                  <div className="mt-3">
-                    <p className="text-sm text-gray-600 line-clamp-2">{job.jobDescription}</p>
+                  <div className="mt-2 sm:mt-3">
+                    <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">{job.jobDescription}</p>
                   </div>
                 </div>
               </div>
 
               {/* View full job button */}
-              <div className="mt-4 flex justify-end">
+              <div className="mt-3 sm:mt-4 flex justify-end">
                 <Button
                   variant="outline"
-                  size="sm"
-                  className="flex items-center gap-1"
+                  size={isMobile ? "sm" : "default"}
+                  className="flex items-center gap-1 text-xs sm:text-sm"
                   onClick={() => viewFullJob(job)}
                 >
                   View Full Job
@@ -374,17 +376,17 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] p-3 sm:p-6 overflow-y-auto">
         {/* Custom close button that matches photo album style */}
-        <div className="absolute right-4 top-4 z-10">
+        <div className="absolute right-2 sm:right-4 top-2 sm:top-4 z-10">
           <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogClose>
         </div>
 
-        <DialogHeader className="pr-10">
-          <DialogTitle className="text-xl font-semibold truncate">
+        <DialogHeader className="pr-8 sm:pr-10">
+          <DialogTitle className="text-lg sm:text-xl font-semibold truncate">
             {selectedJob ? `${selectedJob.jobTitle} - ${businessName}` : `${businessName} - Job Opportunities`}
           </DialogTitle>
         </DialogHeader>

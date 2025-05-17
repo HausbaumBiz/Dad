@@ -489,17 +489,17 @@ export function BusinessCouponsDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] p-3 sm:p-6 overflow-y-auto">
           {/* Custom close button that matches photo album style */}
-          <div className="absolute right-4 top-4 z-10">
+          <div className="absolute right-2 sm:right-4 top-2 sm:top-4 z-10">
             <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
             </DialogClose>
           </div>
 
-          <DialogHeader className="pr-10">
-            <DialogTitle className="text-xl font-bold truncate">
+          <DialogHeader className="pr-8 sm:pr-10">
+            <DialogTitle className="text-lg sm:text-xl font-bold truncate">
               {businessName ? `${businessName} - Coupons` : "Available Coupons"}
             </DialogTitle>
           </DialogHeader>
@@ -528,11 +528,11 @@ export function BusinessCouponsDialog({
               </TabsList>
 
               <TabsContent value="all" className="mt-4">
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {smallCoupons.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-medium mb-3">Small Coupons</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <h3 className="text-base sm:text-lg font-medium mb-2 sm:mb-3">Small Coupons</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                         {smallCoupons.map((coupon) => (
                           <div
                             key={coupon.id}
@@ -544,13 +544,13 @@ export function BusinessCouponsDialog({
                               <Button
                                 variant="outline"
                                 size="icon"
-                                className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
+                                className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/80 hover:bg-white"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleCouponClick(coupon)
                                 }}
                               >
-                                <Info className="h-4 w-4" />
+                                <Info className="h-3 w-3 sm:h-4 sm:w-4" />
                               </Button>
                             </div>
                             {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
@@ -565,9 +565,9 @@ export function BusinessCouponsDialog({
                   )}
 
                   {largeCoupons.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="text-lg font-medium mb-3">Large Coupons</h3>
-                      <div className="space-y-4">
+                    <div className="mt-4 sm:mt-6">
+                      <h3 className="text-base sm:text-lg font-medium mb-2 sm:mb-3">Large Coupons</h3>
+                      <div className="space-y-3 sm:space-y-4">
                         {largeCoupons.map((coupon) => (
                           <div
                             key={coupon.id}
@@ -575,20 +575,20 @@ export function BusinessCouponsDialog({
                             onClick={() => handleCouponClick(coupon)}
                           >
                             {/* Changed aspect ratio for large coupons to make them fit better */}
-                            <div className="relative aspect-[5/2.5] w-full max-h-[200px]">
+                            <div className="relative aspect-[5/2.5] w-full max-h-[150px] sm:max-h-[200px]">
                               {renderCouponImage(coupon, "5/2.5")}
                             </div>
                             <div className="absolute bottom-2 right-2">
                               <Button
                                 variant="outline"
                                 size="icon"
-                                className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
+                                className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/80 hover:bg-white"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleCouponClick(coupon)
                                 }}
                               >
-                                <Info className="h-4 w-4" />
+                                <Info className="h-3 w-3 sm:h-4 sm:w-4" />
                               </Button>
                             </div>
                             {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
@@ -605,10 +605,10 @@ export function BusinessCouponsDialog({
               </TabsContent>
 
               <TabsContent value="terms" className="mt-4">
-                <div className="bg-white p-6 rounded-lg border">
-                  <h3 className="text-lg font-medium mb-4">Global Terms & Conditions</h3>
+                <div className="bg-white p-4 sm:p-6 rounded-lg border">
+                  <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Global Terms & Conditions</h3>
                   <div
-                    className="text-sm whitespace-pre-wrap"
+                    className="text-xs sm:text-sm whitespace-pre-wrap"
                     dangerouslySetInnerHTML={{
                       __html: formatTermsWithBoldHeadings(globalTerms),
                     }}
@@ -619,7 +619,7 @@ export function BusinessCouponsDialog({
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} size={isMobile ? "sm" : "default"}>
               Close
             </Button>
           </DialogFooter>
@@ -628,7 +628,7 @@ export function BusinessCouponsDialog({
 
       {/* Full Image Dialog */}
       <Dialog open={showFullImage} onOpenChange={setShowFullImage}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-1 sm:p-2">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] p-1 sm:p-2 overflow-y-auto">
           <div className="relative w-full">
             {/* Custom close button that matches photo album style */}
             <div className="absolute top-2 right-2 z-10">
@@ -780,7 +780,7 @@ export function BusinessCouponsDialog({
 
                     {/* Container with max-height to ensure large coupons fit */}
                     <div
-                      className={`relative ${selectedCoupon.size === "large" ? "max-h-[280px] md:max-h-[380px]" : ""} w-full flex items-center justify-center`}
+                      className={`relative ${selectedCoupon.size === "large" ? "max-h-[200px] sm:max-h-[280px] md:max-h-[380px]" : ""} w-full flex items-center justify-center`}
                     >
                       <Image
                         ref={imageRef}
@@ -788,7 +788,7 @@ export function BusinessCouponsDialog({
                         alt={selectedCoupon.title || "Coupon"}
                         width={800}
                         height={selectedCoupon.size === "large" ? 360 : 600}
-                        className={`object-contain max-w-full ${selectedCoupon.size === "large" ? "max-h-[280px] md:max-h-[380px]" : ""}`}
+                        className={`object-contain max-w-full ${selectedCoupon.size === "large" ? "max-h-[200px] sm:max-h-[280px] md:max-h-[380px]" : ""}`}
                         priority
                         unoptimized
                         onError={() => handleImageError(selectedCoupon.id)}
@@ -799,7 +799,7 @@ export function BusinessCouponsDialog({
               </div>
 
               <div className="flex justify-center gap-2 mt-4 pb-2">
-                <Button variant="outline" size="sm" onClick={handleViewTerms}>
+                <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={handleViewTerms}>
                   <Info className="mr-2 h-4 w-4" />
                   Terms & Conditions
                 </Button>
@@ -807,7 +807,7 @@ export function BusinessCouponsDialog({
                 {!imageErrors[selectedCoupon.id] && (
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobile ? "sm" : "default"}
                     onClick={isMobile ? downloadCoupon : printCoupon}
                     disabled={isDownloading}
                   >
@@ -864,7 +864,7 @@ export function BusinessCouponsDialog({
           <div className="flex justify-center gap-2 mt-2">
             <Button
               variant="outline"
-              size="sm"
+              size={isMobile ? "sm" : "default"}
               onClick={isMobile ? downloadCoupon : printCoupon}
               disabled={isDownloading}
             >
@@ -878,7 +878,7 @@ export function BusinessCouponsDialog({
 
             <Button
               variant="outline"
-              size="sm"
+              size={isMobile ? "sm" : "default"}
               onClick={() => {
                 setShowFullSizeImage(false)
                 setShowFullImage(true)
@@ -888,7 +888,7 @@ export function BusinessCouponsDialog({
             </Button>
           </div>
           <div
-            className="text-sm whitespace-pre-wrap"
+            className="text-xs sm:text-sm whitespace-pre-wrap"
             dangerouslySetInnerHTML={{
               __html: formatTermsWithBoldHeadings(globalTerms),
             }}
