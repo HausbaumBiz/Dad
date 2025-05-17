@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -490,8 +490,16 @@ export function BusinessCouponsDialog({
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">
+          {/* Custom close button that matches photo album style */}
+          <div className="absolute right-4 top-4 z-10">
+            <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </div>
+
+          <DialogHeader className="pr-10">
+            <DialogTitle className="text-xl font-bold truncate">
               {businessName ? `${businessName} - Coupons` : "Available Coupons"}
             </DialogTitle>
           </DialogHeader>
@@ -622,14 +630,13 @@ export function BusinessCouponsDialog({
       <Dialog open={showFullImage} onOpenChange={setShowFullImage}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-1 sm:p-2">
           <div className="relative w-full">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 z-10 h-8 w-8 bg-white/80 hover:bg-white rounded-full"
-              onClick={() => setShowFullImage(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            {/* Custom close button that matches photo album style */}
+            <div className="absolute top-2 right-2 z-10">
+              <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
+            </div>
 
             {/* Debug button */}
             {selectedCoupon?.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
@@ -824,17 +831,19 @@ export function BusinessCouponsDialog({
       <Dialog open={showFullSizeImage} onOpenChange={setShowFullSizeImage}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-1 overflow-auto">
           <div className="relative w-full">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 z-10 h-8 w-8 bg-white/80 hover:bg-white rounded-full"
-              onClick={() => {
-                setShowFullSizeImage(false)
-                setShowFullImage(true)
-              }}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            {/* Custom close button that matches photo album style */}
+            <div className="absolute top-2 right-2 z-10">
+              <DialogClose
+                className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+                onClick={() => {
+                  setShowFullSizeImage(false)
+                  setShowFullImage(true)
+                }}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
+            </div>
           </div>
 
           {selectedCoupon?.imageUrl && (

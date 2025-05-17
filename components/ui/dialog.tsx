@@ -47,9 +47,11 @@ const DialogContent = React.forwardRef<
     >
       {children}
       {showCloseButton && (
-        <div className="absolute right-4 top-4 flex items-center">
-          <DialogPrimitive.Close className="rounded-full p-2 bg-gray-100 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-            <X className="h-5 w-5" />
+        <div className="absolute right-4 top-4 flex items-center z-10">
+          {" "}
+          {/* Added z-10 to ensure it's above other content */}
+          <DialogPrimitive.Close className="rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+            <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         </div>

@@ -31,12 +31,8 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   const [videoLoading, setVideoLoading] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<any>(null)
-  const [showDebug, setShowDebug] = useState(false)
 
-  // Debug toggle function
-  const toggleDebug = () => {
-    setShowDebug((prev) => !prev)
-  }
+  // Debug toggle function and state removed
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -186,78 +182,9 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="sm:max-w-lg">
-          {/* Debug button - only in development */}
-          {process.env.NODE_ENV !== "production" && (
-            <div className="absolute top-2 right-12 z-50">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleDebug}
-                className="h-7 px-2 text-xs bg-yellow-50 hover:bg-yellow-100 border-yellow-200"
-              >
-                {showDebug ? "Hide Debug" : "Debug"}
-              </Button>
-            </div>
-          )}
+          {/* Debug button removed */}
 
-          {/* Debug information panel */}
-          {showDebug && debugInfo && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-xs overflow-auto max-h-40">
-              <h4 className="font-medium text-yellow-800 mb-1">Debug Information:</h4>
-              <div className="grid grid-cols-2 gap-1">
-                <div className="font-medium">Business ID:</div>
-                <div>{debugInfo.businessId || "Not set"}</div>
-
-                <div className="font-medium">Has Video ID:</div>
-                <div>{debugInfo.hasVideoId ? "Yes" : "No"}</div>
-
-                <div className="font-medium">Ready to Stream:</div>
-                <div>{debugInfo.isReadyToStream ? "Yes" : "No"}</div>
-
-                <div className="font-medium">Aspect Ratio:</div>
-                <div>{debugInfo.aspectRatio}</div>
-
-                <div className="font-medium">Timestamp:</div>
-                <div>{debugInfo.timestamp}</div>
-
-                {debugInfo.hasVideoId && (
-                  <>
-                    <div className="font-medium">Video ID:</div>
-                    <div>{debugInfo.videoData?.cloudflareVideoId}</div>
-
-                    <div className="font-medium">Account ID:</div>
-                    <div>{process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID || "Not set"}</div>
-                  </>
-                )}
-              </div>
-
-              {debugInfo.error && (
-                <div className="mt-2 text-red-600">
-                  <div className="font-medium">Error:</div>
-                  <div>{debugInfo.error}</div>
-                  {debugInfo.errorStack && (
-                    <details>
-                      <summary className="cursor-pointer">Stack Trace</summary>
-                      <pre className="text-xs mt-1 p-1 bg-red-50">{debugInfo.errorStack}</pre>
-                    </details>
-                  )}
-                </div>
-              )}
-
-              <details>
-                <summary className="cursor-pointer mt-2 text-yellow-700">Full Video Data</summary>
-                <pre className="text-xs mt-1 p-1 bg-yellow-100 overflow-auto">
-                  {JSON.stringify(debugInfo.videoData, null, 2)}
-                </pre>
-              </details>
-
-              <div className="mt-2">
-                <Button variant="outline" size="sm" onClick={retryLoadVideo} className="h-6 px-2 text-xs">
-                  Retry Load Video
-                </Button>
-              </div>
-            </div>
-          )}
+          {/* Debug information panel removed */}
 
           {loading ? (
             <div className="flex justify-center items-center py-12">
@@ -403,20 +330,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                         ></iframe>
                       </div>
 
-                      {/* Fallback for debugging */}
-                      {showDebug && (
-                        <div className="mt-2 text-xs">
-                          <p>Direct video URL (for debugging):</p>
-                          <a
-                            href={getCloudflareStreamUrl(businessVideo.cloudflareVideoId)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 break-all"
-                          >
-                            {getCloudflareStreamUrl(businessVideo.cloudflareVideoId)}
-                          </a>
-                        </div>
-                      )}
+                      {/* Fallback for debugging removed */}
                     </div>
                   )}
 
@@ -432,16 +346,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                       <AlertCircle className="h-4 w-4 text-yellow-600" />
                       <AlertDescription className="text-yellow-700 text-sm">
                         {videoError}
-                        {process.env.NODE_ENV !== "production" && (
-                          <Button
-                            variant="link"
-                            size="sm"
-                            onClick={retryLoadVideo}
-                            className="p-0 h-auto text-xs text-yellow-700 underline ml-2"
-                          >
-                            Retry
-                          </Button>
-                        )}
+                        {/* Debug retry button removed */}
                       </AlertDescription>
                     </Alert>
                   )}

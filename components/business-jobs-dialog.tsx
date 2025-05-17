@@ -1,14 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, RefreshCw, Trash2, ArrowLeft } from "lucide-react"
-import { getBusinessJobs, cleanupDemoJobs } from "@/app/actions/job-actions"
+import { Loader2, ArrowLeft, X } from "lucide-react"
+import { getBusinessJobs } from "@/app/actions/job-actions"
 import type { JobListing } from "@/app/actions/job-actions"
 import Image from "next/image"
-import { toast } from "@/components/ui/use-toast"
 
 interface BusinessJobsDialogProps {
   isOpen: boolean
@@ -21,8 +20,6 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
   const [loading, setLoading] = useState(true)
   const [jobs, setJobs] = useState<JobListing[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState<string>("")
-  const [cleaningUp, setCleaningUp] = useState(false)
   const [selectedJob, setSelectedJob] = useState<JobListing | null>(null)
 
   useEffect(() => {
@@ -36,71 +33,20 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       setLoading(true)
       setError(null)
 
-      // Log the business ID we're using
-      console.log(`Loading jobs for business ID: ${businessId}`)
-      setDebugInfo(`Attempting to load jobs for business ID: ${businessId}`)
-
-      // Only load jobs for the provided business ID, no fallback to demo-business
+      // Only load jobs for the provided business ID
       const jobsData = await getBusinessJobs(businessId)
 
-      console.log(`Found ${jobsData?.length || 0} jobs for business ID: ${businessId}`)
-
       if (jobsData && jobsData.length > 0) {
-        console.log(`Loaded ${jobsData.length} jobs:`, jobsData)
-        setDebugInfo((prevInfo) => `${prevInfo}\nSuccessfully loaded ${jobsData.length} jobs`)
         setJobs(jobsData)
       } else {
         setJobs([])
-        console.log("No jobs found for this business")
-        setDebugInfo((prevInfo) => `${prevInfo}\nNo jobs found for business ID: ${businessId}`)
         setError("No job listings found for this business")
       }
     } catch (err) {
       console.error("Error loading business jobs:", err)
-      setDebugInfo((prevInfo) => `${prevInfo}\nError: ${err instanceof Error ? err.message : String(err)}`)
       setError(`Failed to load job listings: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleRefresh = async () => {
-    await loadBusinessJobs()
-    toast({
-      title: "Refreshed",
-      description: "Job listings have been refreshed",
-    })
-  }
-
-  // Add a new function to clean up demo jobs
-  const handleCleanupDemoJobs = async () => {
-    try {
-      setCleaningUp(true)
-      const result = await cleanupDemoJobs(businessId)
-
-      if (result.success) {
-        toast({
-          title: "Cleanup Successful",
-          description: result.message,
-        })
-        // Reload the jobs after cleanup
-        await loadBusinessJobs()
-      } else {
-        toast({
-          title: "Cleanup Failed",
-          description: result.message,
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error cleaning up demo jobs:", error)
-      toast({
-        title: "Error",
-        description: `Failed to clean up demo jobs: ${error instanceof Error ? error.message : String(error)}`,
-        variant: "destructive",
-      })
-    } finally {
-      setCleaningUp(false)
     }
   }
 
@@ -168,21 +114,21 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
         </div>
 
         <div className="flex flex-col md:flex-row gap-6">
-          {/* Logo */}
+          {/* Logo - Updated for better aspect ratio */}
           <div className="flex-shrink-0 flex items-center justify-center">
             {selectedJob.logoUrl ? (
-              <div className="relative h-32 w-32 rounded-md overflow-hidden border">
+              <div className="relative w-32 h-32 rounded-md overflow-hidden border flex items-center justify-center bg-white">
                 <Image
                   src={selectedJob.logoUrl || "/placeholder.svg"}
                   alt={`${selectedJob.businessName} logo`}
+                  className="object-contain max-w-full max-h-full w-auto h-auto"
                   width={128}
                   height={128}
-                  className="object-contain"
                   unoptimized
                 />
               </div>
             ) : (
-              <div className="h-32 w-32 bg-gray-100 rounded-md flex items-center justify-center">
+              <div className="w-32 h-32 bg-gray-100 rounded-md flex items-center justify-center">
                 <span className="text-gray-400 text-sm text-center">No logo</span>
               </div>
             )}
@@ -286,8 +232,6 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
             )}
           </div>
         </div>
-
-        {/* External link section has been removed */}
       </div>
     )
   }
@@ -307,16 +251,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       return (
         <div className="text-center py-8 text-gray-500">
           <p>{error}</p>
-          {process.env.NODE_ENV !== "production" && debugInfo && (
-            <div className="mt-4 p-3 bg-gray-100 rounded-md text-xs text-left">
-              <p className="font-medium">Debug Information:</p>
-              <pre className="whitespace-pre-wrap">{debugInfo}</pre>
-            </div>
-          )}
           <div className="mt-4 flex justify-center gap-2">
-            <Button variant="outline" onClick={handleRefresh}>
-              Try Again
-            </Button>
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
@@ -329,14 +264,8 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       return (
         <div className="text-center py-8 text-gray-500">
           <p>No job listings available for this business.</p>
-          {process.env.NODE_ENV !== "production" && debugInfo && (
-            <div className="mt-4 p-3 bg-gray-100 rounded-md text-xs text-left">
-              <p className="font-medium">Debug Information:</p>
-              <pre className="whitespace-pre-wrap">{debugInfo}</pre>
-            </div>
-          )}
-          <Button variant="outline" className="mt-4" onClick={handleRefresh}>
-            Refresh
+          <Button variant="outline" className="mt-4" onClick={onClose}>
+            Close
           </Button>
         </div>
       )
@@ -348,21 +277,21 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
           <Card key={job.id} className="overflow-hidden">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row gap-4">
-                {/* Logo */}
+                {/* Logo - Updated for better aspect ratio */}
                 <div className="flex-shrink-0 flex items-center justify-center">
                   {job.logoUrl ? (
-                    <div className="relative h-24 w-24 rounded-md overflow-hidden border">
+                    <div className="relative w-24 h-24 rounded-md overflow-hidden border flex items-center justify-center bg-white">
                       <Image
                         src={job.logoUrl || "/placeholder.svg"}
                         alt={`${job.businessName} logo`}
+                        className="object-contain max-w-full max-h-full w-auto h-auto"
                         width={96}
                         height={96}
-                        className="object-contain"
-                        unoptimized // Use the direct Cloudflare URL
+                        unoptimized
                       />
                     </div>
                   ) : (
-                    <div className="h-24 w-24 bg-gray-100 rounded-md flex items-center justify-center">
+                    <div className="w-24 h-24 bg-gray-100 rounded-md flex items-center justify-center">
                       <span className="text-gray-400 text-xs text-center">No logo</span>
                     </div>
                   )}
@@ -439,15 +368,6 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
             </CardContent>
           </Card>
         ))}
-
-        {process.env.NODE_ENV !== "production" && debugInfo && (
-          <div className="mt-4 p-3 bg-gray-100 rounded-md text-xs">
-            <details>
-              <summary className="cursor-pointer font-medium">Debug Information</summary>
-              <pre className="mt-2 whitespace-pre-wrap">{debugInfo}</pre>
-            </details>
-          </div>
-        )}
       </div>
     )
   }
@@ -455,46 +375,18 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle className="text-xl font-semibold">
+        {/* Custom close button that matches photo album style */}
+        <div className="absolute right-4 top-4 z-10">
+          <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </div>
+
+        <DialogHeader className="pr-10">
+          <DialogTitle className="text-xl font-semibold truncate">
             {selectedJob ? `${selectedJob.jobTitle} - ${businessName}` : `${businessName} - Job Opportunities`}
           </DialogTitle>
-          <div className="flex gap-2">
-            {!selectedJob && process.env.NODE_ENV !== "production" && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(`/api/debug/business-jobs?businessId=${businessId}`, "_blank")}
-                  title="Debug job data"
-                >
-                  Debug
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCleanupDemoJobs}
-                  disabled={cleaningUp || loading}
-                  title="Remove demo jobs"
-                  className="flex items-center gap-1"
-                >
-                  <Trash2 className={`h-4 w-4 ${cleaningUp ? "animate-spin" : ""}`} />
-                  {cleaningUp ? "Cleaning..." : "Remove Demo Jobs"}
-                </Button>
-              </>
-            )}
-            {!selectedJob && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleRefresh}
-                disabled={loading}
-                title="Refresh job listings"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              </Button>
-            )}
-          </div>
         </DialogHeader>
 
         {selectedJob ? renderJobDetails() : renderJobListings()}

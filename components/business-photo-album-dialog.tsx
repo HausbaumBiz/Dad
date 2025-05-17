@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { ImageIcon, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { ImageIcon, ChevronLeft, ChevronRight, Loader2, X } from "lucide-react"
 import { getBusinessMedia, type MediaItem } from "@/app/actions/media-actions"
 
 interface BusinessPhotoAlbumDialogProps {
@@ -77,9 +77,11 @@ export function BusinessPhotoAlbumDialog({ isOpen, onClose, businessId, business
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-4xl p-0 overflow-hidden">
-        <DialogHeader className="p-4 border-b">
+        <DialogHeader className="p-4 border-b photo-album-header">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-semibold">{businessName} Photo Album</DialogTitle>
+            <DialogTitle className="text-xl font-semibold truncate dialog-title">
+              {businessName} Photo Album
+            </DialogTitle>
             <div className="flex items-center gap-2">
               {viewMode === "slideshow" && (
                 <Button variant="outline" size="sm" onClick={() => setViewMode("grid")}>
@@ -141,6 +143,19 @@ export function BusinessPhotoAlbumDialog({ isOpen, onClose, businessId, business
           </div>
         ) : (
           <div className="relative bg-black h-[70vh]">
+            {viewMode === "slideshow" && (
+              <div className="absolute right-4 top-4 z-10">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full bg-white/80 hover:bg-white photo-album-close-button"
+                  onClick={() => setViewMode("grid")}
+                >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close slideshow</span>
+                </Button>
+              </div>
+            )}
             <div className="absolute inset-0 flex items-center justify-center">
               <img
                 src={photos[currentPhotoIndex]?.url || "/placeholder.svg"}

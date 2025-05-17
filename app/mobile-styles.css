@@ -33,3 +33,43 @@
     font-size: 0.875rem !important;
   }
 }
+
+/* Photo album dialog specific fixes */
+@media (max-width: 480px) {
+  /* Ensure title doesn't overlap with close button */
+  .photo-album-header .dialog-title {
+    max-width: 75%;
+    padding-right: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Make close button more visible against various backgrounds */
+  .photo-album-close-button {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Standardized close button for all dialogs */
+.dialog-close-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+  background-color: white;
+  border-radius: 9999px;
+  padding: 0.375rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s;
+}
+
+.dialog-close-button:hover {
+  background-color: #f3f4f6;
+}
+
+/* Ensure dialog titles don't overlap with close buttons */
+.dialog-title-container {
+  padding-right: 2.5rem;
+}
