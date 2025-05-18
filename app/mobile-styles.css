@@ -27,6 +27,32 @@
     padding: 0.75rem !important;
   }
 
+  /* Fix for AdBox title and close button overlap */
+  .adbox-header {
+    position: relative;
+    padding-right: 40px !important; /* Make room for the close button */
+  }
+
+  .adbox-title {
+    font-size: 1.125rem !important;
+    line-height: 1.3 !important;
+    width: calc(100% - 40px) !important; /* Ensure title doesn't overlap with close button */
+    white-space: normal !important; /* Allow wrapping */
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important; /* Limit to 2 lines */
+    -webkit-box-orient: vertical !important;
+  }
+
+  .adbox-close-button {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    padding: 6px !important;
+    margin: 0 !important;
+  }
+
   /* Make text more readable on small screens */
   .adbox-container h3 {
     font-size: 1.25rem !important;
