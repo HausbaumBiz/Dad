@@ -14,6 +14,13 @@ import type { CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-act
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { DialogClose } from "@radix-ui/react-dialog"
 
+// Add CSS to hide the default close button
+const hideDefaultCloseButtonStyle = `
+  .business-profile-dialog-content > div[class*="absolute right-4 top-4"] {
+    display: none !important;
+  }
+`
+
 interface BusinessProfileDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -181,11 +188,16 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
   return (
     <>
+      {/* Add style to hide default close button */}
+      <style jsx global>
+        {hideDefaultCloseButtonStyle}
+      </style>
+
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="business-profile-dialog-content w-full p-0 m-0" closeButton={false}>
-          {/* Custom close button */}
-          <div className="absolute right-4 top-4 z-10">
-            <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+          {/* Custom close button - centered above content */}
+          <div className="flex justify-center w-full py-2 border-b">
+            <DialogClose className="rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
             </DialogClose>

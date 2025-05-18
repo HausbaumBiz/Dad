@@ -46,10 +46,10 @@ export function AdBox({
   return (
     <Card className="overflow-hidden border border-gray-200 shadow-sm adbox-container">
       <CardContent className="p-4 sm:p-6">
-        {/* Header section with title */}
+        {/* Header section with title at the top */}
         <div className="adbox-header mb-4">
           {/* Title at the top */}
-          <h3 className="text-lg font-semibold mb-3 adbox-title text-center">{title}</h3>
+          <h3 className="text-lg font-semibold mb-2 adbox-title text-center">{title}</h3>
 
           {/* Close button centered at the top */}
           <div className="flex justify-center mb-2">
