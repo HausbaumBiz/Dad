@@ -196,7 +196,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="business-profile-dialog-content w-full p-0 m-0" closeButton={false}>
           {/* Custom close button - centered above content */}
-          <div className="flex justify-center w-full py-2 border-b">
+          <div className="flex justify-center w-full py-1 border-b">
             <DialogClose className="rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
@@ -368,33 +368,6 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     </Alert>
                   )}
 
-                  {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
-                    <button
-                      onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
-                      className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-                      style={{
-                        backgroundColor: colorValues.textColor ? "#000000" : colorValues.primary,
-                      }}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-white"
-                      >
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                      </svg>
-                      Visit Website
-                    </button>
-                  )}
-
                   {/* Buttons for Photo Album, Coupons, and Jobs */}
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     <Button
@@ -424,6 +397,34 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                       <span className="text-xs">Jobs</span>
                     </Button>
                   </div>
+
+                  {/* Website button moved below the grid */}
+                  {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
+                    <button
+                      onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
+                      className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90 mt-2"
+                      style={{
+                        backgroundColor: colorValues.textColor ? "#000000" : colorValues.primary,
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-white"
+                      >
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                      </svg>
+                      Visit Website
+                    </button>
+                  )}
                 </div>
               </Card>
             </div>

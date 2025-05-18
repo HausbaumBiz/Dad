@@ -4,10 +4,8 @@ import { useState, useEffect, useRef } from "react"
 import type React from "react"
 
 import { useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
-import { Play, Pause, X } from "lucide-react"
+import { Play, Pause } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
@@ -17,6 +15,11 @@ import { getCurrentBusiness } from "@/app/actions/auth-actions"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
+
+// First, add imports for the dialog components at the top of the file, after the existing imports
+import { BusinessPhotoAlbumDialog } from "@/components/business-photo-album-dialog"
+import { BusinessJobsDialog } from "@/components/business-jobs-dialog"
+import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
 
 interface PhotoItem {
   id: string
@@ -35,6 +38,9 @@ export default function CustomizeAdDesignPage() {
 
   // Add state for the dialogs
   const [isSavingsDialogOpen, setIsSavingsDialogOpen] = useState(false)
+  // Add state variables for the photo album and jobs dialogs
+  // Add these after the existing state variables (around line 45-50)
+  const [isPhotoAlbumDialogOpen, setIsPhotoAlbumDialogOpen] = useState(false)
   const [isJobsDialogOpen, setIsJobsDialogOpen] = useState(false)
 
   // Add state for saved coupons and loading state:
@@ -470,9 +476,11 @@ export default function CustomizeAdDesignPage() {
     }
   }, [videoRef.current])
 
+  // Replace the handleOpenPhotoAlbum function with this new version that opens the dialog
+  // Around line 375
   const handleOpenPhotoAlbum = () => {
-    // Navigate to the photo album page instead of opening a dialog
-    window.location.href = "/photo-album"
+    // Open the photo album dialog instead of navigating to a different page
+    setIsPhotoAlbumDialogOpen(true)
   }
 
   // Modify the handleSubmit function to save the formatted phone number
@@ -809,35 +817,98 @@ export default function CustomizeAdDesignPage() {
             )}
 
             {/* Footer with buttons */}
-
             <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
-              {!hiddenFields.photoAlbum && (
-                <button
-                  onClick={handleOpenPhotoAlbum}
-                  className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{
-                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                    }}
+              {/* Grid layout for buttons - matching the AdBox dialog layout */}
+              <div className="grid grid-cols-3 gap-2">
+                {!hiddenFields.photoAlbum && (
+                  <button
+                    onClick={handleOpenPhotoAlbum}
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 rounded-md border border-gray-200 bg-white px-4 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
                   >
-                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                    <circle cx="9" cy="9" r="2"></circle>
-                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                  </svg>
-                  View Photo Album
-                </button>
-              )}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
+                      className="h-5 w-5"
+                    >
+                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                      <circle cx="9" cy="9" r="2"></circle>
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                    </svg>
+                    <span className="text-xs">Photo Album</span>
+                  </button>
+                )}
 
+                {!hiddenFields.savingsButton && (
+                  <button
+                    onClick={() => setIsSavingsDialogOpen(true)}
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 rounded-md border border-gray-200 bg-white px-4 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
+                      className="h-5 w-5"
+                    >
+                      <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
+                      <path d="M7 7h.01" />
+                    </svg>
+                    <span className="text-xs">Coupons</span>
+                  </button>
+                )}
+
+                {!hiddenFields.jobsButton && (
+                  // Update the Jobs button click handler in the renderDesignPreview function
+                  // Find the Jobs button in the grid layout (around line 600) and replace onClick with:
+                  <button
+                    onClick={() => setIsJobsDialogOpen(true)}
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 rounded-md border border-gray-200 bg-white px-4 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{
+                        color:
+                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      }}
+                      className="h-5 w-5"
+                    >
+                      <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
+                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                    </svg>
+                    <span className="text-xs">Jobs</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Website button - separate from the grid */}
               {!hiddenFields.website && (
                 <button
                   onClick={() => window.open(`https://${formData.website}`, "_blank")}
@@ -863,58 +934,6 @@ export default function CustomizeAdDesignPage() {
                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                   </svg>
                   Visit Website
-                </button>
-              )}
-
-              {!hiddenFields.savingsButton && (
-                <button
-                  onClick={() => setIsSavingsDialogOpen(true)}
-                  className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{
-                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                    }}
-                  >
-                    <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-                    <path d="M7 7h.01" />
-                  </svg>
-                  View Coupons
-                </button>
-              )}
-
-              {!hiddenFields.jobsButton && (
-                <button
-                  onClick={() => setIsJobsDialogOpen(true)}
-                  className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{
-                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                    }}
-                  >
-                    <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
-                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                  </svg>
-                  Job Opportunities
                 </button>
               )}
             </div>
@@ -1301,285 +1320,33 @@ export default function CustomizeAdDesignPage() {
 
       <MainFooter />
 
-      {/* Savings Dialog */}
-      <Dialog open={isSavingsDialogOpen} onOpenChange={setIsSavingsDialogOpen}>
-        <DialogContent className="sm:max-w-3xl" closeButton={false}>
-          <DialogHeader>
-            <DialogTitle>Available Coupons</DialogTitle>
-          </DialogHeader>
-
-          {/* Custom close button */}
-          <div className="absolute right-4 top-4">
-            <DialogClose className="rounded-full h-6 w-6 inline-flex items-center justify-center text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </DialogClose>
-          </div>
-
-          <div className="space-y-6">
-            {isCouponsLoading ? (
-              <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-blue-500 border-r-transparent border-b-blue-500 border-l-transparent"></div>
-                <p className="mt-2 text-gray-600">Loading coupons...</p>
-              </div>
-            ) : savedCoupons.length > 0 ? (
-              <div className="space-y-6">
-                {/* Small Coupons */}
-                {savedCoupons.filter((coupon) => coupon.size === "small").length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Small Coupons</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {savedCoupons
-                        .filter((coupon) => coupon.size === "small")
-                        .map((coupon) => (
-                          <div
-                            key={coupon.id}
-                            className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-4"
-                            ref={(el) => {
-                              if (el) couponRefs.current[coupon.id] = el
-                            }}
-                          >
-                            <div className="text-center mb-2">
-                              <h4 className="font-bold text-lg text-teal-700">{coupon.businessName}</h4>
-                            </div>
-
-                            <div className="text-center mb-3">
-                              <div className="font-bold text-xl">{coupon.title}</div>
-                              <div className="text-2xl font-extrabold text-red-600">{coupon.discount}</div>
-                            </div>
-
-                            <div className="text-sm mb-3">{coupon.description}</div>
-
-                            {coupon.code && (
-                              <div className="text-center mb-2">
-                                <span className="inline-block bg-gray-100 px-2 py-1 rounded font-mono text-sm">
-                                  Code: {coupon.code}
-                                </span>
-                              </div>
-                            )}
-
-                            <div className="text-xs text-gray-600 mt-2">
-                              Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
-                            </div>
-
-                            <div className="text-xs text-gray-500 mt-1">
-                              <button
-                                className="text-teal-600 hover:underline"
-                                onClick={() => setOpenDialogId(coupon.id)}
-                              >
-                                Terms & Conditions
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Large Coupons */}
-                {savedCoupons.filter((coupon) => coupon.size === "large").length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Large Coupons</h3>
-                    <div className="space-y-4">
-                      {savedCoupons
-                        .filter((coupon) => coupon.size === "large")
-                        .map((coupon) => (
-                          <div
-                            key={coupon.id}
-                            className="relative bg-white border-2 border-dashed border-gray-300 rounded-lg p-6"
-                            ref={(el) => {
-                              if (el) couponRefs.current[coupon.id] = el
-                            }}
-                          >
-                            <div className="flex flex-col md:flex-row md:items-center">
-                              <div className="md:w-1/3 text-center mb-4 md:mb-0">
-                                <h4 className="font-bold text-xl text-teal-700 mb-2">{coupon.businessName}</h4>
-                                <div className="text-3xl font-extrabold text-red-600">{coupon.discount}</div>
-                                <div className="font-bold text-xl mt-1">{coupon.title}</div>
-                              </div>
-
-                              <div className="md:w-2/3 md:pl-6 md:border-l border-gray-200">
-                                <div className="text-lg mb-3">{coupon.description}</div>
-
-                                {coupon.code && (
-                                  <div className="mb-3">
-                                    <span className="inline-block bg-gray-100 px-3 py-1 rounded font-mono">
-                                      Code: {coupon.code}
-                                    </span>
-                                  </div>
-                                )}
-
-                                <div className="text-sm text-gray-600 mt-4">
-                                  Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
-                                </div>
-
-                                <div className="text-sm text-gray-500 mt-1">
-                                  <button
-                                    className="text-teal-600 hover:underline"
-                                    onClick={() => setOpenDialogId(coupon.id)}
-                                  >
-                                    Terms & Conditions
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No coupons available. Create coupons on the Penny Saver Workbench page.</p>
-                <Button className="mt-4" onClick={() => (window.location.href = "/coupons")}>
-                  Go to Coupons Page
-                </Button>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Coupons Dialog */}
+      <BusinessCouponsDialog
+        businessId={businessId}
+        isOpen={isSavingsDialogOpen}
+        onOpenChange={setIsSavingsDialogOpen}
+        businessName={formData.businessName}
+      />
 
       {/* Now let's add the Jobs Dialog component */}
 
+      {/* Using BusinessJobsDialog component instead of a custom Jobs dialog */}
+
+      {/* Photo Album Dialog */}
+      <BusinessPhotoAlbumDialog
+        isOpen={isPhotoAlbumDialogOpen}
+        onClose={() => setIsPhotoAlbumDialogOpen(false)}
+        businessId={businessId}
+        businessName={formData.businessName}
+      />
+
       {/* Jobs Dialog */}
-      <Dialog open={isJobsDialogOpen} onOpenChange={setIsJobsDialogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto" closeButton={false}>
-          <DialogHeader>
-            <DialogTitle>Job Opportunities</DialogTitle>
-          </DialogHeader>
-
-          {/* Custom close button */}
-          <div className="absolute right-4 top-4">
-            <DialogClose className="rounded-full h-6 w-6 inline-flex items-center justify-center text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </DialogClose>
-          </div>
-
-          <div className="space-y-6">
-            {isJobsLoading ? (
-              <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-blue-500 border-r-transparent border-b-blue-500 border-l-transparent"></div>
-                <p className="mt-2 text-gray-600">Loading job listings...</p>
-              </div>
-            ) : jobListings.length > 0 ? (
-              <div className="space-y-6">
-                {jobListings.map((job) => (
-                  <div key={job.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-                    {/* Job Header */}
-                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 border-b border-gray-200">
-                      <div className="flex items-center">
-                        {job.logoUrl ? (
-                          <div className="mr-4 flex-shrink-0">
-                            <div className="relative h-16 w-16">
-                              <img
-                                src={job.logoUrl || "/placeholder.svg"}
-                                alt={`${job.businessName} logo`}
-                                className="h-full w-full object-contain"
-                              />
-                            </div>
-                          </div>
-                        ) : null}
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-800">{job.jobTitle}</h3>
-                          <p className="text-sm text-gray-600">{job.businessName}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Job Summary */}
-                    <div className="p-4">
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {job.payType === "hourly" && job.hourlyMin && (
-                          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                            ${job.hourlyMin}
-                            {job.hourlyMax ? ` - $${job.hourlyMax}` : ""}/hour
-                          </span>
-                        )}
-                        {job.payType === "salary" && job.salaryMin && (
-                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                            ${job.salaryMin}
-                            {job.salaryMax ? ` - $${job.salaryMax}` : ""}/year
-                          </span>
-                        )}
-                        {job.payType === "other" && job.otherPay && (
-                          <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                            {job.otherPay}
-                          </span>
-                        )}
-                        <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                          {job.workHours}
-                        </span>
-                      </div>
-
-                      <div className="mb-3 line-clamp-2">
-                        <p className="text-sm text-gray-700">{job.jobDescription}</p>
-                      </div>
-
-                      {/* Categories */}
-                      <div className="mt-3">
-                        <p className="text-xs text-gray-500 mb-1">Categories:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {job.categories.map((category, index) => (
-                            <span
-                              key={index}
-                              className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded"
-                            >
-                              {category}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Show Details Button */}
-                      <button
-                        className="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                        onClick={() => window.open(`/job-listings/${job.id}`, "_blank")}
-                      >
-                        View Full Details
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No job listings available. Create job listings on the Job Listing Workbench page.</p>
-                <Button className="mt-4" onClick={() => (window.location.href = "/job-listing")}>
-                  Go to Job Listing Page
-                </Button>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Terms and Conditions Dialog */}
-      <Dialog open={openDialogId !== null} onOpenChange={() => setOpenDialogId(null)}>
-        <DialogContent className="sm:max-w-md" closeButton={false}>
-          <DialogHeader>
-            <DialogTitle>Terms and Conditions</DialogTitle>
-          </DialogHeader>
-
-          {/* Custom close button */}
-          <div className="absolute right-4 top-4">
-            <DialogClose className="rounded-full h-6 w-6 inline-flex items-center justify-center text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </DialogClose>
-          </div>
-
-          {savedCoupons
-            .filter((coupon) => coupon.id === openDialogId)
-            .map((coupon) => (
-              <div key={coupon.id} className="text-sm">
-                {coupon.terms ? <p>{coupon.terms}</p> : <p>No terms and conditions specified for this coupon.</p>}
-              </div>
-            ))}
-        </DialogContent>
-      </Dialog>
+      <BusinessJobsDialog
+        isOpen={isJobsDialogOpen}
+        onClose={() => setIsJobsDialogOpen(false)}
+        businessId={businessId}
+        businessName={formData.businessName}
+      />
     </div>
   )
 }

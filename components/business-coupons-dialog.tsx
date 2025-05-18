@@ -540,7 +540,7 @@ export function BusinessCouponsDialog({
                   <div className="space-y-6 coupon-content">
                     {smallCoupons.length > 0 && (
                       <div>
-                        <h3 className="text-lg font-medium mb-3">Small Coupons</h3>
+                        <h3 className="text-lg font-medium mb-3">Coupons</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 coupon-grid">
                           {smallCoupons.map((coupon) => (
                             <div
