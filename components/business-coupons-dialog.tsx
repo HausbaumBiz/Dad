@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import {
   getCouponIds,
   getCouponMetadata,
@@ -12,7 +12,7 @@ import {
 } from "@/app/actions/coupon-image-actions"
 import { CLOUDFLARE_ACCOUNT_HASH } from "@/lib/cloudflare-images"
 import Image from "next/image"
-import { Loader2, X, Info, Download, ExternalLink, ImageOff, RefreshCw, Bug, Copy, Check } from "lucide-react"
+import { Loader2, X, Info, Download, ExternalLink, ImageOff, RefreshCw, Bug, Copy, Check, FileText } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useMobile } from "@/hooks/use-mobile"
 
@@ -203,6 +203,11 @@ export function BusinessCouponsDialog({
     setShowFullImage(false)
     setShowFullSizeImage(false)
     setActiveTab("terms") // Set the active tab to terms
+  }
+
+  // Function to toggle between coupons and terms views
+  const toggleView = () => {
+    setActiveTab(activeTab === "all" ? "terms" : "all")
   }
 
   // Function to handle image errors
@@ -521,108 +526,113 @@ export function BusinessCouponsDialog({
               <p>No coupons available for this business.</p>
             </div>
           ) : (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="all" className="tabs-trigger">
-                  All Coupons
-                </TabsTrigger>
-                <TabsTrigger value="terms" className="tabs-trigger">
-                  Terms & Conditions
-                </TabsTrigger>
-              </TabsList>
+            <div className="px-4 pt-2 pb-4">
+              {/* Toggle button for switching between coupons and terms */}
+              <div className="flex justify-end mb-4">
+                <Button onClick={toggleView} variant="outline" size="sm" className="flex items-center gap-1.5">
+                  <FileText className="h-4 w-4" />
+                  {activeTab === "all" ? "Terms & Conditions" : "All Coupons"}
+                </Button>
+              </div>
 
-              <TabsContent value="all" className="mt-4">
-                <div className="space-y-6 coupon-content">
-                  {smallCoupons.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-medium mb-3">Small Coupons</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 coupon-grid">
-                        {smallCoupons.map((coupon) => (
-                          <div
-                            key={coupon.id}
-                            className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                            onClick={() => handleCouponClick(coupon)}
-                          >
-                            <div className="relative aspect-[4/3] w-full">{renderCouponImage(coupon, "4/3")}</div>
-                            <div className="absolute bottom-2 right-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleCouponClick(coupon)
-                                }}
-                              >
-                                <Info className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
-                              <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                                Fixed Image
+              <Tabs value={activeTab} className="w-full">
+                <TabsContent value="all" className="mt-0 pt-0">
+                  <div className="space-y-6 coupon-content">
+                    {smallCoupons.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-3">Small Coupons</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 coupon-grid">
+                          {smallCoupons.map((coupon) => (
+                            <div
+                              key={coupon.id}
+                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                              onClick={() => handleCouponClick(coupon)}
+                            >
+                              <div className="relative aspect-[4/3] w-full">{renderCouponImage(coupon, "4/3")}</div>
+                              <div className="absolute bottom-2 right-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleCouponClick(coupon)
+                                  }}
+                                >
+                                  <Info className="h-4 w-4" />
+                                </Button>
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
+                                <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                                  Fixed Image
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {largeCoupons.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="text-lg font-medium mb-3">Large Coupons</h3>
-                      <div className="space-y-4">
-                        {largeCoupons.map((coupon) => (
-                          <div
-                            key={coupon.id}
-                            className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                            onClick={() => handleCouponClick(coupon)}
-                          >
-                            {/* Changed aspect ratio for large coupons to make them fit better */}
-                            <div className="relative aspect-[5/2.5] w-full max-h-[200px]">
-                              {renderCouponImage(coupon, "5/2.5")}
-                            </div>
-                            <div className="absolute bottom-2 right-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleCouponClick(coupon)
-                                }}
-                              >
-                                <Info className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
-                              <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                                Fixed Image
+                    {largeCoupons.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-medium mb-3">Large Coupons</h3>
+                        <div className="space-y-4">
+                          {largeCoupons.map((coupon) => (
+                            <div
+                              key={coupon.id}
+                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                              onClick={() => handleCouponClick(coupon)}
+                            >
+                              {/* Changed aspect ratio for large coupons to make them fit better */}
+                              <div className="relative aspect-[5/2.5] w-full max-h-[200px]">
+                                {renderCouponImage(coupon, "5/2.5")}
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              <div className="absolute bottom-2 right-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleCouponClick(coupon)
+                                  }}
+                                >
+                                  <Info className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              {coupon.imageId === "3c7f7206-113c-4de6-3ecd-e7c19f4f8300" && (
+                                <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                                  Fixed Image
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
+                    )}
+                  </div>
+                </TabsContent>
 
-              <TabsContent value="terms" className="mt-4">
-                <div className="bg-white p-6 rounded-lg border">
-                  <h3 className="text-lg font-medium mb-4">Global Terms & Conditions</h3>
-                  <div
-                    className="text-sm whitespace-pre-wrap text-sm-content"
-                    dangerouslySetInnerHTML={{
-                      __html: formatTermsWithBoldHeadings(globalTerms),
-                    }}
-                  />
-                </div>
-              </TabsContent>
-            </Tabs>
+                <TabsContent value="terms" className="mt-0 pt-0">
+                  <div className="bg-white rounded-lg border p-6">
+                    <h3 className="text-lg font-medium mb-4">Global Terms & Conditions</h3>
+                    {globalTerms ? (
+                      <div
+                        className="text-sm whitespace-pre-wrap prose max-w-none"
+                        dangerouslySetInnerHTML={{
+                          __html: formatTermsWithBoldHeadings(globalTerms),
+                        }}
+                      />
+                    ) : (
+                      <p className="text-gray-500">No terms and conditions available.</p>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="px-4 py-3 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
