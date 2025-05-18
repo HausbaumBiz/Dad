@@ -18,7 +18,7 @@ export function MainHeader() {
         </Link>
         <Link
           href="/workbench"
-          className="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700"
+          className="px-4 py-2 rounded-md bg-hausbaum hover:bg-hausbaum-dark transition-colors text-white font-medium"
         >
           Back to Workbench
         </Link>

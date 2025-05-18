@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { X } from "lucide-react"
 import Image from "next/image"
 
 interface SuggestCategoryModalProps {
@@ -20,7 +21,15 @@ export function SuggestCategoryModal({ isOpen, onClose }: SuggestCategoryModalPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" closeButton={false}>
+        {/* Custom close button */}
+        <div className="absolute right-4 top-4 z-10">
+          <DialogClose className="rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </div>
+
         <DialogHeader>
           <div className="flex justify-center mb-4">
             <div className="relative w-40 h-20">
@@ -60,11 +69,9 @@ export function SuggestCategoryModal({ isOpen, onClose }: SuggestCategoryModalPr
         </div>
 
         <DialogFooter className="sm:justify-between">
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Close
-            </Button>
-          </DialogClose>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
           <Button type="button" onClick={handleSubmit}>
             Submit
           </Button>

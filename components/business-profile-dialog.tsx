@@ -5,13 +5,14 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
-import { Loader2, ImageIcon, Ticket, Briefcase, AlertCircle } from "lucide-react"
+import { Loader2, ImageIcon, Ticket, Briefcase, AlertCircle, X } from "lucide-react"
 import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
 import { BusinessCouponsDialog } from "./business-coupons-dialog"
 import { BusinessJobsDialog } from "./business-jobs-dialog"
 import { getCloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import type { CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { DialogClose } from "@radix-ui/react-dialog"
 
 interface BusinessProfileDialogProps {
   isOpen: boolean
@@ -182,9 +183,13 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="business-profile-dialog-content w-full p-0 m-0" closeButton={false}>
-          {/* Debug button removed */}
-
-          {/* Debug information panel removed */}
+          {/* Custom close button */}
+          <div className="absolute right-4 top-4 z-10">
+            <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </div>
 
           {loading ? (
             <div className="flex justify-center items-center py-12">

@@ -1,9 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Star } from "lucide-react"
+import { Star, X } from "lucide-react"
 import { ReviewLoginDialog } from "./review-login-dialog"
 
 interface Review {
@@ -32,6 +39,14 @@ export function ReviewsDialog({ isOpen, onClose, providerName, reviews }: Review
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="reviews-dialog-content w-full p-0 m-0" closeButton={false}>
+          {/* Custom close button */}
+          <div className="absolute right-4 top-4 z-10">
+            <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </div>
+
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">{providerName} Reviews</DialogTitle>
             <DialogDescription>See what others are saying about this service provider.</DialogDescription>

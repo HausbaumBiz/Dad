@@ -1,0 +1,48 @@
+/* Debug styles for dialog troubleshooting */
+.dialog-debug-highlight {
+  border: 2px solid red !important;
+  position: relative !important;
+}
+
+.dialog-debug-label {
+  position: absolute !important;
+  top: -20px !important;
+  right: -10px !important;
+  background-color: red !important;
+  color: white !important;
+  border-radius: 50% !important;
+  padding: 2px 6px !important;
+  font-size: 10px !important;
+  font-weight: bold !important;
+  z-index: 9999 !important;
+}
+
+.dialog-debugger-panel {
+  background-color: rgba(255, 248, 230, 0.95) !important;
+  border: 1px solid #f0d070 !important;
+  padding: 8px !important;
+  border-radius: 4px !important;
+  font-size: 11px !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 9999 !important;
+  max-width: 100% !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+.dialog-debugger-panel button {
+  font-size: 10px !important;
+  padding: 2px 4px !important;
+  height: auto !important;
+  min-height: 20px !important;
+}
+
+.dialog-debugger-warning {
+  color: #d32f2f !important;
+  font-weight: bold !important;
+}
+
+.jobs-dialog-main-close {
+  border: 1px solid #4ade80 !important;
+}

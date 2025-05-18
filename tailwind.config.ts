@@ -53,6 +53,12 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Add direct access to the Hausbaum green color
+        hausbaum: {
+          DEFAULT: "#6db43f",
+          light: "#8bc665",
+          dark: "#568f32",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

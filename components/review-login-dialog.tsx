@@ -3,12 +3,19 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, X } from "lucide-react"
 import Link from "next/link"
 
 interface ReviewLoginDialogProps {
@@ -28,7 +35,15 @@ export function ReviewLoginDialog({ isOpen, onClose }: ReviewLoginDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" closeButton={false}>
+        {/* Custom close button */}
+        <div className="absolute right-4 top-4 z-10">
+          <DialogClose className="rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </div>
+
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">Login Required</DialogTitle>
           <DialogDescription>Only registered users can leave reviews. Please login to continue.</DialogDescription>

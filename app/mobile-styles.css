@@ -272,6 +272,22 @@
     max-width: 100% !important;
     box-sizing: border-box !important;
   }
+
+  /* Ensure only one close button is visible in jobs dialog */
+  .jobs-dialog .radix-dialog-close:nth-of-type(n + 2),
+  .jobs-dialog-content .radix-dialog-close:nth-of-type(n + 2) {
+    display: none !important;
+  }
+
+  /* Ensure the close button is properly positioned and visible */
+  .jobs-dialog .dialog-close-button {
+    position: absolute !important;
+    top: 0.5rem !important;
+    right: 0.5rem !important;
+    z-index: 50 !important;
+    background-color: white !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+  }
 }
 
 /* Photo album dialog specific fixes */
