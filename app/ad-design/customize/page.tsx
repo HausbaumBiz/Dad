@@ -5,7 +5,6 @@ import type React from "react"
 
 import { useSearchParams } from "next/navigation"
 import { Card } from "@/components/ui/card"
-import { Play, Pause } from "lucide-react"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
@@ -18,7 +17,7 @@ import { MainFooter } from "@/components/main-footer"
 
 // First, add imports for the dialog components at the top of the file, after the existing imports
 import { BusinessPhotoAlbumDialog } from "@/components/business-photo-album-dialog"
-import { BusinessJobsDialog } from "@/components/business-jobs-dialog"
+import BusinessJobsDialog from "@/components/business-jobs-dialog"
 import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
 
 interface PhotoItem {
@@ -195,15 +194,13 @@ export default function CustomizeAdDesignPage() {
       const media = await getBusinessMedia(id)
 
       if (media) {
-        // Set video if available
-        if (media.videoUrl) {
-          setVideoPreview(media.videoUrl)
-        }
+        // We're not using video, so we don't need to set videoPreview
+        setVideoPreview(null)
 
-        // Set thumbnail if available
-        if (media.thumbnailUrl) {
-          setThumbnailPreview(media.thumbnailUrl)
-        }
+        // Set the Cloudflare image as our placeholder
+        setThumbnailPreview(
+          "https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public",
+        )
 
         // Set photo album if available
         if (media.photoAlbum && Array.isArray(media.photoAlbum) && media.photoAlbum.length > 0) {
@@ -222,7 +219,10 @@ export default function CustomizeAdDesignPage() {
       console.error("Error loading saved media:", error)
       // Initialize with empty values on error
       setVideoPreview(null)
-      setThumbnailPreview(null)
+      // Still set the Cloudflare image as our placeholder even on error
+      setThumbnailPreview(
+        "https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public",
+      )
       setPhotos([])
 
       toast({
@@ -382,99 +382,99 @@ export default function CustomizeAdDesignPage() {
   }
 
   // Video control functions
-  const handlePlayVideo = () => {
-    console.log("Play video triggered")
+  // const handlePlayVideo = () => {
+  //   console.log("Play video triggered")
 
-    // Hide thumbnail when play is triggered
-    setShowThumbnail(false)
+  //   // Hide thumbnail when play is triggered
+  //   setShowThumbnail(false)
 
-    // Set isPlaying to true immediately to update UI
-    setIsPlaying(true)
+  //   // Set isPlaying to true immediately to update UI
+  //   setIsPlaying(true)
 
-    // Get video element
-    const videoElement = videoRef.current
+  //   // Get video element
+  //   const videoElement = videoRef.current
 
-    // Reset video to beginning to ensure consistent playback
-    if (videoElement) {
-      videoElement.currentTime = 0
-    }
+  //   // Reset video to beginning to ensure consistent playback
+  //   if (videoElement) {
+  //     videoElement.currentTime = 0
+  //   }
 
-    // Play video
-    if (videoElement) {
-      // Make sure audio is enabled
-      videoElement.muted = false
+  //   // Play video
+  //   if (videoElement) {
+  //     // Make sure audio is enabled
+  //     videoElement.muted = false
 
-      const playPromise = videoElement.play()
+  //     const playPromise = videoElement.play()
 
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log("Video playback started successfully")
-          })
-          .catch((error) => {
-            console.error("Error playing video:", error)
-            // If video fails to play, show thumbnail again
-            setShowThumbnail(true)
-            setIsPlaying(false)
-          })
-      }
-    }
-  }
+  //     if (playPromise !== undefined) {
+  //       playPromise
+  //         .then(() => {
+  //           console.log("Video playback started successfully")
+  //         })
+  //         .catch((error) => {
+  //           console.error("Error playing video:", error)
+  //           // If video fails to play, show thumbnail again
+  //           setShowThumbnail(true)
+  //           setIsPlaying(false)
+  //         })
+  //     }
+  //   }
+  // }
 
-  const handlePauseVideo = () => {
-    if (videoRef.current) {
-      videoRef.current.pause()
-    }
+  // const handlePauseVideo = () => {
+  //   if (videoRef.current) {
+  //     videoRef.current.pause()
+  //   }
 
-    setIsPlaying(false)
-    // Don't show thumbnail on pause, only when video ends or before it starts
-  }
+  //   setIsPlaying(false)
+  //   // Don't show thumbnail on pause, only when video ends or before it starts
+  // }
 
   // Update the video end handler useEffect
-  useEffect(() => {
-    // Get video element that currently exists in the DOM
-    const videoElement = videoRef.current
-    let timeUpdateHandler: (() => void) | null = null
+  // useEffect(() => {
+  //   // Get video element that currently exists in the DOM
+  //   const videoElement = videoRef.current
+  //   let timeUpdateHandler: (() => void) | null = null
 
-    const handleVideoEnd = () => {
-      console.log("Video ended, showing thumbnail")
-      setIsPlaying(false)
-      setShowThumbnail(true) // Show thumbnail when video ends
-    }
+  //   const handleVideoEnd = () => {
+  //     console.log("Video ended, showing thumbnail")
+  //     setIsPlaying(false)
+  //     setShowThumbnail(true) // Show thumbnail when video ends
+  //   }
 
-    // Add event listeners to video element
-    if (videoElement) {
-      // Remove any existing event listeners first to avoid duplicates
-      videoElement.removeEventListener("ended", handleVideoEnd)
+  //   // Add event listeners to video element
+  //   if (videoElement) {
+  //     // Remove any existing event listeners first to avoid duplicates
+  //     videoElement.removeEventListener("ended", handleVideoEnd)
 
-      // Add the event listener for video end
-      videoElement.addEventListener("ended", handleVideoEnd)
+  //     // Add the event listener for video end
+  //     videoElement.addEventListener("ended", handleVideoEnd)
 
-      // Also monitor the currentTime to detect when video is near the end
-      // This is a backup in case the ended event doesn't fire properly
-      timeUpdateHandler = () => {
-        if (videoElement.currentTime >= videoElement.duration - 0.2 && videoElement.duration > 0) {
-          console.log(`Video near end: ${videoElement.currentTime}/${videoElement.duration}`)
-          handleVideoEnd()
-        }
-      }
+  //     // Also monitor the currentTime to detect when video is near the end
+  //     // This is a backup in case the ended event doesn't fire properly
+  //     timeUpdateHandler = () => {
+  //       if (videoElement.currentTime >= videoElement.duration - 0.2 && videoElement.duration > 0) {
+  //         console.log(`Video near end: ${videoElement.currentTime}/${videoElement.duration}`)
+  //         handleVideoEnd()
+  //       }
+  //     }
 
-      videoElement.removeEventListener("timeupdate", timeUpdateHandler)
-      videoElement.addEventListener("timeupdate", timeUpdateHandler)
-    }
+  //     videoElement.removeEventListener("timeupdate", timeUpdateHandler)
+  //     videoElement.addEventListener("timeupdate", timeUpdateHandler)
+  //   }
 
-    return () => {
-      // Clean up all event listeners safely
-      if (videoElement) {
-        videoElement.removeEventListener("ended", handleVideoEnd)
+  //   return () => {
+  //     // Clean up all event listeners safely
+  //     if (videoElement) {
+  //       videoElement.removeEventListener("ended", handleVideoEnd)
 
-        // Remove timeupdate listener
-        if (timeUpdateHandler) {
-          videoElement.removeEventListener("timeupdate", timeUpdateHandler)
-        }
-      }
-    }
-  }, [videoRef.current])
+  //       // Remove timeupdate listener
+  //       if (timeUpdateHandler) {
+  //         videoElement.removeEventListener("timeupdate", timeUpdateHandler)
+  //       }
+  //     }
+  //   }
+  // }, [videoRef.current])
 
   // Replace the handleOpenPhotoAlbum function with this new version that opens the dialog
   // Around line 375
@@ -543,26 +543,26 @@ export default function CustomizeAdDesignPage() {
   }
 
   // Custom video control buttons component
-  const VideoControls = () => (
-    <div className="flex justify-center mt-2 space-x-4">
-      <button
-        onClick={handlePlayVideo}
-        className={`p-2 rounded-full ${isPlaying ? "opacity-50" : "opacity-100"}`}
-        style={{ backgroundColor: colorValues.primary }}
-        disabled={isPlaying}
-      >
-        <Play size={20} className="text-white" />
-      </button>
-      <button
-        onClick={handlePauseVideo}
-        className={`p-2 rounded-full ${!isPlaying ? "opacity-50" : "opacity-100"}`}
-        style={{ backgroundColor: colorValues.primary }}
-        disabled={!isPlaying}
-      >
-        <Pause size={20} className="text-white" />
-      </button>
-    </div>
-  )
+  // const VideoControls = () => (
+  //   <div className="flex justify-center mt-2 space-x-4">
+  //     <button
+  //       onClick={handlePlayVideo}
+  //       className={`p-2 rounded-full ${isPlaying ? "opacity-50" : "opacity-100"}`}
+  //       style={{ backgroundColor: colorValues.primary }}
+  //       disabled={isPlaying}
+  //     >
+  //       <Play size={20} className="text-white" />
+  //     </button>
+  //     <button
+  //       onClick={handlePauseVideo}
+  //       className={`p-2 rounded-full ${!isPlaying ? "opacity-50" : "opacity-100"}`}
+  //       style={{ backgroundColor: colorValues.primary }}
+  //       disabled={!isPlaying}
+  //     >
+  //       <Pause size={20} className="text-white" />
+  //     </button>
+  //   </div>
+  // )
 
   // Update the fetchSavedCoupons function to properly fetch coupons
 
@@ -758,61 +758,24 @@ export default function CustomizeAdDesignPage() {
               )}
             </div>
 
-            {/* Video Section */}
+            {/* Video Section - Using Image as Placeholder */}
             {!hiddenFields.video && (
               <div className="border-t pt-4 mt-4 px-4">
                 <div className="relative w-full pb-[56.25%]">
-                  {/* Thumbnail overlay */}
-                  {!hiddenFields.thumbnail && thumbnailPreview && showThumbnail && (
-                    <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
-                      <img
-                        src={thumbnailPreview || "/placeholder.svg?height=220&width=392"}
-                        alt="Video thumbnail"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-
-                  {videoPreview ? (
-                    <video
-                      ref={videoRef}
-                      src={videoPreview}
-                      className="absolute top-0 left-0 w-full h-full rounded-md"
-                      onClick={isPlaying ? handlePauseVideo : handlePlayVideo}
-                      muted
+                  {/* Image Placeholder */}
+                  <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                    <img
+                      src="https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public"
+                      alt="Business image"
+                      className="w-full h-full object-cover"
                     />
-                  ) : (
-                    <div
-                      className="absolute inset-0 flex items-center justify-center cursor-pointer bg-gray-100 rounded-md"
-                      onClick={handlePlayVideo}
-                    >
-                      <div
-                        className="rounded-full p-3 shadow-lg"
-                        style={{
-                          background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
-                        }}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="32"
-                          height="32"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="text-white"
-                        >
-                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
 
-                {/* Custom video controls */}
-                {videoPreview && <VideoControls />}
+                {/* Info text instead of video controls */}
+                <div className="text-center mt-2 text-sm text-gray-500">
+                  <p>Business showcase image</p>
+                </div>
               </div>
             )}
 

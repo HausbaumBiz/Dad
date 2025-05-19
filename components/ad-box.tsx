@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { X } from "lucide-react"
+import { X, Phone, MapPin } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -15,6 +15,8 @@ interface AdBoxProps {
   businessId: string
   ctaText?: string
   ctaLink?: string
+  phoneNumber?: string
+  address?: string
   onClose?: () => void
 }
 
@@ -26,6 +28,8 @@ export function AdBox({
   businessId,
   ctaText = "Learn More",
   ctaLink,
+  phoneNumber,
+  address,
   onClose,
 }: AdBoxProps) {
   const [isVisible, setIsVisible] = useState(true)
@@ -42,6 +46,7 @@ export function AdBox({
   }
 
   const finalCtaLink = ctaLink || `/business/${businessId}`
+  const mapsUrl = address ? `https://maps.google.com/?q=${encodeURIComponent(address)}` : null
 
   return (
     <Card className="overflow-hidden border border-gray-200 shadow-sm adbox-container">
@@ -81,6 +86,30 @@ export function AdBox({
         )}
 
         <p className="text-sm text-gray-700 mb-4">{description}</p>
+
+        <div className="space-y-3 mb-4">
+          {phoneNumber && (
+            <a
+              href={`tel:${phoneNumber.replace(/\D/g, "")}`}
+              className="text-sm text-blue-600 flex items-center hover:underline"
+            >
+              <Phone className="h-4 w-4 mr-2" />
+              {phoneNumber}
+            </a>
+          )}
+
+          {address && mapsUrl && (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 flex items-center hover:underline"
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              <span className="line-clamp-2">{address}</span>
+            </a>
+          )}
+        </div>
 
         <div className="flex justify-end">
           <Link href={finalCtaLink}>

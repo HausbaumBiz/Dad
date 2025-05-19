@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, ArrowLeft, X, Bug } from "lucide-react"
+import { Loader2, ArrowLeft, X } from "lucide-react"
 import { getBusinessJobs } from "@/app/actions/job-actions"
 import type { JobListing } from "@/app/actions/job-actions"
 import Image from "next/image"
@@ -21,10 +21,20 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
   const [jobs, setJobs] = useState<JobListing[]>([])
   const [error, setError] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<JobListing | null>(null)
-  const [debugMode, setDebugMode] = useState(false)
-  const [closeButtons, setCloseButtons] = useState<Element[]>([])
-  const dialogRef = useRef<HTMLDivElement>(null)
   const fixAppliedRef = useRef(false)
+
+  const loadBusinessJobs = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const jobsData = await getBusinessJobs(businessId)
+      setJobs(jobsData)
+    } catch (err: any) {
+      setError(err.message || "Failed to load job listings.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -41,25 +51,6 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       }, 100)
     }
   }, [isOpen])
-
-  // Debug effect - scan for and highlight close buttons
-  useEffect(() => {
-    if (isOpen && dialogRef.current) {
-      // Wait for dialog to fully render
-      setTimeout(() => {
-        findCloseButtons()
-      }, 500)
-    }
-  }, [isOpen, debugMode])
-
-  // Additional effect to scan when debug mode is toggled
-  useEffect(() => {
-    if (debugMode && isOpen) {
-      console.log("Debug mode enabled, scanning for buttons...")
-      // Use setTimeout to ensure the DOM is ready
-      setTimeout(findCloseButtons, 300)
-    }
-  }, [debugMode])
 
   // Function to permanently fix the duplicate button issue
   const applyPermanentFix = () => {
@@ -110,184 +101,6 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
     }, 200)
 
     fixAppliedRef.current = true
-  }
-
-  // Function to find and count close buttons
-  const findCloseButtons = () => {
-    console.log("🔍 Scanning for close buttons in Jobs Dialog...")
-
-    // Use a more robust selector that will find all possible close buttons
-    // Look in the entire document to catch any that might be outside our ref
-    const dialogElement = document.querySelector(".jobs-dialog-content")
-
-    if (!dialogElement) {
-      console.log("❌ Dialog element not found")
-      return
-    }
-
-    // Find close buttons using multiple selectors to catch all possibilities
-    const radixCloseButtons = dialogElement.querySelectorAll("[data-radix-collection-item]")
-    const xButtons = dialogElement.querySelectorAll('.dialog-close-button, [aria-label="Close"], button:has(.lucide-x)')
-    const dialogCloseButtons = dialogElement.querySelectorAll("button.DialogClose, .DialogClose button")
-    const roundedButtons = dialogElement.querySelectorAll("button.rounded-full")
-
-    // Combine all found buttons and remove duplicates
-    const allButtons = new Set([
-      ...Array.from(radixCloseButtons),
-      ...Array.from(xButtons),
-      ...Array.from(dialogCloseButtons),
-      ...Array.from(roundedButtons),
-    ])
-
-    const closeButtonsList = Array.from(allButtons)
-    console.log(`🔍 Found ${closeButtonsList.length} potential close button(s)`)
-
-    // Log details about each button for debugging
-    closeButtonsList.forEach((btn, index) => {
-      const el = btn as HTMLElement
-      console.log(`Button #${index + 1}:`, {
-        classes: el.className,
-        html: el.outerHTML.slice(0, 100) + "...",
-        attributes: Array.from(el.attributes)
-          .map((attr) => `${attr.name}="${attr.value}"`)
-          .join(", "),
-      })
-    })
-
-    setCloseButtons(closeButtonsList)
-
-    if (debugMode) {
-      // Add visual indicators to each button
-      closeButtonsList.forEach((btn, index) => {
-        const el = btn as HTMLElement
-        el.style.border = "2px solid red"
-        el.style.position = "relative"
-        el.dataset.buttonIndex = `${index + 1}`
-
-        // Make sure existing labels are removed
-        const existingLabel = el.querySelector(".debug-button-label")
-        if (existingLabel) existingLabel.remove()
-
-        // Add a label to identify each close button
-        const label = document.createElement("span")
-        label.className = "debug-button-label"
-        label.textContent = `#${index + 1}`
-        label.style.position = "absolute"
-        label.style.top = "-20px"
-        label.style.right = "-10px"
-        label.style.backgroundColor = "red"
-        label.style.color = "white"
-        label.style.borderRadius = "50%"
-        label.style.padding = "2px 6px"
-        label.style.fontSize = "10px"
-        label.style.fontWeight = "bold"
-        label.style.zIndex = "9999"
-        el.appendChild(label)
-      })
-    }
-  }
-
-  // Function to remove extra close buttons
-  const removeExtraCloseButtons = () => {
-    const dialogElement = document.querySelector(".jobs-dialog-content")
-    if (!dialogElement) return
-
-    // Use the same comprehensive selectors as in findCloseButtons
-    const radixCloseButtons = dialogElement.querySelectorAll("[data-radix-collection-item]")
-    const xButtons = dialogElement.querySelectorAll('.dialog-close-button, [aria-label="Close"], button:has(.lucide-x)')
-    const dialogCloseButtons = dialogElement.querySelectorAll("button.DialogClose, .DialogClose button")
-    const roundedButtons = dialogElement.querySelectorAll("button.rounded-full")
-
-    // Combine all found buttons and remove duplicates
-    const allButtons = new Set([
-      ...Array.from(radixCloseButtons),
-      ...Array.from(xButtons),
-      ...Array.from(dialogCloseButtons),
-      ...Array.from(roundedButtons),
-    ])
-
-    const buttons = Array.from(allButtons)
-
-    // Keep track of which button we're keeping
-    let keptButton = null
-
-    // Hide all but the first close button
-    buttons.forEach((btn, index) => {
-      const el = btn as HTMLElement
-
-      if (index === 0) {
-        // Keep the first button and mark it
-        keptButton = el
-        el.style.border = "2px solid green"
-        console.log(`✅ Keeping close button #1`)
-      } else {
-        // Hide all other buttons
-        el.style.display = "none"
-        console.log(`🗑️ Hiding duplicate close button #${index + 1}`)
-      }
-    })
-
-    // Add a permanent CSS rule to hide these buttons
-    if (buttons.length > 1) {
-      try {
-        // Create a style element if it doesn't exist
-        let styleEl = document.getElementById("dialog-fix-styles")
-        if (!styleEl) {
-          styleEl = document.createElement("style")
-          styleEl.id = "dialog-fix-styles"
-          document.head.appendChild(styleEl)
-        }
-
-        // Add CSS rules to hide duplicate buttons
-        const cssRule = `
-          .jobs-dialog-content [data-radix-collection-item]:not(:first-of-type),
-          .jobs-dialog-content .dialog-close-button:not(:first-of-type),
-          .jobs-dialog-content [aria-label="Close"]:not(:first-of-type),
-          .jobs-dialog-content button.rounded-full:not(:first-of-type) {
-            display: none !important;
-          }
-          
-          /* Target the specific button */
-          .jobs-dialog-content .rounded-full.p-1\\.5.bg-gray-100 {
-            display: none !important;
-          }
-        `
-        styleEl.textContent += cssRule
-        console.log("✅ Added permanent CSS fix for duplicate buttons")
-      } catch (err) {
-        console.error("Failed to add CSS fix:", err)
-      }
-    }
-
-    // Re-scan after removal
-    findCloseButtons()
-  }
-
-  // Toggle debug mode
-  const toggleDebugMode = () => {
-    setDebugMode((prev) => !prev)
-  }
-
-  const loadBusinessJobs = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Only load jobs for the provided business ID
-      const jobsData = await getBusinessJobs(businessId)
-
-      if (jobsData && jobsData.length > 0) {
-        setJobs(jobsData)
-      } else {
-        setJobs([])
-        setError("No job listings found for this business")
-      }
-    } catch (err) {
-      console.error("Error loading business jobs:", err)
-      setError(`Failed to load job listings: ${err instanceof Error ? err.message : String(err)}`)
-    } finally {
-      setLoading(false)
-    }
   }
 
   // Format pay range for display
@@ -594,69 +407,9 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
     )
   }
 
-  // Render Debugger Controls
-  const renderDebugger = () => {
-    if (!isOpen) return null
-
-    return (
-      <div className="bg-yellow-50 border border-yellow-200 p-2 rounded-md mt-2 text-xs">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-bold text-yellow-800 flex items-center">
-            <Bug className="w-3 h-3 mr-1" /> Dialog Debugger
-          </h3>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-6 text-[10px] px-1 bg-gray-100 hover:bg-gray-200"
-            onClick={toggleDebugMode}
-          >
-            {debugMode ? "Hide Debug Info" : "Show Debug Info"}
-          </Button>
-        </div>
-
-        {debugMode && (
-          <>
-            <div className="mb-1">
-              <p className="text-yellow-800">
-                Close buttons found: <strong>{closeButtons.length}</strong>
-              </p>
-              {closeButtons.length > 1 && (
-                <p className="text-red-600 font-medium">⚠️ Multiple close buttons detected!</p>
-              )}
-            </div>
-
-            <div className="flex gap-1 mt-2">
-              <Button
-                variant="default"
-                size="sm"
-                className="h-7 text-[11px] px-2 bg-blue-600 text-white hover:bg-blue-700"
-                onClick={() => {
-                  console.log("Scan button clicked")
-                  setTimeout(findCloseButtons, 100)
-                }}
-              >
-                Scan for buttons
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="h-7 text-[11px] px-2"
-                onClick={removeExtraCloseButtons}
-              >
-                Remove duplicates
-              </Button>
-            </div>
-
-            <p className="mt-2 text-[10px] text-gray-500">Check the browser console for detailed logs.</p>
-          </>
-        )}
-      </div>
-    )
-  }
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="jobs-dialog jobs-dialog-content w-full p-0 m-0" closeButton={false} ref={dialogRef}>
+      <DialogContent className="jobs-dialog jobs-dialog-content w-full p-0 m-0" closeButton={false}>
         {/* Custom close button - with unique class for identification */}
         <div className="absolute right-1 top-1 z-10">
           <DialogClose className="rounded-full p-1 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none dialog-close-button jobs-dialog-main-close">
@@ -672,9 +425,6 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
         </DialogHeader>
 
         <div className="jobs-dialog-scrollable w-full p-2 overflow-hidden overflow-y-auto">
-          {/* Debug UI */}
-          {renderDebugger()}
-
           {/* Content */}
           {selectedJob ? renderJobDetails() : renderJobListings()}
         </div>
@@ -682,3 +432,6 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
     </Dialog>
   )
 }
+
+// Make sure to export the component as both default and named export
+export default BusinessJobsDialog
