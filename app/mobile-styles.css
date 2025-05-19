@@ -538,3 +538,17 @@
   width: 100%;
   order: 3;
 }
+
+/* Add these styles to ensure links are clickable on mobile */
+.adbox-container a {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  touch-action: manipulation;
+  position: relative;
+  z-index: 10;
+}
+
+.adbox-container .adbox-contact-link {
+  display: block;
+  padding: 8px 0;
+  margin: -8px 0;
+}

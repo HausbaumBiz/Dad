@@ -87,14 +87,15 @@ export function AdBox({
 
         <p className="text-sm text-gray-700 mb-4">{description}</p>
 
-        <div className="space-y-3 mb-4">
+        <div className="space-y-3 mb-4 relative z-10">
           {phoneNumber && (
             <a
-              href={`tel:${phoneNumber.replace(/\D/g, "")}`}
-              className="text-sm text-blue-600 flex items-center hover:underline"
+              href={`tel:${phoneNumber?.replace(/\D/g, "")}`}
+              className="text-sm text-blue-600 flex items-center hover:underline active:text-blue-800 cursor-pointer z-10 relative"
+              onClick={(e) => e.stopPropagation()}
             >
-              <Phone className="h-4 w-4 mr-2" />
-              {phoneNumber}
+              <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
+              <span>{phoneNumber}</span>
             </a>
           )}
 
@@ -103,9 +104,10 @@ export function AdBox({
               href={mapsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-blue-600 flex items-center hover:underline"
+              className="text-sm text-blue-600 flex items-center hover:underline active:text-blue-800 cursor-pointer z-10 relative"
+              onClick={(e) => e.stopPropagation()}
             >
-              <MapPin className="h-4 w-4 mr-2" />
+              <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
               <span className="line-clamp-2">{address}</span>
             </a>
           )}
