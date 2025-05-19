@@ -5,7 +5,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
-import { Loader2, ImageIcon, Ticket, Briefcase, AlertCircle, X } from "lucide-react"
+import { Loader2, ImageIcon, Ticket, Briefcase, AlertCircle, X, Phone, MapPin } from "lucide-react"
 import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
 import { BusinessCouponsDialog } from "./business-coupons-dialog"
 import { BusinessJobsDialog } from "./business-jobs-dialog"
@@ -186,6 +186,19 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     return `https://customer-${accountId}.cloudflarestream.com/${videoId}/thumbnails/thumbnail.jpg?time=${time}s`
   }
 
+  // Function to handle phone call
+  const handlePhoneCall = (phone: string) => {
+    if (!phone) return
+    const phoneNumber = phone.replace(/\D/g, "")
+    window.open(`tel:${phoneNumber}`)
+  }
+
+  // Function to handle map directions
+  const handleGetDirections = (address: string) => {
+    if (!address) return
+    window.open(`https://maps.google.com/?q=${encodeURIComponent(address)}`, "_blank")
+  }
+
   return (
     <>
       {/* Add style to hide default close button */}
@@ -231,7 +244,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                 </div>
 
                 <div className="pt-6 px-6 space-y-4">
-                  {!adDesign.hiddenFields?.phone && (
+                  {!adDesign.hiddenFields?.phone && adDesign.businessInfo?.phone && (
                     <div className="flex items-start gap-3">
                       <div
                         className="h-5 w-5 mt-0.5 flex-shrink-0"
@@ -239,23 +252,16 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                           color: colorValues.textColor ? "#000000" : colorValues.primary,
                         }}
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
+                        <Phone className="h-5 w-5" />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500">Phone</p>
-                        <p>{formatPhone(adDesign.businessInfo?.phone)}</p>
+                        <button
+                          onClick={() => handlePhoneCall(adDesign.businessInfo?.phone)}
+                          className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
+                        >
+                          {formatPhone(adDesign.businessInfo?.phone)}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -268,24 +274,16 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                           color: colorValues.textColor ? "#000000" : colorValues.primary,
                         }}
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                          <circle cx="12" cy="10" r="3"></circle>
-                        </svg>
+                        <MapPin className="h-5 w-5" />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500">Address</p>
-                        <p>{formatAddress(adDesign.businessInfo)}</p>
+                        <button
+                          onClick={() => handleGetDirections(formatAddress(adDesign.businessInfo))}
+                          className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative text-left"
+                        >
+                          {formatAddress(adDesign.businessInfo)}
+                        </button>
                       </div>
                     </div>
                   )}

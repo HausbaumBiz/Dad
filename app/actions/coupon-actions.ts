@@ -114,3 +114,19 @@ export async function getBusinessCoupons(
     return { success: false, error: "Failed to retrieve coupons" }
   }
 }
+
+// Add the missing export for getCouponsByBusinessId
+export async function getCouponsByBusinessId(businessId: string): Promise<Coupon[]> {
+  try {
+    const result = await getBusinessCoupons(businessId)
+
+    if (result.success && result.coupons) {
+      return result.coupons
+    }
+
+    return []
+  } catch (error) {
+    console.error("Error in getCouponsByBusinessId:", error)
+    return []
+  }
+}

@@ -15,7 +15,8 @@ interface CloudflareImageProps {
   priority?: boolean
 }
 
-export default function CloudflareImage({
+// Define the component as a named function
+export function CloudflareImage({
   imageId,
   alt,
   width,
@@ -59,3 +60,6 @@ export default function CloudflareImage({
     />
   )
 }
+
+// Keep the default export for backward compatibility
+export default CloudflareImage
