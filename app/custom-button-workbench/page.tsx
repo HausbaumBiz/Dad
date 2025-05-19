@@ -14,21 +14,21 @@ import {
   Trash2,
   AlertCircle,
   ArrowLeft,
-  Search,
-  X,
   FileText,
   MenuIcon,
   ClipboardList,
   File,
   ExternalLink,
   Maximize2,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/components/ui/use-toast"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
@@ -36,10 +36,10 @@ import {
   uploadDocument,
   getBusinessDocuments,
   deleteDocument,
+  renameDocument,
   type DocumentMetadata,
   type DocumentType,
 } from "@/app/actions/document-actions"
-import { Check } from "lucide-react"
 
 export default function CustomButtonWorkbenchPage() {
   const { toast } = useToast()
@@ -48,8 +48,6 @@ export default function CustomButtonWorkbenchPage() {
   const [documents, setDocuments] = useState<DocumentMetadata[]>([])
   const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [activeTab, setActiveTab] = useState<DocumentType | "all">("all")
   const [error, setError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState(false)
   const [pdfViewerError, setPdfViewerError] = useState(false)
@@ -57,6 +55,11 @@ export default function CustomButtonWorkbenchPage() {
   const uploadFormRef = useRef<HTMLFormElement>(null)
   const pdfObjectRef = useRef<HTMLObjectElement>(null)
   const router = useRouter()
+
+  // Rename state
+  const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null)
+  const [newDocumentName, setNewDocumentName] = useState("")
+  const renameInputRef = useRef<HTMLInputElement>(null)
 
   // File upload form state
   const [documentName, setDocumentName] = useState("")
@@ -90,6 +93,13 @@ export default function CustomButtonWorkbenchPage() {
 
     fetchBusinessData()
   }, [router])
+
+  // Focus the rename input when editing starts
+  useEffect(() => {
+    if (editingDocumentId && renameInputRef.current) {
+      renameInputRef.current.focus()
+    }
+  }, [editingDocumentId])
 
   // Reset PDF viewer error when selecting a new document
   useEffect(() => {
@@ -229,6 +239,68 @@ export default function CustomButtonWorkbenchPage() {
     }
   }
 
+  const startRenaming = (document: DocumentMetadata, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent document selection when clicking rename
+    setEditingDocumentId(document.id)
+    setNewDocumentName(document.name)
+  }
+
+  const cancelRenaming = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation() // Prevent document selection when clicking cancel
+    setEditingDocumentId(null)
+    setNewDocumentName("")
+  }
+
+  const handleRename = async (document: DocumentMetadata, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent document selection when clicking save
+
+    if (!newDocumentName.trim()) {
+      toast({
+        title: "Error",
+        description: "Document name cannot be empty",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const success = await renameDocument(business.id, document.id, newDocumentName)
+
+    if (success) {
+      // Update document in the list
+      setDocuments((prev) => prev.map((doc) => (doc.id === document.id ? { ...doc, name: newDocumentName } : doc)))
+
+      // Update selected document if it's the one being renamed
+      if (selectedDocument?.id === document.id) {
+        setSelectedDocument({ ...selectedDocument, name: newDocumentName })
+      }
+
+      // Show toast notification
+      toast({
+        title: "Document renamed",
+        description: `Document has been renamed to "${newDocumentName}"`,
+      })
+
+      // Exit rename mode
+      setEditingDocumentId(null)
+      setNewDocumentName("")
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to rename document. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRenameKeyDown = (document: DocumentMetadata, e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation()
+    if (e.key === "Enter") {
+      handleRename(document, e as unknown as React.MouseEvent)
+    } else if (e.key === "Escape") {
+      cancelRenaming()
+    }
+  }
+
   const handlePrint = () => {
     if (selectedDocument) {
       // Open the document in a new tab
@@ -283,16 +355,6 @@ export default function CustomButtonWorkbenchPage() {
   const handlePdfError = () => {
     setPdfViewerError(true)
   }
-
-  const filteredDocuments = documents.filter((doc) => {
-    // Filter by search term
-    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase())
-
-    // Filter by type
-    const matchesType = activeTab === "all" || doc.type === activeTab
-
-    return matchesSearch && matchesType
-  })
 
   const getDocumentIcon = (fileType: string) => {
     if (fileType.includes("pdf")) {
@@ -512,100 +574,91 @@ export default function CustomButtonWorkbenchPage() {
                     </TabsList>
 
                     <TabsContent value="documents" className="mt-0">
-                      <div className="mb-4">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                          <Input
-                            placeholder="Search documents..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9"
-                          />
-                          {searchTerm && (
-                            <button
-                              onClick={() => setSearchTerm("")}
-                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <TabsList className="w-full flex overflow-x-auto pb-1 mb-2">
-                          <TabsTrigger
-                            value="all"
-                            onClick={() => setActiveTab("all")}
-                            className={activeTab === "all" ? "bg-primary text-primary-foreground" : ""}
-                          >
-                            All
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="form"
-                            onClick={() => setActiveTab("form")}
-                            className={activeTab === "form" ? "bg-primary text-primary-foreground" : ""}
-                          >
-                            <ClipboardList className="h-4 w-4 mr-1" />
-                            Forms
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="menu"
-                            onClick={() => setActiveTab("menu")}
-                            className={activeTab === "menu" ? "bg-primary text-primary-foreground" : ""}
-                          >
-                            <MenuIcon className="h-4 w-4 mr-1" />
-                            Menus
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="handout"
-                            onClick={() => setActiveTab("handout")}
-                            className={activeTab === "handout" ? "bg-primary text-primary-foreground" : ""}
-                          >
-                            <FileText className="h-4 w-4 mr-1" />
-                            Handouts
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="other"
-                            onClick={() => setActiveTab("other")}
-                            className={activeTab === "other" ? "bg-primary text-primary-foreground" : ""}
-                          >
-                            Other
-                          </TabsTrigger>
-                        </TabsList>
-                      </div>
-
                       {loading ? (
                         <div className="space-y-3">
                           {[...Array(5)].map((_, i) => (
                             <Skeleton key={i} className="h-16 w-full" />
                           ))}
                         </div>
-                      ) : filteredDocuments.length > 0 ? (
+                      ) : documents.length > 0 ? (
                         <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                          {filteredDocuments.map((doc) => (
+                          {documents.map((doc) => (
                             <div
                               key={doc.id}
-                              className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                              className={`p-3 rounded-lg border transition-colors ${
                                 selectedDocument?.id === doc.id
                                   ? "bg-primary/10 border-primary"
                                   : "bg-white border-gray-200 hover:bg-gray-50"
                               }`}
-                              onClick={() => setSelectedDocument(doc)}
+                              onClick={() => editingDocumentId !== doc.id && setSelectedDocument(doc)}
                             >
                               <div className="flex items-center gap-3">
                                 {getDocumentIcon(doc.fileType)}
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="font-medium text-gray-900 truncate">{doc.name}</h3>
-                                  <div className="flex items-center text-xs text-gray-500 mt-1">
-                                    <span className="flex items-center">
-                                      {getDocumentTypeIcon(doc.type)}
-                                      <span className="ml-1 capitalize">{doc.type}</span>
-                                    </span>
-                                    <span className="mx-2">•</span>
-                                    <span>{formatFileSize(doc.size)}</span>
-                                  </div>
+                                  {editingDocumentId === doc.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        ref={renameInputRef}
+                                        value={newDocumentName}
+                                        onChange={(e) => setNewDocumentName(e.target.value)}
+                                        onKeyDown={(e) => handleRenameKeyDown(doc, e)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="h-8 py-1"
+                                        autoFocus
+                                      />
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-7 w-7 text-green-600"
+                                        onClick={(e) => handleRename(doc, e)}
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-7 w-7 text-gray-500"
+                                        onClick={cancelRenaming}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center justify-between">
+                                        <h3 className="font-medium text-gray-900 truncate">{doc.name}</h3>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-7 w-7 text-gray-400 hover:text-gray-700 ml-2 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                          onClick={(e) => startRenaming(doc, e)}
+                                          title="Rename document"
+                                        >
+                                          <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </div>
+                                      <div className="flex items-center text-xs text-gray-500 mt-1">
+                                        <span className="flex items-center">
+                                          {getDocumentTypeIcon(doc.type)}
+                                          <span className="ml-1 capitalize">{doc.type}</span>
+                                        </span>
+                                        <span className="mx-2">•</span>
+                                        <span>{formatFileSize(doc.size)}</span>
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
+                                {editingDocumentId !== doc.id && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                                    onClick={(e) => startRenaming(doc, e)}
+                                    title="Rename document"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -614,19 +667,7 @@ export default function CustomButtonWorkbenchPage() {
                         <div className="text-center py-8">
                           <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                           <h3 className="text-gray-500 font-medium mb-1">No documents found</h3>
-                          <p className="text-gray-400 text-sm mb-4">
-                            {searchTerm ? "Try a different search term" : "Upload your first document to get started"}
-                          </p>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSearchTerm("")
-                              setActiveTab("all")
-                            }}
-                          >
-                            Clear filters
-                          </Button>
+                          <p className="text-gray-400 text-sm mb-4">Upload your first document to get started</p>
                         </div>
                       )}
                     </TabsContent>
@@ -643,44 +684,6 @@ export default function CustomButtonWorkbenchPage() {
                               placeholder="Enter document name"
                               required
                             />
-                          </div>
-
-                          <div>
-                            <Label>Document Type</Label>
-                            <RadioGroup
-                              value={documentType}
-                              onValueChange={(value) => setDocumentType(value as DocumentType)}
-                              className="flex flex-wrap gap-2 mt-2"
-                            >
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="form" id="form" />
-                                <Label htmlFor="form" className="flex items-center gap-1 cursor-pointer">
-                                  <ClipboardList className="h-4 w-4" />
-                                  Form
-                                </Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="menu" id="menu" />
-                                <Label htmlFor="menu" className="flex items-center gap-1 cursor-pointer">
-                                  <MenuIcon className="h-4 w-4" />
-                                  Menu
-                                </Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="handout" id="handout" />
-                                <Label htmlFor="handout" className="flex items-center gap-1 cursor-pointer">
-                                  <FileText className="h-4 w-4" />
-                                  Handout
-                                </Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="other" id="other" />
-                                <Label htmlFor="other" className="flex items-center gap-1 cursor-pointer">
-                                  <File className="h-4 w-4" />
-                                  Other
-                                </Label>
-                              </div>
-                            </RadioGroup>
                           </div>
 
                           <div>

@@ -166,3 +166,43 @@ export async function deleteDocument(businessId: string, documentId: string): Pr
     return false
   }
 }
+
+// Add this new function after the deleteDocument function
+
+export async function renameDocument(businessId: string, documentId: string, newName: string): Promise<boolean> {
+  try {
+    // Get document metadata
+    const documentData = await kv.hget(`business:${businessId}:documents`, documentId)
+
+    if (!documentData) {
+      throw new Error("Document not found")
+    }
+
+    // Parse document data safely
+    let document: DocumentMetadata
+    if (typeof documentData === "string") {
+      document = JSON.parse(documentData) as DocumentMetadata
+    } else if (typeof documentData === "object") {
+      document = documentData as DocumentMetadata
+    } else {
+      throw new Error("Invalid document data format")
+    }
+
+    // Update the document name
+    document.name = newName
+    document.updatedAt = Date.now()
+
+    // Save updated metadata
+    await kv.hset(`business:${businessId}:documents`, {
+      [documentId]: JSON.stringify(document),
+    })
+
+    // Revalidate the path
+    revalidatePath("/custom-button-workbench")
+
+    return true
+  } catch (error) {
+    console.error("Error renaming document:", error)
+    return false
+  }
+}
