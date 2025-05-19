@@ -154,6 +154,12 @@ export default function WorkbenchPage() {
                   />
 
                   <WorkbenchButton
+                    href="/custom-button-workbench"
+                    iconSrc="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/custom%20button02-2xZ348ksSBLZaql05dru0A4P6c5K27.png"
+                    label="Custom Button Workbench"
+                  />
+
+                  <WorkbenchButton
                     href="/user-account"
                     iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/user-account-icon%20sm-PZ61Ko9nsGv5oeESUWjM2pDekdeewQ.png"
                     label="User Account"

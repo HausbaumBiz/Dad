@@ -20,6 +20,25 @@ import { BusinessPhotoAlbumDialog } from "@/components/business-photo-album-dial
 import BusinessJobsDialog from "@/components/business-jobs-dialog"
 import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
 
+import {
+  Menu,
+  List,
+  FileText,
+  ShoppingCart,
+  Clipboard,
+  Calendar,
+  MessageSquare,
+  Map,
+  Settings,
+  BookOpen,
+  PenTool,
+  Truck,
+  Heart,
+  Coffee,
+  Gift,
+  Music,
+} from "lucide-react"
+
 interface PhotoItem {
   id: string
   url: string
@@ -53,6 +72,14 @@ export default function CustomizeAdDesignPage() {
   // Add state for terms and conditions dialog
   const [openDialogId, setOpenDialogId] = useState<string | null>(null)
 
+  // Add state for custom button
+  const [customButtonType, setCustomButtonType] = useState<string>("Menu")
+  const [customButtonName, setCustomButtonName] = useState<string>("Menu")
+  const [showCustomNameInput, setShowCustomNameInput] = useState<boolean>(false)
+
+  // Add state for custom button icon
+  const [customButtonIcon, setCustomButtonIcon] = useState<string>("Menu")
+
   // Color mapping
   const colorMap: Record<string, { primary: string; secondary: string; textColor?: string }> = {
     blue: { primary: "#007BFF", secondary: "#0056b3" },
@@ -69,6 +96,26 @@ export default function CustomizeAdDesignPage() {
     darkpink: { primary: "#FF1493", secondary: "#C71585" },
     lightpink: { primary: "#FFC0CB", secondary: "#FFB6C1", textColor: "#000000" },
   }
+
+  // Available icons for custom button
+  const availableIcons = [
+    { name: "Menu", component: Menu },
+    { name: "List", component: List },
+    { name: "FileText", component: FileText },
+    { name: "ShoppingCart", component: ShoppingCart },
+    { name: "Clipboard", component: Clipboard },
+    { name: "Calendar", component: Calendar },
+    { name: "MessageSquare", component: MessageSquare },
+    { name: "Map", component: Map },
+    { name: "Settings", component: Settings },
+    { name: "BookOpen", component: BookOpen },
+    { name: "PenTool", component: PenTool },
+    { name: "Truck", component: Truck },
+    { name: "Heart", component: Heart },
+    { name: "Coffee", component: Coffee },
+    { name: "Gift", component: Gift },
+    { name: "Music", component: Music },
+  ]
 
   // Get the selected color values
   const colorValues = colorMap[selectedColor] || colorMap.blue
@@ -101,6 +148,7 @@ export default function CustomizeAdDesignPage() {
     freeText: boolean
     savingsButton: boolean
     jobsButton: boolean
+    customButton: boolean
   }>({
     address: false,
     phone: false,
@@ -112,6 +160,7 @@ export default function CustomizeAdDesignPage() {
     freeText: false,
     savingsButton: false,
     jobsButton: false,
+    customButton: false,
   })
 
   // Add a handler function for toggling field visibility
@@ -120,6 +169,25 @@ export default function CustomizeAdDesignPage() {
       ...prev,
       [field]: !prev[field],
     }))
+  }
+
+  // Add handler for custom button type change
+  const handleCustomButtonTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedType = e.target.value
+    setCustomButtonType(selectedType)
+
+    if (selectedType === "Other") {
+      setShowCustomNameInput(true)
+      setCustomButtonName("")
+    } else {
+      setShowCustomNameInput(false)
+      setCustomButtonName(selectedType)
+    }
+  }
+
+  // Add handler for custom button name change
+  const handleCustomButtonNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomButtonName(e.target.value)
   }
 
   // Photo album state
@@ -272,6 +340,24 @@ export default function CustomizeAdDesignPage() {
             ...prevFields,
             ...savedDesign.hiddenFields,
           }))
+        }
+
+        // Update the loadBusinessData function to properly extract the custom button data
+        // Around line 200-220
+
+        // Load custom button settings if available
+        if (savedDesign.customButton) {
+          console.log("Found saved custom button settings:", savedDesign.customButton)
+          setCustomButtonType(savedDesign.customButton.type || "Menu")
+          setCustomButtonName(savedDesign.customButton.name || "Menu")
+          setShowCustomNameInput(savedDesign.customButton.type === "Other")
+          setCustomButtonIcon(savedDesign.customButton.icon || "Menu")
+        } else {
+          console.log("No custom button settings found, using defaults")
+          setCustomButtonType("Menu")
+          setCustomButtonName("Menu")
+          setShowCustomNameInput(false)
+          setCustomButtonIcon("Menu")
         }
 
         // Update form data with saved business information - ensure no undefined values
@@ -509,6 +595,16 @@ export default function CustomizeAdDesignPage() {
         address: getFormattedAddress(), // Add the formatted address
       }
 
+      // Add debug logging to the handleSubmit function to verify what's being saved
+      // Around line 350-370
+
+      // Inside the try block of handleSubmit, before calling saveBusinessAdDesign
+      console.log("Saving custom button settings:", {
+        type: customButtonType,
+        name: customButtonName,
+        icon: customButtonIcon,
+      })
+
       // Save business ad design data with all the necessary information
       const result = await saveBusinessAdDesign(businessId, {
         designId: selectedDesign,
@@ -516,6 +612,11 @@ export default function CustomizeAdDesignPage() {
         colorValues: colorValues, // Save the actual color values
         businessInfo: formattedData,
         hiddenFields: hiddenFields, // Save visibility settings
+        customButton: {
+          type: customButtonType,
+          name: customButtonName,
+          icon: customButtonIcon,
+        },
         updatedAt: new Date().toISOString(),
       })
 
@@ -867,6 +968,28 @@ export default function CustomizeAdDesignPage() {
                       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                     </svg>
                     <span className="text-xs">Jobs</span>
+                  </button>
+                )}
+
+                {!hiddenFields.customButton && (
+                  <button
+                    onClick={() => alert(`${customButtonName} functionality would open here`)}
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 rounded-md border border-gray-200 bg-white px-4 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
+                  >
+                    {(() => {
+                      const IconComponent =
+                        availableIcons.find((icon) => icon.name === customButtonIcon)?.component || Menu
+                      return (
+                        <IconComponent
+                          style={{
+                            color:
+                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                          }}
+                          className="h-5 w-5"
+                        />
+                      )
+                    })()}
+                    <span className="text-xs">{customButtonName}</span>
                   </button>
                 )}
               </div>
@@ -1245,8 +1368,85 @@ export default function CustomizeAdDesignPage() {
                         </label>
                       </div>
                     </div>
+
+                    <div className="mt-6 border-t pt-6">
+                      <h3 className="text-lg font-medium mb-4">Custom Button</h3>
+
+                      <div className="flex items-center mb-4">
+                        <input
+                          type="checkbox"
+                          id="hideCustomButton"
+                          checked={hiddenFields.customButton}
+                          onChange={() => toggleFieldVisibility("customButton")}
+                          className="mr-2"
+                        />
+                        <label htmlFor="hideCustomButton" className="text-gray-700">
+                          Hide Custom Button
+                        </label>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label htmlFor="customButtonType" className="block text-sm font-medium text-gray-700 mb-1">
+                            Button Type
+                          </label>
+                          <select
+                            id="customButtonType"
+                            value={customButtonType}
+                            onChange={handleCustomButtonTypeChange}
+                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                          >
+                            <option value="Menu">Menu</option>
+                            <option value="Forms">Forms</option>
+                            <option value="Product List">Product List</option>
+                            <option value="Other">Other (Custom Name)</option>
+                          </select>
+                        </div>
+
+                        {showCustomNameInput && (
+                          <div>
+                            <label htmlFor="customButtonName" className="block text-sm font-medium text-gray-700 mb-1">
+                              Custom Button Name
+                            </label>
+                            <input
+                              type="text"
+                              id="customButtonName"
+                              value={customButtonName}
+                              onChange={handleCustomButtonNameChange}
+                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="Enter custom button name"
+                              maxLength={20}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </Card>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Button Icon</label>
+                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                    {availableIcons.map((icon) => {
+                      const IconComponent = icon.component
+                      return (
+                        <button
+                          key={icon.name}
+                          type="button"
+                          onClick={() => setCustomButtonIcon(icon.name)}
+                          className={`p-2 border rounded-md flex items-center justify-center ${
+                            customButtonIcon === icon.name
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-gray-200 hover:bg-gray-50"
+                          }`}
+                          title={icon.name}
+                        >
+                          <IconComponent className="h-5 w-5" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
 
                 <div className="flex justify-center pt-4">
                   <button

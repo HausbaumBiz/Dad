@@ -437,6 +437,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
       JSON.stringify({
         designId: designData.designId,
         colorScheme: designData.colorScheme,
+        customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
         updatedAt: new Date().toISOString(),
       }),
     )
@@ -594,12 +595,13 @@ export async function getBusinessAdDesign(businessId: string) {
       freeText: "",
     }
 
-    // Combine all the data
+    // Ensure customButton is included in the returned data
     const result = {
       ...designData,
       colorValues: colorValues || {},
       businessInfo: { ...defaultBusinessInfo, ...(businessInfo || {}) },
       hiddenFields: hiddenFields || {},
+      customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
     }
 
     console.log("Final combined ad design data:", result)

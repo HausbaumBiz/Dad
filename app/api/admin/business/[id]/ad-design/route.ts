@@ -79,6 +79,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       hiddenFields,
     }
 
+    // Make sure we're returning the customButton data that's stored in the main design data
     return NextResponse.json(combinedData)
   } catch (error) {
     console.error("Error fetching business ad design:", error)
