@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { FileText, FileType, File, Download, Printer, ExternalLink, Maximize2, X } from "lucide-react"
+import { FileText, FileType, File, Download, Printer, ExternalLink, Maximize2 } from "lucide-react"
 import Image from "next/image"
 import { getBusinessDocuments, type DocumentMetadata } from "@/app/actions/document-actions"
 import { useToast } from "@/components/ui/use-toast"
@@ -125,9 +125,8 @@ export function DocumentsDialog({ isOpen, onClose, businessId, businessName }: D
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        // Only allow our custom close button to close the dialog
         if (!open) {
-          // Do nothing - prevent automatic closing
+          onClose()
         }
       }}
     >
@@ -139,9 +138,7 @@ export function DocumentsDialog({ isOpen, onClose, businessId, businessName }: D
       >
         <div className="flex justify-between items-center border-b p-4">
           <DialogTitle className="text-xl font-semibold">{businessName} Documents</DialogTitle>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close dialog">
-            <X className="h-4 w-4" />
-          </Button>
+          {/* No close button here */}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 h-[calc(90vh-8rem)] overflow-hidden">
@@ -317,6 +314,13 @@ export function DocumentsDialog({ isOpen, onClose, businessId, businessName }: D
               </div>
             )}
           </div>
+        </div>
+
+        {/* Footer with close button (no X icon) */}
+        <div className="border-t p-4 flex justify-end">
+          <Button onClick={onClose} variant="outline">
+            Close
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
