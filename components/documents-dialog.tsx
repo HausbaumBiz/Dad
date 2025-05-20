@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { FileText, FileType, File, Download, Printer, ExternalLink, Maximize2, ArrowLeft } from "lucide-react"
+import { FileText, FileType, File, Download, Printer, ExternalLink, Maximize2, ArrowLeft, Eye } from "lucide-react"
 import Image from "next/image"
 import { getBusinessDocuments, type DocumentMetadata } from "@/app/actions/document-actions"
 import { useToast } from "@/components/ui/use-toast"
@@ -189,21 +189,73 @@ export function DocumentsDialog({ isOpen, onClose, businessId, businessName }: D
     </div>
   )
 
-  // Render document detail view
-  const renderDocumentDetail = () => {
+  // Render simplified mobile document detail view
+  const renderMobileDocumentDetail = () => {
+    if (!selectedDocument) return null
+
+    const fileExtension = selectedDocument.fileType.split("/")[1].toUpperCase()
+
+    return (
+      <div className="w-full h-full flex flex-col">
+        <div className="mb-4">
+          <Button variant="ghost" size="sm" onClick={handleBackToList} className="flex items-center gap-1 -ml-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Documents
+          </Button>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+          <div className="bg-gray-50 rounded-xl p-8 w-full max-w-sm mb-6">
+            {selectedDocument.fileType.includes("pdf") ? (
+              <FileText className="h-20 w-20 text-red-500 mx-auto mb-4" />
+            ) : selectedDocument.fileType.includes("image") ? (
+              <FileType className="h-20 w-20 text-blue-500 mx-auto mb-4" />
+            ) : (
+              <File className="h-20 w-20 text-gray-500 mx-auto mb-4" />
+            )}
+
+            <h2 className="text-xl font-semibold mb-2">{selectedDocument.name}</h2>
+
+            <div className="flex flex-col gap-2 text-sm text-gray-500 mb-4">
+              <div>
+                <span className="font-medium">Type:</span> {fileExtension}
+              </div>
+              <div>
+                <span className="font-medium">Size:</span> {formatFileSize(selectedDocument.size)}
+              </div>
+              <div>
+                <span className="font-medium">Uploaded:</span>{" "}
+                {new Date(selectedDocument.createdAt).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 w-full max-w-sm">
+            <Button onClick={handleOpenInNewWindow} className="flex-1 flex items-center justify-center gap-2">
+              <Eye className="h-4 w-4" />
+              View Document
+            </Button>
+
+            <Button
+              onClick={handleDownload}
+              variant="outline"
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Render document detail view for desktop
+  const renderDesktopDocumentDetail = () => {
     if (!selectedDocument) return null
 
     return (
-      <div className={`${isMobile ? "w-full h-full" : "md:col-span-2"} h-full flex flex-col`}>
-        {isMobile && (
-          <div className="mb-3">
-            <Button variant="ghost" size="sm" onClick={handleBackToList} className="flex items-center gap-1 -ml-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Documents
-            </Button>
-          </div>
-        )}
-
+      <div className="md:col-span-2 h-full flex flex-col">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-semibold flex items-center gap-2 truncate max-w-[70%]">
             {getDocumentIcon(selectedDocument.fileType)}
@@ -352,21 +404,23 @@ export function DocumentsDialog({ isOpen, onClose, businessId, businessName }: D
 
         {isMobile ? (
           <div className="p-4 h-[calc(90vh-8rem)] overflow-hidden">
-            {showDocumentDetail && selectedDocument ? renderDocumentDetail() : renderDocumentList()}
+            {showDocumentDetail && selectedDocument ? renderMobileDocumentDetail() : renderDocumentList()}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 h-[calc(90vh-8rem)] overflow-hidden">
             {renderDocumentList()}
-            {selectedDocument ? renderDocumentDetail() : renderEmptyState()}
+            {selectedDocument ? renderDesktopDocumentDetail() : renderEmptyState()}
           </div>
         )}
 
         {/* Footer with close button (no X icon) */}
-        <div className="border-t p-4 flex justify-end">
-          <Button onClick={onClose} variant="outline">
-            Close
-          </Button>
-        </div>
+        {(!isMobile || !showDocumentDetail) && (
+          <div className="border-t p-4 flex justify-end">
+            <Button onClick={onClose} variant="outline">
+              Close
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
