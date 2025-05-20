@@ -1,14 +1,42 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
-import { Loader2, ImageIcon, Ticket, Briefcase, AlertCircle, X, Phone, MapPin } from "lucide-react"
+import {
+  Loader2,
+  ImageIcon,
+  Ticket,
+  Briefcase,
+  AlertCircle,
+  X,
+  Phone,
+  MapPin,
+  Menu,
+  List,
+  FileText,
+  ShoppingCart,
+  Clipboard,
+  Calendar,
+  MessageSquare,
+  Map,
+  Settings,
+  BookOpen,
+  PenTool,
+  Truck,
+  Heart,
+  Coffee,
+  Gift,
+  Music,
+} from "lucide-react"
 import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
 import { BusinessCouponsDialog } from "./business-coupons-dialog"
 import { BusinessJobsDialog } from "./business-jobs-dialog"
+import { DocumentsDialog } from "./documents-dialog"
 import { getCloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import type { CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -35,6 +63,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   const [isPhotoAlbumOpen, setIsPhotoAlbumOpen] = useState(false)
   const [isCouponsOpen, setIsCouponsOpen] = useState(false)
   const [isJobsOpen, setIsJobsOpen] = useState(false)
+  const [isDocumentsOpen, setIsDocumentsOpen] = useState(false)
   const [businessVideo, setBusinessVideo] = useState<CloudflareBusinessMedia | null>(null)
   const [videoLoading, setVideoLoading] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
@@ -56,6 +85,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       setIsPhotoAlbumOpen(false)
       setIsCouponsOpen(false)
       setIsJobsOpen(false)
+      setIsDocumentsOpen(false)
     }
   }, [isOpen])
 
@@ -164,26 +194,28 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     return hours.split("\n")
   }
 
-  // Function to manually retry loading the video
-  const retryLoadVideo = () => {
-    loadBusinessVideo()
-  }
+  // Function to get the icon component based on icon name
+  const getIconComponent = (iconName: string) => {
+    const iconMap: Record<string, React.ElementType> = {
+      Menu: Menu,
+      List: List,
+      FileText: FileText,
+      ShoppingCart: ShoppingCart,
+      Clipboard: Clipboard,
+      Calendar: Calendar,
+      MessageSquare: MessageSquare,
+      Map: Map,
+      Settings: Settings,
+      BookOpen: BookOpen,
+      PenTool: PenTool,
+      Truck: Truck,
+      Heart: Heart,
+      Coffee: Coffee,
+      Gift: Gift,
+      Music: Music,
+    }
 
-  // Function to get Cloudflare Stream public URL
-  const getCloudflareStreamUrl = (videoId: string) => {
-    const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID
-    return `https://customer-${accountId}.cloudflarestream.com/${videoId}/manifest/video.m3u8`
-  }
-
-  // Function to get Cloudflare Stream iframe embed URL
-  const getCloudflareStreamEmbedUrl = (videoId: string) => {
-    return `https://iframe.cloudflarestream.com/${videoId}`
-  }
-
-  // Function to get Cloudflare Stream thumbnail URL
-  const getCloudflareStreamThumbnailUrl = (videoId: string, time = 0) => {
-    const accountId = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID
-    return `https://customer-${accountId}.cloudflarestream.com/${videoId}/thumbnails/thumbnail.jpg?time=${time}s`
+    return iconMap[iconName] || Menu // Default to Menu if icon not found
   }
 
   // Function to handle phone call
@@ -325,47 +357,42 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                   )}
                 </div>
 
+                {/* Business Video */}
+                {businessVideo && businessVideo.cloudflareVideoId && (
+                  <div className="border-t pt-4 mt-4 px-4">
+                    <p className="text-sm font-medium text-gray-500 mb-2">Business Video</p>
+
+                    {/* Using iframe embed for maximum compatibility */}
+                    <div
+                      className={`relative ${businessVideo.videoAspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-video"} w-full overflow-hidden rounded-md`}
+                    >
+                      <iframe
+                        src={`https://iframe.cloudflarestream.com/${businessVideo.cloudflareVideoId}`}
+                        className="absolute top-0 left-0 w-full h-full"
+                        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title={`${businessName} Video`}
+                      ></iframe>
+                    </div>
+                  </div>
+                )}
+
+                {videoLoading && (
+                  <div className="flex justify-center items-center py-2 mb-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                    <span className="text-sm">Loading video...</span>
+                  </div>
+                )}
+
+                {videoError && !videoLoading && !businessVideo && (
+                  <Alert className="mb-3 bg-yellow-50 border-yellow-200">
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                    <AlertDescription className="text-yellow-700 text-sm">{videoError}</AlertDescription>
+                  </Alert>
+                )}
+
                 {/* Footer with buttons */}
                 <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
-                  {/* Business Video */}
-                  {businessVideo && businessVideo.cloudflareVideoId && (
-                    <div className="mb-3">
-                      <p className="text-sm font-medium text-gray-500 mb-2">Business Video</p>
-
-                      {/* Using iframe embed for maximum compatibility */}
-                      <div
-                        className={`relative ${businessVideo.videoAspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-video"} w-full overflow-hidden rounded-md`}
-                      >
-                        <iframe
-                          src={getCloudflareStreamEmbedUrl(businessVideo.cloudflareVideoId)}
-                          className="absolute top-0 left-0 w-full h-full"
-                          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          title={`${businessName} Video`}
-                        ></iframe>
-                      </div>
-
-                      {/* Fallback for debugging removed */}
-                    </div>
-                  )}
-
-                  {videoLoading && (
-                    <div className="flex justify-center items-center py-2 mb-2">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
-                      <span className="text-sm">Loading video...</span>
-                    </div>
-                  )}
-
-                  {videoError && !videoLoading && !businessVideo && (
-                    <Alert className="mb-3 bg-yellow-50 border-yellow-200">
-                      <AlertCircle className="h-4 w-4 text-yellow-600" />
-                      <AlertDescription className="text-yellow-700 text-sm">
-                        {videoError}
-                        {/* Debug retry button removed */}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
                   {/* Buttons for Photo Album, Coupons, and Jobs */}
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     <Button
@@ -396,7 +423,29 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     </Button>
                   </div>
 
-                  {/* Website button moved below the grid */}
+                  {/* Custom Button */}
+                  {adDesign && adDesign.customButton && !adDesign.hiddenFields?.customButton && (
+                    <Button
+                      variant="outline"
+                      className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2"
+                      onClick={() => setIsDocumentsOpen(true)}
+                    >
+                      {(() => {
+                        const IconComponent = getIconComponent(adDesign.customButton.icon || "Menu")
+                        return (
+                          <IconComponent
+                            className="h-5 w-5"
+                            style={{
+                              color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            }}
+                          />
+                        )
+                      })()}
+                      <span className="text-xs">{adDesign.customButton.name || "Menu"}</span>
+                    </Button>
+                  )}
+
+                  {/* Website button */}
                   {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
                     <button
                       onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
@@ -457,6 +506,14 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       <BusinessJobsDialog
         isOpen={isJobsOpen}
         onClose={() => setIsJobsOpen(false)}
+        businessId={businessId}
+        businessName={businessName}
+      />
+
+      {/* Documents Dialog */}
+      <DocumentsDialog
+        isOpen={isDocumentsOpen}
+        onClose={() => setIsDocumentsOpen(false)}
         businessId={businessId}
         businessName={businessName}
       />

@@ -5,6 +5,7 @@ import type React from "react"
 
 import { useSearchParams } from "next/navigation"
 import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
@@ -19,6 +20,7 @@ import { MainFooter } from "@/components/main-footer"
 import { BusinessPhotoAlbumDialog } from "@/components/business-photo-album-dialog"
 import BusinessJobsDialog from "@/components/business-jobs-dialog"
 import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
+import { DocumentsDialog } from "@/components/documents-dialog"
 
 import {
   Menu,
@@ -37,6 +39,9 @@ import {
   Coffee,
   Gift,
   Music,
+  ImageIcon,
+  Ticket,
+  Briefcase,
 } from "lucide-react"
 
 interface PhotoItem {
@@ -569,6 +574,30 @@ export default function CustomizeAdDesignPage() {
     setIsPhotoAlbumDialogOpen(true)
   }
 
+  // Function to get the icon component based on icon name
+  const getIconComponent = (iconName: string) => {
+    const iconMap: Record<string, React.ElementType> = {
+      Menu: Menu,
+      List: List,
+      FileText: FileText,
+      ShoppingCart: ShoppingCart,
+      Clipboard: Clipboard,
+      Calendar: Calendar,
+      MessageSquare: MessageSquare,
+      Map: Map,
+      Settings: Settings,
+      BookOpen: BookOpen,
+      PenTool: PenTool,
+      Truck: Truck,
+      Heart: Heart,
+      Coffee: Coffee,
+      Gift: Gift,
+      Music: Music,
+    }
+
+    return iconMap[iconName] || Menu // Default to Menu if icon not found
+  }
+
   // Modify the handleSubmit function to save the formatted phone number
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -743,6 +772,9 @@ export default function CustomizeAdDesignPage() {
     }
   }, [isJobsDialogOpen])
 
+  // Add this state variable with the other state variables
+  const [isDocumentsOpen, setIsDocumentsOpen] = useState(false)
+
   // Update the renderDesignPreview function to handle all designs with the selected color
   const renderDesignPreview = () => {
     // Default to Design 5 (Modern Business Card design)
@@ -768,7 +800,7 @@ export default function CustomizeAdDesignPage() {
                   <div
                     className="h-5 w-5 mt-0.5 flex-shrink-0"
                     style={{
-                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      color: colorValues.textColor ? "#000000" : colorValues.primary,
                     }}
                   >
                     <svg
@@ -797,7 +829,7 @@ export default function CustomizeAdDesignPage() {
                   <div
                     className="h-5 w-5 mt-0.5 flex-shrink-0"
                     style={{
-                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      color: colorValues.textColor ? "#000000" : colorValues.primary,
                     }}
                   >
                     <svg
@@ -827,7 +859,7 @@ export default function CustomizeAdDesignPage() {
                   <div
                     className="h-5 w-5 mt-0.5 flex-shrink-0"
                     style={{
-                      color: selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                      color: colorValues.textColor ? "#000000" : colorValues.primary,
                     }}
                   >
                     <svg
@@ -885,123 +917,83 @@ export default function CustomizeAdDesignPage() {
               {/* Grid layout for buttons - matching the AdBox dialog layout */}
               <div className="grid grid-cols-3 gap-2">
                 {!hiddenFields.photoAlbum && (
-                  <button
+                  <Button
+                    variant="outline"
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3"
                     onClick={handleOpenPhotoAlbum}
-                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 rounded-md border border-gray-200 bg-white px-4 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
+                    <ImageIcon
                       className="h-5 w-5"
-                    >
-                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                      <circle cx="9" cy="9" r="2"></circle>
-                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                    </svg>
+                      style={{
+                        color: colorValues.textColor ? "#000000" : colorValues.primary,
+                      }}
+                    />
                     <span className="text-xs">Photo Album</span>
-                  </button>
+                  </Button>
                 )}
 
                 {!hiddenFields.savingsButton && (
-                  <button
+                  <Button
+                    variant="outline"
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3"
                     onClick={() => setIsSavingsDialogOpen(true)}
-                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 rounded-md border border-gray-200 bg-white px-4 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
+                    <Ticket
                       className="h-5 w-5"
-                    >
-                      <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
-                      <path d="M7 7h.01" />
-                    </svg>
+                      style={{
+                        color: colorValues.textColor ? "#000000" : colorValues.primary,
+                      }}
+                    />
                     <span className="text-xs">Coupons</span>
-                  </button>
+                  </Button>
                 )}
 
                 {!hiddenFields.jobsButton && (
-                  // Update the Jobs button click handler in the renderDesignPreview function
-                  // Find the Jobs button in the grid layout (around line 600) and replace onClick with:
-                  <button
+                  <Button
+                    variant="outline"
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3"
                     onClick={() => setIsJobsDialogOpen(true)}
-                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 rounded-md border border-gray-200 bg-white px-4 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{
-                        color:
-                          selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                      }}
+                    <Briefcase
                       className="h-5 w-5"
-                    >
-                      <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
-                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                    </svg>
+                      style={{
+                        color: colorValues.textColor ? "#000000" : colorValues.primary,
+                      }}
+                    />
                     <span className="text-xs">Jobs</span>
-                  </button>
-                )}
-
-                {!hiddenFields.customButton && (
-                  <button
-                    onClick={() => alert(`${customButtonName} functionality would open here`)}
-                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 rounded-md border border-gray-200 bg-white px-4 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50"
-                  >
-                    {(() => {
-                      const IconComponent =
-                        availableIcons.find((icon) => icon.name === customButtonIcon)?.component || Menu
-                      return (
-                        <IconComponent
-                          style={{
-                            color:
-                              selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
-                          }}
-                          className="h-5 w-5"
-                        />
-                      )
-                    })()}
-                    <span className="text-xs">{customButtonName}</span>
-                  </button>
+                  </Button>
                 )}
               </div>
 
-              {/* Website button - separate from the grid */}
+              {/* Custom Button */}
+              {!hiddenFields.customButton && (
+                <Button
+                  variant="outline"
+                  className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2"
+                  onClick={() => setIsDocumentsOpen(true)}
+                >
+                  {(() => {
+                    const IconComponent = getIconComponent(customButtonIcon)
+                    return (
+                      <IconComponent
+                        className="h-5 w-5"
+                        style={{
+                          color: colorValues.textColor ? "#000000" : colorValues.primary,
+                        }}
+                      />
+                    )
+                  })()}
+                  <span className="text-xs">{customButtonName}</span>
+                </Button>
+              )}
+
+              {/* Website button */}
               {!hiddenFields.website && (
                 <button
                   onClick={() => window.open(`https://${formData.website}`, "_blank")}
                   className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
                   style={{
-                    backgroundColor:
-                      selectedColor === "white" || selectedColor === "yellow" ? "#000000" : colorValues.primary,
+                    backgroundColor: colorValues.textColor ? "#000000" : colorValues.primary,
                   }}
                 >
                   <svg
@@ -1507,6 +1499,14 @@ export default function CustomizeAdDesignPage() {
       <BusinessJobsDialog
         isOpen={isJobsDialogOpen}
         onClose={() => setIsJobsDialogOpen(false)}
+        businessId={businessId}
+        businessName={formData.businessName}
+      />
+
+      {/* Documents Dialog */}
+      <DocumentsDialog
+        isOpen={isDocumentsOpen}
+        onClose={() => setIsDocumentsOpen(false)}
         businessId={businessId}
         businessName={formData.businessName}
       />
