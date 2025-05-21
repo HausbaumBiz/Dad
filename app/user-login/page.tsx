@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,6 +19,7 @@ import { useToast } from "@/components/ui/use-toast"
 
 export default function UserLoginPage() {
   const { toast } = useToast()
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
@@ -28,6 +30,7 @@ export default function UserLoginPage() {
   const [error, setError] = useState("")
   const searchParams = useSearchParams()
   const registered = searchParams.get("registered")
+  const returnTo = searchParams.get("returnTo") || "/"
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
@@ -44,6 +47,13 @@ export default function UserLoginPage() {
     setError("") // Clear previous errors
 
     try {
+      // Validate form data
+      if (!formData.email || !formData.password) {
+        setError("Email and password are required")
+        setIsSubmitting(false)
+        return
+      }
+
       // Create a FormData object from the form data
       const formDataObj = new FormData()
       Object.entries(formData).forEach(([key, value]) => {
@@ -57,7 +67,18 @@ export default function UserLoginPage() {
       const result = await loginUser(formDataObj)
 
       // Handle the result
-      if (!result.success) {
+      if (result.success) {
+        // Handle successful login
+        toast({
+          title: "Login successful",
+          description: "You have been logged in successfully",
+          variant: "default",
+        })
+
+        // Navigate to the return URL or home page
+        router.push(result.redirectTo || returnTo)
+      } else {
+        // Handle login failure
         setError(result.message || "Invalid username or password")
         toast({
           title: "Login failed",
@@ -65,8 +86,8 @@ export default function UserLoginPage() {
           variant: "destructive",
         })
       }
-      // If successful, the server action will redirect
     } catch (error) {
+      console.error("Login error:", error)
       setError("An unexpected error occurred. Please try again.")
       toast({
         title: "An error occurred",

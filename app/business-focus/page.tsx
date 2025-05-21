@@ -103,7 +103,7 @@ export default function BusinessFocusPage() {
     setIsSaving(true)
     try {
       // Save to server
-      console.log(`Saving ${selectedCategories.length} categories for business...`)
+      console.log(`Saving ${selectedCategories.length} categories:`, selectedCategories)
       const result = await saveBusinessCategories(selectedCategories)
 
       if (result.success) {

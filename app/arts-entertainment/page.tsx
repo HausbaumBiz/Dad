@@ -388,6 +388,7 @@ export default function ArtsEntertainmentPage() {
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.businessName || selectedProvider.name}
+          businessId={selectedProvider.id}
           reviews={mockReviews.find((p) => p.providerName === selectedProvider.businessName)?.reviews || []}
         />
       )}

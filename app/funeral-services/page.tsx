@@ -305,6 +305,7 @@ export default function FuneralServicesPage() {
         isOpen={isReviewsOpen}
         onClose={() => setIsReviewsOpen(false)}
         providerName={selectedProvider || ""}
+        businessId={selectedProviderId || ""}
         reviews={selectedProvider && providers.length > 0 ? [] : []}
       />
 

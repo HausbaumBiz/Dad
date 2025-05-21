@@ -6,18 +6,15 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState } from "react"
 import Image from "next/image"
 
-export default function ElderCarePage() {
+export default function CareServicesPage() {
   const filterOptions = [
     { id: "homecare1", label: "Non-Medical Elder Care", value: "Non-Medical Elder Care" },
     { id: "homecare2", label: "Non-Medical Special Needs Adult Care", value: "Non-Medical Special Needs Adult Care" },
-    { id: "homecare3", label: "Assisted Living Facilities", value: "Assisted Living Facilities" },
-    { id: "homecare4", label: "Memory Care", value: "Memory Care" },
-    { id: "homecare5", label: "Respite Care", value: "Respite Care" },
-    { id: "homecare6", label: "Nursing Homes", value: "Nursing Homes" },
-    { id: "homecare7", label: "Hospice Care", value: "Hospice Care" },
-    { id: "homecare8", label: "Adult Daycare", value: "Adult Daycare" },
     { id: "childcare1", label: "Babysitting (18+ Sitters only)", value: "Babysitting (18+ Sitters only)" },
+    { id: "homecare3", label: "Other Home Care", value: "Other Home Care" },
     { id: "childcare2", label: "Childcare Centers", value: "Childcare Centers" },
+    { id: "homecare4", label: "Adult Day Services", value: "Adult Day Services" },
+    { id: "homecare5", label: "Rehab/Nursing/Respite and Memory Care", value: "Rehab/Nursing/Respite and Memory Care" },
   ]
 
   // State for reviews dialog

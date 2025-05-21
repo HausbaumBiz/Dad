@@ -39,31 +39,6 @@ export default function AutomotiveServicesPage() {
   const [error, setError] = useState(null)
   const [debugInfo, setDebugInfo] = useState(null)
 
-  // Mock reviews data for when a real business is selected
-  const mockReviews = [
-    {
-      id: 1,
-      userName: "MikeT",
-      rating: 5,
-      comment: "Great service! They fixed my car quickly and at a fair price.",
-      date: "2023-12-10",
-    },
-    {
-      id: 2,
-      userName: "SarahL",
-      rating: 4,
-      comment: "Good service overall. Professional and knowledgeable staff.",
-      date: "2023-11-22",
-    },
-    {
-      id: 3,
-      userName: "DavidW",
-      rating: 5,
-      comment: "Excellent work! They diagnosed and fixed an issue that two other shops couldn't figure out.",
-      date: "2023-10-15",
-    },
-  ]
-
   useEffect(() => {
     async function fetchBusinesses() {
       try {
@@ -190,8 +165,8 @@ export default function AutomotiveServicesPage() {
   }, [])
 
   // Add a function to handle opening the reviews dialog
-  const handleReviewsClick = (providerId) => {
-    setSelectedProvider(providerId)
+  const handleReviewsClick = (provider) => {
+    setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
   }
 
@@ -310,7 +285,7 @@ export default function AutomotiveServicesPage() {
                   </div>
 
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleReviewsClick(provider.id)}>
+                    <Button className="w-full md:w-auto" onClick={() => handleReviewsClick(provider)}>
                       Reviews
                     </Button>
                     <Button
@@ -404,8 +379,9 @@ export default function AutomotiveServicesPage() {
           <ReviewsDialog
             isOpen={isReviewsDialogOpen}
             onClose={() => setIsReviewsDialogOpen(false)}
-            providerName={providers.find((p) => p.id === selectedProvider)?.name || ""}
-            reviews={mockReviews}
+            providerName={selectedProvider ? selectedProvider.name : ""}
+            businessId={selectedProvider ? selectedProvider.id : ""}
+            reviews={[]}
           />
 
           <BusinessProfileDialog

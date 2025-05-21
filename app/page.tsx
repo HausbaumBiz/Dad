@@ -12,6 +12,7 @@ import Image from "next/image"
 import { ZipCodeDialog } from "@/components/zip-code-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { UserMenu } from "@/components/user-menu"
+import { CategorySubcategories } from "@/components/category-subcategories"
 
 export default function HomePage() {
   const { toast } = useToast()
@@ -21,6 +22,7 @@ export default function HomePage() {
   const [isZipDialogOpen, setIsZipDialogOpen] = useState(false)
   const [selectedCategoryHref, setSelectedCategoryHref] = useState("")
   const [userName, setUserName] = useState<string | null>(null)
+  const [selectedSubcategories, setSelectedSubcategories] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
     const savedZip = localStorage.getItem("savedZipCode")
@@ -99,6 +101,16 @@ export default function HomePage() {
     }
   }
 
+  const handleSubcategorySelection = (categoryTitle: string, selected: string[]) => {
+    setSelectedSubcategories((prev) => ({
+      ...prev,
+      [categoryTitle]: selected,
+    }))
+
+    // You can add logic here to filter or navigate based on subcategory selection
+    console.log(`Selected subcategories for ${categoryTitle}:`, selected)
+  }
+
   const categories = [
     {
       title: "Home Improvement",
@@ -111,9 +123,9 @@ export default function HomePage() {
       href: "/automotive-services",
     },
     {
-      title: "Elder Care",
+      title: "Elder and Child Care",
       image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/home%20health-zJyA419byhmD7tyJa0Ebmegg0XzFN3.png",
-      href: "/elder-care",
+      href: "/care-services",
     },
     {
       title: "Pet Care",
@@ -218,11 +230,6 @@ export default function HomePage() {
       title: "Financial Services",
       image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/finance-fqVQ0TmI2kFehcFP7kIOji08oIBhqX.png",
       href: "/financial-services",
-    },
-    {
-      title: "Child Care",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/daycare-tX4p6sCUHmjoNFymH3235qbTp3JM7U.png",
-      href: "/child-care",
     },
   ]
 
@@ -352,17 +359,7 @@ export default function HomePage() {
                   {heroImages.map((img, i) => (
                     <div key={i} className="relative overflow-hidden rounded-lg">
                       <Image
-                        src={
-                          img.src ||
-                          "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/placeholder-ob7miW3mUreePYfXdVwkpFWHthzoR5.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg"
-                        }
+                        src={img.src || "/placeholder.svg"}
                         alt={img.alt}
                         fill
                         className="object-cover"
@@ -415,17 +412,7 @@ export default function HomePage() {
                   <a href={category.href} onClick={(e) => handleCategoryClick(category.href, e)}>
                     <div className="aspect-[4/3] relative">
                       <Image
-                        src={
-                          category.image ||
-                          "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/placeholder-ob7miW3mUreePYfXdVwkpFWHthzoR5.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg" ||
-                          "/placeholder.svg"
-                        }
+                        src={category.image || "/placeholder.svg"}
                         alt={category.title}
                         fill
                         className="object-cover"
@@ -443,33 +430,31 @@ export default function HomePage() {
 
         <h2 className="text-2xl font-bold text-center mb-8">Select a Category</h2>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-12">
           {categories.map((category, index) => (
-            <Card key={index} className="overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-105">
-              <a href={category.href} onClick={(e) => handleCategoryClick(category.href, e)}>
-                <div className="aspect-square relative overflow-hidden rounded-t-lg">
-                  <Image
-                    src={
-                      category.image ||
-                      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/placeholder-ob7miW3mUreePYfXdVwkpFWHthzoR5.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg"
-                    }
-                    alt={category.title}
-                    fill
-                    className="object-cover"
-                    unoptimized={true}
+            <Card key={index} className="overflow-hidden transition-all duration-200 hover:shadow-lg">
+              <div className="aspect-square relative overflow-hidden rounded-t-lg">
+                <Image
+                  src={category.image || "/placeholder.svg"}
+                  alt={category.title}
+                  fill
+                  className="object-cover"
+                  unoptimized={true}
+                />
+              </div>
+              <CardContent className="p-4">
+                <a href={category.href} onClick={(e) => handleCategoryClick(category.href, e)} className="block">
+                  <h3 className="text-lg font-medium text-center mb-2">{category.title}</h3>
+                </a>
+
+                {category.subcategories && (
+                  <CategorySubcategories
+                    categoryTitle={category.title}
+                    subcategories={category.subcategories}
+                    onSelectionChange={(selected) => handleSubcategorySelection(category.title, selected)}
                   />
-                </div>
-                <CardContent className="p-3">
-                  <h3 className="text-sm font-medium text-center line-clamp-2 h-10">{category.title}</h3>
-                </CardContent>
-              </a>
+                )}
+              </CardContent>
             </Card>
           ))}
         </div>

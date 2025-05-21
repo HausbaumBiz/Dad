@@ -63,6 +63,11 @@ export async function createUser(userData: UserCreateInput) {
 // Get user by ID
 export async function getUserById(userId: string) {
   try {
+    if (!userId) {
+      console.error("getUserById called with empty userId")
+      return null
+    }
+
     const user = await kv.get<User>(`user:${userId}`)
     return user
   } catch (error) {
@@ -74,6 +79,11 @@ export async function getUserById(userId: string) {
 // Get user by email
 export async function getUserByEmail(email: string) {
   try {
+    if (!email) {
+      console.error("getUserByEmail called with empty email")
+      return null
+    }
+
     const userId = await kv.get<string>(`user:email:${email}`)
     if (!userId) return null
 
@@ -87,6 +97,10 @@ export async function getUserByEmail(email: string) {
 // Verify user credentials
 export async function verifyCredentials(email: string, password: string) {
   try {
+    if (!email || !password) {
+      return { success: false, message: "Email and password are required" }
+    }
+
     // Get user by email
     const userId = await kv.get<string>(`user:email:${email}`)
     if (!userId) {

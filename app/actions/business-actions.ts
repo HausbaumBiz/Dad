@@ -94,7 +94,7 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
     // Remove business from email index
     if (business.email) {
       console.log(`Removing business from email index: ${business.email}`)
-      await kv.del(`${KEY_PREFIXES.BUSINESS_EMAIL}${business.email}`)
+      await kv.del(`${KEY_PREFIXES.BUSINESS_EMAIL}${business.email.toLowerCase()}`)
     }
 
     // Remove business from category index if it has one
@@ -110,7 +110,11 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
         let categories: CategoryData[] = []
 
         if (typeof categoriesData === "string") {
-          categories = JSON.parse(categoriesData)
+          try {
+            categories = JSON.parse(categoriesData)
+          } catch (e) {
+            console.error("Error parsing categories data:", e)
+          }
         } else if (Array.isArray(categoriesData)) {
           categories = categoriesData
         }
@@ -134,11 +138,42 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
 
     // Get business zip codes and remove from indexes
     try {
-      const zipCodes = await kv.smembers(`${KEY_PREFIXES.BUSINESS}${id}:zipcodes`)
+      let zipCodes: string[] = []
+
+      // First try to get zip codes as a set (smembers)
+      try {
+        zipCodes = await kv.smembers(`${KEY_PREFIXES.BUSINESS}${id}:zipcodes`)
+      } catch (setError) {
+        console.log("Zip codes not stored as a set, trying as a string value:", setError)
+
+        // If that fails, try to get it as a string (get)
+        try {
+          const zipCodesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${id}:zipcodes`)
+          if (zipCodesData) {
+            if (typeof zipCodesData === "string") {
+              try {
+                zipCodes = JSON.parse(zipCodesData)
+              } catch (parseError) {
+                console.error("Error parsing zip codes data:", parseError)
+                // If it's a string but not JSON, it might be a single zip code
+                zipCodes = [zipCodesData]
+              }
+            } else if (Array.isArray(zipCodesData)) {
+              zipCodes = zipCodesData
+            }
+          }
+        } catch (getError) {
+          console.error("Error getting zip codes as string:", getError)
+        }
+      }
+
+      console.log(`Found ${zipCodes.length} zip codes for business ${id}:`, zipCodes)
 
       // Remove business from each zip code's index
       for (const zipCode of zipCodes) {
-        await kv.srem(`${KEY_PREFIXES.ZIPCODE}${zipCode}:businesses`, id)
+        if (typeof zipCode === "string") {
+          await kv.srem(`${KEY_PREFIXES.ZIPCODE}${zipCode}:businesses`, id)
+        }
       }
     } catch (error) {
       console.error(`Error removing business ${id} from zip code indexes:`, error)

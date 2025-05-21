@@ -188,6 +188,7 @@ export default function FoodDiningPage() {
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={providers.find((p) => p.id === selectedProvider)?.name || ""}
+          businessId={selectedProvider.toString()}
           reviews={mockReviews}
         />
       )}

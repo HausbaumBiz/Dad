@@ -339,6 +339,16 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
         JSON.stringify(categoriesWithSubcategories),
       )
 
+      // Create a simplified format for admin display
+      const simplifiedCategories = categories.map((cat) => ({
+        category: cat.category,
+        subcategory: cat.subcategory,
+        fullPath: cat.fullPath,
+      }))
+
+      // Store the simplified format
+      await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}:simplifiedCategories`, JSON.stringify(simplifiedCategories))
+
       // Update the business object with all categories and subcategories
       // Ensure the primary category and subcategory are updated
       const updatedBusiness = {

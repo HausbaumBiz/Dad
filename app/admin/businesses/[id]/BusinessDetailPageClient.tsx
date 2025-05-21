@@ -10,6 +10,7 @@ import { getBusinessZipCodesById } from "@/app/actions/zip-code-actions"
 import { useToast } from "@/components/ui/use-toast"
 import type { Business } from "@/lib/definitions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
+import { getBusinessSimplifiedCategories, type SimplifiedCategory } from "@/app/actions/admin-category-actions"
 
 interface BusinessDetailPageClientProps {
   business: Business
@@ -20,6 +21,8 @@ export default function BusinessDetailPageClient({ business }: BusinessDetailPag
   const [serviceArea, setServiceArea] = useState<{ zipCodes: ZipCodeData[]; isNationwide: boolean } | null>(null)
   const [isLoadingServiceArea, setIsLoadingServiceArea] = useState(false)
   const { toast } = useToast()
+  const [categories, setCategories] = useState<SimplifiedCategory[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
 
   const handleTabChange = async (value: string) => {
     setActiveTab(value)
@@ -47,6 +50,32 @@ export default function BusinessDetailPageClient({ business }: BusinessDetailPag
         })
       } finally {
         setIsLoadingServiceArea(false)
+      }
+    }
+
+    // Load categories when switching to the categories tab
+    if (value === "categories" && categories.length === 0 && !isLoadingCategories) {
+      setIsLoadingCategories(true)
+      try {
+        const result = await getBusinessSimplifiedCategories(business.id)
+        if (result.success && result.data) {
+          setCategories(result.data)
+        } else {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to load categories",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error loading categories:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load categories",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoadingCategories(false)
       }
     }
   }
@@ -203,7 +232,33 @@ export default function BusinessDetailPageClient({ business }: BusinessDetailPag
               <CardDescription>Business categories and subcategories</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-500 italic">Category information not available</p>
+              {isLoadingCategories ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                </div>
+              ) : categories.length > 0 ? (
+                <div>
+                  <p className="mb-4">This business is listed in the following categories:</p>
+                  <div className="space-y-4">
+                    {categories.map((cat, index) => (
+                      <div key={index} className="p-4 rounded-md border border-gray-200 bg-gray-50">
+                        <div className="flex flex-col">
+                          <div className="flex items-center">
+                            <span className="font-semibold text-gray-700">Category:</span>
+                            <span className="ml-2">{cat.category}</span>
+                          </div>
+                          <div className="flex items-center mt-1">
+                            <span className="font-semibold text-gray-700">Subcategory:</span>
+                            <span className="ml-2">{cat.subcategory}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-500 italic">No categories defined for this business</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

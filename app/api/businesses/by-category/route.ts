@@ -23,7 +23,10 @@ export async function GET(request: NextRequest) {
       businessIds = await kv.smembers(`${KEY_PREFIXES.CATEGORY}${category}`)
       console.log(`API: Found ${businessIds.length} businesses for exact category: ${category}`)
     } catch (error) {
-      console.error(`API: Error fetching businesses for exact category ${category}:`, error)
+      console.error(
+        `API: Error fetching businesses for exact category ${category}:`,
+        error instanceof Error ? error.message : String(error),
+      )
     }
 
     // Also try with the normalized category
@@ -35,7 +38,10 @@ export async function GET(request: NextRequest) {
         )
         businessIds = [...businessIds, ...normalizedBusinessIds]
       } catch (error) {
-        console.error(`API: Error fetching businesses for normalized category ${normalizedCategory}:`, error)
+        console.error(
+          `API: Error fetching businesses for normalized category ${normalizedCategory}:`,
+          error instanceof Error ? error.message : String(error),
+        )
       }
     }
 
@@ -47,7 +53,10 @@ export async function GET(request: NextRequest) {
       )
       businessIds = [...businessIds, ...businessIdsWithSuffix]
     } catch (error) {
-      console.error(`API: Error fetching businesses for category with suffix ${category}:businesses:`, error)
+      console.error(
+        `API: Error fetching businesses for category with suffix ${category}:businesses:`,
+        error instanceof Error ? error.message : String(error),
+      )
     }
 
     if (normalizedCategory !== category) {
@@ -62,7 +71,7 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         console.error(
           `API: Error fetching businesses for normalized category with suffix ${normalizedCategory}:businesses:`,
-          error,
+          error instanceof Error ? error.message : String(error),
         )
       }
     }
@@ -87,7 +96,10 @@ export async function GET(request: NextRequest) {
         )
         businessIds = [...businessIds, ...etcBusinessIdsWithSuffix]
       } catch (error) {
-        console.error(`API: Error fetching businesses for etc format:`, error)
+        console.error(
+          `API: Error fetching businesses for etc format:`,
+          error instanceof Error ? error.message : String(error),
+        )
       }
     }
 
@@ -105,7 +117,7 @@ export async function GET(request: NextRequest) {
         const business = await kv.get(`${KEY_PREFIXES.BUSINESS}${id}`)
         return business ? { ...business, id } : null
       } catch (err) {
-        console.error(`API: Error fetching business ${id}:`, err)
+        console.error(`API: Error fetching business ${id}:`, err instanceof Error ? err.message : String(err))
         return null
       }
     })
@@ -115,7 +127,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ businesses })
   } catch (error) {
-    console.error("API: Error fetching businesses by category:", error)
+    console.error("API: Error fetching businesses by category:", error instanceof Error ? error.message : String(error))
     return NextResponse.json({ error: "Failed to fetch businesses" }, { status: 500 })
   }
 }
