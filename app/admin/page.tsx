@@ -40,6 +40,14 @@ export default function AdminDashboardPage() {
             View Media →
           </a>
         </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Category Mappings</h2>
+          <p className="text-gray-600 mb-4">View and manage mappings between business categories and frontend pages.</p>
+          <a href="/admin/category-mappings" className="text-blue-600 hover:text-blue-800">
+            View Mappings →
+          </a>
+        </div>
       </div>
     </div>
   )
