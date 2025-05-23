@@ -9,6 +9,7 @@ import { ReviewForm } from "@/components/review-form"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { StarRating } from "./star-rating"
+import { Loader2 } from "lucide-react"
 
 interface ReviewsDialogProps {
   isOpen: boolean
@@ -16,15 +17,25 @@ interface ReviewsDialogProps {
   providerName: string
   businessId: string
   reviews?: any[]
+  // Add page context to track where reviews are being viewed from
+  pageContext?: string
 }
 
-export function ReviewsDialog({ isOpen, onClose, providerName, businessId, reviews = [] }: ReviewsDialogProps) {
+export function ReviewsDialog({
+  isOpen,
+  onClose,
+  providerName,
+  businessId,
+  reviews = [],
+  pageContext,
+}: ReviewsDialogProps) {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState("reviews")
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [businessReviews, setBusinessReviews] = useState<Review[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // Check if user is logged in
@@ -39,15 +50,19 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
       }
     }
 
-    // Fetch reviews from database
+    // Fetch reviews from database - only for this specific business
     const fetchReviews = async () => {
       if (businessId && isOpen) {
         setIsLoading(true)
+        setError(null)
         try {
+          console.log(`Fetching reviews for business ID: ${businessId} from page: ${pageContext}`)
           const fetchedReviews = await getBusinessReviews(businessId)
+          console.log(`Fetched ${fetchedReviews.length} reviews for business ${businessId}`)
           setBusinessReviews(fetchedReviews)
         } catch (error) {
           console.error("Error fetching reviews:", error)
+          setError("Failed to load reviews. Please try again.")
           toast({
             title: "Error fetching reviews",
             description: "There was a problem loading reviews.",
@@ -63,7 +78,7 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
       checkLoginStatus()
       fetchReviews()
     }
-  }, [isOpen, businessId, toast])
+  }, [isOpen, businessId, pageContext, toast])
 
   const handleWriteReviewClick = () => {
     if (isLoggedIn) {
@@ -75,13 +90,13 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
 
   const handleReviewSuccess = () => {
     setActiveTab("reviews")
-    // Refresh reviews
+    // Refresh reviews for this specific business
     getBusinessReviews(businessId).then((reviews) => {
       setBusinessReviews(reviews)
     })
   }
 
-  // Use either database reviews or provided mock reviews
+  // Use database reviews for this specific business, fallback to provided mock reviews
   const displayReviews = businessReviews.length > 0 ? businessReviews : reviews
 
   return (
@@ -90,7 +105,10 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">{providerName} Reviews</DialogTitle>
-            <DialogDescription>Customer reviews and experiences with {providerName}</DialogDescription>
+            <DialogDescription>
+              Customer reviews and experiences with {providerName}
+              {pageContext && <span className="text-xs text-gray-500 block mt-1">Viewing from: {pageContext}</span>}
+            </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="reviews" value={activeTab} onValueChange={setActiveTab}>
@@ -109,8 +127,30 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
             <TabsContent value="reviews" className="mt-4">
               {isLoading ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mx-auto"></div>
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
                   <p className="mt-2 text-gray-500">Loading reviews...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-8">
+                  <p className="text-red-500 mb-4">{error}</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsLoading(true)
+                      getBusinessReviews(businessId)
+                        .then((reviews) => {
+                          setBusinessReviews(reviews)
+                          setError(null)
+                        })
+                        .catch((err) => {
+                          console.error("Error retrying reviews fetch:", err)
+                          setError("Failed to load reviews. Please try again.")
+                        })
+                        .finally(() => setIsLoading(false))
+                    }}
+                  >
+                    Retry
+                  </Button>
                 </div>
               ) : displayReviews.length > 0 ? (
                 <div className="space-y-6">
@@ -122,7 +162,7 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
                           <div className="flex items-center mt-1">
                             <StarRating rating={review.rating} />
                             <span className="text-sm text-gray-500 ml-2">
-                              {new Date(review.date).toLocaleDateString()}
+                              {new Date(review.date || Date.now()).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
@@ -143,7 +183,12 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
 
             <TabsContent value="write-review" className="mt-4">
               {isLoggedIn ? (
-                <ReviewForm businessId={businessId} businessName={providerName} onSuccess={handleReviewSuccess} />
+                <ReviewForm
+                  businessId={businessId}
+                  businessName={providerName}
+                  onSuccess={handleReviewSuccess}
+                  pageContext={pageContext}
+                />
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-700 mb-4">Please log in to write a review</p>

@@ -1,45 +1,64 @@
-export const metadata = {
-  title: "Admin Dashboard",
-  description: "Admin dashboard for managing the application",
-}
+import { RefreshCw } from "lucide-react"
+import Link from "next/link"
 
-export default function AdminDashboardPage() {
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+
+export default function AdminPage() {
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-10">
       <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Users</h2>
-          <p className="text-gray-600 mb-4">Manage user accounts and permissions.</p>
-          <a href="/admin/users" className="text-blue-600 hover:text-blue-800">
-            View Users →
-          </a>
-        </div>
+        {/* Existing Cards (replace with actual existing cards if any) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Placeholder Card 1</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>This is a placeholder card.</p>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Businesses</h2>
-          <p className="text-gray-600 mb-4">Manage business listings and information.</p>
-          <a href="/admin/businesses" className="text-blue-600 hover:text-blue-800">
-            View Businesses →
-          </a>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Placeholder Card 2</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>This is another placeholder card.</p>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">ZIP Codes</h2>
-          <p className="text-gray-600 mb-4">Manage ZIP code data and service areas.</p>
-          <a href="/admin/zip-codes" className="text-blue-600 hover:text-blue-800">
-            View ZIP Codes →
-          </a>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Placeholder Card 3</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>This is a third placeholder card.</p>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Media</h2>
-          <p className="text-gray-600 mb-4">Manage uploaded images, videos, and other media.</p>
-          <a href="/admin/media" className="text-blue-600 hover:text-blue-800">
-            View Media →
-          </a>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <RefreshCw className="mr-2 h-5 w-5" />
+              Page Mappings
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 mb-4">
+              Rebuild business-to-page mappings to ensure businesses appear on category pages.
+            </p>
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/admin/rebuild-page-mappings">Rebuild Page Mappings</Link>
+              </Button>
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/admin/category-mappings">View Category Mappings</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

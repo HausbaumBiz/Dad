@@ -5,6 +5,7 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
 import { useState } from "react"
 import Image from "next/image"
+import { Button } from "@/components/ui/button"
 
 export default function PetCarePage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -31,6 +32,8 @@ export default function PetCarePage() {
     { id: "pet13", label: "Pet Poop Pickup", value: "Pet Poop Pickup" },
     { id: "pet14", label: "Other Pet Care", value: "Other Pet Care" },
   ]
+
+  const providers: any[] = [] // Assuming providers is an empty array initially
 
   return (
     <CategoryLayout title="Pet Care Services" backLink="/" backText="Categories">
@@ -65,10 +68,21 @@ export default function PetCarePage() {
 
       <CategoryFilter options={filterOptions} />
 
-      <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
-        <h3 className="text-xl font-medium text-gray-700 mb-2">No Pet Care Providers Found</h3>
-        <p className="text-gray-600">Enter your zip code to find pet care providers in your area.</p>
-      </div>
+      {providers.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-600 mb-4">No pet care service businesses found.</p>
+          <p className="text-gray-600 mb-6">Be the first to register your business in this category!</p>
+          <Button variant="default" asChild>
+            <a href="/business-register">Register Your Business</a>
+          </Button>
+        </div>
+      ) : (
+        // existing providers mapping code
+        <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
+          <h3 className="text-xl font-medium text-gray-700 mb-2">Providers will be mapped here</h3>
+          <p className="text-gray-600">This section will display providers when available.</p>
+        </div>
+      )}
 
       <Toaster />
     </CategoryLayout>

@@ -1,86 +1,121 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { kv } from "@/lib/redis"
 import { KEY_PREFIXES } from "@/lib/db-schema"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const businessId = searchParams.get("businessId")
+    console.log("Fetching all businesses for category debug...")
 
-    if (!businessId) {
-      return NextResponse.json({ error: "businessId parameter is required" }, { status: 400 })
+    // Get all business IDs
+    const businessIds = await kv.smembers(KEY_PREFIXES.BUSINESSES_SET)
+    console.log(`Found ${businessIds.length} business IDs`)
+
+    if (!businessIds || businessIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        businesses: [],
+        message: "No businesses found in the system",
+      })
     }
 
-    // Get business data
-    const business = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
+    // Fetch each business with their categories and page mappings
+    const businessesPromises = businessIds.slice(0, 20).map(async (id) => {
+      try {
+        const business = await kv.get(`${KEY_PREFIXES.BUSINESS}${id}`)
+        const categories = await kv.get(`${KEY_PREFIXES.BUSINESS}${id}:categories`)
+        const pageMappings = await kv.get(`${KEY_PREFIXES.BUSINESS}${id}:pages`)
 
-    if (!business) {
-      return NextResponse.json({ error: "Business not found" }, { status: 404 })
-    }
+        let parsedCategories = []
+        let parsedPageMappings = {}
 
-    // Get categories data
-    const categoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)
-    const allCategoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:allCategories`)
-    const allSubcategoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
+        if (categories) {
+          if (typeof categories === "string") {
+            try {
+              parsedCategories = JSON.parse(categories)
+            } catch (error) {
+              console.error(`Error parsing categories for business ${id}:`, error)
+            }
+          } else if (Array.isArray(categories)) {
+            parsedCategories = categories
+          }
+        }
 
-    // Check which category indexes the business is in
-    const categoryChecks = {
-      arts: {},
-      automotive: {},
-    }
+        if (pageMappings) {
+          if (typeof pageMappings === "string") {
+            try {
+              parsedPageMappings = JSON.parse(pageMappings)
+            } catch (error) {
+              console.error(`Error parsing page mappings for business ${id}:`, error)
+            }
+          } else if (typeof pageMappings === "object" && pageMappings !== null) {
+            parsedPageMappings = pageMappings
+          }
+        }
 
-    // Check arts categories
-    const artsFormats = [
-      "artDesignEntertainment",
-      "Art, Design and Entertainment",
-      "arts-entertainment",
-      "Arts & Entertainment",
-      "art-design-entertainment",
-      "art-design-and-entertainment",
-      "arts-&-entertainment",
-    ]
+        return {
+          id,
+          businessName: business?.businessName || business?.business_name || "Unknown",
+          email: business?.email || "",
+          categories: parsedCategories,
+          pageMappings: parsedPageMappings,
+          hasCategories: parsedCategories.length > 0,
+          hasPageMappings: Object.keys(parsedPageMappings).length > 0,
+          is_demo: business?.is_demo || false,
+        }
+      } catch (error) {
+        console.error(`Error fetching business ${id}:`, error)
+        return null
+      }
+    })
 
-    for (const format of artsFormats) {
-      categoryChecks.arts[format] = await kv.sismember(`${KEY_PREFIXES.CATEGORY}${format}`, businessId)
-      categoryChecks.arts[`${format}:businesses`] = await kv.sismember(
-        `${KEY_PREFIXES.CATEGORY}${format}:businesses`,
-        businessId,
-      )
-    }
+    const businesses = (await Promise.all(businessesPromises)).filter(Boolean)
 
-    // Check automotive categories
-    const autoFormats = [
-      "automotive",
-      "automotiveServices",
-      "automotive-services",
-      "Automotive Services",
-      "Automotive/Motorcycle/RV",
-      "auto-services",
-      "autoServices",
-    ]
+    // Filter out demo businesses
+    const realBusinesses = businesses.filter((business: any) => {
+      if (business.is_demo) return false
 
-    for (const format of autoFormats) {
-      categoryChecks.automotive[format] = await kv.sismember(`${KEY_PREFIXES.CATEGORY}${format}`, businessId)
-      categoryChecks.automotive[`${format}:businesses`] = await kv.sismember(
-        `${KEY_PREFIXES.CATEGORY}${format}:businesses`,
-        businessId,
-      )
-    }
+      const name = business.businessName || ""
+      const email = business.email || ""
+
+      if (
+        name.toLowerCase().includes("demo") ||
+        name.toLowerCase().includes("sample") ||
+        name.toLowerCase().includes("test") ||
+        email.toLowerCase().includes("demo") ||
+        email.toLowerCase().includes("sample") ||
+        email.toLowerCase().includes("test") ||
+        email.toLowerCase().includes("example.com")
+      ) {
+        return false
+      }
+
+      return true
+    })
+
+    console.log(`Returning ${realBusinesses.length} real businesses out of ${businesses.length} total`)
 
     return NextResponse.json({
-      business: {
-        id: businessId,
-        name: business.businessName,
-        category: business.category,
-        subcategory: business.subcategory,
+      success: true,
+      businesses: realBusinesses,
+      totalBusinesses: businessIds.length,
+      sampledBusinesses: businesses.length,
+      realBusinesses: realBusinesses.length,
+      summary: {
+        withCategories: realBusinesses.filter((b) => b.hasCategories).length,
+        withoutCategories: realBusinesses.filter((b) => !b.hasCategories).length,
+        withPageMappings: realBusinesses.filter((b) => b.hasPageMappings).length,
+        withoutPageMappings: realBusinesses.filter((b) => !b.hasPageMappings).length,
       },
-      categories: categoriesData,
-      allCategories: allCategoriesData,
-      allSubcategories: allSubcategoriesData,
-      categoryIndexes: categoryChecks,
     })
   } catch (error) {
-    console.error("Error fetching business categories:", error)
-    return NextResponse.json({ error: "Failed to fetch business categories" }, { status: 500 })
+    console.error("Error in business categories debug:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch business categories",
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
+    )
   }
 }

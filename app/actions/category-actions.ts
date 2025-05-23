@@ -6,7 +6,234 @@ import { getCurrentBusiness } from "./business-actions"
 import type { CategorySelection } from "@/components/category-selector"
 import { saveBusinessCategories as saveBusinessCategoriesToDb, KEY_PREFIXES, type CategoryData } from "@/lib/db-schema"
 
-// Save business categories
+// Enhanced category to page mapping function
+function getCategoryPageMapping(): Record<string, string> {
+  return {
+    // Main categories
+    "Home, Lawn, and Manual Labor": "home-improvement",
+    "Retail Stores": "retail-stores",
+    "Travel and Vacation": "travel-vacation",
+    "Tailors, Dressmakers, and Fabric and Clothes Cleaning and Repair": "tailoring-clothing",
+    "Art, Design and Entertainment": "arts-entertainment",
+    "Physical Rehabilitation": "physical-rehabilitation",
+    "Insurance, Finance, Debt and Sales": "financial-services",
+    "Weddings and Special Events": "weddings-events",
+    "Pet Care": "pet-care",
+    "Language Lessons/School Subject Tutoring": "education-tutoring",
+    "Home Buying and Selling": "real-estate",
+    "Athletics, Personal Trainers, Group Fitness Classes and Dance Instruction": "fitness-athletics",
+    Music: "music-lessons",
+    "Home Care": "care-services",
+    "Automotive/Motorcycle/RV, etc": "automotive-services",
+    "Hair care, Beauty, Tattoo and Piercing": "beauty-wellness",
+    "Medical Practitioners - non MD/DO": "medical-practitioners",
+    "Counselors, Psychologists, Addiction Specialists, Team Building": "mental-health",
+    "Computers and the Web": "tech-it-services",
+    "Restaurant, Food and Drink": "food-dining",
+    Assistants: "personal-assistants",
+    "Mortuary Services": "funeral-services",
+    Lawyers: "legal-services",
+
+    // Home improvement subcategories
+    "Lawn, Garden and Snow Removal": "home-improvement/lawn-garden",
+    "Outside Home Maintenance and Repair": "home-improvement/outside-maintenance",
+    "Outdoor Structure Assembly/Construction and Fencing": "home-improvement/outdoor-structures",
+    "Pool Services": "home-improvement/pool-services",
+    "Asphalt, Concrete, Stone and Gravel": "home-improvement/asphalt-concrete",
+    "Home Construction and Design": "home-improvement/construction-design",
+    "Inside Home Maintenance and Repair": "home-improvement/inside-maintenance",
+    "Windows and Doors": "home-improvement/windows-doors",
+    "Floor/Carpet Care and Installation": "home-improvement/flooring",
+    "Audio/Visual and Home Security": "home-improvement/audio-visual-security",
+    "Home Hazard Mitigation": "home-improvement/hazard-mitigation",
+    "Pest Control/ Wildlife Removal": "home-improvement/pest-control",
+    "Trash Cleanup and Removal": "home-improvement/trash-cleanup",
+    "Home and Office Cleaning": "home-improvement/cleaning",
+    "Fireplaces and Chimneys": "home-improvement/fireplaces-chimneys",
+    "Movers/Moving Trucks": "home-improvement/movers",
+    Handymen: "home-improvement/handymen",
+
+    // Care services subcategories
+    "Non-Medical Elder Care": "elder-care",
+    "Non-Medical Special Needs Adult Care": "care-services",
+    "Babysitting (18+ Sitters only)": "child-care",
+    "Childcare Centers": "child-care",
+    "Adult Day Services": "elder-care",
+    "Rehab/Nursing/Respite and Memory Care": "elder-care",
+  }
+}
+
+// Function to get all pages a business should be mapped to based on their categories
+function getBusinessPageMappings(categories: CategorySelection[]): string[] {
+  const categoryPageMapping = getCategoryPageMapping()
+  const pages = new Set<string>()
+
+  for (const category of categories) {
+    // Check if the full category name maps to a page
+    if (categoryPageMapping[category.category]) {
+      pages.add(categoryPageMapping[category.category])
+    }
+
+    // Check if the subcategory maps to a specific page
+    if (categoryPageMapping[category.subcategory]) {
+      pages.add(categoryPageMapping[category.subcategory])
+    }
+
+    // For home improvement, also add the main page
+    if (category.category === "Home, Lawn, and Manual Labor") {
+      pages.add("home-improvement")
+    }
+
+    // For care services, also add the main page
+    if (category.category === "Home Care") {
+      pages.add("care-services")
+    }
+  }
+
+  return Array.from(pages)
+}
+
+// Function to completely remove a business from all page mappings
+async function removeBusinessFromAllPages(businessId: string): Promise<string[]> {
+  const removedPages: string[] = []
+
+  try {
+    // Get current page mappings for this business
+    const currentPageMappings = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:pages`)
+    let currentPages: string[] = []
+
+    if (currentPageMappings) {
+      if (typeof currentPageMappings === "string") {
+        try {
+          const parsed = JSON.parse(currentPageMappings)
+          currentPages = Object.keys(parsed)
+        } catch (error) {
+          console.error(`Error parsing current page mappings for business ${businessId}:`, error)
+        }
+      } else if (typeof currentPageMappings === "object" && currentPageMappings !== null) {
+        currentPages = Object.keys(currentPageMappings as Record<string, boolean>)
+      }
+    }
+
+    // Also check all possible page keys to ensure complete cleanup
+    const allPossiblePages = [
+      "home-improvement",
+      "retail-stores",
+      "travel-vacation",
+      "tailoring-clothing",
+      "arts-entertainment",
+      "physical-rehabilitation",
+      "financial-services",
+      "weddings-events",
+      "pet-care",
+      "education-tutoring",
+      "real-estate",
+      "fitness-athletics",
+      "music-lessons",
+      "care-services",
+      "automotive-services",
+      "beauty-wellness",
+      "medical-practitioners",
+      "mental-health",
+      "tech-it-services",
+      "food-dining",
+      "personal-assistants",
+      "funeral-services",
+      "legal-services",
+      "elder-care",
+      "child-care",
+      // Home improvement subcategories
+      "home-improvement/lawn-garden",
+      "home-improvement/outside-maintenance",
+      "home-improvement/outdoor-structures",
+      "home-improvement/pool-services",
+      "home-improvement/asphalt-concrete",
+      "home-improvement/construction-design",
+      "home-improvement/inside-maintenance",
+      "home-improvement/windows-doors",
+      "home-improvement/flooring",
+      "home-improvement/audio-visual-security",
+      "home-improvement/hazard-mitigation",
+      "home-improvement/pest-control",
+      "home-improvement/trash-cleanup",
+      "home-improvement/cleaning",
+      "home-improvement/fireplaces-chimneys",
+      "home-improvement/movers",
+      "home-improvement/handymen",
+    ]
+
+    // Combine current pages with all possible pages to ensure complete cleanup
+    const pagesToCheck = [...new Set([...currentPages, ...allPossiblePages])]
+
+    // Remove business from all page sets
+    for (const page of pagesToCheck) {
+      try {
+        // Check if business is actually in this page set before removing
+        const isMember = await kv.sismember(`page:${page}:businesses`, businessId)
+
+        if (isMember === 1) {
+          const removed = await kv.srem(`page:${page}:businesses`, businessId)
+          if (removed > 0) {
+            removedPages.push(page)
+            console.log(`Removed business ${businessId} from page:${page}:businesses`)
+          }
+        }
+      } catch (error) {
+        console.error(`Error removing business ${businessId} from page:${page}:businesses:`, error)
+      }
+    }
+
+    // Clear the business's page mappings
+    await kv.del(`${KEY_PREFIXES.BUSINESS}${businessId}:pages`)
+
+    console.log(`Removed business ${businessId} from ${removedPages.length} pages: ${removedPages.join(", ")}`)
+  } catch (error) {
+    console.error(`Error removing business ${businessId} from all pages:`, error)
+  }
+
+  return removedPages
+}
+
+// Function to add a business to specific pages
+async function addBusinessToPages(businessId: string, pages: string[]): Promise<string[]> {
+  const addedPages: string[] = []
+
+  try {
+    // Create page mappings object
+    const pageMappings: Record<string, boolean> = {}
+
+    for (const page of pages) {
+      try {
+        // Add business to the page set
+        const added = await kv.sadd(`page:${page}:businesses`, businessId)
+
+        // Verify the business was actually added
+        const isMember = await kv.sismember(`page:${page}:businesses`, businessId)
+
+        if (isMember === 1) {
+          addedPages.push(page)
+          pageMappings[page] = true
+          console.log(`Added business ${businessId} to page:${page}:businesses`)
+        } else {
+          console.error(`Failed to add business ${businessId} to page:${page}:businesses`)
+        }
+      } catch (error) {
+        console.error(`Error adding business ${businessId} to page:${page}:businesses:`, error)
+      }
+    }
+
+    // Save the page mappings to the business
+    await kv.set(`${KEY_PREFIXES.BUSINESS}${businessId}:pages`, JSON.stringify(pageMappings))
+
+    console.log(`Added business ${businessId} to ${addedPages.length} pages: ${addedPages.join(", ")}`)
+  } catch (error) {
+    console.error(`Error adding business ${businessId} to pages:`, error)
+  }
+
+  return addedPages
+}
+
+// Save business categories with complete page mapping cleanup and reassignment
 export async function saveBusinessCategories(categories: CategorySelection[]) {
   try {
     const business = await getCurrentBusiness()
@@ -16,101 +243,25 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
 
     console.log(`Saving ${categories.length} categories for business ${business.id}`)
 
-    // Get current categories to identify what needs to be removed
-    const currentCategoriesResult = await getBusinessCategories()
-    const currentCategories = currentCategoriesResult.success ? currentCategoriesResult.data || [] : []
+    // Step 1: Completely remove business from all existing page mappings
+    console.log("Step 1: Removing business from all existing page mappings...")
+    const removedPages = await removeBusinessFromAllPages(business.id)
 
-    // Get current business data to check for category changes
-    const oldPrimaryCategory = business.category
-    const oldPrimarySubcategory = business.subcategory
-    const oldAllCategories = business.allCategories || []
+    // Step 2: Determine which pages the business should be on based on new categories
+    console.log("Step 2: Determining new page mappings...")
+    const newPages = getBusinessPageMappings(categories)
+    console.log(`Business should be mapped to pages: ${newPages.join(", ")}`)
 
-    console.log(`Previous primary category: ${oldPrimaryCategory}`)
-    console.log(`New categories: ${categories.map((c) => c.category).join(", ")}`)
+    // Step 3: Add business to the new pages
+    console.log("Step 3: Adding business to new page mappings...")
+    const addedPages = await addBusinessToPages(business.id, newPages)
+
+    // Step 4: Update business data with categories
+    console.log("Step 4: Updating business data...")
 
     // Extract all unique categories and subcategories
     const allCategories = [...new Set(categories.map((cat) => cat.category))]
     const allSubcategories = [...new Set(categories.map((cat) => cat.subcategory))]
-
-    console.log(`Found ${allCategories.length} unique categories and ${allSubcategories.length} unique subcategories`)
-
-    // Find categories that have been removed
-    const removedCategories = currentCategories.filter(
-      (oldCat) => !categories.some((newCat) => newCat.fullPath === oldCat.fullPath),
-    )
-
-    // Remove business from indexes for removed categories
-    for (const removedCat of removedCategories as any) {
-      const categoryKey = removedCat.category.toLowerCase().replace(/\s+/g, "-")
-
-      // Remove from primary category index
-      await kv.srem(`${KEY_PREFIXES.CATEGORY}${categoryKey}`, business.id)
-      await kv.srem(`${KEY_PREFIXES.CATEGORY}${categoryKey}:businesses`, business.id)
-
-      // Handle special case for Mortuary Services / Funeral Services
-      if (removedCat.category === "Mortuary Services" || removedCat.category.includes("Funeral")) {
-        const mortuaryFormats = [
-          "mortuaryServices",
-          "mortuary-services",
-          "mortuary_services",
-          "funeral-services",
-          "funeral_services",
-          "funeralServices",
-          "Mortuary Services",
-          "Funeral Services",
-        ]
-
-        for (const format of mortuaryFormats) {
-          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
-          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
-        }
-      }
-
-      // Handle special case for Automotive Services
-      if (
-        removedCat.category === "Automotive Services" ||
-        removedCat.category.includes("Automotive") ||
-        removedCat.category.includes("Auto")
-      ) {
-        const autoFormats = [
-          "automotiveServices",
-          "automotive-services",
-          "automotive_services",
-          "auto-services",
-          "auto_services",
-          "autoServices",
-          "Automotive Services",
-          "Auto Services",
-          "automotive",
-        ]
-
-        for (const format of autoFormats) {
-          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
-          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
-        }
-      }
-
-      // Remove from path index
-      if (removedCat.fullPath) {
-        await kv.srem(`${KEY_PREFIXES.CATEGORY}path:${removedCat.fullPath}`, business.id)
-      }
-
-      console.log(`Removed business ${business.id} from category ${removedCat.category}`)
-    }
-
-    // If primary category has changed, remove business from all old category variations
-    if (oldPrimaryCategory && !allCategories.includes(oldPrimaryCategory)) {
-      const oldCategoryKey = oldPrimaryCategory.toLowerCase().replace(/\s+/g, "-")
-
-      // Remove from primary index
-      await kv.srem(`${KEY_PREFIXES.CATEGORY}${oldCategoryKey}`, business.id)
-      await kv.srem(`${KEY_PREFIXES.CATEGORY}${oldCategoryKey}:businesses`, business.id)
-
-      // Remove from legacy index
-      await kv.srem(`${KEY_PREFIXES.CATEGORY}${oldPrimaryCategory}`, business.id)
-
-      console.log(`Removed business ${business.id} from old primary category ${oldPrimaryCategory}`)
-    }
 
     // Save all categories and subcategories as separate lists
     await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}:allCategories`, JSON.stringify(allCategories))
@@ -124,239 +275,28 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
       path: cat.fullPath,
     }))
 
-    // Special handling for Art, Design and Entertainment category
-    const hasArtsCategory = categories.some(
-      (cat) =>
-        cat.category === "Art, Design and Entertainment" ||
-        cat.category === "Arts & Entertainment" ||
-        (cat.category.toLowerCase().includes("art") && cat.category.toLowerCase().includes("entertainment")),
-    )
-
-    // Check for category conflicts - don't add to arts category if it's an automotive business
-    const hasAutomotiveSubcategory = categories.some((cat) => {
-      const subcategoryLower = cat.subcategory.toLowerCase()
-      return (
-        subcategoryLower.includes("auto") ||
-        subcategoryLower.includes("car") ||
-        subcategoryLower.includes("vehicle") ||
-        subcategoryLower.includes("motorcycle") ||
-        subcategoryLower.includes("rv") ||
-        subcategoryLower.includes("repair") ||
-        subcategoryLower.includes("mechanic") ||
-        subcategoryLower.includes("body shop") ||
-        subcategoryLower.includes("tire") ||
-        subcategoryLower.includes("oil change")
-      )
-    })
-
-    // If it has both arts and automotive subcategories, prioritize automotive
-    if (hasArtsCategory && hasAutomotiveSubcategory) {
-      console.log(`Business ${business.id} has both arts and automotive categories, prioritizing automotive`)
-
-      // Remove from arts category
-      const artsFormats = [
-        "artDesignEntertainment",
-        "Art, Design and Entertainment",
-        "arts-entertainment",
-        "Arts & Entertainment",
-        "art-design-entertainment",
-        "art-design-and-entertainment",
-        "arts-&-entertainment",
-      ]
-
-      for (const format of artsFormats) {
-        await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
-        await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
-      }
-
-      // Make sure it's in automotive category
-      const autoFormats = [
-        "automotive",
-        "automotiveServices",
-        "automotive-services",
-        "Automotive Services",
-        "Automotive/Motorcycle/RV",
-        "auto-services",
-        "autoServices",
-      ]
-
-      for (const format of autoFormats) {
-        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
-        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
-      }
-    }
-
-    if (hasArtsCategory) {
-      console.log(`Business ${business.id} has Arts & Entertainment category, adding to special indexes`)
-
-      // Add to arts-entertainment category explicitly with multiple formats
-      const artsFormats = [
-        "artDesignEntertainment",
-        "Art, Design and Entertainment",
-        "arts-entertainment",
-        "Arts & Entertainment",
-        "art-design-entertainment",
-        "art-design-and-entertainment",
-        "arts-&-entertainment",
-      ]
-
-      for (const format of artsFormats) {
-        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
-        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
-      }
-    } else {
-      // Remove from arts category if it was previously there but isn't now
-      if (
-        oldAllCategories.some(
-          (cat) =>
-            cat === "Art, Design and Entertainment" ||
-            cat === "Arts & Entertainment" ||
-            (cat.toLowerCase().includes("art") && cat.toLowerCase().includes("entertainment")),
-        )
-      ) {
-        console.log(`Business ${business.id} no longer has Arts category, removing from arts indexes`)
-
-        const artsFormats = [
-          "artDesignEntertainment",
-          "Art, Design and Entertainment",
-          "arts-entertainment",
-          "Arts & Entertainment",
-          "art-design-entertainment",
-          "art-design-and-entertainment",
-          "arts-&-entertainment",
-        ]
-
-        for (const format of artsFormats) {
-          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
-          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
-        }
-      }
-    }
-
-    // Special handling for Automotive/Motorcycle/RV category
-    const hasAutomotiveCategory = categories.some(
-      (cat) =>
-        cat.category === "Automotive Services" ||
-        cat.category === "Automotive/Motorcycle/RV" ||
-        cat.category.toLowerCase().includes("automotive") ||
-        cat.category.toLowerCase().includes("auto services") ||
-        cat.category.toLowerCase().includes("motorcycle") ||
-        cat.category.toLowerCase().includes("rv"),
-    )
-
-    if (hasAutomotiveCategory) {
-      console.log(`Business ${business.id} has Automotive category, adding to special indexes`)
-
-      // Add to automotive-services category explicitly with multiple formats
-      const autoFormats = [
-        "automotive",
-        "automotiveServices",
-        "automotive-services",
-        "Automotive Services",
-        "Automotive/Motorcycle/RV",
-        "auto-services",
-        "autoServices",
-      ]
-
-      for (const format of autoFormats) {
-        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
-        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
-      }
-    } else {
-      // Remove from automotive category if it was previously there but isn't now
-      if (
-        oldAllCategories.some(
-          (cat) =>
-            cat === "Automotive Services" ||
-            cat === "Automotive/Motorcycle/RV" ||
-            cat.toLowerCase().includes("automotive") ||
-            cat.toLowerCase().includes("auto services"),
-        )
-      ) {
-        console.log(`Business ${business.id} no longer has Automotive category, removing from automotive indexes`)
-
-        const autoFormats = [
-          "automotive",
-          "automotiveServices",
-          "automotive-services",
-          "Automotive Services",
-          "Automotive/Motorcycle/RV",
-          "auto-services",
-          "autoServices",
-        ]
-
-        for (const format of autoFormats) {
-          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}`, business.id)
-          await kv.srem(`${KEY_PREFIXES.CATEGORY}${format}:businesses`, business.id)
-        }
-      }
-    }
-
-    // Check for automotive subcategories even if the main category is different
-    const hasAutomotiveSubcategory2 = categories.some((cat) => {
-      const subcategoryLower = cat.subcategory.toLowerCase()
-      return (
-        subcategoryLower.includes("auto") ||
-        subcategoryLower.includes("car") ||
-        subcategoryLower.includes("vehicle") ||
-        subcategoryLower.includes("motorcycle") ||
-        subcategoryLower.includes("rv") ||
-        subcategoryLower.includes("repair") ||
-        subcategoryLower.includes("mechanic") ||
-        subcategoryLower.includes("body shop") ||
-        subcategoryLower.includes("tire") ||
-        subcategoryLower.includes("oil change")
-      )
-    })
-
-    if (hasAutomotiveSubcategory2 && !hasAutomotiveCategory) {
-      console.log(`Business ${business.id} has automotive-related subcategory, adding to automotive category indexes`)
-
-      // Add to automotive-services category explicitly
-      await kv.sadd(`${KEY_PREFIXES.CATEGORY}automotive-services`, business.id)
-      await kv.sadd(`${KEY_PREFIXES.CATEGORY}automotive-services:businesses`, business.id)
-      await kv.sadd(`${KEY_PREFIXES.CATEGORY}automotive`, business.id)
-      await kv.sadd(`${KEY_PREFIXES.CATEGORY}automotive:businesses`, business.id)
-    }
-
     // Save using the new schema
     const success = await saveBusinessCategoriesToDb(business.id, categoryData)
 
     if (success) {
-      // Also save as JSON string for backward compatibility
+      // Save categories in multiple formats for backward compatibility
       await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}:categories`, JSON.stringify(categories))
 
-      // Save categories and subcategories explicitly
-      // This creates a structure with "category" and "subcategory" fields
+      // Save categories with subcategories
       const categoriesWithSubcategories = categories.map((cat) => ({
         category: cat.category,
         subcategory: cat.subcategory,
       }))
-
-      // Save the explicit category/subcategory format
       await kv.set(
         `${KEY_PREFIXES.BUSINESS}${business.id}:categoriesWithSubcategories`,
         JSON.stringify(categoriesWithSubcategories),
       )
 
-      // Create a simplified format for admin display
-      const simplifiedCategories = categories.map((cat) => ({
-        category: cat.category,
-        subcategory: cat.subcategory,
-        fullPath: cat.fullPath,
-      }))
-
-      // Store the simplified format
-      await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}:simplifiedCategories`, JSON.stringify(simplifiedCategories))
-
-      // Update the business object with all categories and subcategories
-      // Ensure the primary category and subcategory are updated
+      // Update the business object
       const updatedBusiness = {
         ...business,
-        // Always update the primary category/subcategory to the first selected category
         category: categories.length > 0 ? categories[0].category : "",
         subcategory: categories.length > 0 ? categories[0].subcategory : "",
-        // Add all categories and subcategories to the business object
         allCategories,
         allSubcategories,
         categoriesCount: categories.length,
@@ -366,39 +306,74 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
       // Save the updated business
       await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}`, updatedBusiness)
 
-      // Index the business by each category for easier lookup
+      // Step 5: Update category indexes
+      console.log("Step 5: Updating category indexes...")
       for (const category of allCategories) {
         const categoryKey = category.toLowerCase().replace(/\s+/g, "-")
         await kv.sadd(`${KEY_PREFIXES.CATEGORY}${categoryKey}:businesses`, business.id)
         await kv.sadd(`${KEY_PREFIXES.CATEGORY}${categoryKey}`, business.id)
+
+        // Also add with original category name
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${category}`, business.id)
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${category}:businesses`, business.id)
       }
 
-      // Revalidate all potentially affected paths
+      // Step 6: Verify page mappings
+      console.log("Step 6: Verifying page mappings...")
+      const verificationResults: Record<string, boolean> = {}
+
+      for (const page of addedPages) {
+        const isMember = await kv.sismember(`page:${page}:businesses`, business.id)
+        verificationResults[page] = isMember === 1
+
+        if (isMember !== 1) {
+          console.error(`Verification failed: Business ${business.id} is not in page:${page}:businesses`)
+          // Try to add again
+          await kv.sadd(`page:${page}:businesses`, business.id)
+        }
+      }
+
+      // Step 7: Revalidate all affected paths
+      console.log("Step 7: Revalidating paths...")
+      const allAffectedPages = [...new Set([...removedPages, ...addedPages])]
+
+      // Revalidate core paths
       revalidatePath("/business-focus")
       revalidatePath("/statistics")
       revalidatePath("/workbench")
       revalidatePath("/admin/businesses")
       revalidatePath(`/admin/businesses/${business.id}`)
-      revalidatePath("/arts-entertainment")
-      revalidatePath("/funeral-services")
-      revalidatePath("/automotive-services")
 
-      // Revalidate all category paths
-      if (oldAllCategories.length > 0 || allCategories.length > 0) {
-        const allCategoryPaths = [...new Set([...oldAllCategories, ...allCategories])]
-        for (const cat of allCategoryPaths) {
-          const path = cat.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "and").replace(/\//g, "-")
-          revalidatePath(`/${path}`)
-        }
+      // Revalidate all affected category pages with cache busting
+      for (const page of allAffectedPages) {
+        console.log(`Revalidating path: /${page}`)
+        revalidatePath(`/${page}`)
+        revalidatePath(`/${page}?t=${Date.now()}`) // Cache busting
       }
 
-      return { success: true, message: `Saved ${categories.length} categories` }
+      console.log(
+        `Successfully saved categories for business ${business.id}. Removed from ${removedPages.length} pages, added to ${addedPages.length} pages.`,
+      )
+
+      return {
+        success: true,
+        message: `Saved ${categories.length} categories. Business moved from ${removedPages.length} pages to ${addedPages.length} pages.`,
+        details: {
+          removedPages,
+          addedPages,
+          categoriesCount: categories.length,
+          verificationResults,
+        },
+      }
     } else {
-      throw new Error("Failed to save categories")
+      throw new Error("Failed to save categories to database")
     }
   } catch (error) {
     console.error("Error saving business categories:", error)
-    return { success: false, message: "Failed to save categories" }
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save categories",
+    }
   }
 }
 
@@ -410,7 +385,7 @@ export async function getBusinessCategories() {
       return { success: false, message: "Not authenticated" }
     }
 
-    // Try to get categories as JSON string (for backward compatibility)
+    // Try to get categories as JSON string
     const categoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${business.id}:categories`)
 
     if (!categoriesData) {
@@ -511,17 +486,14 @@ export async function removeBusinessCategory(fullPath: string) {
     // Filter out the category to remove
     const updatedCategories = result.data.filter((cat) => cat.fullPath !== fullPath)
 
-    // Save the updated categories
+    // Save the updated categories (this will trigger the complete remapping)
     const saveResult = await saveBusinessCategories(updatedCategories)
 
     if (!saveResult.success) {
       return { success: false, message: saveResult.message }
     }
 
-    revalidatePath("/business-focus")
-    revalidatePath("/statistics")
-
-    return { success: true, message: "Category removed successfully" }
+    return { success: true, message: "Category removed and page mappings updated successfully" }
   } catch (error) {
     console.error("Error removing business category:", error)
     return { success: false, message: "Failed to remove category" }
@@ -562,5 +534,139 @@ export async function suggestCategory(formData: FormData) {
   } catch (error) {
     console.error("Error suggesting category:", error)
     return { success: false, message: "Failed to submit suggestion" }
+  }
+}
+
+// Force rebuild page mappings for all businesses using the new system
+export async function rebuildPageMappings() {
+  try {
+    console.log("Starting complete page mappings rebuild...")
+
+    // Get all business IDs
+    const businessIds = await kv.smembers(KEY_PREFIXES.BUSINESSES_SET)
+    console.log(`Found ${businessIds.length} businesses to process`)
+
+    let processed = 0
+    let errors = 0
+    let successfullyMapped = 0
+
+    for (const businessId of businessIds) {
+      try {
+        // Get business categories
+        const categoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)
+
+        if (!categoriesData) {
+          console.log(`No categories found for business ${businessId}`)
+          continue
+        }
+
+        let categories: CategorySelection[] = []
+
+        if (typeof categoriesData === "string") {
+          try {
+            categories = JSON.parse(categoriesData)
+          } catch (error) {
+            console.error(`Error parsing categories for business ${businessId}:`, error)
+            continue
+          }
+        } else if (Array.isArray(categoriesData)) {
+          categories = categoriesData
+        }
+
+        if (categories.length === 0) {
+          console.log(`No valid categories for business ${businessId}`)
+          continue
+        }
+
+        // Remove from all existing pages
+        await removeBusinessFromAllPages(businessId)
+
+        // Determine new page mappings
+        const newPages = getBusinessPageMappings(categories)
+
+        // Add to new pages
+        const addedPages = await addBusinessToPages(businessId, newPages)
+
+        if (addedPages.length > 0) {
+          successfullyMapped++
+        }
+
+        processed++
+        console.log(`Processed business ${businessId} (${processed}/${businessIds.length})`)
+      } catch (error) {
+        console.error(`Error processing business ${businessId}:`, error)
+        errors++
+      }
+    }
+
+    console.log(
+      `Page mappings rebuild complete. Processed: ${processed}, Successfully mapped: ${successfullyMapped}, Errors: ${errors}`,
+    )
+
+    // Revalidate all category pages
+    const allPages = [
+      "home-improvement",
+      "retail-stores",
+      "travel-vacation",
+      "tailoring-clothing",
+      "arts-entertainment",
+      "physical-rehabilitation",
+      "financial-services",
+      "weddings-events",
+      "pet-care",
+      "education-tutoring",
+      "real-estate",
+      "fitness-athletics",
+      "music-lessons",
+      "care-services",
+      "automotive-services",
+      "beauty-wellness",
+      "medical-practitioners",
+      "mental-health",
+      "tech-it-services",
+      "food-dining",
+      "personal-assistants",
+      "funeral-services",
+      "legal-services",
+      "elder-care",
+      "child-care",
+      // Home improvement subcategories
+      "home-improvement/lawn-garden",
+      "home-improvement/outside-maintenance",
+      "home-improvement/outdoor-structures",
+      "home-improvement/pool-services",
+      "home-improvement/asphalt-concrete",
+      "home-improvement/construction-design",
+      "home-improvement/inside-maintenance",
+      "home-improvement/windows-doors",
+      "home-improvement/flooring",
+      "home-improvement/audio-visual-security",
+      "home-improvement/hazard-mitigation",
+      "home-improvement/pest-control",
+      "home-improvement/trash-cleanup",
+      "home-improvement/cleaning",
+      "home-improvement/fireplaces-chimneys",
+      "home-improvement/movers",
+      "home-improvement/handymen",
+    ]
+
+    for (const page of allPages) {
+      revalidatePath(`/${page}`)
+      revalidatePath(`/${page}?t=${Date.now()}`) // Cache busting
+    }
+
+    return {
+      success: true,
+      message: `Rebuilt page mappings for ${processed} businesses (${successfullyMapped} successfully mapped) with ${errors} errors`,
+      processed,
+      successfullyMapped,
+      errors,
+    }
+  } catch (error) {
+    console.error("Error rebuilding page mappings:", error)
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    }
   }
 }

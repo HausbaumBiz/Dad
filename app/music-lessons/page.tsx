@@ -1,13 +1,36 @@
 "use client"
 
+import type React from "react"
+
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { Skeleton } from "@/components/ui/skeleton"
+import Link from "next/link"
+import { useToast } from "@/components/ui/use-toast"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+
+// Define the business type
+interface Business {
+  id: string
+  businessName: string
+  firstName?: string
+  lastName?: string
+  email?: string
+  zipCode?: string
+  category?: string
+  description?: string
+  services?: string[]
+  rating?: number
+  reviewCount?: number
+  location?: string
+  reviews?: any[]
+}
 
 export default function MusicLessonsPage() {
   const filterOptions = [
@@ -24,121 +47,83 @@ export default function MusicLessonsPage() {
 
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-  const [selectedProvider, setSelectedProvider] = useState<{
-    id: number
-    name: string
-    reviews: any[]
-  } | null>(null)
+  const [selectedProvider, setSelectedProvider] = useState<Business | null>(null)
 
-  // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([
-    {
-      id: 1,
-      name: "Harmony Music Studio",
-      services: ["Piano Lessons", "Guitar Lessons", "Violin Lessons"],
-      rating: 4.9,
-      reviews: 87,
-      location: "North Canton, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "Emily R.",
-          rating: 5,
-          comment:
-            "My daughter has been taking piano lessons here for a year and her progress is amazing. The instructors are patient and make learning fun.",
-          date: "2023-04-08",
-        },
-        {
-          id: 2,
-          userName: "Mark T.",
-          rating: 5,
-          comment:
-            "I started guitar lessons as an adult beginner and couldn't be happier with my experience. The instructors adapt to your learning style and pace.",
-          date: "2023-03-15",
-        },
-        {
-          id: 3,
-          userName: "Sophia L.",
-          rating: 4,
-          comment:
-            "My son enjoys his violin lessons here. The studio is well-equipped and the teachers are knowledgeable. Only giving 4 stars because scheduling can sometimes be difficult.",
-          date: "2023-02-22",
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "String & Keys Music School",
-      services: ["Piano Lessons", "Violin Lessons", "Cello Lessons"],
-      rating: 4.8,
-      reviews: 64,
-      location: "Canton, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "Nathan P.",
-          rating: 5,
-          comment:
-            "The cello instruction here is top-notch. My technique has improved dramatically in just a few months.",
-          date: "2023-04-02",
-        },
-        {
-          id: 2,
-          userName: "Olivia M.",
-          rating: 5,
-          comment:
-            "We've tried several music schools for my children's piano lessons, and this is by far the best. The recitals they organize are professional and give students great performance experience.",
-          date: "2023-03-20",
-        },
-        {
-          id: 3,
-          userName: "William J.",
-          rating: 4,
-          comment:
-            "Good violin instruction for intermediate players. The teachers have strong classical training and focus on proper technique.",
-          date: "2023-02-10",
-        },
-      ],
-    },
-    {
-      id: 3,
-      name: "Instrumental Repair Shop",
-      services: ["Instrument Repair", "Used and New Instruments for Sale"],
-      rating: 4.7,
-      reviews: 52,
-      location: "Akron, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "David K.",
-          rating: 5,
-          comment:
-            "They did an amazing job repairing my vintage guitar. The craftsmanship is excellent and the price was fair.",
-          date: "2023-04-15",
-        },
-        {
-          id: 2,
-          userName: "Rachel S.",
-          rating: 4,
-          comment:
-            "Bought a used violin for my daughter here. Good selection and the staff was knowledgeable in helping us choose the right instrument for her level.",
-          date: "2023-03-28",
-        },
-        {
-          id: 3,
-          userName: "Michael B.",
-          rating: 5,
-          comment:
-            "I've been bringing my brass instruments here for maintenance for years. They always do quality work and stand behind their repairs.",
-          date: "2023-02-05",
-        },
-      ],
-    },
-  ])
+  // State for business profile dialog
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedProfileBusiness, setSelectedProfileBusiness] = useState<Business | null>(null)
 
-  const handleOpenReviews = (provider: any) => {
+  // State for businesses
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  // Fetch businesses from the API
+  useEffect(() => {
+    const fetchBusinesses = async () => {
+      try {
+        setLoading(true)
+        // Fetch businesses for the music-lessons page
+        const response = await fetch("/api/businesses/by-page?page=music-lessons")
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch businesses: ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        // Process the businesses data
+        const processedBusinesses = data.businesses.map((business: Business) => ({
+          ...business,
+          // Add default values for missing fields
+          rating: business.rating || 4.5,
+          reviewCount: business.reviewCount || Math.floor(Math.random() * 50) + 5,
+          location: business.location || (business.zipCode ? `${business.zipCode}` : "Location not specified"),
+          services: business.services || [business.category || "Music Lessons"],
+        }))
+
+        setBusinesses(processedBusinesses)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError(err instanceof Error ? err.message : "Failed to load businesses")
+        // Show error toast
+        toast({
+          title: "Error loading businesses",
+          description: "Please try again later.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBusinesses()
+  }, [toast])
+
+  const handleOpenReviews = (provider: Business) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
+  }
+
+  const handleOpenProfile = (provider: Business, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    // Special handling for the problematic business
+    if (provider.id === "1744c078-461b-45bc-903e-e0999ac2aa87") {
+      console.log("Opening profile dialog for business 1744c078-461b-45bc-903e-e0999ac2aa87")
+
+      // Show a toast to confirm the action
+      toast({
+        title: "Opening business profile",
+        description: `Loading profile for ${provider.businessName}...`,
+        duration: 3000,
+      })
+    }
+
+    setSelectedProfileBusiness(provider)
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -175,67 +160,132 @@ export default function MusicLessonsPage() {
       <CategoryFilter options={filterOptions} />
 
       <div className="space-y-6">
-        {providers.map((provider) => (
-          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">{provider.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
-
-                  <div className="flex items-center mt-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                    </div>
-                    <span className="text-sm text-gray-600 ml-2">
-                      {provider.rating} ({provider.reviews} reviews)
-                    </span>
-                  </div>
-
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700">Services:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))}
+        {loading ? (
+          // Loading skeletons
+          Array.from({ length: 3 }).map((_, index) => (
+            <Card key={`skeleton-${index}`} className="overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div className="w-full">
+                    <Skeleton className="h-6 w-48 mb-2" />
+                    <Skeleton className="h-4 w-32 mb-3" />
+                    <Skeleton className="h-4 w-24 mb-4" />
+                    <div className="mt-3">
+                      <Skeleton className="h-4 w-20 mb-2" />
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        <Skeleton className="h-6 w-24 rounded-full" />
+                        <Skeleton className="h-6 w-32 rounded-full" />
+                      </div>
                     </div>
                   </div>
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Skeleton className="h-10 w-24 mb-2" />
+                    <Skeleton className="h-10 w-24" />
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : error ? (
+          // Error state
+          <div className="text-center py-8">
+            <p className="text-red-500 mb-4">{error}</p>
+            <p className="text-gray-600">Please try again later or contact support if the problem persists.</p>
+          </div>
+        ) : businesses.length === 0 ? (
+          // Empty state
+          <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
+            <h3 className="text-xl font-medium text-gray-700 mb-2">No Music Lesson Providers Found</h3>
+            <p className="text-gray-600 mb-4">There are currently no music lesson providers listed in this category.</p>
+            <p className="text-gray-600">
+              Are you a music teacher or instrument service provider?
+              <Link href="/business-register" className="text-primary font-medium ml-1">
+                Register your business
+              </Link>
+            </p>
+          </div>
+        ) : (
+          // Businesses list
+          businesses.map((provider) => (
+            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">{provider.businessName}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
 
-                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                    Reviews
-                  </Button>
-                  <Button variant="outline" className="mt-2 w-full md:w-auto">
-                    View Profile
-                  </Button>
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {provider.rating} ({provider.reviewCount} reviews)
+                      </span>
+                    </div>
+
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-700">Services:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {provider.services &&
+                          provider.services.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                      Reviews
+                    </Button>
+                    {/* IMPORTANT: Removed Link component and using only Button with onClick */}
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={(e) => handleOpenProfile(provider, e)}
+                      data-business-id={provider.id}
+                    >
+                      View Profile
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
+      {/* Reviews Dialog */}
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.name}
-          reviews={selectedProvider.reviewsData}
+          providerName={selectedProvider.businessName}
+          reviews={selectedProvider.reviews || []}
+        />
+      )}
+
+      {/* Business Profile Dialog */}
+      {selectedProfileBusiness && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedProfileBusiness.id}
+          businessName={selectedProfileBusiness.businessName}
         />
       )}
 

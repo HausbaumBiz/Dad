@@ -52,6 +52,24 @@ export default function ArtsEntertainmentPage() {
     async function fetchBusinesses() {
       setIsLoading(true)
       try {
+        // First try to get businesses from the page:businesses set
+        const response = await fetch("/api/businesses/by-page?page=arts-entertainment")
+        if (response.ok) {
+          const data = await response.json()
+          if (data.businesses && data.businesses.length > 0) {
+            console.log(`Found ${data.businesses.length} businesses for arts-entertainment page`)
+            setBusinesses(data.businesses)
+            setDebugInfo({
+              source: "page:businesses set",
+              count: data.businesses.length,
+              businesses: data.businesses.map((b: any) => ({ id: b.id, name: b.businessName })),
+            })
+            setIsLoading(false)
+            return
+          }
+        }
+
+        // Fallback to the old method if no businesses found
         // Try multiple category formats to ensure we find all relevant businesses
         const categoryFormats = [
           "artDesignEntertainment",
@@ -106,6 +124,7 @@ export default function ArtsEntertainmentPage() {
         )
 
         setDebugInfo({
+          source: "fallback method",
           categoryFormats,
           results: debugResults,
           totalFound: allBusinesses.length,
@@ -153,100 +172,6 @@ export default function ArtsEntertainmentPage() {
         return false
       })
     : businesses
-
-  // Add mock reviews data specific to arts and entertainment services
-  const mockReviews = [
-    {
-      id: 1,
-      providerName: "Creative Visions Studio",
-      reviews: [
-        {
-          id: 101,
-          username: "ArtLover42",
-          rating: 5,
-          date: "2023-11-15",
-          comment:
-            "Absolutely stunning photography work! They captured our family portraits with such creativity and attention to detail. The graphic design work they did for our business cards was equally impressive.",
-        },
-        {
-          id: 102,
-          username: "DesignEnthusiast",
-          rating: 5,
-          date: "2023-10-22",
-          comment:
-            "Professional, creative, and a pleasure to work with. Their photography perfectly captured the essence of our event, and the edited photos were delivered ahead of schedule.",
-        },
-        {
-          id: 103,
-          username: "MarketingPro",
-          rating: 4,
-          date: "2023-09-18",
-          comment:
-            "Great graphic design work for our company rebrand. They really understood our vision and translated it beautifully into our new logo and marketing materials.",
-        },
-      ],
-    },
-    {
-      id: 2,
-      providerName: "Harmony Music Productions",
-      reviews: [
-        {
-          id: 201,
-          username: "MusicFan88",
-          rating: 5,
-          date: "2023-11-10",
-          comment:
-            "The musicians they provided for our wedding were exceptional! They learned our special request songs and performed them beautifully. The recording studio is also top-notch.",
-        },
-        {
-          id: 202,
-          username: "BandMember23",
-          rating: 4,
-          date: "2023-10-05",
-          comment:
-            "Great recording studio with professional sound engineers. They helped us get the perfect sound for our EP. The equipment is high quality and the space is comfortable.",
-        },
-        {
-          id: 203,
-          username: "EventPlanner",
-          rating: 5,
-          date: "2023-09-12",
-          comment:
-            "Hired their musicians for a corporate event and they were fantastic! Very professional, on time, and their performance created the perfect atmosphere.",
-        },
-      ],
-    },
-    {
-      id: 3,
-      providerName: "Modern Space Interiors",
-      reviews: [
-        {
-          id: 301,
-          username: "HomeOwner2023",
-          rating: 5,
-          date: "2023-11-20",
-          comment:
-            "Transformed our living space completely! Their interior design vision was exactly what we needed. They worked within our budget and the results exceeded our expectations.",
-        },
-        {
-          id: 302,
-          username: "BusinessOwner",
-          rating: 4,
-          date: "2023-10-15",
-          comment:
-            "Hired them to redesign our office space and they did a fantastic job. The space is now both functional and beautiful. Our clients always comment on how nice it looks.",
-        },
-        {
-          id: 303,
-          username: "RenovationQueen",
-          rating: 5,
-          date: "2023-09-05",
-          comment:
-            "Amazing attention to detail and they really listen to what you want. They helped me select the perfect colors, furniture, and accessories for my home renovation.",
-        },
-      ],
-    },
-  ]
 
   // Add a handler function for opening the reviews dialog
   const handleOpenReviews = (provider: any) => {
@@ -371,15 +296,11 @@ export default function ArtsEntertainmentPage() {
         </div>
       ) : (
         <div className="text-center py-12">
-          <p className="text-gray-500">No businesses found in this category. Check back later!</p>
-
-          {/* Debug information - only visible in development */}
-          {process.env.NODE_ENV === "development" && (
-            <div className="mt-8 p-4 border border-gray-300 rounded text-left bg-gray-50">
-              <h3 className="font-bold mb-2">Debug Information:</h3>
-              <pre className="text-xs overflow-auto max-h-96">{JSON.stringify(debugInfo, null, 2)}</pre>
-            </div>
-          )}
+          <p className="text-gray-600 mb-4">No arts and entertainment businesses found.</p>
+          <p className="text-gray-600 mb-6">Be the first to register your business in this category!</p>
+          <Button variant="default" asChild>
+            <a href="/business-register">Register Your Business</a>
+          </Button>
         </div>
       )}
 
@@ -389,7 +310,7 @@ export default function ArtsEntertainmentPage() {
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.businessName || selectedProvider.name}
           businessId={selectedProvider.id}
-          reviews={mockReviews.find((p) => p.providerName === selectedProvider.businessName)?.reviews || []}
+          reviews={selectedProvider.reviewsData || []}
         />
       )}
 

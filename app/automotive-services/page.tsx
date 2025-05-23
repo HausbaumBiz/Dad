@@ -9,7 +9,8 @@ import { Toaster } from "@/components/ui/toaster"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, AlertCircle } from "lucide-react"
+import { Loader2, AlertCircle, Info } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function AutomotiveServicesPage() {
   const filterOptions = [
@@ -38,124 +39,75 @@ export default function AutomotiveServicesPage() {
   const [selectedFilters, setSelectedFilters] = useState([])
   const [error, setError] = useState(null)
   const [debugInfo, setDebugInfo] = useState(null)
+  const [showDebug, setShowDebug] = useState(false)
 
+  // Update the useEffect hook that fetches businesses
   useEffect(() => {
     async function fetchBusinesses() {
       try {
         setLoading(true)
         setError(null)
 
-        // Debug info to help diagnose issues
-        const debugData = {
-          categoryFormats: [],
-          businessIdsByFormat: {},
-          totalUniqueBusinessIds: 0,
-          businessDetails: [],
+        // Use the new API endpoint with cache busting
+        const timestamp = Date.now()
+        const response = await fetch(`/api/businesses/by-page?page=automotive-services&debug=true&t=${timestamp}`)
+
+        if (!response.ok) {
+          throw new Error(`API returned status ${response.status}`)
         }
 
-        // Fetch businesses from multiple category formats to ensure we get all automotive businesses
-        const categoryFormats = [
-          "automotive",
-          "automotive-services",
-          "automotiveServices",
-          "Automotive Services",
-          "Automotive/Motorcycle/RV",
-          "automotive/motorcycle/rv",
-          "automotive-motorcycle-rv",
-          // Add the exact format with ", etc"
-          "Automotive/Motorcycle/RV, etc",
-          "automotive/motorcycle/rv, etc",
-        ]
+        const data = await response.json()
+        console.log("API response:", data)
 
-        debugData.categoryFormats = categoryFormats
-
-        let allBusinessIds = []
-
-        // Fetch business IDs from all category formats
-        for (const format of categoryFormats) {
-          try {
-            console.log(`Fetching businesses for category format: ${format}`)
-            const response = await fetch(`/api/businesses/by-category?category=${format}`)
-            if (response.ok) {
-              const data = await response.json()
-              if (data.businesses && Array.isArray(data.businesses)) {
-                debugData.businessIdsByFormat[format] = data.businesses.map((b) => b.id)
-                allBusinessIds = [...allBusinessIds, ...data.businesses.map((b) => b.id)]
-                console.log(`Found ${data.businesses.length} businesses for format ${format}`)
-              } else {
-                console.log(`No businesses found for format ${format}`)
-                debugData.businessIdsByFormat[format] = []
-              }
-            } else {
-              console.error(`Error response for format ${format}:`, response.status)
-              debugData.businessIdsByFormat[format] = `Error: ${response.status}`
+        if (data.businesses && data.businesses.length > 0) {
+          // Process business details
+          const businessDetails = data.businesses.map((business: any) => {
+            // Extract services from subcategories or use default
+            let services = []
+            if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+              services = business.allSubcategories
+            } else if (business.subcategory) {
+              services = [business.subcategory]
             }
-          } catch (error) {
-            console.error(`Error fetching businesses for category format ${format}:`, error)
-            debugData.businessIdsByFormat[format] = `Error: ${error.message}`
-          }
-        }
 
-        // Remove duplicates
-        allBusinessIds = [...new Set(allBusinessIds)]
-        debugData.totalUniqueBusinessIds = allBusinessIds.length
-        console.log(`Total unique business IDs: ${allBusinessIds.length}`)
-
-        if (allBusinessIds.length === 0) {
-          // No businesses found - set empty array
-          setProviders([])
-          setDebugInfo(debugData)
-        } else {
-          // Fetch details for each business
-          const businessDetailsPromises = allBusinessIds.map(async (id) => {
-            try {
-              console.log(`Fetching details for business ${id}`)
-              const response = await fetch(`/api/businesses/${id}`)
-              if (response.ok) {
-                const business = await response.json()
-
-                // Extract services from subcategories or use default
-                let services = []
-                if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-                  services = business.allSubcategories
-                } else if (business.subcategory) {
-                  services = [business.subcategory]
-                }
-
-                const businessDetail = {
-                  id: business.id,
-                  name: business.businessName || business.name || "Unknown Business",
-                  services: services,
-                  rating: business.rating || (Math.random() * 1 + 4).toFixed(1), // Random rating between 4.0 and 5.0
-                  reviews: business.reviewCount || Math.floor(Math.random() * 150) + 50, // Random review count
-                  location: business.city ? `${business.city}, ${business.state || "OH"}` : "Ohio",
-                  category: business.category,
-                  subcategory: business.subcategory,
-                  allCategories: business.allCategories,
-                  allSubcategories: business.allSubcategories,
-                }
-
-                debugData.businessDetails.push(businessDetail)
-                return businessDetail
-              }
-              console.error(`Error response for business ${id}:`, response.status)
-              return null
-            } catch (error) {
-              console.error(`Error fetching details for business ${id}:`, error)
-              return null
+            return {
+              id: business.id,
+              name: business.businessName || business.name || "Unknown Business",
+              services: services,
+              rating: business.rating || 0,
+              reviews: business.reviewCount || 0,
+              location: business.city ? `${business.city}, ${business.state || "OH"}` : "Ohio",
+              category: business.category,
+              subcategory: business.subcategory,
+              allCategories: business.allCategories,
+              allSubcategories: business.allSubcategories,
             }
           })
 
-          const businessDetails = await Promise.all(businessDetailsPromises)
-          const validBusinesses = businessDetails.filter(Boolean)
-          console.log(`Successfully fetched details for ${validBusinesses.length} businesses`)
-          setProviders(validBusinesses)
-          setDebugInfo(debugData)
+          setProviders(businessDetails)
+          setDebugInfo({
+            source: "page:businesses API",
+            totalFound: data.totalFound,
+            realBusinesses: data.realBusinesses,
+            timestamp: data.timestamp,
+            debug: data.debug,
+          })
+        } else {
+          setProviders([])
+          setDebugInfo({
+            source: "page:businesses API - no businesses found",
+            message: data.message,
+            timestamp: data.timestamp,
+          })
         }
       } catch (error) {
         console.error("Error fetching automotive businesses:", error)
         setError("Failed to load automotive businesses. Please try again later.")
         setProviders([])
+        setDebugInfo({
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString(),
+        })
       } finally {
         setLoading(false)
       }
@@ -238,6 +190,14 @@ export default function AutomotiveServicesPage() {
         </div>
       ) : filteredProviders.length > 0 ? (
         <div className="space-y-6">
+          <Alert className="bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-500" />
+            <AlertDescription className="text-blue-700">
+              Showing {filteredProviders.length} automotive service providers
+              {selectedFilters.length > 0 ? ` matching your selected filters` : ""}
+            </AlertDescription>
+          </Alert>
+
           {filteredProviders.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
@@ -255,7 +215,7 @@ export default function AutomotiveServicesPage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
@@ -327,52 +287,21 @@ export default function AutomotiveServicesPage() {
               </Button>
             </div>
           )}
-
-          {/* Debug information for admins */}
-          {debugInfo && (
-            <details className="mt-8 text-left bg-gray-50 p-4 rounded-lg border">
-              <summary className="font-medium cursor-pointer">Debug Information (Admin Only)</summary>
-              <div className="mt-4 space-y-4">
-                <div>
-                  <h4 className="font-medium">Category Formats Checked:</h4>
-                  <ul className="list-disc list-inside mt-2 text-sm">
-                    {debugInfo.categoryFormats.map((format, index) => (
-                      <li key={index}>{format}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-medium">Business IDs by Format:</h4>
-                  <div className="mt-2 text-sm">
-                    {Object.entries(debugInfo.businessIdsByFormat).map(([format, ids], index) => (
-                      <div key={index} className="mb-2">
-                        <strong>{format}:</strong>{" "}
-                        {Array.isArray(ids) ? (ids.length > 0 ? ids.join(", ") : "No businesses found") : ids}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium">Total Unique Business IDs: {debugInfo.totalUniqueBusinessIds}</h4>
-                </div>
-
-                {debugInfo.businessDetails.length > 0 && (
-                  <div>
-                    <h4 className="font-medium">Business Details:</h4>
-                    <div className="mt-2 max-h-60 overflow-y-auto">
-                      <pre className="text-xs whitespace-pre-wrap">
-                        {JSON.stringify(debugInfo.businessDetails, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </details>
-          )}
         </div>
       )}
+
+      <div className="mt-8">
+        <Button variant="outline" size="sm" onClick={() => setShowDebug(!showDebug)}>
+          {showDebug ? "Hide Debug Info" : "Show Debug Info"}
+        </Button>
+
+        {showDebug && debugInfo && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border text-sm">
+            <h4 className="font-medium mb-2">Debug Information:</h4>
+            <pre className="whitespace-pre-wrap overflow-x-auto">{JSON.stringify(debugInfo, null, 2)}</pre>
+          </div>
+        )}
+      </div>
 
       {selectedProvider !== null && (
         <>

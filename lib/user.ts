@@ -53,6 +53,9 @@ export async function createUser(userData: UserCreateInput) {
     // Create email index for lookup
     await kv.set(`user:email:${userData.email}`, userId)
 
+    // Add to user index set
+    await kv.sadd("user_ids", userId)
+
     return { success: true, userId, message: "User registered successfully" }
   } catch (error) {
     console.error("Error creating user:", error)
@@ -126,23 +129,56 @@ export async function verifyCredentials(email: string, password: string) {
   }
 }
 
-// Get all users
+// Get all users - FIXED VERSION
 export async function getAllUsers() {
   try {
-    // Get all keys that match the user pattern
-    const userKeys = await kv.keys("user:*")
+    // Try to get user IDs from the set first (for new users)
+    let userIds = (await kv.smembers("user_ids")) as string[]
 
-    // Filter out email index keys
-    const userIdKeys = userKeys.filter((key) => !key.startsWith("user:email:"))
+    // If no user IDs in the set, try the fallback method
+    if (!userIds || userIds.length === 0) {
+      // Fallback: Scan for keys instead of using KEYS command
+      let cursor = 0
+      const userIdKeys: string[] = []
 
-    // Get all users
+      do {
+        try {
+          // Use SCAN instead of KEYS for better performance
+          const [nextCursor, keys] = (await kv.scan(cursor, {
+            match: "user:*",
+            count: 100,
+          })) as [number, string[]]
+
+          cursor = nextCursor
+
+          // Filter out email index keys
+          const filteredKeys = keys.filter(
+            (key) => key.startsWith("user:") && !key.startsWith("user:email:") && !key.includes("user_ids"),
+          )
+
+          userIdKeys.push(...filteredKeys)
+        } catch (scanError) {
+          console.error("Error scanning keys:", scanError)
+          break
+        }
+      } while (cursor !== 0)
+
+      // Extract user IDs from keys
+      userIds = userIdKeys.map((key) => key.replace("user:", ""))
+    }
+
+    // Get all users by their IDs
     const users = await Promise.all(
-      userIdKeys.map(async (key) => {
-        const user = await kv.get<User>(key)
-        if (user) {
-          // Remove sensitive information
-          const { passwordHash, ...safeUser } = user
-          return safeUser
+      userIds.map(async (userId) => {
+        try {
+          const user = await kv.get<User>(`user:${userId}`)
+          if (user) {
+            // Remove sensitive information
+            const { passwordHash, ...safeUser } = user
+            return safeUser
+          }
+        } catch (getUserError) {
+          console.error(`Error getting user ${userId}:`, getUserError)
         }
         return null
       }),
@@ -153,5 +189,44 @@ export async function getAllUsers() {
   } catch (error) {
     console.error("Error getting all users:", error)
     return []
+  }
+}
+
+// Migration function to add existing users to the set
+export async function migrateUsersToSet() {
+  try {
+    let cursor = 0
+    const userIdKeys: string[] = []
+
+    do {
+      // Use SCAN instead of KEYS
+      const [nextCursor, keys] = (await kv.scan(cursor, {
+        match: "user:*",
+        count: 100,
+      })) as [number, string[]]
+
+      cursor = nextCursor
+
+      // Filter out email index keys
+      const filteredKeys = keys.filter(
+        (key) => key.startsWith("user:") && !key.startsWith("user:email:") && !key.includes("user_ids"),
+      )
+
+      userIdKeys.push(...filteredKeys)
+    } while (cursor !== 0)
+
+    // Extract user IDs from keys
+    const userIds = userIdKeys.map((key) => key.replace("user:", ""))
+
+    // Add all user IDs to the set
+    if (userIds.length > 0) {
+      await kv.sadd("user_ids", ...userIds)
+      return { success: true, count: userIds.length }
+    }
+
+    return { success: true, count: 0 }
+  } catch (error) {
+    console.error("Error migrating users to set:", error)
+    return { success: false, error: String(error) }
   }
 }

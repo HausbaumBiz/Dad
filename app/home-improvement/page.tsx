@@ -1,7 +1,16 @@
+"use client"
+
 import { CategoryLayout } from "@/components/category-layout"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
+import { useState, useEffect } from "react"
+import { AdBox } from "@/components/ad-box"
+import { Loader2, AlertCircle } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 
 export default function HomeImprovementPage() {
   const categories = [
@@ -169,6 +178,73 @@ export default function HomeImprovementPage() {
     },
   ]
 
+  const [businesses, setBusinesses] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  const fetchBusinesses = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch("/api/businesses/by-page?page=home-improvement")
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.businesses && data.businesses.length > 0) {
+        console.log(`Found ${data.businesses.length} businesses for home-improvement page`)
+        // Filter out demo businesses
+        const realBusinesses = data.businesses.filter((business: any) => {
+          // Check if it's a demo business
+          if (business.is_demo) return false
+
+          // Check business name for demo indicators
+          const name = business.businessName || business.business_name || ""
+          if (
+            name.toLowerCase().includes("demo") ||
+            name.toLowerCase().includes("sample") ||
+            name.toLowerCase().includes("test")
+          ) {
+            return false
+          }
+
+          // Check email for demo indicators
+          const email = business.email || ""
+          if (
+            email.toLowerCase().includes("demo") ||
+            email.toLowerCase().includes("sample") ||
+            email.toLowerCase().includes("test") ||
+            email.toLowerCase().includes("example.com")
+          ) {
+            return false
+          }
+
+          return true
+        })
+
+        setBusinesses(realBusinesses)
+      } else {
+        setBusinesses([])
+      }
+    } catch (error) {
+      console.error("Error fetching businesses:", error)
+      setError(error instanceof Error ? error.message : "Failed to load businesses")
+      toast({
+        title: "Error loading businesses",
+        description: "There was a problem loading businesses. Please try again later.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchBusinesses()
+  }, [toast])
+
   return (
     <CategoryLayout title="Looking to Hire? Select the Job Type" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -218,6 +294,61 @@ export default function HomeImprovementPage() {
           </Card>
         ))}
       </div>
+
+      {error && (
+        <Alert variant="destructive" className="mt-8">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            {error}
+            <div className="mt-2">
+              <Button variant="outline" size="sm" onClick={fetchBusinesses}>
+                Try Again
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <p>Loading featured businesses...</p>
+        </div>
+      ) : businesses.length > 0 ? (
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold mb-6">Featured Home Improvement Businesses</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {businesses.slice(0, 6).map((business) => (
+              <AdBox
+                key={business.id}
+                title={business.adTitle || "Home Improvement Services"}
+                description={
+                  business.adDescription ||
+                  `${business.businessName || business.business_name} offers professional home improvement services in your area.`
+                }
+                imageUrl={business.adImageUrl || business.logoUrl}
+                businessName={business.businessName || business.business_name}
+                businessId={business.id}
+                phoneNumber={business.phoneNumber || business.phone}
+                address={
+                  business.address
+                    ? `${business.address}, ${business.city}, ${business.state} ${business.zipCode}`
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+        </div>
+      ) : !isLoading && !error ? (
+        <div className="mt-12 text-center p-8 bg-gray-50 rounded-lg">
+          <h2 className="text-2xl font-bold mb-4">No Featured Businesses Yet</h2>
+          <p className="text-gray-600">
+            We're currently adding businesses to this category. Check back soon or browse our other categories.
+          </p>
+        </div>
+      ) : null}
+      <Toaster />
     </CategoryLayout>
   )
 }

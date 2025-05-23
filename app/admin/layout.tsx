@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
-import { Users, Building, Home, MapPin, ImageIcon } from "lucide-react"
+import { Users, Building, Home, MapPin, ImageIcon, Tag, FileText, Database, Upload, Trash2 } from "lucide-react"
 
 interface AdminLayoutProps {
   children: ReactNode
@@ -13,6 +13,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { href: "/admin/businesses", label: "Businesses", icon: <Building className="h-4 w-4 mr-2" /> },
     { href: "/admin/zip-codes", label: "ZIP Codes", icon: <MapPin className="h-4 w-4 mr-2" /> },
     { href: "/admin/media", label: "Media", icon: <ImageIcon className="h-4 w-4 mr-2" /> },
+    { href: "/admin/category-mappings", label: "Category Mappings", icon: <Tag className="h-4 w-4 mr-2" /> },
+    {
+      href: "/admin/category-troubleshooting",
+      label: "Category Troubleshooting",
+      icon: <FileText className="h-4 w-4 mr-2" />,
+    },
+    { href: "/admin/data-migration", label: "Data Migration", icon: <Database className="h-4 w-4 mr-2" /> },
+    { href: "/admin/add-sample-data", label: "Add Sample Data", icon: <Upload className="h-4 w-4 mr-2" /> },
+    {
+      href: "/admin/remove-demo-businesses",
+      label: "Remove Demo Businesses",
+      icon: <Trash2 className="h-4 w-4 mr-2" />,
+    },
   ]
 
   return (

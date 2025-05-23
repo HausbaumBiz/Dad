@@ -5,11 +5,19 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
-import { ReviewsDialog } from "@/components/reviews-dialog"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function MentalHealthPage() {
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [businesses, setBusinesses] = useState<any[]>([])
+  const [selectedBusiness, setSelectedBusiness] = useState<any>(null)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
   const filterOptions = [
     { id: "counselors1", label: "Counselors", value: "Counselors" },
     {
@@ -28,124 +36,38 @@ export default function MentalHealthPage() {
     { id: "counselors7", label: "Motivational Speakers", value: "Motivational Speakers" },
   ]
 
-  // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([
-    {
-      id: 1,
-      name: "Mindful Therapy Group",
-      services: ["Counselors", "Clinical and Counseling Psychologists"],
-      rating: 4.9,
-      reviews: 87,
-      location: "North Canton, OH",
-    },
-    {
-      id: 2,
-      name: "Recovery Solutions",
-      services: ["Addiction Specialists", "Suboxone/Methadone Clinics"],
-      rating: 4.8,
-      reviews: 64,
-      location: "Canton, OH",
-    },
-    {
-      id: 3,
-      name: "Corporate Wellness Consultants",
-      services: ["Team Building", "Industrial-Organizational Psychologists", "Motivational Speakers"],
-      rating: 4.7,
-      reviews: 52,
-      location: "Akron, OH",
-    },
-  ])
+  useEffect(() => {
+    const fetchBusinesses = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch(`/api/businesses/by-page?page=mental-health&timestamp=${Date.now()}`)
 
-  // State for reviews dialog
-  const [selectedProvider, setSelectedProvider] = useState<any>(null)
-  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch businesses: ${response.status}`)
+        }
 
-  // Mock reviews data
-  const mockReviews = {
-    1: [
-      {
-        id: 1,
-        username: "HealingJourney",
-        rating: 5,
-        date: "2023-11-18",
-        comment:
-          "Dr. Williams at Mindful Therapy Group has been instrumental in helping me work through my anxiety. The cognitive behavioral therapy techniques she taught me have changed my life.",
-      },
-      {
-        id: 2,
-        username: "NewBeginnings",
-        rating: 5,
-        date: "2023-10-25",
-        comment:
-          "After my divorce, I was struggling to cope. The counseling I received here gave me tools to process my grief and start rebuilding. Highly recommend their services.",
-      },
-      {
-        id: 3,
-        username: "GratefulParent",
-        rating: 4,
-        date: "2023-09-12",
-        comment:
-          "We sought help for our teenager who was dealing with depression. The therapist connected well with our child and we've seen significant improvement in their mood and outlook.",
-      },
-    ],
-    2: [
-      {
-        id: 1,
-        username: "SoberAndStrong",
-        rating: 5,
-        date: "2023-11-10",
-        comment:
-          "Recovery Solutions saved my life. Their addiction specialists understand the complex nature of addiction and provide compassionate, effective treatment. I'm now 8 months sober.",
-      },
-      {
-        id: 2,
-        username: "FamilySupport",
-        rating: 4,
-        date: "2023-10-05",
-        comment:
-          "As the spouse of someone in recovery, I appreciated the family counseling services. They helped me understand addiction better and how to support my partner without enabling.",
-      },
-      {
-        id: 3,
-        username: "SecondChance",
-        rating: 5,
-        date: "2023-09-22",
-        comment:
-          "The medication-assisted treatment program here is excellent. The staff is non-judgmental and the doctors work with you to find the right treatment approach.",
-      },
-    ],
-    3: [
-      {
-        id: 1,
-        username: "TeamLeader",
-        rating: 5,
-        date: "2023-11-20",
-        comment:
-          "Corporate Wellness Consultants transformed our workplace culture. Their team building workshop was engaging and produced tangible improvements in how our departments collaborate.",
-      },
-      {
-        id: 2,
-        username: "HRDirector",
-        rating: 4,
-        date: "2023-10-15",
-        comment:
-          "We brought in their organizational psychologist to help with employee satisfaction issues. The assessment and recommendations were data-driven and practical.",
-      },
-      {
-        id: 3,
-        username: "ConferenceOrganizer",
-        rating: 5,
-        date: "2023-09-08",
-        comment:
-          "Their motivational speaker was the highlight of our annual conference. Engaging, inspiring, and provided actionable strategies our attendees could implement immediately.",
-      },
-    ],
-  }
+        const data = await response.json()
+        setBusinesses(data.businesses || [])
+        setError(null)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError("Failed to load businesses. Please try again later.")
+        toast({
+          title: "Error",
+          description: "Failed to load businesses. Please try again later.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-  // Handle opening reviews dialog
-  const handleOpenReviews = (provider: any) => {
-    setSelectedProvider(provider)
-    setIsReviewsDialogOpen(true)
+    fetchBusinesses()
+  }, [toast])
+
+  const handleOpenProfile = (business: any) => {
+    setSelectedBusiness(business)
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -181,69 +103,89 @@ export default function MentalHealthPage() {
 
       <CategoryFilter options={filterOptions} />
 
-      <div className="space-y-6">
-        {providers.map((provider) => (
-          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">{provider.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : error ? (
+        <div className="text-center py-12">
+          <p className="text-red-500">{error}</p>
+        </div>
+      ) : businesses.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-600 mb-4">No mental health service businesses found.</p>
+          <p className="text-gray-600 mb-6">Be the first to register your business in this category!</p>
+          <Button variant="default" asChild>
+            <a href="/business-register">Register Your Business</a>
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {businesses.map((business) => (
+            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">{business.name}</h3>
+                    <p className="text-gray-600 text-sm mt-1">
+                      {business.city}, {business.state}
+                    </p>
 
-                  <div className="flex items-center mt-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-4 h-4 ${
+                              i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"
+                            }`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {business.rating || "No ratings"} ({business.reviewCount || 0} reviews)
+                      </span>
                     </div>
-                    <span className="text-sm text-gray-600 ml-2">
-                      {provider.rating} ({provider.reviews} reviews)
-                    </span>
+
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-700">Categories:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {business.categories?.map((category: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {category}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700">Services:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenProfile(business)}>
+                      View Profile
+                    </Button>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                    Reviews
-                  </Button>
-                  <Button variant="outline" className="mt-2 w-full md:w-auto">
-                    View Profile
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Reviews Dialog */}
-      <ReviewsDialog
-        isOpen={isReviewsDialogOpen}
-        onClose={() => setIsReviewsDialogOpen(false)}
-        providerName={selectedProvider?.name}
-        reviews={selectedProvider ? mockReviews[selectedProvider.id] : []}
-      />
+      {/* Business Profile Dialog */}
+      {selectedBusiness && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          business={selectedBusiness}
+        />
+      )}
 
       <Toaster />
     </CategoryLayout>

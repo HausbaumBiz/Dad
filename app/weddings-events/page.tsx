@@ -5,6 +5,7 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
 import { useState } from "react"
 import Image from "next/image"
+import { Button } from "@/components/ui/button"
 
 export default function WeddingsEventsPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -34,6 +35,8 @@ export default function WeddingsEventsPage() {
     { id: "weddings16", label: "Marriage Officiants", value: "Marriage Officiants" },
     { id: "weddings17", label: "Other Weddings and Special Events", value: "Other Weddings and Special Events" },
   ]
+
+  const providers = [] // Mock data, replace with actual data fetching
 
   return (
     <CategoryLayout title="Weddings and Special Events" backLink="/" backText="Categories">
@@ -68,10 +71,21 @@ export default function WeddingsEventsPage() {
 
       <CategoryFilter options={filterOptions} />
 
-      <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
-        <h3 className="text-xl font-medium text-gray-700 mb-2">No Event Providers Found</h3>
-        <p className="text-gray-600">Enter your zip code to find wedding and event professionals in your area.</p>
-      </div>
+      {providers.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-600 mb-4">No wedding and event service businesses found.</p>
+          <p className="text-gray-600 mb-6">Be the first to register your business in this category!</p>
+          <Button variant="default" asChild>
+            <a href="/business-register">Register Your Business</a>
+          </Button>
+        </div>
+      ) : (
+        // existing providers mapping code
+        <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
+          <h3 className="text-xl font-medium text-gray-700 mb-2">Providers will be displayed here</h3>
+          <p className="text-gray-600">This section will display the list of providers.</p>
+        </div>
+      )}
 
       <Toaster />
     </CategoryLayout>

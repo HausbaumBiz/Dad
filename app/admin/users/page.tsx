@@ -4,24 +4,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
+import MigrateUsersButton from "./migrate-users-button"
 
 export default async function AdminUsersPage() {
   const users = await getAllUsers()
 
   return (
     <div className="container mx-auto py-8">
-      <div className="mb-6">
+      <div className="mb-6 flex justify-between items-center">
         <Button variant="ghost" asChild className="pl-0">
-          <Link href="/" className="flex items-center text-primary">
+          <Link href="/admin" className="flex items-center text-primary">
             <ChevronLeft className="mr-1 h-4 w-4" />
-            Back to Home
+            Back to Admin Dashboard
           </Link>
         </Button>
+
+        <MigrateUsersButton />
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Registered Users</CardTitle>
+          <div className="text-sm text-muted-foreground">Total: {users.length}</div>
         </CardHeader>
         <CardContent>
           {users.length === 0 ? (
