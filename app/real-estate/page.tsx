@@ -8,6 +8,8 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
+import { useEffect } from "react"
 
 export default function RealEstatePage() {
   const filterOptions = [
@@ -27,111 +29,49 @@ export default function RealEstatePage() {
     reviews: any[]
   } | null>(null)
 
-  // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([
-    {
-      id: 1,
-      name: "Premier Real Estate Group",
-      services: ["Real Estate Agent", "Home Staging"],
-      rating: 4.9,
-      reviews: 124,
-      location: "North Canton, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "Jennifer & Michael Davis",
-          rating: 5,
-          comment:
-            "Sarah from Premier Real Estate Group was amazing! She helped us find our dream home in a competitive market and negotiated a great price. Her knowledge of the local neighborhoods was invaluable.",
-          date: "2023-03-15",
-        },
-        {
-          id: 2,
-          userName: "Robert Wilson",
-          rating: 5,
-          comment:
-            "We used Premier for both selling our old home and buying our new one. Their home staging service transformed our place and we got multiple offers above asking price within days.",
-          date: "2023-02-22",
-        },
-        {
-          id: 3,
-          userName: "Lisa Thompson",
-          rating: 4,
-          comment:
-            "Good experience overall. Our agent was responsive and knowledgeable. The only reason for 4 stars instead of 5 is that some paperwork took longer than expected.",
-          date: "2023-01-10",
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Accurate Home Inspections",
-      services: ["Home Inspection", "Home Energy Audit"],
-      rating: 4.8,
-      reviews: 87,
-      location: "Canton, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "David Chen",
-          rating: 5,
-          comment:
-            "Tom from Accurate Home Inspections was thorough and professional. He found issues that we would have never noticed and saved us from a potentially expensive mistake.",
-          date: "2023-04-05",
-        },
-        {
-          id: 2,
-          userName: "Amanda Johnson",
-          rating: 5,
-          comment:
-            "The energy audit was eye-opening. They identified several ways we could improve efficiency and save on utilities. The report was detailed and easy to understand.",
-          date: "2023-03-18",
-        },
-        {
-          id: 3,
-          userName: "Mark Rodriguez",
-          rating: 4,
-          comment:
-            "Solid inspection service. They were on time and detailed. I appreciated the same-day report with photos of all issues found.",
-          date: "2023-02-27",
-        },
-      ],
-    },
-    {
-      id: 3,
-      name: "Value Appraisal Services",
-      services: ["Real Estate Appraising"],
-      rating: 4.7,
-      reviews: 56,
-      location: "Akron, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "James Miller",
-          rating: 5,
-          comment:
-            "Fast and professional service. The appraiser was knowledgeable about the local market and provided a fair valuation with detailed supporting documentation.",
-          date: "2023-04-12",
-        },
-        {
-          id: 2,
-          userName: "Susan Williams",
-          rating: 4,
-          comment:
-            "Good experience with Value Appraisal. They were responsive and completed the appraisal quickly for our refinance.",
-          date: "2023-03-30",
-        },
-        {
-          id: 3,
-          userName: "Thomas Brown",
-          rating: 5,
-          comment:
-            "I needed an appraisal for estate purposes, and Value Appraisal was recommended by my attorney. They were professional, thorough, and reasonably priced.",
-          date: "2023-02-15",
-        },
-      ],
-    },
-  ])
+  // Remove the mock providers state and replace with real data fetching
+  const [providers, setProviders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchBusinesses() {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Try multiple category formats to find businesses
+        const categoryVariants = ["Real Estate", "real-estate", "Home Buying and Selling", "home-buying-and-selling"]
+
+        let allBusinesses: any[] = []
+
+        for (const category of categoryVariants) {
+          try {
+            const businesses = await getBusinessesByCategory(category)
+            if (businesses && businesses.length > 0) {
+              allBusinesses = [...allBusinesses, ...businesses]
+            }
+          } catch (err) {
+            console.log(`No businesses found for category: ${category}`)
+          }
+        }
+
+        // Remove duplicates based on business ID
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setProviders(uniqueBusinesses)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError("Failed to load businesses")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBusinesses()
+  }, [])
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
@@ -171,61 +111,95 @@ export default function RealEstatePage() {
 
       <CategoryFilter options={filterOptions} />
 
-      <div className="space-y-6">
-        {providers.map((provider) => (
-          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">{provider.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+      {loading ? (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading real estate professionals...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-8">
+          <p className="text-red-600">{error}</p>
+        </div>
+      ) : providers.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="max-w-md mx-auto">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Real Estate Professionals Yet</h3>
+            <p className="text-gray-600 mb-4">
+              Be the first real estate professional to join our platform and connect with potential clients in your
+              area.
+            </p>
+            <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {providers.map((provider) => (
+            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">{provider.name}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{provider.location || "Location not specified"}</p>
 
-                  <div className="flex items-center mt-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {provider.rating || 0} ({provider.reviewCount || 0} reviews)
+                      </span>
                     </div>
-                    <span className="text-sm text-gray-600 ml-2">
-                      {provider.rating} ({provider.reviews} reviews)
-                    </span>
+
+                    {provider.services && provider.services.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700">Services:</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {provider.services.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700">Services:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                      Reviews
+                    </Button>
+                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                      View Profile
+                    </Button>
                   </div>
                 </div>
-
-                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                    Reviews
-                  </Button>
-                  <Button variant="outline" className="mt-2 w-full md:w-auto">
-                    View Profile
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {selectedProvider && (
         <ReviewsDialog

@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Trash2, CheckCircle, Save, FileText, AlertTriangle } from "lucide-react"
 import Image from "next/image"
-import Link from "next/link"
 import {
   Dialog,
   DialogContent,
@@ -21,13 +20,14 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { saveBusinessCoupons, getBusinessCoupons, type Coupon } from "@/app/actions/coupon-actions"
+import { saveBusinessCoupons, getBusinessCoupons, type Coupon, reinstateCoupon } from "@/app/actions/coupon-actions"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
 import { saveGlobalCouponTerms, getGlobalCouponTerms } from "@/app/actions/coupon-image-actions"
 import { toast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import html2canvas from "html2canvas"
 import { X } from "lucide-react"
+import { Calendar, Clock, RotateCcw } from "lucide-react"
 
 // Function to format terms with bold headings
 const formatTermsWithBoldHeadings = (terms: string) => {
@@ -57,10 +57,51 @@ const formatTermsWithBoldHeadings = (terms: string) => {
   return formattedTerms
 }
 
+// Client-side expiration functions (using user's local timezone)
+const isCouponExpiredClient = (expirationDate: string): boolean => {
+  if (!expirationDate) return false
+
+  // Get current date and time in user's local timezone
+  const now = new Date()
+
+  // Parse the expiration date (format: YYYY-MM-DD) and set to end of day in LOCAL time
+  const [year, month, day] = expirationDate.split("-").map(Number)
+  const expDate = new Date(year, month - 1, day, 23, 59, 59, 999) // month is 0-indexed
+
+  // Debug logging
+  console.log("Client-side expiration check:", {
+    expirationDate,
+    now: now.toLocaleString(),
+    expDate: expDate.toLocaleString(),
+    isExpired: now > expDate,
+  })
+
+  // Only expired if current time is after the end of expiration day
+  return now > expDate
+}
+
+const getDaysUntilExpirationClient = (expirationDate: string): number => {
+  if (!expirationDate) return 0
+
+  // Get today's date at start of day in local time
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Parse expiration date and set to start of day in local time
+  const [year, month, day] = expirationDate.split("-").map(Number)
+  const expDate = new Date(year, month - 1, day, 0, 0, 0, 0) // month is 0-indexed
+
+  // Calculate difference in days
+  const diffTime = expDate.getTime() - today.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}
+
 export default function CouponsPage() {
   const router = useRouter()
   const [coupons, setCoupons] = useState<Coupon[]>([])
   // Find the line where coupons state is defined and add this new state below it
+  // Add this helper function after the state declarations
+
   const [couponDimensions, setCouponDimensions] = useState<{ [key: string]: { width: number; height: number } }>({})
   const [globalTerms, setGlobalTerms] = useState("")
   const [savingTerms, setSavingTerms] = useState(false)
@@ -77,6 +118,10 @@ export default function CouponsPage() {
   const [showTermsDialog, setShowTermsDialog] = useState(false)
   // Track which coupons have been updated vs newly created
   const [updatedCoupons, setUpdatedCoupons] = useState<Set<string>>(new Set())
+  const [reinstatingCoupon, setReinstatingCoupon] = useState<string | null>(null)
+  const [showReinstateDialog, setShowReinstateDialog] = useState(false)
+  const [couponToReinstate, setCouponToReinstate] = useState<Coupon | null>(null)
+  const [newExpirationDate, setNewExpirationDate] = useState("")
 
   // Refs for coupon elements
   const smallCouponRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
@@ -142,7 +187,16 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
         if (business) {
           setBusinessId(business.id)
           setBusinessName(business.businessName || "")
-          setFormData((prev) => ({ ...prev, businessName: business.businessName || "" }))
+          setFormData((prev) => ({
+            ...prev,
+            businessName: business.businessName || "",
+            // Pre-fill form with test data for today's expiration
+            title: "Test Expiration Timing",
+            description: "This coupon expires today - testing the 12:00 AM logic",
+            discount: "TEST TIMING",
+            code: "TESTTODAY",
+            expirationDate: new Date().toISOString().split("T")[0], // Today's date
+          }))
 
           // Load global terms
           const termsResult = await getGlobalCouponTerms(business.id)
@@ -722,29 +776,174 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
   // Filter coupons by size
   const smallCoupons = coupons.filter((coupon) => coupon.size === "small")
 
+  const handleReinstateCoupon = async (coupon: Coupon) => {
+    setCouponToReinstate(coupon)
+    // Set default new expiration date to 30 days from today
+    const futureDate = new Date()
+    futureDate.setDate(futureDate.getDate() + 30)
+    setNewExpirationDate(futureDate.toISOString().split("T")[0])
+    setShowReinstateDialog(true)
+  }
+
+  const confirmReinstateCoupon = async () => {
+    if (!couponToReinstate || !newExpirationDate) return
+
+    setReinstatingCoupon(couponToReinstate.id)
+    try {
+      const result = await reinstateCoupon(couponToReinstate.id, newExpirationDate)
+
+      if (result.success) {
+        // Update local state
+        setCoupons((prev) =>
+          prev.map((coupon) =>
+            coupon.id === couponToReinstate.id ? { ...coupon, expirationDate: newExpirationDate } : coupon,
+          ),
+        )
+
+        toast({
+          title: "Success",
+          description: "Coupon reinstated successfully",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to reinstate coupon",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error reinstating coupon:", error)
+      toast({
+        title: "Error",
+        description: "Failed to reinstate coupon",
+        variant: "destructive",
+      })
+    } finally {
+      setReinstatingCoupon(null)
+      setShowReinstateDialog(false)
+      setCouponToReinstate(null)
+      setNewExpirationDate("")
+    }
+  }
+
+  const renderCouponStatus = (coupon: Coupon) => {
+    const daysUntilExpiration = getDaysUntilExpirationClient(coupon.expirationDate)
+    const isExpired = isCouponExpiredClient(coupon.expirationDate)
+
+    // Special handling for test coupons - show detailed timing
+    const isTestCoupon = coupon.title.includes("Test") || coupon.code === "MIDNIGHT" || coupon.code === "TESTTODAY"
+
+    if (isTestCoupon) {
+      const now = new Date()
+      const [year, month, day] = coupon.expirationDate.split("-").map(Number)
+      const expDate = new Date(year, month - 1, day, 23, 59, 59, 999)
+
+      const timeUntilExpiration = expDate.getTime() - now.getTime()
+      const hoursLeft = Math.floor(timeUntilExpiration / (1000 * 60 * 60))
+      const minutesLeft = Math.floor((timeUntilExpiration % (1000 * 60 * 60)) / (1000 * 60))
+
+      if (isExpired) {
+        return (
+          <div className="flex items-center justify-between mt-2">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              <Clock className="h-3 w-3 mr-1" />✅ EXPIRED (Test Passed!)
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleReinstateCoupon(coupon)
+              }}
+              className="text-xs px-2 py-1 h-auto"
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Reinstate
+            </Button>
+          </div>
+        )
+      }
+
+      if (daysUntilExpiration === 0 && timeUntilExpiration > 0) {
+        return (
+          <div className="mt-2">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              <Clock className="h-3 w-3 mr-1" />⏰ {hoursLeft}h {minutesLeft}m left today
+            </span>
+            <div className="text-xs text-gray-500 mt-1">Expires at 11:59:59 PM today</div>
+          </div>
+        )
+      }
+    }
+
+    // Regular coupon status logic
+    if (isExpired) {
+      return (
+        <div className="flex items-center justify-between mt-2">
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+            <Clock className="h-3 w-3 mr-1" />
+            Expired
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleReinstateCoupon(coupon)
+            }}
+            className="text-xs px-2 py-1 h-auto"
+          >
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Reinstate
+          </Button>
+        </div>
+      )
+    }
+
+    if (daysUntilExpiration <= 7) {
+      return (
+        <div className="mt-2">
+          <span
+            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+              daysUntilExpiration <= 3 ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"
+            }`}
+          >
+            <Clock className="h-3 w-3 mr-1" />
+            {daysUntilExpiration === 0
+              ? "Expires today"
+              : daysUntilExpiration === 1
+                ? "Expires tomorrow"
+                : `${daysUntilExpiration} days left`}
+          </span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="mt-2">
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <Calendar className="h-3 w-3 mr-1" />
+          {daysUntilExpiration} days left
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
 
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="relative w-16 h-16">
-              <Image
-                src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png"
-                alt="Penny Saver"
-                fill
-                className="object-contain"
-              />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-800">Penny Saver Workbench</h1>
+        <div className="flex items-center gap-4 mb-8">
+          <div className="relative w-16 h-16">
+            <Image
+              src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png"
+              alt="Penny Saver"
+              fill
+              className="object-contain"
+            />
           </div>
-          <Link
-            href="/workbench5"
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            Back to Workbench
-          </Link>
+          <h1 className="text-3xl font-bold text-gray-800">Penny Saver Workbench</h1>
         </div>
 
         {/* Success Dialog */}
@@ -1017,6 +1216,7 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                                   <div className="text-xs text-gray-600 mt-2 font-semibold">
                                     Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
                                   </div>
+                                  {renderCouponStatus(coupon)}
                                 </div>
 
                                 {/* Status indicator for new/updated coupons */}
@@ -1027,13 +1227,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
                                 ) : (
                                   <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded">
                                     New
-                                  </div>
-                                )}
-
-                                {/* Dimensions display */}
-                                {couponDimensions[coupon.id] && (
-                                  <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                                    {couponDimensions[coupon.id].width} × {couponDimensions[coupon.id].height}px
                                   </div>
                                 )}
 
@@ -1090,6 +1283,66 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
             </div>
           </div>
         )}
+        {/* Reinstate Coupon Dialog */}
+        <Dialog open={showReinstateDialog} onOpenChange={setShowReinstateDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-teal-700">
+                <RotateCcw className="h-6 w-6" />
+                Reinstate Coupon
+              </DialogTitle>
+              <DialogDescription>Set a new expiration date for this coupon to make it active again.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              {couponToReinstate && (
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium">{couponToReinstate.title}</h4>
+                  <p className="text-sm text-gray-600">{couponToReinstate.discount}</p>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="newExpirationDate">New Expiration Date</Label>
+                <Input
+                  id="newExpirationDate"
+                  type="date"
+                  value={newExpirationDate}
+                  onChange={(e) => setNewExpirationDate(e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter className="sm:justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowReinstateDialog(false)
+                  setCouponToReinstate(null)
+                  setNewExpirationDate("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmReinstateCoupon}
+                disabled={reinstatingCoupon === couponToReinstate?.id || !newExpirationDate}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                {reinstatingCoupon === couponToReinstate?.id ? (
+                  <>
+                    <span className="mr-2">Reinstating...</span>
+                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Reinstate Coupon
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
 
       <MainFooter />

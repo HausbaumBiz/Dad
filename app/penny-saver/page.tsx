@@ -36,33 +36,8 @@ export default function PennySaverPage() {
     setSavedZipCode(zipCodeValue)
   }
 
-  // Mock deals for the Penny Saver
-  const deals = [
-    {
-      title: "50% Off Oil Change",
-      business: "Quick Fix Auto Repair",
-      description: "Complete oil change service including filter replacement and fluid check.",
-      expires: "May 15, 2025",
-    },
-    {
-      title: "Free Consultation",
-      business: "Johnson & Associates Law Firm",
-      description: "Initial 30-minute legal consultation at no charge for new clients.",
-      expires: "June 1, 2025",
-    },
-    {
-      title: "Buy One Get One Free",
-      business: "Bella Italia Restaurant",
-      description: "Purchase any entrée and receive a second entrée of equal or lesser value for free.",
-      expires: "May 20, 2025",
-    },
-    {
-      title: "20% Off First Cleaning",
-      business: "Spotless Home Cleaners",
-      description: "New customers receive 20% off their first home cleaning service.",
-      expires: "May 31, 2025",
-    },
-  ]
+  // Real deals will be loaded from the database
+  const deals: any[] = []
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -160,32 +135,39 @@ export default function PennySaverPage() {
 
         <div className="mb-12">
           <h2 className="text-2xl font-bold text-center mb-8">Featured Deals</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {deals.map((deal, index) => (
-              <Card key={index} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex flex-col h-full">
-                    <div className="bg-amber-50 px-3 py-1 rounded-full text-amber-800 text-sm font-medium self-start mb-2">
-                      Expires: {deal.expires}
+          {deals.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg mb-4">No deals available at this time.</p>
+              <p className="text-gray-400">Check back soon for new savings opportunities!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {deals.map((deal, index) => (
+                <Card key={index} className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col h-full">
+                      <div className="bg-amber-50 px-3 py-1 rounded-full text-amber-800 text-sm font-medium self-start mb-2">
+                        Expires: {deal.expires}
+                      </div>
+                      <h3 className="text-xl font-semibold mb-1">{deal.title}</h3>
+                      <p className="text-primary font-medium mb-3">{deal.business}</p>
+                      <p className="text-gray-600 mb-4 flex-grow">{deal.description}</p>
+                      <div className="flex justify-between mt-4">
+                        <Button variant="outline" size="sm" className="flex items-center">
+                          <Download className="mr-1 h-4 w-4" />
+                          Save
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex items-center">
+                          <Share2 className="mr-1 h-4 w-4" />
+                          Share
+                        </Button>
+                      </div>
                     </div>
-                    <h3 className="text-xl font-semibold mb-1">{deal.title}</h3>
-                    <p className="text-primary font-medium mb-3">{deal.business}</p>
-                    <p className="text-gray-600 mb-4 flex-grow">{deal.description}</p>
-                    <div className="flex justify-between mt-4">
-                      <Button variant="outline" size="sm" className="flex items-center">
-                        <Download className="mr-1 h-4 w-4" />
-                        Save
-                      </Button>
-                      <Button variant="outline" size="sm" className="flex items-center">
-                        <Share2 className="mr-1 h-4 w-4" />
-                        Share
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-amber-50 rounded-lg p-6 mb-12">

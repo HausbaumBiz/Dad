@@ -130,3 +130,84 @@ export async function getCouponsByBusinessId(businessId: string): Promise<Coupon
     return []
   }
 }
+
+// Function to check if a coupon is expired
+export async function isCouponExpired(expirationDate: string): Promise<boolean> {
+  if (!expirationDate) return false
+
+  // Get current date and time
+  const now = new Date()
+
+  // Parse the expiration date (format: YYYY-MM-DD) and set to end of day in LOCAL time
+  const [year, month, day] = expirationDate.split("-").map(Number)
+  const expDate = new Date(year, month - 1, day, 23, 59, 59, 999) // month is 0-indexed
+
+  // Debug logging (remove in production)
+  console.log("Checking expiration:", {
+    expirationDate,
+    now: now.toLocaleString(),
+    expDate: expDate.toLocaleString(),
+    isExpired: now > expDate,
+  })
+
+  // Only expired if current time is after the end of expiration day
+  return now > expDate
+}
+
+// Function to get days until expiration (negative if expired)
+export async function getDaysUntilExpiration(expirationDate: string): Promise<number> {
+  if (!expirationDate) return 0
+
+  // Get today's date at start of day in local time
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Parse expiration date and set to start of day in local time
+  const [year, month, day] = expirationDate.split("-").map(Number)
+  const expDate = new Date(year, month - 1, day, 0, 0, 0, 0) // month is 0-indexed
+
+  // Calculate difference in days
+  const diffTime = expDate.getTime() - today.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}
+
+// Function to reinstate an expired coupon with new expiration date
+export async function reinstateCoupon(couponId: string, newExpirationDate: string) {
+  try {
+    const business = await getCurrentBusiness()
+    if (!business) {
+      return { success: false, error: "No business found in session" }
+    }
+
+    // Get current coupons
+    const result = await getBusinessCoupons(business.id)
+    if (!result.success || !result.coupons) {
+      return { success: false, error: "Failed to retrieve current coupons" }
+    }
+
+    // Find and update the specific coupon
+    const updatedCoupons = result.coupons.map((coupon) => {
+      if (coupon.id === couponId) {
+        return {
+          ...coupon,
+          expirationDate: newExpirationDate,
+          reinstated: true,
+          reinstatedAt: new Date().toISOString(),
+        }
+      }
+      return coupon
+    })
+
+    // Save updated coupons
+    const saveResult = await saveBusinessCoupons(business.id, updatedCoupons)
+
+    if (saveResult.success) {
+      return { success: true, message: "Coupon reinstated successfully" }
+    } else {
+      return { success: false, error: saveResult.error || "Failed to reinstate coupon" }
+    }
+  } catch (error) {
+    console.error("Error reinstating coupon:", error)
+    return { success: false, error: "Failed to reinstate coupon" }
+  }
+}

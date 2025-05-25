@@ -5,8 +5,9 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
 export default function OutsideMaintenancePage() {
   const filterOptions = [
@@ -25,117 +26,49 @@ export default function OutsideMaintenancePage() {
     { id: "outside13", label: "Other Outside Home Maintenance", value: "Other Outside Home Maintenance" },
   ]
 
-  // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([
-    {
-      id: 1,
-      name: "Premier Roofing Solutions",
-      services: ["Roofing", "Gutter Cleaning/Repair"],
-      rating: 4.7,
-      reviews: 98,
-      location: "North Canton, OH",
-    },
-    {
-      id: 2,
-      name: "Exterior Experts",
-      services: ["Siding", "House Painting", "Pressure Washing"],
-      rating: 4.9,
-      reviews: 112,
-      location: "Canton, OH",
-    },
-    {
-      id: 3,
-      name: "Foundation Masters",
-      services: ["Foundation Repair", "Masonry Stone and Brick"],
-      rating: 4.8,
-      reviews: 76,
-      location: "Akron, OH",
-    },
-  ])
+  const [providers, setProviders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchProviders() {
+      try {
+        setLoading(true)
+        const categoryVariants = [
+          "Outside Home Maintenance and Repair",
+          "Outside Home Maintenance",
+          "Exterior Maintenance",
+          "Home Maintenance",
+          "Roofing",
+        ]
+
+        let allProviders: any[] = []
+        for (const category of categoryVariants) {
+          try {
+            const businesses = await getBusinessesByCategory(category)
+            if (businesses && businesses.length > 0) {
+              allProviders = [...allProviders, ...businesses]
+            }
+          } catch (err) {
+            console.log(`No businesses found for category: ${category}`)
+          }
+        }
+
+        setProviders(allProviders)
+      } catch (err) {
+        setError("Failed to load providers")
+        console.error("Error fetching providers:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProviders()
+  }, [])
 
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-
-  // Mock reviews data
-  const mockReviews = {
-    "Premier Roofing Solutions": [
-      {
-        id: 1,
-        username: "HomeProtector",
-        rating: 5,
-        date: "2023-09-18",
-        comment:
-          "Excellent roofing job! They replaced our entire roof in just two days and cleaned up perfectly afterward.",
-      },
-      {
-        id: 2,
-        username: "RainReadyHome",
-        rating: 4,
-        date: "2023-08-05",
-        comment: "Did a thorough job cleaning and repairing our gutters. No more overflows during heavy rain.",
-      },
-      {
-        id: 3,
-        username: "QualitySeeker",
-        rating: 5,
-        date: "2023-07-22",
-        comment:
-          "Used them for a roof inspection before buying our home. Very detailed report and honest assessment of needed repairs.",
-      },
-    ],
-    "Exterior Experts": [
-      {
-        id: 1,
-        username: "CurbAppealFan",
-        rating: 5,
-        date: "2023-10-12",
-        comment:
-          "The new siding transformed our home! Professional installation and they helped us choose the perfect color.",
-      },
-      {
-        id: 2,
-        username: "FreshLookHome",
-        rating: 5,
-        date: "2023-09-30",
-        comment:
-          "Their house painting service was top-notch. The crew was meticulous with prep work and the finish is flawless.",
-      },
-      {
-        id: 3,
-        username: "CleanDriveway",
-        rating: 4,
-        date: "2023-08-15",
-        comment:
-          "Pressure washed our driveway, walkways, and patio. Everything looks brand new again. Would recommend.",
-      },
-    ],
-    "Foundation Masters": [
-      {
-        id: 1,
-        username: "StructuralSafety",
-        rating: 5,
-        date: "2023-07-28",
-        comment:
-          "Fixed a serious foundation issue that other companies said couldn't be repaired. Saved us from having to sell our home.",
-      },
-      {
-        id: 2,
-        username: "BrickHomeOwner",
-        rating: 4,
-        date: "2023-06-15",
-        comment: "Repaired and repointed our brick exterior. Matched the mortar color perfectly to the original.",
-      },
-      {
-        id: 3,
-        username: "BasementDry",
-        rating: 5,
-        date: "2023-05-20",
-        comment:
-          "Fixed our foundation cracks and waterproofed the basement. Haven't had any water issues since, even during heavy storms.",
-      },
-    ],
-  }
 
   // Handler for opening reviews dialog
   const handleOpenReviews = (provider: any) => {
@@ -151,68 +84,98 @@ export default function OutsideMaintenancePage() {
     >
       <CategoryFilter options={filterOptions} />
 
-      <div className="space-y-6">
-        {providers.map((provider) => (
-          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">{provider.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : error ? (
+        <div className="text-center py-12">
+          <p className="text-red-600">{error}</p>
+        </div>
+      ) : providers.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="max-w-md mx-auto">
+            <div className="w-16 h-16 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Outside Maintenance Services Found</h3>
+            <p className="text-gray-600 mb-4">
+              We're currently building our network of exterior home maintenance and repair professionals in your area.
+            </p>
+            <Button className="bg-orange-600 hover:bg-orange-700">Register Your Business</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {providers.map((provider) => (
+            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">{provider.name}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
 
-                  <div className="flex items-center mt-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {provider.rating} ({provider.reviews} reviews)
+                      </span>
                     </div>
-                    <span className="text-sm text-gray-600 ml-2">
-                      {provider.rating} ({provider.reviews} reviews)
-                    </span>
+
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-700">Services:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {provider.services.map((service, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {service}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700">Services:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                      Reviews
+                    </Button>
+                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                      View Profile
+                    </Button>
                   </div>
                 </div>
-
-                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                    Reviews
-                  </Button>
-                  <Button variant="outline" className="mt-2 w-full md:w-auto">
-                    View Profile
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Reviews Dialog */}
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.name}
-        reviews={selectedProvider ? mockReviews[selectedProvider.name] : []}
+        reviews={selectedProvider ? [] : []}
       />
 
       <Toaster />

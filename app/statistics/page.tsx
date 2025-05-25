@@ -29,6 +29,49 @@ import { type JobListing, getBusinessJobs, removeJobListing } from "@/app/action
 import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
+import { getBusinessCoupons, reinstateCoupon, type Coupon } from "@/app/actions/coupon-actions"
+import { Calendar, Clock, RotateCcw } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+
+// Client-side expiration functions (using user's local timezone) - same as coupons page
+const isCouponExpiredClient = (expirationDate: string): boolean => {
+  if (!expirationDate) return false
+
+  // Get current date and time in user's local timezone
+  const now = new Date()
+
+  // Parse the expiration date (format: YYYY-MM-DD) and set to end of day in LOCAL time
+  const [year, month, day] = expirationDate.split("-").map(Number)
+  const expDate = new Date(year, month - 1, day, 23, 59, 59, 999) // month is 0-indexed
+
+  // Only expired if current time is after the end of expiration day
+  return now > expDate
+}
+
+const getDaysUntilExpirationClient = (expirationDate: string): number => {
+  if (!expirationDate) return 0
+
+  // Get today's date at start of day in local time
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Parse expiration date and set to start of day in local time
+  const [year, month, day] = expirationDate.split("-").map(Number)
+  const expDate = new Date(year, month - 1, day, 0, 0, 0, 0) // month is 0-indexed
+
+  // Calculate difference in days
+  const diffTime = expDate.getTime() - today.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}
 
 export default function StatisticsPage() {
   const router = useRouter()
@@ -51,6 +94,12 @@ export default function StatisticsPage() {
   const [isZipCodesLoading, setIsZipCodesLoading] = useState(true)
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
   const [businessId, setBusinessId] = useState<string | null>("demo-business")
+  const [coupons, setCoupons] = useState<Coupon[]>([])
+  const [isCouponsLoading, setIsCouponsLoading] = useState(true)
+  const [reinstatingCoupon, setReinstatingCoupon] = useState<string | null>(null)
+  const [showReinstateDialog, setShowReinstateDialog] = useState(false)
+  const [couponToReinstate, setCouponToReinstate] = useState<Coupon | null>(null)
+  const [newExpirationDate, setNewExpirationDate] = useState("")
 
   // Load selected categories from server on component mount
   useEffect(() => {
@@ -199,6 +248,30 @@ export default function StatisticsPage() {
     loadJobListings()
   }, [])
 
+  // Load coupons from server on component mount
+  useEffect(() => {
+    async function loadCoupons() {
+      setIsCouponsLoading(true)
+      try {
+        const result = await getBusinessCoupons()
+        if (result.success && result.coupons) {
+          setCoupons(result.coupons)
+        }
+      } catch (error) {
+        console.error("Error loading coupons:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load your coupons",
+          variant: "destructive",
+        })
+      } finally {
+        setIsCouponsLoading(false)
+      }
+    }
+
+    loadCoupons()
+  }, [])
+
   // Group categories by main category
   const groupedCategories = selectedCategories.reduce(
     (acc, selection) => {
@@ -299,6 +372,109 @@ export default function StatisticsPage() {
       setShowRemoveJobDialog(false)
       setJobToRemove(null)
     }
+  }
+
+  const handleReinstateCoupon = async (coupon: Coupon) => {
+    setCouponToReinstate(coupon)
+    const futureDate = new Date()
+    futureDate.setDate(futureDate.getDate() + 30)
+    setNewExpirationDate(futureDate.toISOString().split("T")[0])
+    setShowReinstateDialog(true)
+  }
+
+  const confirmReinstateCoupon = async () => {
+    if (!couponToReinstate || !newExpirationDate) return
+
+    setReinstatingCoupon(couponToReinstate.id)
+    try {
+      const result = await reinstateCoupon(couponToReinstate.id, newExpirationDate)
+
+      if (result.success) {
+        setCoupons((prev) =>
+          prev.map((coupon) =>
+            coupon.id === couponToReinstate.id ? { ...coupon, expirationDate: newExpirationDate } : coupon,
+          ),
+        )
+
+        toast({
+          title: "Success",
+          description: "Coupon reinstated successfully",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to reinstate coupon",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error reinstating coupon:", error)
+      toast({
+        title: "Error",
+        description: "Failed to reinstate coupon",
+        variant: "destructive",
+      })
+    } finally {
+      setReinstatingCoupon(null)
+      setShowReinstateDialog(false)
+      setCouponToReinstate(null)
+      setNewExpirationDate("")
+    }
+  }
+
+  const renderCouponStatus = (coupon: Coupon) => {
+    const daysUntilExpiration = getDaysUntilExpirationClient(coupon.expirationDate)
+    const isExpired = isCouponExpiredClient(coupon.expirationDate)
+
+    if (isExpired) {
+      return (
+        <div className="flex items-center justify-between">
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+            <Clock className="h-3 w-3 mr-1" />
+            Expired
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleReinstateCoupon(coupon)}
+            className="text-xs px-2 py-1 h-auto"
+          >
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Reinstate
+          </Button>
+        </div>
+      )
+    }
+
+    if (daysUntilExpiration <= 7) {
+      return (
+        <span
+          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+            daysUntilExpiration <= 3 ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"
+          }`}
+        >
+          <Clock className="h-3 w-3 mr-1" />
+          {daysUntilExpiration === 0
+            ? "Expires today"
+            : daysUntilExpiration === 1
+              ? "Expires tomorrow"
+              : `${daysUntilExpiration} days left`}
+        </span>
+      )
+    }
+
+    return (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        <Calendar className="h-3 w-3 mr-1" />
+        {daysUntilExpiration} days left
+      </span>
+    )
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return ""
+    const [year, month, day] = dateString.split("-")
+    return `${month}/${day}/${year}`
   }
 
   // Sample data for awards
@@ -699,6 +875,56 @@ export default function StatisticsPage() {
             </Card>
 
             <Card>
+              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b flex flex-row items-center justify-between">
+                <CardTitle className="text-teal-700">Your Coupons</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/coupons")}
+                  className="flex items-center gap-1"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline">Manage Coupons</span>
+                  <span className="sm:hidden">Manage</span>
+                </Button>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {isCouponsLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2">Loading your coupons...</span>
+                  </div>
+                ) : coupons.length > 0 ? (
+                  <div className="space-y-4">
+                    {coupons.map((coupon) => (
+                      <div key={coupon.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-800">{coupon.title}</h3>
+                          <p className="text-sm text-gray-600">{coupon.discount}</p>
+                          <p className="text-xs text-gray-500">
+                            Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
+                          </p>
+                        </div>
+                        <div className="ml-4">{renderCouponStatus(coupon)}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="flex justify-center mb-4">
+                      <AlertCircle className="h-12 w-12 text-amber-500" />
+                    </div>
+                    <p className="text-gray-500 mb-4">No coupons created yet.</p>
+                    <Button onClick={() => router.push("/coupons")} className="flex items-center gap-2">
+                      <PlusCircle className="h-4 w-4" />
+                      Create Coupon
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
               <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
                 <CardTitle className="text-teal-700">Awards</CardTitle>
               </CardHeader>
@@ -882,6 +1108,67 @@ export default function StatisticsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reinstate Coupon Dialog */}
+      <Dialog open={showReinstateDialog} onOpenChange={setShowReinstateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-teal-700">
+              <RotateCcw className="h-6 w-6" />
+              Reinstate Coupon
+            </DialogTitle>
+            <DialogDescription>Set a new expiration date for this coupon to make it active again.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {couponToReinstate && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <h4 className="font-medium">{couponToReinstate.title}</h4>
+                <p className="text-sm text-gray-600">{couponToReinstate.discount}</p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="newExpirationDate">New Expiration Date</Label>
+              <Input
+                id="newExpirationDate"
+                type="date"
+                value={newExpirationDate}
+                onChange={(e) => setNewExpirationDate(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowReinstateDialog(false)
+                setCouponToReinstate(null)
+                setNewExpirationDate("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmReinstateCoupon}
+              disabled={reinstatingCoupon === couponToReinstate?.id || !newExpirationDate}
+              className="bg-teal-600 hover:bg-teal-700"
+            >
+              {reinstatingCoupon === couponToReinstate?.id ? (
+                <>
+                  <span className="mr-2">Reinstating...</span>
+                  <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reinstate Coupon
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

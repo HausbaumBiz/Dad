@@ -326,6 +326,21 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
       // Also save as JSON string for backward compatibility
       await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}:categories`, JSON.stringify(categories))
 
+      // Store just the category IDs for admin viewing
+      const categoryIds = categories.map((cat) => cat.category)
+      const subcategoryIds = categories.map((cat) => cat.subcategory)
+      await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}:selectedCategoryIds`, JSON.stringify(categoryIds))
+      await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}:selectedSubcategoryIds`, JSON.stringify(subcategoryIds))
+
+      // Store the full category selection data for admin viewing
+      const categorySelectionData = categories.map((cat) => ({
+        categoryId: cat.category,
+        subcategoryId: cat.subcategory,
+        fullPath: cat.fullPath,
+        timestamp: new Date().toISOString(),
+      }))
+      await kv.set(`${KEY_PREFIXES.BUSINESS}${business.id}:categorySelections`, JSON.stringify(categorySelectionData))
+
       // Save categories and subcategories explicitly
       // This creates a structure with "category" and "subcategory" fields
       const categoriesWithSubcategories = categories.map((cat) => ({

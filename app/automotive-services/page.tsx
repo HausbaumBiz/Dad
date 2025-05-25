@@ -1,43 +1,49 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, AlertCircle } from "lucide-react"
+import { AdBox } from "@/components/ad-box"
+import { getBusinessesBySelectedCategories, getBusinessAdDesignData } from "@/app/actions/business-category-fetcher"
+import type { Business } from "@/lib/definitions"
 
 export default function AutomotiveServicesPage() {
   const filterOptions = [
-    { id: "auto1", label: "General Auto Repair", value: "General Auto Repair" },
-    { id: "auto2", label: "Engine and Transmission", value: "Engine and Transmission" },
-    { id: "auto3", label: "Body Shop", value: "Body Shop" },
-    { id: "auto4", label: "Tire and Brakes", value: "Tire and Brakes" },
-    { id: "auto5", label: "Mufflers", value: "Mufflers" },
-    { id: "auto6", label: "Oil Change", value: "Oil Change" },
-    { id: "auto7", label: "Windshield Repair", value: "Windshield Repair" },
-    { id: "auto8", label: "Custom Paint", value: "Custom Paint" },
-    { id: "auto9", label: "Detailing Services", value: "Detailing Services" },
-    { id: "auto10", label: "Car Wash", value: "Car Wash" },
-    { id: "auto11", label: "Auto Parts", value: "Auto Parts" },
-    { id: "auto12", label: "ATV/Motorcycle Repair", value: "ATV/Motorcycle Repair" },
-    { id: "auto13", label: "Utility Vehicle Repair", value: "Utility Vehicle Repair" },
-    { id: "auto14", label: "RV Maintenance and Repair", value: "RV Maintenance and Repair" },
-    { id: "auto15", label: "Other Automotive Services", value: "Other Automotive Services" },
+    { id: "auto1", label: "Auto Repair", value: "Auto Repair" },
+    { id: "auto2", label: "Oil Change", value: "Oil Change" },
+    { id: "auto3", label: "Tire Service", value: "Tire Service" },
+    { id: "auto4", label: "Brake Service", value: "Brake Service" },
+    { id: "auto5", label: "Transmission Repair", value: "Transmission Repair" },
+    { id: "auto6", label: "Engine Repair", value: "Engine Repair" },
+    { id: "auto7", label: "Car Wash", value: "Car Wash" },
+    { id: "auto8", label: "Auto Detailing", value: "Auto Detailing" },
+    { id: "auto9", label: "Towing Service", value: "Towing Service" },
+    { id: "auto10", label: "Auto Body Shop", value: "Auto Body Shop" },
+    { id: "auto11", label: "Auto Glass Repair", value: "Auto Glass Repair" },
+    { id: "auto12", label: "Motorcycle Repair", value: "Motorcycle Repair" },
+    { id: "auto13", label: "RV Repair", value: "RV Repair" },
+    { id: "auto14", label: "Auto Parts", value: "Auto Parts" },
+    { id: "auto15", label: "Car Dealership", value: "Car Dealership" },
   ]
 
-  const [providers, setProviders] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selectedProvider, setSelectedProvider] = useState(null)
+  // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-  const [selectedFilters, setSelectedFilters] = useState([])
-  const [error, setError] = useState(null)
-  const [debugInfo, setDebugInfo] = useState(null)
+  const [selectedProvider, setSelectedProvider] = useState<{
+    id: string
+    name: string
+    reviews: any[]
+  } | null>(null)
+
+  // State for businesses and ad designs
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [businessAdDesigns, setBusinessAdDesigns] = useState<Record<string, any>>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchBusinesses() {
@@ -45,117 +51,22 @@ export default function AutomotiveServicesPage() {
         setLoading(true)
         setError(null)
 
-        // Debug info to help diagnose issues
-        const debugData = {
-          categoryFormats: [],
-          businessIdsByFormat: {},
-          totalUniqueBusinessIds: 0,
-          businessDetails: [],
-        }
+        // Fetch businesses that have selected "automotive" category
+        const matchingBusinesses = await getBusinessesBySelectedCategories("/automotive-services")
+        setBusinesses(matchingBusinesses)
 
-        // Fetch businesses from multiple category formats to ensure we get all automotive businesses
-        const categoryFormats = [
-          "automotive",
-          "automotive-services",
-          "automotiveServices",
-          "Automotive Services",
-          "Automotive/Motorcycle/RV",
-          "automotive/motorcycle/rv",
-          "automotive-motorcycle-rv",
-          // Add the exact format with ", etc"
-          "Automotive/Motorcycle/RV, etc",
-          "automotive/motorcycle/rv, etc",
-        ]
-
-        debugData.categoryFormats = categoryFormats
-
-        let allBusinessIds = []
-
-        // Fetch business IDs from all category formats
-        for (const format of categoryFormats) {
-          try {
-            console.log(`Fetching businesses for category format: ${format}`)
-            const response = await fetch(`/api/businesses/by-category?category=${format}`)
-            if (response.ok) {
-              const data = await response.json()
-              if (data.businesses && Array.isArray(data.businesses)) {
-                debugData.businessIdsByFormat[format] = data.businesses.map((b) => b.id)
-                allBusinessIds = [...allBusinessIds, ...data.businesses.map((b) => b.id)]
-                console.log(`Found ${data.businesses.length} businesses for format ${format}`)
-              } else {
-                console.log(`No businesses found for format ${format}`)
-                debugData.businessIdsByFormat[format] = []
-              }
-            } else {
-              console.error(`Error response for format ${format}:`, response.status)
-              debugData.businessIdsByFormat[format] = `Error: ${response.status}`
-            }
-          } catch (error) {
-            console.error(`Error fetching businesses for category format ${format}:`, error)
-            debugData.businessIdsByFormat[format] = `Error: ${error.message}`
+        // Fetch ad design data for each business
+        const adDesigns: Record<string, any> = {}
+        for (const business of matchingBusinesses) {
+          const adDesign = await getBusinessAdDesignData(business.id)
+          if (adDesign) {
+            adDesigns[business.id] = adDesign
           }
         }
-
-        // Remove duplicates
-        allBusinessIds = [...new Set(allBusinessIds)]
-        debugData.totalUniqueBusinessIds = allBusinessIds.length
-        console.log(`Total unique business IDs: ${allBusinessIds.length}`)
-
-        if (allBusinessIds.length === 0) {
-          // No businesses found - set empty array
-          setProviders([])
-          setDebugInfo(debugData)
-        } else {
-          // Fetch details for each business
-          const businessDetailsPromises = allBusinessIds.map(async (id) => {
-            try {
-              console.log(`Fetching details for business ${id}`)
-              const response = await fetch(`/api/businesses/${id}`)
-              if (response.ok) {
-                const business = await response.json()
-
-                // Extract services from subcategories or use default
-                let services = []
-                if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-                  services = business.allSubcategories
-                } else if (business.subcategory) {
-                  services = [business.subcategory]
-                }
-
-                const businessDetail = {
-                  id: business.id,
-                  name: business.businessName || business.name || "Unknown Business",
-                  services: services,
-                  rating: business.rating || (Math.random() * 1 + 4).toFixed(1), // Random rating between 4.0 and 5.0
-                  reviews: business.reviewCount || Math.floor(Math.random() * 150) + 50, // Random review count
-                  location: business.city ? `${business.city}, ${business.state || "OH"}` : "Ohio",
-                  category: business.category,
-                  subcategory: business.subcategory,
-                  allCategories: business.allCategories,
-                  allSubcategories: business.allSubcategories,
-                }
-
-                debugData.businessDetails.push(businessDetail)
-                return businessDetail
-              }
-              console.error(`Error response for business ${id}:`, response.status)
-              return null
-            } catch (error) {
-              console.error(`Error fetching details for business ${id}:`, error)
-              return null
-            }
-          })
-
-          const businessDetails = await Promise.all(businessDetailsPromises)
-          const validBusinesses = businessDetails.filter(Boolean)
-          console.log(`Successfully fetched details for ${validBusinesses.length} businesses`)
-          setProviders(validBusinesses)
-          setDebugInfo(debugData)
-        }
-      } catch (error) {
-        console.error("Error fetching automotive businesses:", error)
-        setError("Failed to load automotive businesses. Please try again later.")
-        setProviders([])
+        setBusinessAdDesigns(adDesigns)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError("Failed to load automotive services")
       } finally {
         setLoading(false)
       }
@@ -164,36 +75,21 @@ export default function AutomotiveServicesPage() {
     fetchBusinesses()
   }, [])
 
-  // Add a function to handle opening the reviews dialog
-  const handleReviewsClick = (provider) => {
-    setSelectedProvider(provider)
+  const handleOpenReviews = (business: Business) => {
+    setSelectedProvider({
+      id: business.id,
+      name: business.businessName,
+      reviews: business.reviewsData || [],
+    })
     setIsReviewsDialogOpen(true)
   }
-
-  // Add a function to handle opening the profile dialog
-  const handleProfileClick = (providerId) => {
-    setSelectedProvider(providerId)
-    setIsProfileDialogOpen(true)
-  }
-
-  // Filter providers based on selected filters
-  const filteredProviders =
-    selectedFilters.length > 0
-      ? providers.filter((provider) =>
-          provider.services.some(
-            (service) =>
-              selectedFilters.includes(service) ||
-              selectedFilters.some((filter) => service.toLowerCase().includes(filter.toLowerCase())),
-          ),
-        )
-      : providers
 
   return (
     <CategoryLayout title="Automotive Services" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/auto-mQWtZXyRogQgO5qlNVcR1OYcyDqe59.png"
+            src="/placeholder.svg?height=500&width=500&query=automotive services garage mechanic"
             alt="Automotive Services"
             width={500}
             height={500}
@@ -203,194 +99,148 @@ export default function AutomotiveServicesPage() {
 
         <div className="space-y-6">
           <p className="text-lg text-gray-700">
-            Find qualified automotive professionals for all your vehicle needs. Browse services below or use filters to
-            narrow your search.
+            Find trusted automotive professionals in your area. From routine maintenance to major repairs, connect with
+            qualified mechanics and service providers.
           </p>
 
           <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Verified local mechanics and auto professionals</li>
-              <li>Compare quotes from multiple service providers</li>
-              <li>Read customer reviews before hiring</li>
-              <li>Book appointments online</li>
+              <li>Verified automotive professionals</li>
+              <li>Read customer reviews and ratings</li>
+              <li>Compare services and pricing</li>
+              <li>Find specialists for your vehicle type</li>
             </ul>
           </div>
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} onFilterChange={(filters) => setSelectedFilters(filters)} />
+      <CategoryFilter options={filterOptions} />
 
       {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2">Loading automotive service providers...</span>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading automotive service providers...</p>
         </div>
       ) : error ? (
-        <div className="text-center py-12">
-          <div className="flex justify-center mb-4">
-            <AlertCircle className="h-12 w-12 text-red-500" />
-          </div>
-          <p className="text-red-500 font-medium">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
+        <div className="text-center py-8">
+          <p className="text-red-600">{error}</p>
         </div>
-      ) : filteredProviders.length > 0 ? (
-        <div className="space-y-6">
-          {filteredProviders.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
-
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
-                      </span>
-                    </div>
-
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.slice(0, 3).map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
-                        {provider.services.length > 3 && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            +{provider.services.length - 3} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleReviewsClick(provider)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleProfileClick(provider.id)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      ) : businesses.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="max-w-md mx-auto">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Automotive Services Yet</h3>
+            <p className="text-gray-600 mb-4">
+              Be the first automotive professional to join our platform and connect with vehicle owners in your area.
+            </p>
+            <Button className="bg-blue-600 hover:bg-blue-700">Register Your Service</Button>
+          </div>
         </div>
       ) : (
-        <div className="text-center py-12 space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 max-w-2xl mx-auto">
-            <h3 className="text-lg font-medium text-amber-800 mb-2">No Automotive Businesses Found</h3>
-            <p className="text-amber-700">
-              There are currently no automotive service providers registered in this category.
-            </p>
-            <div className="mt-4 p-4 bg-white rounded border border-amber-100">
-              <p className="text-gray-700 font-medium">Are you an automotive service provider?</p>
-              <p className="text-gray-600 mt-1">
-                Register your business on Hausbaum to reach more customers in your area.
-              </p>
-              <Button className="mt-3" asChild>
-                <a href="/business-register">Register Your Business</a>
-              </Button>
-            </div>
-          </div>
+        <div className="space-y-6">
+          {businesses.map((business) => {
+            const adDesign = businessAdDesigns[business.id]
 
-          {selectedFilters.length > 0 && (
-            <div>
-              <p className="text-gray-500">No results match your selected filters.</p>
-              <Button variant="outline" className="mt-2" onClick={() => setSelectedFilters([])}>
-                Clear Filters
-              </Button>
-            </div>
-          )}
-
-          {/* Debug information for admins */}
-          {debugInfo && (
-            <details className="mt-8 text-left bg-gray-50 p-4 rounded-lg border">
-              <summary className="font-medium cursor-pointer">Debug Information (Admin Only)</summary>
-              <div className="mt-4 space-y-4">
-                <div>
-                  <h4 className="font-medium">Category Formats Checked:</h4>
-                  <ul className="list-disc list-inside mt-2 text-sm">
-                    {debugInfo.categoryFormats.map((format, index) => (
-                      <li key={index}>{format}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-medium">Business IDs by Format:</h4>
-                  <div className="mt-2 text-sm">
-                    {Object.entries(debugInfo.businessIdsByFormat).map(([format, ids], index) => (
-                      <div key={index} className="mb-2">
-                        <strong>{format}:</strong>{" "}
-                        {Array.isArray(ids) ? (ids.length > 0 ? ids.join(", ") : "No businesses found") : ids}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium">Total Unique Business IDs: {debugInfo.totalUniqueBusinessIds}</h4>
-                </div>
-
-                {debugInfo.businessDetails.length > 0 && (
-                  <div>
-                    <h4 className="font-medium">Business Details:</h4>
-                    <div className="mt-2 max-h-60 overflow-y-auto">
-                      <pre className="text-xs whitespace-pre-wrap">
-                        {JSON.stringify(debugInfo.businessDetails, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
+            return (
+              <div key={business.id} className="space-y-4">
+                {/* Business AdBox */}
+                {adDesign && (
+                  <AdBox
+                    title={adDesign.businessInfo?.businessName || business.businessName}
+                    description={adDesign.businessInfo?.freeText || "Professional automotive services"}
+                    businessName={business.businessName}
+                    businessId={business.id}
+                    phoneNumber={adDesign.businessInfo?.phone || business.phone}
+                    address={
+                      adDesign.businessInfo?.streetAddress
+                        ? `${adDesign.businessInfo.streetAddress}, ${adDesign.businessInfo.city || ""}, ${adDesign.businessInfo.state || ""} ${adDesign.businessInfo.zipCode || ""}`.trim()
+                        : undefined
+                    }
+                  />
                 )}
+
+                {/* Business Card */}
+                <Card className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row justify-between">
+                      <div>
+                        <h3 className="text-xl font-semibold">{business.businessName}</h3>
+                        <p className="text-gray-600 text-sm mt-1">
+                          {business.city && business.state
+                            ? `${business.city}, ${business.state}`
+                            : `Zip: ${business.zipCode}`}
+                        </p>
+
+                        <div className="flex items-center mt-2">
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <svg
+                                key={i}
+                                className={`w-4 h-4 ${i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                            ))}
+                          </div>
+                          <span className="text-sm text-gray-600 ml-2">
+                            {business.rating || 0} ({business.reviews || 0} reviews)
+                          </span>
+                        </div>
+
+                        {business.services && business.services.length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-sm font-medium text-gray-700">Services:</p>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {business.services.map((service, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                                >
+                                  {service}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                        <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
+                          Reviews
+                        </Button>
+                        <Button variant="outline" className="mt-2 w-full md:w-auto">
+                          View Profile
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </details>
-          )}
+            )
+          })}
         </div>
       )}
 
-      {selectedProvider !== null && (
-        <>
-          <ReviewsDialog
-            isOpen={isReviewsDialogOpen}
-            onClose={() => setIsReviewsDialogOpen(false)}
-            providerName={selectedProvider ? selectedProvider.name : ""}
-            businessId={selectedProvider ? selectedProvider.id : ""}
-            reviews={[]}
-          />
-
-          <BusinessProfileDialog
-            isOpen={isProfileDialogOpen}
-            onClose={() => setIsProfileDialogOpen(false)}
-            businessId={selectedProvider}
-            businessName={providers.find((p) => p.id === selectedProvider)?.name || ""}
-          />
-        </>
+      {selectedProvider && (
+        <ReviewsDialog
+          isOpen={isReviewsDialogOpen}
+          onClose={() => setIsReviewsDialogOpen(false)}
+          providerName={selectedProvider.name}
+          businessId={selectedProvider.id}
+          reviews={selectedProvider.reviews}
+        />
       )}
 
       <Toaster />

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { useEffect } from "react"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
 export default function CleaningPage() {
   const filterOptions = [
@@ -21,115 +23,55 @@ export default function CleaningPage() {
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
 
-  // Mock reviews data
-  const mockReviews = {
-    "Spotless Home Cleaners": [
-      {
-        id: 1,
-        username: "BusyParent",
-        rating: 5,
-        date: "2023-10-18",
-        comment:
-          "Spotless Home Cleaners has been a lifesaver for our family. They are thorough, reliable, and always leave our home smelling fresh. Their deep carpet cleaning service is exceptional!",
-      },
-      {
-        id: 2,
-        username: "WorkFromHome",
-        rating: 4,
-        date: "2023-09-25",
-        comment:
-          "I've been using their bi-weekly cleaning service for six months now. They're generally very good, though occasionally miss some spots. Overall, I'm happy with the service.",
-      },
-      {
-        id: 3,
-        username: "CleanFreak",
-        rating: 5,
-        date: "2023-08-12",
-        comment:
-          "As someone who is particular about cleaning, I was skeptical about hiring a service. Spotless Home Cleaners exceeded my expectations. They pay attention to detail and use eco-friendly products as requested.",
-      },
-    ],
-    "Professional Office Maintenance": [
-      {
-        id: 1,
-        username: "SmallBusinessOwner",
-        rating: 5,
-        date: "2023-10-14",
-        comment:
-          "We've contracted Professional Office Maintenance for our medical practice, and they've been excellent. They understand the importance of sanitation in our environment and are always thorough.",
-      },
-      {
-        id: 2,
-        username: "OfficeManager",
-        rating: 4,
-        date: "2023-09-20",
-        comment:
-          "Reliable service for our corporate office. They work after hours as requested and are responsive to special cleaning requests. Good value for the quality provided.",
-      },
-      {
-        id: 3,
-        username: "StartupFounder",
-        rating: 5,
-        date: "2023-08-05",
-        comment:
-          "Our startup needed a flexible cleaning service that could adapt to our changing office needs. Professional Office Maintenance has been perfect - accommodating and detail-oriented.",
-      },
-    ],
-    "Crystal Clear Windows": [
-      {
-        id: 1,
-        username: "HistoricHomeowner",
-        rating: 5,
-        date: "2023-10-10",
-        comment:
-          "Crystal Clear Windows did an amazing job on our historic home with 30+ windows. They were careful with the old glass and frames, and the results were spectacular. Worth every penny!",
-      },
-      {
-        id: 2,
-        username: "SunlightLover",
-        rating: 4,
-        date: "2023-09-15",
-        comment:
-          "Good service overall. They cleaned our two-story home's windows inside and out. A few streaks were left on some windows, but they came back to fix it when I pointed it out.",
-      },
-      {
-        id: 3,
-        username: "RetailShopOwner",
-        rating: 5,
-        date: "2023-08-22",
-        comment:
-          "We use Crystal Clear for our storefront windows monthly. They are always on time, professional, and make our shop look inviting. Our customers often comment on how clean our windows are!",
-      },
-    ],
-  }
+  const [providers, setProviders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([
-    {
-      id: 1,
-      name: "Spotless Home Cleaners",
-      services: ["House Cleaning", "Deep Carpet and Floor Cleaning"],
-      rating: 4.9,
-      reviews: 156,
-      location: "North Canton, OH",
-    },
-    {
-      id: 2,
-      name: "Professional Office Maintenance",
-      services: ["Office Cleaning"],
-      rating: 4.8,
-      reviews: 87,
-      location: "Canton, OH",
-    },
-    {
-      id: 3,
-      name: "Crystal Clear Windows",
-      services: ["Window Cleaning"],
-      rating: 4.7,
-      reviews: 64,
-      location: "Akron, OH",
-    },
-  ])
+  useEffect(() => {
+    async function fetchBusinesses() {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Try multiple category formats to catch businesses
+        const categoryVariants = [
+          "Home and Office Cleaning",
+          "cleaning",
+          "House Cleaning",
+          "Office Cleaning",
+          "Window Cleaning",
+          "Deep Carpet and Floor Cleaning",
+        ]
+
+        let allBusinesses: any[] = []
+
+        for (const category of categoryVariants) {
+          try {
+            const businesses = await getBusinessesByCategory(category)
+            if (businesses && businesses.length > 0) {
+              allBusinesses = [...allBusinesses, ...businesses]
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch businesses for category: ${category}`)
+          }
+        }
+
+        // Remove duplicates based on business ID
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setProviders(uniqueBusinesses)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError("Failed to load businesses")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBusinesses()
+  }, [])
 
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
@@ -142,67 +84,95 @@ export default function CleaningPage() {
       <CategoryFilter options={filterOptions} />
 
       <div className="space-y-6">
-        {providers.map((provider) => (
-          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">{provider.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-600">{error}</p>
+          </div>
+        ) : providers.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Cleaning Services Found</h3>
+            <p className="text-gray-600 mb-6">
+              Be the first cleaning service to join our platform and help local customers keep their spaces spotless!
+            </p>
+            <Button>Register Your Cleaning Business</Button>
+          </div>
+        ) : (
+          providers.map((provider) => (
+            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">{provider.name}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
 
-                  <div className="flex items-center mt-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {provider.rating} ({provider.reviews} reviews)
+                      </span>
                     </div>
-                    <span className="text-sm text-gray-600 ml-2">
-                      {provider.rating} ({provider.reviews} reviews)
-                    </span>
+
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-700">Services:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {provider.services.map((service, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {service}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700">Services:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                      Reviews
+                    </Button>
+                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                      View Profile
+                    </Button>
                   </div>
                 </div>
-
-                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider.name)}>
-                    Reviews
-                  </Button>
-                  <Button variant="outline" className="mt-2 w-full md:w-auto">
-                    View Profile
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Reviews Dialog */}
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
-        providerName={selectedProvider}
-        reviews={selectedProvider ? mockReviews[selectedProvider] || [] : []}
+        providerName={selectedProvider?.name}
+        reviews={selectedProvider?.reviews || []}
       />
 
       <Toaster />

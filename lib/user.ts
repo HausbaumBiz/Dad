@@ -53,6 +53,9 @@ export async function createUser(userData: UserCreateInput) {
     // Create email index for lookup
     await kv.set(`user:email:${userData.email}`, userId)
 
+    // Add user ID to the users set for easier retrieval
+    await kv.sadd("users", userId)
+
     return { success: true, userId, message: "User registered successfully" }
   } catch (error) {
     console.error("Error creating user:", error)
@@ -129,27 +132,51 @@ export async function verifyCredentials(email: string, password: string) {
 // Get all users
 export async function getAllUsers() {
   try {
-    // Get all keys that match the user pattern
-    const userKeys = await kv.keys("user:*")
+    // First, try to get a list of user IDs from a set (if it exists)
+    let userIds: string[] = []
 
-    // Filter out email index keys
-    const userIdKeys = userKeys.filter((key) => !key.startsWith("user:email:"))
+    try {
+      // Try to get user IDs from a set first
+      const userIdSet = await kv.smembers("users")
+      if (userIdSet && userIdSet.length > 0) {
+        userIds = userIdSet as string[]
+      }
+    } catch (setError) {
+      console.log("No users set found, falling back to keys scan")
+    }
 
-    // Get all users
-    const users = await Promise.all(
-      userIdKeys.map(async (key) => {
-        const user = await kv.get<User>(key)
-        if (user) {
+    // If no set exists, fall back to scanning keys
+    if (userIds.length === 0) {
+      try {
+        const allKeys = await kv.keys("user:*")
+        // Filter out email index keys and extract user IDs
+        userIds = allKeys
+          .filter((key) => !key.startsWith("user:email:") && key.startsWith("user:"))
+          .map((key) => key.replace("user:", ""))
+      } catch (keysError) {
+        console.error("Error scanning keys:", keysError)
+        return []
+      }
+    }
+
+    // Get all users safely
+    const users = []
+    for (const userId of userIds) {
+      try {
+        const user = await kv.get<User>(`user:${userId}`)
+        if (user && typeof user === "object" && user.id) {
           // Remove sensitive information
           const { passwordHash, ...safeUser } = user
-          return safeUser
+          users.push(safeUser)
         }
-        return null
-      }),
-    )
+      } catch (userError) {
+        console.error(`Error getting user ${userId}:`, userError)
+        // Continue with other users
+      }
+    }
 
-    // Filter out null values and sort by creation date
-    return users.filter(Boolean).sort((a, b) => b.createdAt - a.createdAt)
+    // Sort by creation date
+    return users.sort((a, b) => b.createdAt - a.createdAt)
   } catch (error) {
     console.error("Error getting all users:", error)
     return []

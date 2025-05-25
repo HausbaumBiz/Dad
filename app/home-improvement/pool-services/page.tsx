@@ -5,8 +5,9 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
 export default function PoolServicesPage() {
   const filterOptions = [
@@ -19,115 +20,56 @@ export default function PoolServicesPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
 
+  const [businesses, setBusinesses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    async function fetchBusinesses() {
+      try {
+        setLoading(true)
+        const categoryVariants = [
+          "Pool Services",
+          "Swimming Pool Services",
+          "Pool Maintenance",
+          "Pool Installation",
+          "Pool Cleaning",
+        ]
+
+        let allBusinesses = []
+        for (const category of categoryVariants) {
+          try {
+            const result = await getBusinessesByCategory(category)
+            if (result && Array.isArray(result)) {
+              allBusinesses = [...allBusinesses, ...result]
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch businesses for category: ${category}`)
+          }
+        }
+
+        // Remove duplicates based on business ID
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setBusinesses(uniqueBusinesses)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError("Failed to load businesses")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBusinesses()
+  }, [])
+
   // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([
-    {
-      id: 1,
-      name: "Blue Waters Pool Construction",
-      services: ["Swimming Pool Installers/Builders"],
-      rating: 4.9,
-      reviews: 45,
-      location: "North Canton, OH",
-    },
-    {
-      id: 2,
-      name: "Crystal Clear Pool Services",
-      services: ["Swimming Pool Maintenance/Cleaning"],
-      rating: 4.7,
-      reviews: 83,
-      location: "Canton, OH",
-    },
-    {
-      id: 3,
-      name: "Complete Pool Solutions",
-      services: ["Swimming Pool Installers/Builders", "Swimming Pool Maintenance/Cleaning", "Other Pool Services"],
-      rating: 4.8,
-      reviews: 62,
-      location: "Akron, OH",
-    },
-  ])
+  const [providers] = useState([])
 
   // Mock reviews data
-  const mockReviews = {
-    "Blue Waters Pool Construction": [
-      {
-        id: 1,
-        username: "PoolOwner2023",
-        rating: 5,
-        date: "2023-07-15",
-        comment:
-          "Blue Waters built our dream pool! The design process was collaborative, and they finished on time and on budget. Our backyard is now the envy of the neighborhood.",
-      },
-      {
-        id: 2,
-        username: "SummerFun",
-        rating: 5,
-        date: "2023-06-22",
-        comment:
-          "Exceptional craftsmanship! They handled all permits and inspections, making the process stress-free. The finished pool exceeded our expectations.",
-      },
-      {
-        id: 3,
-        username: "HomeImprover",
-        rating: 4,
-        date: "2023-05-10",
-        comment:
-          "Great work overall. There were some minor delays due to weather, but they communicated well throughout the process. The pool is beautiful and well-constructed.",
-      },
-    ],
-    "Crystal Clear Pool Services": [
-      {
-        id: 1,
-        username: "BusyHomeowner",
-        rating: 5,
-        date: "2023-08-05",
-        comment:
-          "Crystal Clear has been maintaining our pool for two years now. They're reliable, thorough, and our pool always looks pristine. Worth every penny!",
-      },
-      {
-        id: 2,
-        username: "SwimFanatic",
-        rating: 4,
-        date: "2023-07-18",
-        comment:
-          "Good service overall. They're prompt and professional. Occasionally miss some debris in corners, but quick to fix when pointed out.",
-      },
-      {
-        id: 3,
-        username: "SummerHost",
-        rating: 5,
-        date: "2023-06-30",
-        comment:
-          "We host a lot of summer parties, and Crystal Clear keeps our pool in perfect condition. Their chemical balancing is spot-on, and the water is always crystal clear.",
-      },
-    ],
-    "Complete Pool Solutions": [
-      {
-        id: 1,
-        username: "NewPoolOwner",
-        rating: 5,
-        date: "2023-08-12",
-        comment:
-          "From design to maintenance, Complete Pool Solutions has been fantastic. They built our pool last year and now handle all maintenance. Couldn't be happier!",
-      },
-      {
-        id: 2,
-        username: "BackyardOasis",
-        rating: 4,
-        date: "2023-07-25",
-        comment:
-          "They installed our pool and now do regular maintenance. The installation was flawless, and their maintenance service is reliable and thorough.",
-      },
-      {
-        id: 3,
-        username: "YearRoundSwimmer",
-        rating: 5,
-        date: "2023-06-15",
-        comment:
-          "We had them install a heated pool with a cover system. Everything works perfectly, and their maintenance team keeps it in top condition year-round.",
-      },
-    ],
-  }
+  const mockReviews = {}
 
   // Function to handle opening the reviews dialog
   const handleOpenReviews = (provider: any) => {
@@ -140,59 +82,84 @@ export default function PoolServicesPage() {
       <CategoryFilter options={filterOptions} />
 
       <div className="space-y-6">
-        {providers.map((provider) => (
-          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">{provider.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
-
-                  <div className="flex items-center mt-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-600">{error}</p>
+          </div>
+        ) : businesses.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Pool Services Found</h3>
+            <p className="text-gray-600 mb-4">Be the first pool service provider to join our platform!</p>
+            <Button>Register Your Business</Button>
+          </div>
+        ) : (
+          businesses.map((business) => (
+            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">{business.name}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{business.location || "Location not specified"}</p>
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-4 h-4 ${i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {business.rating || 0} ({business.reviewCount || 0} reviews)
+                      </span>
                     </div>
-                    <span className="text-sm text-gray-600 ml-2">
-                      {provider.rating} ({provider.reviews} reviews)
-                    </span>
+                    {business.services && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700">Services:</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {business.services.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700">Services:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
+                      Reviews
+                    </Button>
+                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                      View Profile
+                    </Button>
                   </div>
                 </div>
-
-                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                    Reviews
-                  </Button>
-                  <Button variant="outline" className="mt-2 w-full md:w-auto">
-                    View Profile
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Reviews Dialog */}

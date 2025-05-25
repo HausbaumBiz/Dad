@@ -37,7 +37,6 @@ export default function ArtsEntertainmentPage() {
     { id: "arts14", label: "Models", value: "Models" },
   ]
 
-  // Add state variables for tracking the selected provider and dialog open state
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
@@ -45,14 +44,12 @@ export default function ArtsEntertainmentPage() {
   const [businesses, setBusinesses] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState<any>({})
 
   // Fetch businesses in this category
   useEffect(() => {
     async function fetchBusinesses() {
       setIsLoading(true)
       try {
-        // Try multiple category formats to ensure we find all relevant businesses
         const categoryFormats = [
           "artDesignEntertainment",
           "Art, Design and Entertainment",
@@ -64,62 +61,21 @@ export default function ArtsEntertainmentPage() {
         ]
 
         let allBusinesses: any[] = []
-        const debugResults: Record<string, any> = {}
 
-        // Fetch businesses for each category format
         for (const format of categoryFormats) {
-          console.log(`Fetching businesses for category format: ${format}`)
           try {
             const result = await getBusinessesByCategory(format)
-            debugResults[format] = {
-              count: result?.length || 0,
-              businesses: result?.map((b) => ({ id: b.id, name: b.businessName })) || [],
-            }
-
             if (result && result.length > 0) {
-              console.log(`Found ${result.length} businesses for format: ${format}`)
               allBusinesses = [...allBusinesses, ...result]
             }
           } catch (error) {
             console.error(`Error fetching businesses for format ${format}:`, error)
-            debugResults[format] = { error: error.message }
           }
         }
 
-        // Also try to fetch businesses directly from the Redis set
-        try {
-          const directResult = await fetch("/api/debug/arts-businesses")
-          const directData = await directResult.json()
-          debugResults["direct_redis"] = directData
-
-          if (directData.businesses && directData.businesses.length > 0) {
-            allBusinesses = [...allBusinesses, ...directData.businesses]
-          }
-        } catch (error) {
-          console.error("Error fetching businesses directly:", error)
-          debugResults["direct_redis"] = { error: error.message }
-        }
-
-        // Remove duplicates by ID
         const uniqueBusinesses = allBusinesses.filter(
           (business, index, self) => index === self.findIndex((b) => b.id === business.id),
         )
-
-        setDebugInfo({
-          categoryFormats,
-          results: debugResults,
-          totalFound: allBusinesses.length,
-          uniqueCount: uniqueBusinesses.length,
-        })
-
-        if (uniqueBusinesses.length === 0) {
-          toast({
-            title: "No businesses found",
-            description:
-              "We couldn't find any businesses in the Arts & Entertainment category. This might be a technical issue.",
-            variant: "destructive",
-          })
-        }
 
         setBusinesses(uniqueBusinesses)
       } catch (error) {
@@ -140,13 +96,11 @@ export default function ArtsEntertainmentPage() {
   // Filter businesses based on selected subcategory
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
-        // Check if business has categories with the selected subcategory
         if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
           return business.allSubcategories.some((sub: string) =>
             sub.toLowerCase().includes(selectedFilter.toLowerCase()),
           )
         }
-        // Also check the subcategory field
         if (business.subcategory) {
           return business.subcategory.toLowerCase().includes(selectedFilter.toLowerCase())
         }
@@ -154,113 +108,16 @@ export default function ArtsEntertainmentPage() {
       })
     : businesses
 
-  // Add mock reviews data specific to arts and entertainment services
-  const mockReviews = [
-    {
-      id: 1,
-      providerName: "Creative Visions Studio",
-      reviews: [
-        {
-          id: 101,
-          username: "ArtLover42",
-          rating: 5,
-          date: "2023-11-15",
-          comment:
-            "Absolutely stunning photography work! They captured our family portraits with such creativity and attention to detail. The graphic design work they did for our business cards was equally impressive.",
-        },
-        {
-          id: 102,
-          username: "DesignEnthusiast",
-          rating: 5,
-          date: "2023-10-22",
-          comment:
-            "Professional, creative, and a pleasure to work with. Their photography perfectly captured the essence of our event, and the edited photos were delivered ahead of schedule.",
-        },
-        {
-          id: 103,
-          username: "MarketingPro",
-          rating: 4,
-          date: "2023-09-18",
-          comment:
-            "Great graphic design work for our company rebrand. They really understood our vision and translated it beautifully into our new logo and marketing materials.",
-        },
-      ],
-    },
-    {
-      id: 2,
-      providerName: "Harmony Music Productions",
-      reviews: [
-        {
-          id: 201,
-          username: "MusicFan88",
-          rating: 5,
-          date: "2023-11-10",
-          comment:
-            "The musicians they provided for our wedding were exceptional! They learned our special request songs and performed them beautifully. The recording studio is also top-notch.",
-        },
-        {
-          id: 202,
-          username: "BandMember23",
-          rating: 4,
-          date: "2023-10-05",
-          comment:
-            "Great recording studio with professional sound engineers. They helped us get the perfect sound for our EP. The equipment is high quality and the space is comfortable.",
-        },
-        {
-          id: 203,
-          username: "EventPlanner",
-          rating: 5,
-          date: "2023-09-12",
-          comment:
-            "Hired their musicians for a corporate event and they were fantastic! Very professional, on time, and their performance created the perfect atmosphere.",
-        },
-      ],
-    },
-    {
-      id: 3,
-      providerName: "Modern Space Interiors",
-      reviews: [
-        {
-          id: 301,
-          username: "HomeOwner2023",
-          rating: 5,
-          date: "2023-11-20",
-          comment:
-            "Transformed our living space completely! Their interior design vision was exactly what we needed. They worked within our budget and the results exceeded our expectations.",
-        },
-        {
-          id: 302,
-          username: "BusinessOwner",
-          rating: 4,
-          date: "2023-10-15",
-          comment:
-            "Hired them to redesign our office space and they did a fantastic job. The space is now both functional and beautiful. Our clients always comment on how nice it looks.",
-        },
-        {
-          id: 303,
-          username: "RenovationQueen",
-          rating: 5,
-          date: "2023-09-05",
-          comment:
-            "Amazing attention to detail and they really listen to what you want. They helped me select the perfect colors, furniture, and accessories for my home renovation.",
-        },
-      ],
-    },
-  ]
-
-  // Add a handler function for opening the reviews dialog
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
   }
 
-  // Add a handler function for opening the profile dialog
   const handleOpenProfile = (provider: any) => {
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
   }
 
-  // Handle filter change
   const handleFilterChange = (value: string) => {
     setSelectedFilter(value === selectedFilter ? null : value)
   }
@@ -327,7 +184,7 @@ export default function ArtsEntertainmentPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {business.rating || 4.5} ({business.reviews || 12} reviews)
+                        {business.rating || 4.5} ({business.reviews || 0} reviews)
                       </span>
                     </div>
 
@@ -371,15 +228,21 @@ export default function ArtsEntertainmentPage() {
         </div>
       ) : (
         <div className="text-center py-12">
-          <p className="text-gray-500">No businesses found in this category. Check back later!</p>
-
-          {/* Debug information - only visible in development */}
-          {process.env.NODE_ENV === "development" && (
-            <div className="mt-8 p-4 border border-gray-300 rounded text-left bg-gray-50">
-              <h3 className="font-bold mb-2">Debug Information:</h3>
-              <pre className="text-xs overflow-auto max-h-96">{JSON.stringify(debugInfo, null, 2)}</pre>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 max-w-2xl mx-auto">
+            <h3 className="text-xl font-medium text-blue-800 mb-2">No Arts & Entertainment Providers Found</h3>
+            <p className="text-blue-700 mb-4">
+              We're building our network of creative professionals and entertainers in your area.
+            </p>
+            <div className="bg-white rounded border border-blue-100 p-4">
+              <p className="text-gray-700 font-medium">Are you a creative professional or entertainer?</p>
+              <p className="text-gray-600 mt-1">
+                Join Hausbaum to showcase your talents and connect with clients in your area.
+              </p>
+              <Button className="mt-3" asChild>
+                <a href="/business-register">Register Your Creative Business</a>
+              </Button>
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -389,7 +252,7 @@ export default function ArtsEntertainmentPage() {
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.businessName || selectedProvider.name}
           businessId={selectedProvider.id}
-          reviews={mockReviews.find((p) => p.providerName === selectedProvider.businessName)?.reviews || []}
+          reviews={[]}
         />
       )}
 

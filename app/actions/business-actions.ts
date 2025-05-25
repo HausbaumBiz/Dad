@@ -17,27 +17,82 @@ import {
   type CategoryData,
 } from "@/lib/db-schema"
 
+// Helper function to safely extract error messages
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+  if (typeof error === "string") {
+    return error
+  }
+  if (error && typeof error === "object") {
+    return JSON.stringify(error)
+  }
+  return "Unknown error occurred"
+}
+
 // Get all businesses
 export async function getBusinesses(): Promise<Business[]> {
   try {
     console.log("Fetching all businesses")
 
+    // Check if KV environment variables are available
+    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      console.warn("KV environment variables are missing. Using mock data for development.")
+      // Return mock data for development/preview
+      return [
+        {
+          id: "demo-business-1",
+          firstName: "Demo",
+          lastName: "User",
+          businessName: "Demo Business 1",
+          zipCode: "12345",
+          email: "demo1@example.com",
+          isEmailVerified: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: "demo-business-2",
+          firstName: "Sample",
+          lastName: "Owner",
+          businessName: "Sample Business 2",
+          zipCode: "67890",
+          email: "demo2@example.com",
+          isEmailVerified: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ]
+    }
+
     // Get all business IDs from the set
-    const businessIds = (await kv.smembers(KEY_PREFIXES.BUSINESSES_SET)) as string[]
+    let businessIds: string[] = []
 
-    console.log(`Found ${businessIds.length} business IDs`)
-
-    if (!businessIds || businessIds.length === 0) {
+    try {
+      businessIds = (await kv.smembers(KEY_PREFIXES.BUSINESSES_SET)) as string[]
+      console.log(`Found ${businessIds.length} business IDs`)
+    } catch (error) {
+      console.error("Error fetching business IDs:", getErrorMessage(error))
       return []
     }
 
-    // Fetch each business's data
+    if (!businessIds || businessIds.length === 0) {
+      console.log("No business IDs found in the set")
+      return []
+    }
+
+    // Fetch each business's data with individual error handling
     const businessesPromises = businessIds.map(async (id) => {
       try {
         const business = (await kv.get(`${KEY_PREFIXES.BUSINESS}${id}`)) as Business | null
-        return business ? { ...business, id } : null
+        if (business && typeof business === "object") {
+          return { ...business, id }
+        }
+        console.warn(`Business ${id} not found or invalid data`)
+        return null
       } catch (err) {
-        console.error(`Error fetching business ${id}:`, err)
+        console.error(`Error fetching business ${id}:`, getErrorMessage(err))
         return null
       }
     })
@@ -53,7 +108,7 @@ export async function getBusinesses(): Promise<Business[]> {
       return dateB - dateA
     })
   } catch (error) {
-    console.error("Error fetching businesses:", error)
+    console.error("Error fetching businesses:", getErrorMessage(error))
     return []
   }
 }
@@ -71,7 +126,7 @@ export async function getBusinessById(id: string): Promise<Business | null> {
 
     return { ...business, id }
   } catch (error) {
-    console.error(`Error fetching business with ID ${id}:`, error)
+    console.error(`Error fetching business with ID ${id}:`, getErrorMessage(error))
     return null
   }
 }
@@ -113,7 +168,7 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
           try {
             categories = JSON.parse(categoriesData)
           } catch (e) {
-            console.error("Error parsing categories data:", e)
+            console.error("Error parsing categories data:", getErrorMessage(e))
           }
         } else if (Array.isArray(categoriesData)) {
           categories = categoriesData
@@ -133,7 +188,7 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
         }
       }
     } catch (error) {
-      console.error(`Error removing business ${id} from category indexes:`, error)
+      console.error(`Error removing business ${id} from category indexes:`, getErrorMessage(error))
     }
 
     // Get business zip codes and remove from indexes
@@ -144,7 +199,7 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
       try {
         zipCodes = await kv.smembers(`${KEY_PREFIXES.BUSINESS}${id}:zipcodes`)
       } catch (setError) {
-        console.log("Zip codes not stored as a set, trying as a string value:", setError)
+        console.log("Zip codes not stored as a set, trying as a string value:", getErrorMessage(setError))
 
         // If that fails, try to get it as a string (get)
         try {
@@ -154,7 +209,7 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
               try {
                 zipCodes = JSON.parse(zipCodesData)
               } catch (parseError) {
-                console.error("Error parsing zip codes data:", parseError)
+                console.error("Error parsing zip codes data:", getErrorMessage(parseError))
                 // If it's a string but not JSON, it might be a single zip code
                 zipCodes = [zipCodesData]
               }
@@ -163,7 +218,7 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
             }
           }
         } catch (getError) {
-          console.error("Error getting zip codes as string:", getError)
+          console.error("Error getting zip codes as string:", getErrorMessage(getError))
         }
       }
 
@@ -176,7 +231,7 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
         }
       }
     } catch (error) {
-      console.error(`Error removing business ${id} from zip code indexes:`, error)
+      console.error(`Error removing business ${id} from zip code indexes:`, getErrorMessage(error))
     }
 
     // Remove business from the set of all businesses
@@ -206,10 +261,10 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
       message: `Business ${business.businessName} successfully deleted`,
     }
   } catch (error) {
-    console.error(`Error deleting business with ID ${id}:`, error)
+    console.error(`Error deleting business with ID ${id}:`, getErrorMessage(error))
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to delete business",
+      message: getErrorMessage(error),
     }
   }
 }
@@ -301,7 +356,7 @@ export async function registerBusiness(formData: FormData) {
       redirectUrl: "/legal-notice",
     }
   } catch (error) {
-    console.error("Business registration failed:", error)
+    console.error("Business registration failed:", getErrorMessage(error))
     return { success: false, message: "Registration failed. Please try again." }
   }
 }
@@ -358,7 +413,7 @@ export async function loginBusiness(formData: FormData) {
       redirectUrl: "/workbench",
     }
   } catch (error) {
-    console.error("Business login failed:", error)
+    console.error("Business login failed:", getErrorMessage(error))
     return { success: false, message: "Login failed. Please try again." }
   }
 }
@@ -401,7 +456,7 @@ export async function getCurrentBusiness() {
     // Make sure the ID is included in the returned object
     return { ...(business as Business), id: businessId }
   } catch (error) {
-    console.error("Error getting current business:", error)
+    console.error("Error getting current business:", getErrorMessage(error))
     // In case of error, return null instead of mock data to trigger proper error handling
     return null
   }
@@ -413,7 +468,7 @@ export async function logoutBusiness() {
     cookies().delete("businessId")
     return { success: true }
   } catch (error) {
-    console.error("Error during logout:", error)
+    console.error("Error during logout:", getErrorMessage(error))
     return { success: false, error: "Failed to logout" }
   }
 }
@@ -425,7 +480,7 @@ export async function checkBusinessEmailExists(email: string) {
     const businessId = await kv.get(`${KEY_PREFIXES.BUSINESS_EMAIL}${normalizedEmail}`)
     return !!businessId
   } catch (error) {
-    console.error("Error checking business email:", error)
+    console.error("Error checking business email:", getErrorMessage(error))
     return false
   }
 }
@@ -503,10 +558,10 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
 
     return { success: true }
   } catch (error) {
-    console.error("Error saving business ad design:", error)
+    console.error("Error saving business ad design:", getErrorMessage(error))
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to save ad design",
+      error: getErrorMessage(error),
     }
   }
 }
@@ -537,7 +592,7 @@ export async function getBusinessAdDesign(businessId: string) {
         designData = typeof designDataStr === "string" ? JSON.parse(designDataStr) : designDataStr
       }
     } catch (error) {
-      console.error("Error getting main design data:", error)
+      console.error("Error getting main design data:", getErrorMessage(error))
     }
 
     // Get the color values
@@ -550,7 +605,7 @@ export async function getBusinessAdDesign(businessId: string) {
         colorValues = typeof colorValuesStr === "string" ? JSON.parse(colorValuesStr) : colorValuesStr
       }
     } catch (error) {
-      console.error("Error getting color values:", error)
+      console.error("Error getting color values:", getErrorMessage(error))
     }
 
     // Get the business information
@@ -563,7 +618,7 @@ export async function getBusinessAdDesign(businessId: string) {
         businessInfo = typeof businessInfoStr === "string" ? JSON.parse(businessInfoStr) : businessInfoStr
       }
     } catch (error) {
-      console.error("Error getting business info:", error)
+      console.error("Error getting business info:", getErrorMessage(error))
     }
 
     // Get the hidden fields settings
@@ -576,7 +631,7 @@ export async function getBusinessAdDesign(businessId: string) {
         hiddenFields = typeof hiddenFieldsStr === "string" ? JSON.parse(hiddenFieldsStr) : hiddenFieldsStr
       }
     } catch (error) {
-      console.error("Error getting hidden fields:", error)
+      console.error("Error getting hidden fields:", getErrorMessage(error))
     }
 
     // If we don't have any design data, try to get it from the old format
@@ -608,7 +663,7 @@ export async function getBusinessAdDesign(businessId: string) {
           console.log("Successfully retrieved data from old format")
         }
       } catch (error) {
-        console.error("Error getting data from old format:", error)
+        console.error("Error getting data from old format:", getErrorMessage(error))
       }
     }
 
@@ -642,7 +697,7 @@ export async function getBusinessAdDesign(businessId: string) {
     console.log("Final combined ad design data:", result)
     return result
   } catch (error) {
-    console.error("Error getting business ad design:", error)
+    console.error("Error getting business ad design:", getErrorMessage(error))
     return null
   }
 }

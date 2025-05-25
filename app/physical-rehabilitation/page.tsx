@@ -5,13 +5,58 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
 export default function PhysicalRehabilitationPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
+  const [providers, setProviders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchProviders() {
+      try {
+        setLoading(true)
+        const categoryVariants = [
+          "Physical Rehabilitation",
+          "Physical Therapists",
+          "Occupational Therapists",
+          "Massage Therapists",
+          "Speech-Language Pathologists",
+        ]
+
+        let allProviders: any[] = []
+        for (const category of categoryVariants) {
+          try {
+            const result = await getBusinessesByCategory(category)
+            if (result.success && result.businesses) {
+              allProviders = [...allProviders, ...result.businesses]
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch businesses for category: ${category}`)
+          }
+        }
+
+        // Remove duplicates based on business ID
+        const uniqueProviders = allProviders.filter(
+          (provider, index, self) => index === self.findIndex((p) => p.id === provider.id),
+        )
+
+        setProviders(uniqueProviders)
+      } catch (err) {
+        console.error("Error fetching rehabilitation providers:", err)
+        setError("Failed to load providers")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProviders()
+  }, [])
 
   const filterOptions = [
     { id: "therapy1", label: "Occupational Therapists", value: "Occupational Therapists" },
@@ -26,114 +71,11 @@ export default function PhysicalRehabilitationPage() {
     { id: "therapy10", label: "Therapists, All Other", value: "Therapists, All Other" },
   ]
 
-  // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([
-    {
-      id: 1,
-      name: "Complete Physical Therapy",
-      services: ["Physical Therapists", "Occupational Therapists"],
-      rating: 4.9,
-      reviews: 112,
-      location: "North Canton, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "Robert J.",
-          rating: 5,
-          comment:
-            "After my knee surgery, I was worried about recovery. The team at Complete Physical Therapy created a personalized plan that got me back to running in just 3 months!",
-          date: "April 5, 2023",
-        },
-        {
-          id: 2,
-          userName: "Maria S.",
-          rating: 5,
-          comment:
-            "The occupational therapists here are amazing. They helped my mother regain independence after her stroke with practical, effective exercises and techniques.",
-          date: "March 12, 2023",
-        },
-        {
-          id: 3,
-          userName: "Thomas L.",
-          rating: 4,
-          comment:
-            "Very professional staff and clean facility. My only complaint is that sometimes appointments run behind schedule, but the quality of care makes up for it.",
-          date: "February 28, 2023",
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Healing Touch Massage",
-      services: ["Massage Therapists"],
-      rating: 4.8,
-      reviews: 87,
-      location: "Canton, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "Jennifer K.",
-          rating: 5,
-          comment:
-            "Best deep tissue massage I've ever had! The therapist really listened to my concerns about chronic back pain and targeted all the right areas.",
-          date: "April 10, 2023",
-        },
-        {
-          id: 2,
-          userName: "Paul M.",
-          rating: 5,
-          comment:
-            "As someone who sits at a desk all day, their office worker package was exactly what I needed. My neck and shoulder tension is finally gone!",
-          date: "March 22, 2023",
-        },
-        {
-          id: 3,
-          userName: "Samantha R.",
-          rating: 4,
-          comment:
-            "Very relaxing environment and skilled therapists. They offer a variety of massage styles to choose from. Prices are reasonable for the quality.",
-          date: "February 15, 2023",
-        },
-      ],
-    },
-    {
-      id: 3,
-      name: "Speech & Language Specialists",
-      services: ["Speech-Language Pathologists"],
-      rating: 4.7,
-      reviews: 64,
-      location: "Akron, OH",
-      reviewsData: [
-        {
-          id: 1,
-          userName: "Daniel T.",
-          rating: 5,
-          comment:
-            "The speech therapists here worked wonders with my 5-year-old son. His pronunciation has improved dramatically in just a few months of sessions.",
-          date: "April 3, 2023",
-        },
-        {
-          id: 2,
-          userName: "Lisa W.",
-          rating: 4,
-          comment:
-            "After my father's stroke, he struggled with speaking. The pathologists here were patient and effective in helping him regain his communication skills.",
-          date: "March 18, 2023",
-        },
-        {
-          id: 3,
-          userName: "Kevin B.",
-          rating: 5,
-          comment:
-            "As an adult who stutters, I was nervous about seeking help. The team here was so supportive and non-judgmental. I've seen real improvement in my fluency.",
-          date: "February 5, 2023",
-        },
-      ],
-    },
-  ])
-
   const handleOpenReviews = (provider: any) => {
-    setSelectedProvider(provider)
+    setSelectedProvider({
+      ...provider,
+      reviewsData: provider.reviews || [],
+    })
     setIsReviewsDialogOpen(true)
   }
 
@@ -171,59 +113,90 @@ export default function PhysicalRehabilitationPage() {
       <CategoryFilter options={filterOptions} />
 
       <div className="space-y-6">
-        {providers.map((provider) => (
-          <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">{provider.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
-
-                  <div className="flex items-center mt-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <svg
-                          key={i}
-                          className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                    </div>
-                    <span className="text-sm text-gray-600 ml-2">
-                      {provider.rating} ({provider.reviews} reviews)
-                    </span>
-                  </div>
-
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700">Services:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                  <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                    Reviews
-                  </Button>
-                  <Button variant="outline" className="mt-2 w-full md:w-auto">
-                    View Profile
-                  </Button>
-                </div>
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading rehabilitation providers...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-600">{error}</p>
+          </div>
+        ) : providers.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="max-w-md mx-auto">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                  />
+                </svg>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Rehabilitation Providers Yet</h3>
+              <p className="text-gray-600 mb-4">
+                Be the first rehabilitation professional to join our platform and connect with patients in your area.
+              </p>
+              <Button className="bg-purple-600 hover:bg-purple-700">Register Your Practice</Button>
+            </div>
+          </div>
+        ) : (
+          providers.map((provider) => (
+            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">{provider.name}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+
+                    <div className="flex items-center mt-2">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <svg
+                            key={i}
+                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {provider.rating} ({provider.reviews} reviews)
+                      </span>
+                    </div>
+
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-700">Services:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {provider.services.map((service, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {service}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                      Reviews
+                    </Button>
+                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                      View Profile
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {selectedProvider && (
@@ -231,7 +204,7 @@ export default function PhysicalRehabilitationPage() {
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.name}
-          reviews={selectedProvider.reviewsData}
+          reviews={selectedProvider?.reviewsData || []}
         />
       )}
 
