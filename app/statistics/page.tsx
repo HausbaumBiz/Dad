@@ -25,7 +25,7 @@ import { getBusinessCategories, removeBusinessCategory } from "@/app/actions/cat
 import { useToast } from "@/components/ui/use-toast"
 import { getBusinessKeywords } from "@/app/actions/keyword-actions"
 import { Badge } from "@/components/ui/badge"
-import { type JobListing, getBusinessJobs, removeJobListing } from "@/app/actions/job-actions"
+import { type JobListing, getBusinessJobs, removeJobListing, renewJobListing } from "@/app/actions/job-actions"
 import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
@@ -100,6 +100,7 @@ export default function StatisticsPage() {
   const [showReinstateDialog, setShowReinstateDialog] = useState(false)
   const [couponToReinstate, setCouponToReinstate] = useState<Coupon | null>(null)
   const [newExpirationDate, setNewExpirationDate] = useState("")
+  const [renewingJob, setRenewingJob] = useState<string | null>(null)
 
   // Load selected categories from server on component mount
   useEffect(() => {
@@ -616,6 +617,110 @@ export default function StatisticsPage() {
     },
   ]
 
+  const handleRenewJob = async (jobId: string) => {
+    setRenewingJob(jobId)
+    try {
+      // Find the job to get its business ID
+      const jobToRenew = jobListings.find((job) => job.id === jobId)
+      if (!jobToRenew) {
+        throw new Error("Job listing not found")
+      }
+
+      const result = await renewJobListing(jobToRenew.businessId, jobId)
+
+      if (result.success) {
+        // Reload job listings to get updated data
+        const updatedJobs = await getBusinessJobs(jobToRenew.businessId)
+        setJobListings(updatedJobs)
+
+        toast({
+          title: "Success",
+          description: result.message,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error renewing job listing:", error)
+      toast({
+        title: "Error",
+        description: "Failed to renew job listing",
+        variant: "destructive",
+      })
+    } finally {
+      setRenewingJob(null)
+    }
+  }
+
+  const renderJobStatus = (job: JobListing) => {
+    // Use the same timezone-aware logic as the server functions
+    let expirationDate: Date
+
+    if (job.expiresAt) {
+      expirationDate = new Date(job.expiresAt)
+    } else {
+      // Calculate expiration from creation date if expiresAt is missing
+      const createdDate = job.createdAt ? new Date(job.createdAt) : new Date()
+      expirationDate = new Date(createdDate)
+      expirationDate.setDate(expirationDate.getDate() + 5)
+    }
+
+    // Set expiration to END of day in local timezone
+    expirationDate.setHours(23, 59, 59, 999)
+
+    // Get current time in local timezone
+    const now = new Date()
+
+    // Check if expired
+    const expired = now > expirationDate
+
+    // Calculate days until expiration
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const expDate = new Date(expirationDate)
+    expDate.setHours(0, 0, 0, 0)
+    const diffTime = expDate.getTime() - today.getTime()
+    const daysUntilExpiration = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (expired) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <Clock className="h-3 w-3 mr-1" />
+          Expired
+        </span>
+      )
+    }
+
+    if (daysUntilExpiration <= 1) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+          <Clock className="h-3 w-3 mr-1" />
+          {daysUntilExpiration === 0 ? "Expires today" : "Expires tomorrow"}
+        </span>
+      )
+    }
+
+    if (daysUntilExpiration <= 2) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          <Clock className="h-3 w-3 mr-1" />
+          {daysUntilExpiration} days left
+        </span>
+      )
+    }
+
+    return (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        <Calendar className="h-3 w-3 mr-1" />
+        {daysUntilExpiration} days left
+      </span>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
@@ -841,21 +946,43 @@ export default function StatisticsPage() {
                   <div className="space-y-4">
                     {jobListings.map((job) => (
                       <div key={job.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                        <div>
+                        <div className="flex-1">
                           <h3 className="font-medium text-gray-800">{job.jobTitle}</h3>
                           <p className="text-xs text-gray-500">
                             Posted: {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Unknown date"}
                           </p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveJob(job.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Remove
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {renderJobStatus(job)}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRenewJob(job.id)}
+                            disabled={renewingJob === job.id}
+                            className="text-xs px-2 py-1 h-auto text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            {renewingJob === job.id ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Renewing...
+                              </>
+                            ) : (
+                              <>
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                                Renew Listing
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveJob(job.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Remove
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

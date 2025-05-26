@@ -20,6 +20,8 @@ export interface JobListing {
   businessId: string
   createdAt: string
   updatedAt: string
+  expiresAt: string // Add expiration date
+  isExpired: boolean // Add expiration status
 
   // Basic job details
   jobTitle: string
@@ -74,7 +76,7 @@ export async function saveJobListing(
     // Parse form data
     const jobData = JSON.parse(formData.get("jobData") as string) as Omit<
       JobListing,
-      "id" | "businessId" | "createdAt" | "updatedAt" | "logoUrl"
+      "id" | "businessId" | "createdAt" | "updatedAt" | "logoUrl" | "expiresAt" | "isExpired"
     >
 
     // Handle logo upload
@@ -122,13 +124,19 @@ export async function saveJobListing(
     }
 
     // Create the job listing object
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + 5) // 5 days from now
+    expiresAt.setHours(23, 59, 59, 999) // Set to end of day like coupons
+
     const jobListing: JobListing = {
       id: jobId,
       businessId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      isExpired: false,
       logoUrl,
-      logoId, // Add the logoId to the job listing
+      logoId,
       ...jobData,
     }
 
@@ -239,6 +247,21 @@ export async function getBusinessJobs(businessId: string): Promise<JobListing[]>
           // Ensure the job has required fields
           if (!job.id) job.id = jobId
           if (!job.businessId) job.businessId = businessId
+
+          // Handle jobs created before expiration system was added
+          if (!job.expiresAt) {
+            const createdDate = job.createdAt ? new Date(job.createdAt) : new Date()
+            const expiresAt = new Date(createdDate)
+            expiresAt.setDate(expiresAt.getDate() + 5)
+            job.expiresAt = expiresAt.toISOString()
+            job.isExpired = false
+
+            // Update the job in Redis with the new expiration date
+            const updatedJobKey = `job:${businessId}:${jobId}`
+            await kv.set(updatedJobKey, JSON.stringify(job))
+          }
+
+          // Don't automatically update expiration status here - let the UI calculate it dynamically
 
           jobs.push(job)
         } catch (error) {
@@ -419,5 +442,153 @@ export async function cleanupDemoJobs(businessId: string): Promise<{
       success: false,
       message: `Failed to cleanup demo jobs: ${error instanceof Error ? error.message : String(error)}`,
     }
+  }
+}
+
+// Helper function to check if a job is expired (using local timezone like coupons)
+export async function isJobExpired(job: JobListing): Promise<boolean> {
+  let expirationDate: Date
+
+  if (job.expiresAt) {
+    // Parse the ISO string and convert to local timezone
+    expirationDate = new Date(job.expiresAt)
+  } else {
+    // Calculate expiration from creation date if expiresAt is missing
+    const createdDate = job.createdAt ? new Date(job.createdAt) : new Date()
+    expirationDate = new Date(createdDate)
+    expirationDate.setDate(expirationDate.getDate() + 5)
+  }
+
+  // Set expiration to END of day in local timezone
+  expirationDate.setHours(23, 59, 59, 999)
+
+  // Get current time in local timezone
+  const now = new Date()
+
+  // Only expired if current time is after the end of expiration day
+  return now > expirationDate
+}
+
+// Helper function to get days until expiration (using local timezone like coupons)
+export async function getDaysUntilExpiration(job: JobListing): Promise<number> {
+  let expirationDate: Date
+
+  if (job.expiresAt) {
+    expirationDate = new Date(job.expiresAt)
+  } else {
+    // Calculate expiration from creation date if expiresAt is missing
+    const createdDate = job.createdAt ? new Date(job.createdAt) : new Date()
+    expirationDate = new Date(createdDate)
+    expirationDate.setDate(expirationDate.getDate() + 5)
+  }
+
+  // Get today's date at start of day in local time
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Set expiration date to start of day in local time for comparison
+  const expDate = new Date(expirationDate)
+  expDate.setHours(0, 0, 0, 0)
+
+  // Calculate difference in days
+  const diffTime = expDate.getTime() - today.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}
+
+// Function to renew a job listing
+export async function renewJobListing(
+  businessId: string,
+  jobId: string,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    if (!businessId || !jobId) {
+      return {
+        success: false,
+        message: "Missing business ID or job ID",
+      }
+    }
+
+    // Get the existing job
+    const jobKey = `job:${businessId}:${jobId}`
+    const jobData = await kv.get(jobKey)
+
+    if (!jobData) {
+      return {
+        success: false,
+        message: "Job listing not found",
+      }
+    }
+
+    let job: JobListing
+    if (typeof jobData === "string") {
+      job = JSON.parse(jobData) as JobListing
+    } else {
+      job = jobData as JobListing
+    }
+
+    // Set new expiration date (5 days from now)
+    const newExpiresAt = new Date()
+    newExpiresAt.setDate(newExpiresAt.getDate() + 5)
+
+    // Update the job
+    const updatedJob: JobListing = {
+      ...job,
+      expiresAt: newExpiresAt.toISOString(),
+      isExpired: false,
+      updatedAt: new Date().toISOString(),
+    }
+
+    // Save back to Redis
+    await kv.set(jobKey, JSON.stringify(updatedJob))
+
+    // Revalidate paths
+    revalidatePath("/job-listings")
+    revalidatePath("/ad-design/customize")
+    revalidatePath("/statistics")
+    revalidatePath(`/business/${businessId}`)
+
+    return {
+      success: true,
+      message: "Job listing renewed successfully! It will be active for another 5 days.",
+    }
+  } catch (error) {
+    console.error("Error renewing job listing:", error)
+    return {
+      success: false,
+      message: "Failed to renew job listing. Please try again.",
+    }
+  }
+}
+
+// Function to get active (non-expired) jobs for ad display
+export async function getActiveBusinessJobs(businessId: string): Promise<JobListing[]> {
+  try {
+    const allJobs = await getBusinessJobs(businessId)
+
+    // Filter out expired jobs and update their status
+    const activeJobs: JobListing[] = []
+    const expiredJobs: JobListing[] = []
+
+    for (const job of allJobs) {
+      const expired = await isJobExpired(job)
+      if (expired) {
+        // Mark as expired if not already
+        if (!job.isExpired) {
+          const updatedJob = { ...job, isExpired: true, updatedAt: new Date().toISOString() }
+          const jobKey = `job:${businessId}:${job.id}`
+          await kv.set(jobKey, JSON.stringify(updatedJob))
+          expiredJobs.push(updatedJob)
+        } else {
+          expiredJobs.push(job)
+        }
+      } else {
+        activeJobs.push(job)
+      }
+    }
+
+    return activeJobs
+  } catch (error) {
+    console.error("Error getting active business jobs:", error)
+    return []
   }
 }

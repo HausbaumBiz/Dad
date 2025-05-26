@@ -112,6 +112,8 @@ export interface JobListing {
   businessId: string
   createdAt: string
   updatedAt: string
+  expiresAt: string // Add expiration date
+  isExpired: boolean // Add expiration status
 
   // Basic job details
   jobTitle: string
