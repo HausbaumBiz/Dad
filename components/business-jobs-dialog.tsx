@@ -127,7 +127,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
     return "Not specified"
   }
 
-  // Get active benefits
+  // Get active benefits with full details
   const getActiveBenefits = (job: JobListing) => {
     if (!job.benefits) return []
 
@@ -135,11 +135,37 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       .filter(([_, benefit]) => benefit.enabled)
       .map(([key, benefit]) => {
         // Format the benefit key for display
-        const formatted = key
-          .replace(/([A-Z])/g, " $1") // Add space before capital letters
-          .replace(/^./, (str) => str.toUpperCase()) // Capitalize first letter
+        const benefitNames: Record<string, string> = {
+          individualHealth: "Individual Health Insurance",
+          familyHealth: "Family Health Insurance",
+          dental: "Dental Insurance",
+          vision: "Vision Insurance",
+          lifeInsurance: "Life Insurance",
+          disability: "Disability Insurance",
+          pto: "Paid Time Off (PTO)",
+          relocation: "Relocation Assistance",
+          investment: "Investment Opportunities",
+          sickLeave: "Sick Leave",
+          paidHolidays: "Paid Holidays",
+          retirement: "Retirement Savings Plans",
+          fsaHsa: "Flexible Spending / Health Savings Accounts",
+          parentalLeave: "Parental Leave",
+          tuition: "Tuition Reimbursement / Education Assistance",
+          eap: "Employee Assistance Programs (EAPs)",
+          wellness: "Wellness Programs",
+          remoteFlexible: "Remote Work / Flexible Scheduling",
+          commuter: "Commuter Benefits",
+          companyPerks: "Company Perks & Discounts",
+          other: "Other",
+        }
 
-        return benefit.details ? `${formatted} (${benefit.details})` : formatted
+        const displayName =
+          benefitNames[key] || key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())
+
+        return {
+          name: displayName,
+          details: benefit.details || null,
+        }
       })
   }
 
@@ -158,7 +184,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
     if (!selectedJob) return null
 
     return (
-      <div className="space-y-2 w-full max-w-full">
+      <div className="space-y-2 w-full max-w-full min-h-0">
         <div className="flex items-center">
           <Button
             variant="ghost"
@@ -234,15 +260,15 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
         {selectedJob.benefits && Object.keys(selectedJob.benefits).length > 0 && (
           <div className="mt-2 job-details-section w-full">
             <h3 className="text-xs font-medium text-gray-700 mb-1">Benefits</h3>
-            <div className="flex flex-wrap gap-1 job-benefits-container">
-              {getActiveBenefits(selectedJob).map((benefit, idx) => (
-                <span
-                  key={idx}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700"
-                >
-                  {benefit}
-                </span>
-              ))}
+            <div className="bg-gray-50 p-2 rounded-md job-benefits-container">
+              <div className="space-y-1">
+                {getActiveBenefits(selectedJob).map((benefit, idx) => (
+                  <div key={idx} className="text-xs">
+                    <span className="font-medium text-green-700">{benefit.name}</span>
+                    {benefit.details && <span className="text-gray-600 ml-1">- {benefit.details}</span>}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -409,7 +435,10 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="jobs-dialog jobs-dialog-content w-full p-0 m-0" closeButton={false}>
+      <DialogContent
+        className="jobs-dialog jobs-dialog-content w-[95vw] max-w-2xl h-[90vh] max-h-[90vh] p-0 m-0 flex flex-col"
+        closeButton={false}
+      >
         {/* Custom close button - with unique class for identification */}
         <div className="absolute right-1 top-1 z-10">
           <DialogClose className="rounded-full p-1 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none dialog-close-button jobs-dialog-main-close">
@@ -418,13 +447,13 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
           </DialogClose>
         </div>
 
-        <DialogHeader className="pr-5 jobs-dialog-header mb-1 p-2 w-full">
+        <DialogHeader className="flex-shrink-0 pr-5 jobs-dialog-header mb-1 p-2 w-full border-b bg-white">
           <DialogTitle className="text-sm sm:text-base font-semibold truncate dialog-title">
             {selectedJob ? `${selectedJob.jobTitle}` : `${businessName} - Jobs`}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="jobs-dialog-scrollable w-full p-2 overflow-hidden overflow-y-auto">
+        <div className="jobs-dialog-scrollable flex-1 w-full p-2 overflow-y-auto overscroll-contain">
           {/* Content */}
           {selectedJob ? renderJobDetails() : renderJobListings()}
         </div>

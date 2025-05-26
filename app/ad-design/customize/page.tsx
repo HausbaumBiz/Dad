@@ -331,11 +331,20 @@ export default function CustomizeAdDesignPage() {
         let phoneLine = "4567"
 
         if (businessInfo.phone) {
+          // Try to parse formatted phone number like "(555) 123-4567"
           const phoneMatch = businessInfo.phone.match(/$$(\d{3})$$\s*(\d{3})-(\d{4})/)
           if (phoneMatch) {
             phoneArea = phoneMatch[1]
             phonePrefix = phoneMatch[2]
             phoneLine = phoneMatch[3]
+          } else {
+            // Try to parse just digits if format is different
+            const digitsOnly = businessInfo.phone.replace(/\D/g, "")
+            if (digitsOnly.length === 10) {
+              phoneArea = digitsOnly.slice(0, 3)
+              phonePrefix = digitsOnly.slice(3, 6)
+              phoneLine = digitsOnly.slice(6, 10)
+            }
           }
         }
 
@@ -617,12 +626,15 @@ export default function CustomizeAdDesignPage() {
       // Save hidden fields settings
       await saveMediaSettings(businessId, { hiddenFields })
 
-      // Format the phone number for saving
+      // Format the phone number for saving - ensure consistent format
+      const formattedPhone = getFormattedPhone()
       const formattedData = {
         ...formData,
-        phone: getFormattedPhone(), // Use the formatted phone number
+        phone: formattedPhone, // Use the formatted phone number
         address: getFormattedAddress(), // Add the formatted address
       }
+
+      console.log("Saving phone number:", formattedPhone) // Debug log
 
       // Add debug logging to the handleSubmit function to verify what's being saved
       // Around line 350-370
