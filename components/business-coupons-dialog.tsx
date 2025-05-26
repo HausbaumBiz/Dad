@@ -521,7 +521,7 @@ export function BusinessCouponsDialog({
           src={getValidImageSrc(coupon.imageUrl) || "/placeholder.svg"}
           alt={coupon.title || "Coupon"}
           fill
-          className="object-cover"
+          className="object-contain"
           sizes={aspectRatio === "4/3" ? "(max-width: 768px) 100vw, 50vw" : aspectRatio === "5/2.5" ? "100vw" : "100vw"}
           priority
           unoptimized
@@ -593,7 +593,9 @@ export function BusinessCouponsDialog({
                               className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                               onClick={() => handleCouponClick(coupon)}
                             >
-                              <div className="relative aspect-[4/3] w-full">{renderCouponImage(coupon, "4/3")}</div>
+                              <div className="relative aspect-[4/3] w-full p-2 bg-gray-50">
+                                {renderCouponImage(coupon, "4/3")}
+                              </div>
                               <div className="absolute bottom-2 right-2">
                                 <Button
                                   variant="outline"
@@ -629,7 +631,7 @@ export function BusinessCouponsDialog({
                               onClick={() => handleCouponClick(coupon)}
                             >
                               {/* Changed aspect ratio for large coupons to make them fit better */}
-                              <div className="relative aspect-[5/2.5] w-full max-h-[200px]">
+                              <div className="relative aspect-[5/2.5] w-full max-h-[200px] p-2 bg-gray-50">
                                 {renderCouponImage(coupon, "5/2.5")}
                               </div>
                               <div className="absolute bottom-2 right-2">
