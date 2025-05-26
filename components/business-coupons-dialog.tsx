@@ -661,24 +661,27 @@ export function BusinessCouponsDialog({
                 </TabsContent>
 
                 <TabsContent value="terms" className="mt-0 pt-0">
-                  <div className="bg-white rounded-lg border p-6">
-                    <div className="flex justify-between items-center mb-4">
+                  <div className="bg-white rounded-lg border">
+                    <div className="flex justify-between items-center p-4 border-b">
                       <h3 className="text-lg font-medium">Global Terms & Conditions</h3>
                       <Button variant="outline" size="sm" onClick={printTerms} className="flex items-center gap-1">
                         <Printer className="h-4 w-4" />
                         <span>Print</span>
                       </Button>
                     </div>
-                    {globalTerms ? (
-                      <div
-                        className="text-sm whitespace-pre-wrap prose max-w-none"
-                        dangerouslySetInnerHTML={{
-                          __html: formatTermsWithBoldHeadings(globalTerms),
-                        }}
-                      />
-                    ) : (
-                      <p className="text-gray-500">No terms and conditions available.</p>
-                    )}
+                    {/* Scrollable content area with fixed height */}
+                    <div className="h-[60vh] max-h-[500px] overflow-y-auto p-4 overscroll-contain">
+                      {globalTerms ? (
+                        <div
+                          className="text-sm whitespace-pre-wrap prose max-w-none leading-relaxed"
+                          dangerouslySetInnerHTML={{
+                            __html: formatTermsWithBoldHeadings(globalTerms),
+                          }}
+                        />
+                      ) : (
+                        <p className="text-gray-500">No terms and conditions available.</p>
+                      )}
+                    </div>
                   </div>
                 </TabsContent>
               </Tabs>
