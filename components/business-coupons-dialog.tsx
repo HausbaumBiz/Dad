@@ -534,7 +534,7 @@ export function BusinessCouponsDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="coupons-dialog-content w-full p-0 m-0" closeButton={false}>
+        <DialogContent className="coupons-dialog-content w-full lg:max-w-6xl xl:max-w-7xl p-0 m-0" closeButton={false}>
           {/* Custom close button that matches photo album style */}
           <div className="absolute right-4 top-4 z-10">
             <DialogClose className="rounded-full p-1.5 bg-white hover:bg-gray-100 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
@@ -586,15 +586,15 @@ export function BusinessCouponsDialog({
                     {smallCoupons.length > 0 && (
                       <div>
                         <h3 className="text-lg font-medium mb-3">Coupons</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 coupon-grid">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8 coupon-grid">
                           {smallCoupons.map((coupon) => (
                             <div
                               key={coupon.id}
-                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow m-2 flex items-center justify-center"
                               style={{ minHeight: "200px" }}
+                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow m-2 flex items-center justify-center lg:min-h-[250px] xl:min-h-[300px]"
                               onClick={() => handleCouponClick(coupon)}
                             >
-                              <div className="relative aspect-[4/3] w-full p-4 bg-gray-50 max-w-full">
+                              <div className="relative aspect-[4/3] w-full p-4 bg-gray-50 max-w-full lg:p-6">
                                 {renderCouponImage(coupon, "4/3")}
                               </div>
                               <div className="absolute bottom-2 right-2">
@@ -628,11 +628,11 @@ export function BusinessCouponsDialog({
                           {largeCoupons.map((coupon) => (
                             <div
                               key={coupon.id}
-                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow m-2 flex items-center justify-center"
                               style={{ minHeight: "200px" }}
+                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow m-2 flex items-center justify-center lg:min-h-[250px] xl:min-h-[300px]"
                               onClick={() => handleCouponClick(coupon)}
                             >
-                              <div className="relative aspect-[5/2.5] w-full p-4 bg-gray-50 max-w-full">
+                              <div className="relative aspect-[5/2.5] w-full p-4 bg-gray-50 max-w-full lg:p-6">
                                 {renderCouponImage(coupon, "5/2.5")}
                               </div>
                               <div className="absolute bottom-2 right-2">
