@@ -594,7 +594,7 @@ export function BusinessCouponsDialog({
                               style={{ minHeight: "200px" }}
                               onClick={() => handleCouponClick(coupon)}
                             >
-                              <div className="relative aspect-[4/3] w-full p-3 bg-gray-50 scale-150 max-w-[90%]">
+                              <div className="relative aspect-[4/3] w-full p-4 bg-gray-50 max-w-full">
                                 {renderCouponImage(coupon, "4/3")}
                               </div>
                               <div className="absolute bottom-2 right-2">
@@ -629,10 +629,10 @@ export function BusinessCouponsDialog({
                             <div
                               key={coupon.id}
                               className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow m-2 flex items-center justify-center"
-                              style={{ minHeight: "250px" }}
+                              style={{ minHeight: "200px" }}
                               onClick={() => handleCouponClick(coupon)}
                             >
-                              <div className="relative aspect-[5/2.5] w-full max-h-[300px] p-3 bg-gray-50 scale-150 max-w-[90%]">
+                              <div className="relative aspect-[5/2.5] w-full p-4 bg-gray-50 max-w-full">
                                 {renderCouponImage(coupon, "5/2.5")}
                               </div>
                               <div className="absolute bottom-2 right-2">
