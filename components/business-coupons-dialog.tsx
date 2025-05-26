@@ -64,7 +64,6 @@ export function BusinessCouponsDialog({
   const [globalTerms, setGlobalTerms] = useState<string>("")
   const [showTerms, setShowTerms] = useState(false)
   const [showFullImage, setShowFullImage] = useState(false)
-  const [showFullSizeImage, setShowFullSizeImage] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
   const [showDebugInfo, setShowDebugInfo] = useState(false)
@@ -74,6 +73,7 @@ export function BusinessCouponsDialog({
   const imageRef = useRef<HTMLImageElement>(null)
   const [activeTab, setActiveTab] = useState<string>("all")
   const [isDownloading, setIsDownloading] = useState(false)
+  const [showFullSizeImage, setShowFullSizeImage] = useState(false)
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -586,14 +586,15 @@ export function BusinessCouponsDialog({
                     {smallCoupons.length > 0 && (
                       <div>
                         <h3 className="text-lg font-medium mb-3">Coupons</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 coupon-grid">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 coupon-grid">
                           {smallCoupons.map((coupon) => (
                             <div
                               key={coupon.id}
-                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow m-2 flex items-center justify-center"
+                              style={{ minHeight: "200px" }}
                               onClick={() => handleCouponClick(coupon)}
                             >
-                              <div className="relative aspect-[4/3] w-full p-2 bg-gray-50">
+                              <div className="relative aspect-[4/3] w-full p-3 bg-gray-50 scale-150 max-w-[90%]">
                                 {renderCouponImage(coupon, "4/3")}
                               </div>
                               <div className="absolute bottom-2 right-2">
@@ -623,15 +624,15 @@ export function BusinessCouponsDialog({
                     {largeCoupons.length > 0 && (
                       <div className="mt-6">
                         <h3 className="text-lg font-medium mb-3">Large Coupons</h3>
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                           {largeCoupons.map((coupon) => (
                             <div
                               key={coupon.id}
-                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                              className="relative border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow m-2 flex items-center justify-center"
+                              style={{ minHeight: "250px" }}
                               onClick={() => handleCouponClick(coupon)}
                             >
-                              {/* Changed aspect ratio for large coupons to make them fit better */}
-                              <div className="relative aspect-[5/2.5] w-full max-h-[200px] p-2 bg-gray-50">
+                              <div className="relative aspect-[5/2.5] w-full max-h-[300px] p-3 bg-gray-50 scale-150 max-w-[90%]">
                                 {renderCouponImage(coupon, "5/2.5")}
                               </div>
                               <div className="absolute bottom-2 right-2">
