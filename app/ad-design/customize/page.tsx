@@ -12,6 +12,7 @@ import { toast } from "@/components/ui/use-toast"
 import { getBusinessMedia, saveMediaSettings, type MediaItem } from "@/app/actions/media-actions"
 import { saveBusinessAdDesign, getBusinessAdDesign } from "@/app/actions/business-actions"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
+import { getCloudflareBusinessMedia, type CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -84,6 +85,9 @@ export default function CustomizeAdDesignPage() {
 
   // Add state for custom button icon
   const [customButtonIcon, setCustomButtonIcon] = useState<string>("Menu")
+
+  // Add state for Cloudflare video
+  const [cloudflareVideo, setCloudflareVideo] = useState<CloudflareBusinessMedia | null>(null)
 
   // Color mapping
   const colorMap: Record<string, { primary: string; secondary: string; textColor?: string }> = {
@@ -266,6 +270,16 @@ export default function CustomizeAdDesignPage() {
     try {
       const media = await getBusinessMedia(id)
 
+      // Load Cloudflare video
+      const cloudflareMedia = await getCloudflareBusinessMedia(id)
+      console.log("Cloudflare media data:", cloudflareMedia)
+      if (cloudflareMedia && cloudflareMedia.cloudflareVideoId) {
+        console.log("Setting cloudflare video:", cloudflareMedia)
+        setCloudflareVideo(cloudflareMedia)
+      } else {
+        console.log("No cloudflare video found or video ID missing")
+      }
+
       if (media) {
         // We're not using video, so we don't need to set videoPreview
         setVideoPreview(null)
@@ -292,6 +306,7 @@ export default function CustomizeAdDesignPage() {
       console.error("Error loading saved media:", error)
       // Initialize with empty values on error
       setVideoPreview(null)
+      setCloudflareVideo(null)
       // Still set the Cloudflare image as our placeholder even on error
       setThumbnailPreview(
         "https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public",
@@ -903,23 +918,54 @@ export default function CustomizeAdDesignPage() {
               )}
             </div>
 
-            {/* Video Section - Using Image as Placeholder */}
+            {/* Video Section - Using Cloudflare Video or Image Placeholder */}
             {!hiddenFields.video && (
               <div className="border-t pt-4 mt-4 px-4">
                 <div className="relative w-full pb-[56.25%]">
-                  {/* Image Placeholder */}
-                  <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
-                    <img
-                      src="https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public"
-                      alt="Business image"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
+                  {(() => {
+                    console.log("Video render check:", {
+                      cloudflareVideo,
+                      hasVideoId: cloudflareVideo?.cloudflareVideoId,
+                      isReady: cloudflareVideo?.cloudflareVideoReadyToStream,
+                      fullCondition:
+                        cloudflareVideo &&
+                        cloudflareVideo.cloudflareVideoId &&
+                        cloudflareVideo.cloudflareVideoReadyToStream,
+                    })
 
-                {/* Info text instead of video controls */}
-                <div className="text-center mt-2 text-sm text-gray-500">
-                  <p>Business showcase image</p>
+                    if (cloudflareVideo && cloudflareVideo.cloudflareVideoId) {
+                      // Use Cloudflare Stream iframe embed for better compatibility
+                      const embedUrl = `https://customer-5093uhykxo17njhi.cloudflarestream.com/${cloudflareVideo.cloudflareVideoId}/iframe`
+
+                      console.log("Rendering video with embed URL:", embedUrl)
+
+                      return (
+                        /* Cloudflare Video using iframe embed */
+                        <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                          <iframe
+                            src={embedUrl}
+                            className="w-full h-full"
+                            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                            allowFullScreen
+                            style={{ border: "none" }}
+                            title="Business Video"
+                          />
+                        </div>
+                      )
+                    } else {
+                      console.log("Rendering placeholder image instead of video")
+                      return (
+                        /* Image Placeholder */
+                        <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                          <img
+                            src="https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public"
+                            alt="Business image"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )
+                    }
+                  })()}
                 </div>
               </div>
             )}

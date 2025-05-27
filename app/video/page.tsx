@@ -291,6 +291,13 @@ export default function VideoPage() {
                 setExistingVideo(media)
                 console.log("Initial video data loaded after upload:", media)
               }
+
+              // Trigger revalidation of the customize page so it picks up the new video
+              try {
+                await fetch("/api/revalidate-customize", { method: "POST" })
+              } catch (error) {
+                console.log("Could not trigger revalidation:", error)
+              }
             } else {
               throw new Error(result.error || "Failed to save video information")
             }
