@@ -30,6 +30,29 @@ export default function BusinessLoginPage({
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
+    // Load stored credentials if they exist and haven't expired
+    const storedCredentials = localStorage.getItem("businessLoginCredentials")
+    if (storedCredentials) {
+      try {
+        const { email, password, timestamp } = JSON.parse(storedCredentials)
+        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000
+
+        if (Date.now() - timestamp < thirtyDaysInMs) {
+          setEmail(email)
+          setPassword(password)
+          setRememberMe(true)
+        } else {
+          // Credentials expired, remove them
+          localStorage.removeItem("businessLoginCredentials")
+        }
+      } catch (error) {
+        // Invalid stored data, remove it
+        localStorage.removeItem("businessLoginCredentials")
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     if (searchParams?.verified === "true") {
       setShowVerifiedMessage(true)
 
@@ -41,6 +64,13 @@ export default function BusinessLoginPage({
       return () => clearTimeout(timer)
     }
   }, [searchParams?.verified])
+
+  useEffect(() => {
+    if (!rememberMe) {
+      // If remember me is unchecked, remove stored credentials
+      localStorage.removeItem("businessLoginCredentials")
+    }
+  }, [rememberMe])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,6 +88,15 @@ export default function BusinessLoginPage({
       const result = await loginBusiness(formData)
 
       if (result.success) {
+        // Save credentials if remember me is checked
+        if (rememberMe) {
+          const credentialsToStore = {
+            email,
+            password,
+            timestamp: Date.now(),
+          }
+          localStorage.setItem("businessLoginCredentials", JSON.stringify(credentialsToStore))
+        }
         // Force redirect to workbench page directly
         router.push("/workbench")
       } else {
@@ -168,6 +207,12 @@ export default function BusinessLoginPage({
                   <Label htmlFor="rememberMe" className="text-sm font-normal">
                     Remember me for 30 days
                   </Label>
+                </div>
+
+                <div className="text-right">
+                  <Link href="#" className="text-sm text-primary hover:underline">
+                    Forgot password?
+                  </Link>
                 </div>
 
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white" disabled={isLoading}>

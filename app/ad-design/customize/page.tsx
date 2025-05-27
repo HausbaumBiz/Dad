@@ -22,6 +22,7 @@ import { BusinessPhotoAlbumDialog } from "@/components/business-photo-album-dial
 import BusinessJobsDialog from "@/components/business-jobs-dialog"
 import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
 import { DocumentsDialog } from "@/components/documents-dialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 import {
   Menu,
@@ -89,6 +90,26 @@ export default function CustomizeAdDesignPage() {
   // Add state for Cloudflare video
   const [cloudflareVideo, setCloudflareVideo] = useState<CloudflareBusinessMedia | null>(null)
 
+  // Add state for completion status dialog
+  const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false)
+  const [completionStatus, setCompletionStatus] = useState<{
+    businessInfo: boolean
+    video: boolean
+    photos: boolean
+    coupons: boolean
+    jobs: boolean
+    customButton: boolean
+    website: boolean
+  }>({
+    businessInfo: false,
+    video: false,
+    photos: false,
+    coupons: false,
+    jobs: false,
+    customButton: false,
+    website: false,
+  })
+
   // Color mapping
   const colorMap: Record<string, { primary: string; secondary: string; textColor?: string }> = {
     blue: { primary: "#007BFF", secondary: "#0056b3" },
@@ -105,6 +126,86 @@ export default function CustomizeAdDesignPage() {
     darkpink: { primary: "#FF1493", secondary: "#C71585" },
     lightpink: { primary: "#FFC0CB", secondary: "#FFB6C1", textColor: "#000000" },
   }
+
+  // Add texture options after colorMap
+  const textureOptions = [
+    {
+      name: "None",
+      value: "none",
+      style: {
+        backgroundColor: "",
+        backgroundImage: "none",
+        backgroundSize: "auto",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Gradient",
+      value: "gradient",
+      style: {
+        backgroundColor: "",
+        backgroundImage: "none",
+        backgroundSize: "auto",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Dots",
+      value: "dots",
+      style: {
+        backgroundColor: "",
+        backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+        backgroundSize: "10px 10px",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Lines",
+      value: "lines",
+      style: {
+        backgroundColor: "",
+        backgroundImage:
+          "repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)",
+        backgroundSize: "auto",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Grid",
+      value: "grid",
+      style: {
+        backgroundColor: "",
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+        backgroundSize: "10px 10px",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Diagonal",
+      value: "diagonal",
+      style: {
+        backgroundColor: "",
+        backgroundImage:
+          "repeating-linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.1) 10px, transparent 10px, transparent 20px)",
+        backgroundSize: "auto",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Waves",
+      value: "waves",
+      style: {
+        backgroundColor: "",
+        backgroundImage: "radial-gradient(ellipse at center, rgba(255,255,255,0.1) 0%, transparent 50%)",
+        backgroundSize: "20px 10px",
+        backgroundRepeat: "repeat",
+      },
+    },
+  ]
+
+  // Add texture state after selectedColor state
+  const [selectedTexture, setSelectedTexture] = useState("gradient")
 
   // Available icons for custom button
   const availableIcons = [
@@ -412,6 +513,11 @@ export default function CustomizeAdDesignPage() {
           setSelectedColor(savedDesign.colorScheme)
         }
 
+        // If we have a saved texture, use it
+        if (savedDesign.texture) {
+          setSelectedTexture(savedDesign.texture)
+        }
+
         // If we have a saved design ID, use it
         if (savedDesign.designId) {
           setSelectedDesign(Number(savedDesign.designId) || 5) // Provide fallback if NaN
@@ -622,6 +728,82 @@ export default function CustomizeAdDesignPage() {
     return iconMap[iconName] || Menu // Default to Menu if icon not found
   }
 
+  // Function to check completion status of all sections
+  const checkCompletionStatus = async () => {
+    const status = {
+      businessInfo: false, // Change to false by default
+      video: false,
+      photos: false,
+      coupons: false,
+      jobs: false,
+      customButton: true, // Default to true since it's optional
+      website: false, // Change to false by default
+    }
+
+    // Check business information completion - must not be default/sample data
+    const hasRealBusinessName =
+      formData.businessName &&
+      formData.businessName !== "Business Name" &&
+      formData.businessName !== "Your Business Name"
+
+    const hasRealAddress =
+      formData.streetAddress && formData.streetAddress !== "123 Business St" && formData.streetAddress !== "123 Main St"
+
+    const hasRealCity = formData.city && formData.city !== "City" && formData.city !== "Your City"
+
+    const hasRealPhone = formData.phoneArea !== "555" || formData.phonePrefix !== "123" || formData.phoneLine !== "4567"
+
+    const hasRealHours =
+      formData.hours && formData.hours !== "Mon-Fri: 9AM-5PM\nSat: 10AM-3PM" && formData.hours !== "Your Business Hours"
+
+    // Business info is complete only if all fields have real data
+    status.businessInfo = hasRealBusinessName && hasRealAddress && hasRealCity && hasRealPhone && hasRealHours
+
+    // Check video completion
+    if (cloudflareVideo && cloudflareVideo.cloudflareVideoId) {
+      status.video = true
+    }
+
+    // Check photos completion
+    if (photos && photos.length > 0) {
+      status.photos = true
+    }
+
+    // Check coupons completion
+    try {
+      const couponsResult = await getBusinessCoupons()
+      if (couponsResult.success && couponsResult.coupons && couponsResult.coupons.length > 0) {
+        status.coupons = true
+      }
+    } catch (error) {
+      console.error("Error checking coupons:", error)
+    }
+
+    // Check jobs completion
+    try {
+      const jobs = await getBusinessJobs(businessId)
+      if (jobs && jobs.length > 0) {
+        status.jobs = true
+      }
+    } catch (error) {
+      console.error("Error checking jobs:", error)
+    }
+
+    // Check custom button completion (if not hidden)
+    if (!hiddenFields.customButton) {
+      status.customButton = !!(customButtonName && customButtonName !== "Menu")
+    }
+
+    // Check website completion - must not be default/sample data
+    const hasRealWebsite =
+      formData.website && formData.website !== "www.businessname.com" && formData.website !== "Your Business Website"
+
+    status.website = hasRealWebsite
+
+    setCompletionStatus(status)
+    return status
+  }
+
   // Modify the handleSubmit function to save the formatted phone number
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -635,6 +817,13 @@ export default function CustomizeAdDesignPage() {
       return
     }
 
+    // Check completion status and show dialog
+    const status = await checkCompletionStatus()
+    setIsCompletionDialogOpen(true)
+  }
+
+  // Add new function to actually save the data
+  const handleActualSave = async () => {
     try {
       setIsLoading(true)
 
@@ -651,9 +840,6 @@ export default function CustomizeAdDesignPage() {
 
       console.log("Saving phone number:", formattedPhone) // Debug log
 
-      // Add debug logging to the handleSubmit function to verify what's being saved
-      // Around line 350-370
-
       // Inside the try block of handleSubmit, before calling saveBusinessAdDesign
       console.log("Saving custom button settings:", {
         type: customButtonType,
@@ -666,6 +852,7 @@ export default function CustomizeAdDesignPage() {
         designId: selectedDesign,
         colorScheme: selectedColor,
         colorValues: colorValues, // Save the actual color values
+        texture: selectedTexture, // Add this line
         businessInfo: formattedData,
         hiddenFields: hiddenFields, // Save visibility settings
         customButton: {
@@ -681,6 +868,9 @@ export default function CustomizeAdDesignPage() {
           title: "Success",
           description: "Your ad design has been saved successfully!",
         })
+
+        // Close the completion dialog
+        setIsCompletionDialogOpen(false)
 
         // Redirect to the workbench or another page after successful save
         // window.location.href = "/workbench"
@@ -698,6 +888,8 @@ export default function CustomizeAdDesignPage() {
       setIsLoading(false)
     }
   }
+
+  // Modify the handleSubmit function to save the formatted phone number
 
   // Custom video control buttons component
   // const VideoControls = () => (
@@ -812,7 +1004,14 @@ export default function CustomizeAdDesignPage() {
             <div
               className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
               style={{
-                background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
+                backgroundColor: selectedTexture === "gradient" ? "" : colorValues.primary,
+                backgroundImage:
+                  selectedTexture === "gradient"
+                    ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                    : textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundImage || "none",
+                backgroundSize: textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundSize || "auto",
+                backgroundRepeat:
+                  textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundRepeat || "repeat",
               }}
             >
               <h3 className="text-2xl font-bold">{formData.businessName}</h3>
@@ -1051,7 +1250,16 @@ export default function CustomizeAdDesignPage() {
                   onClick={() => window.open(`https://${formData.website}`, "_blank")}
                   className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
                   style={{
-                    backgroundColor: colorValues.textColor ? "#000000" : colorValues.primary,
+                    backgroundColor:
+                      selectedTexture === "gradient" ? "" : colorValues.textColor ? "#000000" : colorValues.primary,
+                    backgroundImage:
+                      selectedTexture === "gradient"
+                        ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                        : textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundImage || "none",
+                    backgroundSize:
+                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundSize || "auto",
+                    backgroundRepeat:
+                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundRepeat || "repeat",
                   }}
                 >
                   <svg
@@ -1120,6 +1328,46 @@ export default function CustomizeAdDesignPage() {
                         aria-label={`Select ${colorKey} theme`}
                       >
                         <span className="sr-only">{colorKey}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Add this after the Color Selection Section Card: */}
+              <Card>
+                <div className="p-6 space-y-6">
+                  <h2 className="text-xl font-semibold">Texture Options</h2>
+                  <p className="text-sm text-gray-600">Choose a texture pattern for your header and buttons</p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {textureOptions.map((texture) => (
+                      <button
+                        key={texture.value}
+                        type="button"
+                        onClick={() => setSelectedTexture(texture.value)}
+                        className={`relative h-16 rounded-lg border-2 transition-all overflow-hidden ${
+                          selectedTexture === texture.value ? "ring-2 ring-offset-1 ring-blue-500" : "hover:scale-105"
+                        }`}
+                        style={{
+                          backgroundColor: texture.value === "gradient" ? "" : colorValues.primary,
+                          backgroundImage:
+                            texture.value === "gradient"
+                              ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                              : texture.style.backgroundImage,
+                          backgroundSize: texture.style.backgroundSize,
+                          backgroundRepeat: texture.style.backgroundRepeat,
+                          borderColor: selectedTexture === texture.value ? colorValues.primary : "#e5e7eb",
+                        }}
+                        aria-label={`Select ${texture.name} texture`}
+                      >
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span
+                            className={`text-xs font-medium ${colorValues.textColor ? "text-black" : "text-white"}`}
+                          >
+                            {texture.name}
+                          </span>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -1318,7 +1566,7 @@ export default function CustomizeAdDesignPage() {
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                           value={formData.website}
                           onChange={handleInputChange}
-                          required
+                          required={!hiddenFields.website}
                         />
                       </div>
                     </div>
@@ -1568,6 +1816,143 @@ export default function CustomizeAdDesignPage() {
         businessId={businessId}
         businessName={formData.businessName}
       />
+
+      {/* Completion Status Dialog */}
+      <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
+        <DialogContent className="max-w-md">
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-2">AdBox Completion Status</h2>
+              <p className="text-gray-600 text-sm">Review which sections of your AdBox are complete before saving.</p>
+            </div>
+
+            <div className="space-y-3">
+              {/* Business Information */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-4 h-4 rounded-full ${completionStatus.businessInfo ? "bg-green-500" : "bg-yellow-500"}`}
+                />
+                <span className="text-sm font-medium">Business Information</span>
+                {completionStatus.businessInfo && <span className="text-xs text-green-600 ml-auto">Complete</span>}
+              </div>
+
+              {/* Video */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-4 h-4 rounded-full ${completionStatus.video || hiddenFields.video ? "bg-green-500" : "bg-yellow-500"}`}
+                />
+                <span className="text-sm font-medium">Business Video</span>
+                {hiddenFields.video ? (
+                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
+                ) : completionStatus.video ? (
+                  <span className="text-xs text-green-600 ml-auto">Complete</span>
+                ) : (
+                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
+                )}
+              </div>
+
+              {/* Photos */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-4 h-4 rounded-full ${completionStatus.photos || hiddenFields.photoAlbum ? "bg-green-500" : "bg-yellow-500"}`}
+                />
+                <span className="text-sm font-medium">Photo Album</span>
+                {hiddenFields.photoAlbum ? (
+                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
+                ) : completionStatus.photos ? (
+                  <span className="text-xs text-green-600 ml-auto">Complete</span>
+                ) : (
+                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
+                )}
+              </div>
+
+              {/* Coupons */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-4 h-4 rounded-full ${completionStatus.coupons || hiddenFields.savingsButton ? "bg-green-500" : "bg-yellow-500"}`}
+                />
+                <span className="text-sm font-medium">Coupons & Savings</span>
+                {hiddenFields.savingsButton ? (
+                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
+                ) : completionStatus.coupons ? (
+                  <span className="text-xs text-green-600 ml-auto">Complete</span>
+                ) : (
+                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
+                )}
+              </div>
+
+              {/* Job Listings */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-4 h-4 rounded-full ${completionStatus.jobs || hiddenFields.jobsButton ? "bg-green-500" : "bg-yellow-500"}`}
+                />
+                <span className="text-sm font-medium">Job Listings</span>
+                {hiddenFields.jobsButton ? (
+                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
+                ) : completionStatus.jobs ? (
+                  <span className="text-xs text-green-600 ml-auto">Complete</span>
+                ) : (
+                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
+                )}
+              </div>
+
+              {/* Custom Button */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-4 h-4 rounded-full ${completionStatus.customButton || hiddenFields.customButton ? "bg-green-500" : "bg-yellow-500"}`}
+                />
+                <span className="text-sm font-medium">Custom Button</span>
+                {hiddenFields.customButton ? (
+                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
+                ) : completionStatus.customButton ? (
+                  <span className="text-xs text-green-600 ml-auto">Complete</span>
+                ) : (
+                  <span className="text-xs text-yellow-600 ml-auto">Needs Setup</span>
+                )}
+              </div>
+
+              {/* Website Link */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-4 h-4 rounded-full ${completionStatus.website || hiddenFields.website ? "bg-green-500" : "bg-yellow-500"}`}
+                />
+                <span className="text-sm font-medium">Website Link</span>
+                {hiddenFields.website ? (
+                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
+                ) : completionStatus.website ? (
+                  <span className="text-xs text-green-600 ml-auto">Complete</span>
+                ) : (
+                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Tip:</strong> If you don't want to add photos, coupons, job listings, or a custom button, you
+                can hide them using the checkboxes in the form above.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setIsCompletionDialogOpen(false)} className="flex-1">
+                Continue Editing
+              </Button>
+              <Button
+                onClick={handleActualSave}
+                disabled={isLoading}
+                className="flex-1"
+                style={{
+                  backgroundColor: colorValues.primary,
+                  color: colorValues.textColor ? "#000000" : "#ffffff",
+                }}
+              >
+                {isLoading ? "Saving..." : "Save & Continue"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

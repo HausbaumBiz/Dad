@@ -527,6 +527,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
       JSON.stringify({
         designId: designData.designId,
         colorScheme: designData.colorScheme,
+        texture: designData.texture || "gradient", // Add texture with default
         customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
         updatedAt: new Date().toISOString(),
       }),
@@ -653,6 +654,7 @@ export async function getBusinessAdDesign(businessId: string) {
           designData = {
             designId: parsedData.designId || 5,
             colorScheme: parsedData.colorScheme || "blue",
+            texture: parsedData.texture || "gradient", // Add texture loading
             updatedAt: parsedData.updatedAt || new Date().toISOString(),
           }
 
@@ -692,6 +694,7 @@ export async function getBusinessAdDesign(businessId: string) {
       businessInfo: { ...defaultBusinessInfo, ...(businessInfo || {}) },
       hiddenFields: hiddenFields || {},
       customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
+      texture: designData.texture || "gradient", // Ensure texture is included with default
     }
 
     console.log("Final combined ad design data:", result)

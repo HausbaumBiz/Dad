@@ -9,7 +9,13 @@ export default function LegalNoticePage() {
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <header className="py-12 px-6 border-b border-gray-100 flex flex-col items-center">
             <div className="relative" style={{ width: "512px", height: "256px" }}>
-              <Image src="/hausbaumbiz03.png" alt="Hausbaum Logo" fill style={{ objectFit: "contain" }} priority />
+              <Image
+                src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png"
+                alt="Hausbaum Logo"
+                fill
+                style={{ objectFit: "contain" }}
+                priority
+              />
             </div>
             <Link href="/" className="mt-4 text-gray-600 hover:text-primary transition-colors flex items-center gap-2">
               <svg

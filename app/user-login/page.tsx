@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -41,6 +41,35 @@ export default function UserLoginPage() {
     setShowPassword(!showPassword)
   }
 
+  useEffect(() => {
+    // Load stored credentials if they exist and haven't expired
+    const storedCredentials = localStorage.getItem("userLoginCredentials")
+    if (storedCredentials) {
+      try {
+        const { email, password, timestamp } = JSON.parse(storedCredentials)
+        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000
+
+        if (Date.now() - timestamp < thirtyDaysInMs) {
+          setFormData({ email, password })
+          setRememberMe(true)
+        } else {
+          // Credentials expired, remove them
+          localStorage.removeItem("userLoginCredentials")
+        }
+      } catch (error) {
+        // Invalid stored data, remove it
+        localStorage.removeItem("userLoginCredentials")
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!rememberMe) {
+      // If remember me is unchecked, remove stored credentials
+      localStorage.removeItem("userLoginCredentials")
+    }
+  }, [rememberMe])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -74,6 +103,16 @@ export default function UserLoginPage() {
           description: "You have been logged in successfully",
           variant: "default",
         })
+
+        // Save credentials if remember me is checked
+        if (rememberMe) {
+          const credentialsToStore = {
+            email: formData.email,
+            password: formData.password,
+            timestamp: Date.now(),
+          }
+          localStorage.setItem("userLoginCredentials", JSON.stringify(credentialsToStore))
+        }
 
         // Navigate to the return URL or home page
         router.push(result.redirectTo || returnTo)
