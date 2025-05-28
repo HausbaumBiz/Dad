@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, Search, MapPin, Download, Share2, Calendar, Tag, Sparkles } from "lucide-react"
 import { ZipCodeDialog } from "@/components/zip-code-dialog"
 import { MainHeader } from "@/components/main-header"
@@ -14,6 +15,33 @@ export default function PennySaverPage() {
   const [zipCode, setZipCode] = useState("")
   const [savedZipCode, setSavedZipCode] = useState("")
   const [isZipDialogOpen, setIsZipDialogOpen] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState("all")
+
+  const categories = [
+    "Home Improvement",
+    "Automotive Services",
+    "Elder and Child Care",
+    "Pet Care",
+    "Weddings & Events",
+    "Fitness & Athletics",
+    "Education & Tutoring",
+    "Music Lessons",
+    "Real Estate",
+    "Food & Dining",
+    "Retail Stores",
+    "Legal Services",
+    "Funeral Services",
+    "Personal Assistants",
+    "Travel & Vacation",
+    "Tailoring & Clothing",
+    "Arts & Entertainment",
+    "Tech & IT Services",
+    "Beauty & Wellness",
+    "Physical Rehabilitation",
+    "Healthcare Specialists",
+    "Mental Health",
+    "Financial Services",
+  ]
 
   useEffect(() => {
     const savedZip = localStorage.getItem("pennySaverZipCode")
@@ -37,6 +65,10 @@ export default function PennySaverPage() {
     setSavedZipCode(zipCodeValue)
   }
 
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategory(value)
+  }
+
   // Sample deals for demonstration
   const sampleDeals = [
     {
@@ -57,7 +89,7 @@ export default function PennySaverPage() {
       description: "Buy any two plants and get the third one free of equal or lesser value.",
       code: "PLANT3",
       expires: "2025-05-15",
-      category: "Home & Garden",
+      category: "Home Improvement",
     },
     {
       id: "3",
@@ -67,7 +99,7 @@ export default function PennySaverPage() {
       description: "First-time customers receive $25 off our premium detailing package.",
       code: "NEWCUSTOMER",
       expires: "2025-07-31",
-      category: "Automotive",
+      category: "Automotive Services",
     },
     {
       id: "4",
@@ -77,7 +109,7 @@ export default function PennySaverPage() {
       description: "Join now and get 50% off your first month of membership. No contracts required.",
       code: "SUMMER50",
       expires: "2025-08-15",
-      category: "Health & Fitness",
+      category: "Fitness & Athletics",
     },
     {
       id: "5",
@@ -87,7 +119,7 @@ export default function PennySaverPage() {
       description: "Get $15 off any computer repair service. Diagnostics included.",
       code: "FIXMYPC",
       expires: "2025-09-30",
-      category: "Technology",
+      category: "Tech & IT Services",
     },
     {
       id: "6",
@@ -97,9 +129,13 @@ export default function PennySaverPage() {
       description: "Purchase any three books and only pay for two. Cheapest book is free.",
       code: "BOOKWORM",
       expires: "2025-06-15",
-      category: "Retail",
+      category: "Retail Stores",
     },
   ]
+
+  // Filter deals based on selected category
+  const filteredDeals =
+    selectedCategory === "all" ? sampleDeals : sampleDeals.filter((deal) => deal.category === selectedCategory)
 
   // Format date from YYYY-MM-DD to MM/DD/YYYY
   const formatDate = (dateString: string) => {
@@ -178,6 +214,28 @@ export default function PennySaverPage() {
                 Search
               </Button>
             </div>
+
+            {/* Category Dropdown - Only shows after zip code is entered */}
+            {savedZipCode && (
+              <div className="w-full mt-4">
+                <label htmlFor="category-select" className="block text-sm font-medium text-gray-700 mb-1">
+                  Filter by Category
+                </label>
+                <Select value={selectedCategory} onValueChange={handleCategoryChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -189,6 +247,7 @@ export default function PennySaverPage() {
               Featured Deals
               <Sparkles className="h-6 w-6 ml-2 text-amber-500" />
             </h2>
+            {selectedCategory !== "all" && <p className="text-amber-700 mt-2">Showing deals for: {selectedCategory}</p>}
           </div>
 
           {/* Decorative Festive Border Container */}
@@ -222,14 +281,14 @@ export default function PennySaverPage() {
               ></div>
 
               {/* Coupon Grid */}
-              {sampleDeals.length === 0 ? (
+              {filteredDeals.length === 0 ? (
                 <div className="text-center py-12 relative z-10">
-                  <p className="text-gray-500 text-lg mb-4">No deals available at this time.</p>
+                  <p className="text-gray-500 text-lg mb-4">No deals available for this category at this time.</p>
                   <p className="text-gray-400">Check back soon for new savings opportunities!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
-                  {sampleDeals.map((deal) => (
+                  {filteredDeals.map((deal) => (
                     <div key={deal.id} className="relative">
                       <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div className="absolute -top-2 -right-2">
