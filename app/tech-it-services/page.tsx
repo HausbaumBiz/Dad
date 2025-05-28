@@ -92,10 +92,10 @@ export default function TechITServicesPage() {
           <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Experienced and certified IT professionals</li>
-              <li>Read reviews from other clients</li>
-              <li>Compare services and rates</li>
-              <li>Find the right tech solution for your specific needs</li>
+              <li>Read reviews from other customers</li>
+              <li>View business videos showcasing work and staff</li>
+              <li>Access exclusive coupons directly on each business listing</li>
+              <li>Discover job openings from businesses you'd trust to hire yourself</li>
             </ul>
           </div>
         </div>

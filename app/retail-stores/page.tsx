@@ -113,10 +113,10 @@ export default function RetailStoresPage() {
           <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Discover local and independent retailers</li>
-              <li>Read customer reviews before shopping</li>
-              <li>Find special offers and promotions</li>
-              <li>Support businesses in your community</li>
+              <li>Read reviews from other customers</li>
+              <li>View business videos showcasing work and staff</li>
+              <li>Access exclusive coupons directly on each business listing</li>
+              <li>Discover job openings from businesses you frequent yourself</li>
             </ul>
           </div>
         </div>

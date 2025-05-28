@@ -140,127 +140,62 @@ export default function FoodDiningPage() {
           <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Discover local restaurants and dining options</li>
-              <li>Read reviews from other diners</li>
-              <li>Browse menus and special offers</li>
-              <li>Find the perfect dining experience for any occasion</li>
+              <li>Read reviews from other customers</li>
+              <li>View business videos showcasing work and staff</li>
+              <li>Access exclusive coupons directly on each business listing</li>
+              <li>Discover job openings from businesses you frequent yourself</li>
             </ul>
           </div>
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
-
       {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-          <p>Loading businesses...</p>
-        </div>
-      ) : filteredBusinesses.length > 0 ? (
-        <div className="space-y-6">
-          {filteredBusinesses.map((business) => (
-            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{business.businessName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{business.city || business.zipCode}</p>
-
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(business.rating || 4.5) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {business.rating || 4.5} ({business.reviews || 0} reviews)
-                      </span>
-                    </div>
-
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Categories:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service: string, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {service}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {business.subcategory || "Food & Dining"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto">View Menu</Button>
-                    <Button className="mt-2 w-full md:w-auto" onClick={() => handleReviewsClick(business)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleProfileClick(business)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex justify-center items-center h-48">
+          <Loader2 className="animate-spin h-6 w-6" />
         </div>
       ) : (
-        <div className="text-center py-12">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-2xl mx-auto">
-            <h3 className="text-xl font-medium text-red-800 mb-2">No Restaurants Found</h3>
-            <p className="text-red-700 mb-4">
-              We're building our network of restaurants and dining establishments in your area.
-            </p>
-            <div className="bg-white rounded border border-red-100 p-4">
-              <p className="text-gray-700 font-medium">Do you own a restaurant or food business?</p>
-              <p className="text-gray-600 mt-1">
-                Join Hausbaum to showcase your menu and connect with hungry customers in your area.
-              </p>
-              <Button className="mt-3" asChild>
-                <a href="/business-register">Register Your Restaurant</a>
-              </Button>
-            </div>
+        <>
+          <CategoryFilter options={filterOptions} onChange={handleFilterChange} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredBusinesses.map((provider: any) => (
+              <Card key={provider.id}>
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center">
+                    <Image
+                      src={provider.imageUrl || "/placeholder-image.png"}
+                      alt={provider.name}
+                      width={200}
+                      height={150}
+                      className="rounded-md object-cover mb-2"
+                    />
+                    <h3 className="text-lg font-semibold">{provider.name}</h3>
+                    <p className="text-sm text-gray-500">{provider.subcategory}</p>
+                    <div className="flex mt-2 space-x-2">
+                      <Button size="sm" onClick={() => handleReviewsClick(provider)}>
+                        Reviews
+                      </Button>
+                      <Button size="sm" onClick={() => handleProfileClick(provider)}>
+                        Profile
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </div>
+        </>
       )}
 
-      {selectedProvider && (
-        <ReviewsDialog
-          isOpen={isReviewsDialogOpen}
-          onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.businessName || selectedProvider.name}
-          businessId={selectedProvider.id}
-          reviews={[]}
-        />
-      )}
-
-      {selectedProvider && (
-        <BusinessProfileDialog
-          isOpen={isProfileDialogOpen}
-          onClose={() => setIsProfileDialogOpen(false)}
-          businessId={selectedProvider.id}
-        />
-      )}
-
+      <ReviewsDialog
+        isOpen={isReviewsDialogOpen}
+        onClose={() => setIsReviewsDialogOpen(false)}
+        provider={selectedProvider}
+      />
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        provider={selectedProvider}
+      />
       <Toaster />
     </CategoryLayout>
   )

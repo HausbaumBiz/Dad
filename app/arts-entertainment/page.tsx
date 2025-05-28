@@ -144,10 +144,10 @@ export default function ArtsEntertainmentPage() {
           <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Talented and experienced creative professionals</li>
-              <li>Read reviews from other clients</li>
-              <li>Compare portfolios and services</li>
-              <li>Find the perfect match for your creative needs</li>
+              <li>Read reviews from other customers</li>
+              <li>View business videos showcasing work and staff</li>
+              <li>Access exclusive coupons directly on each business listing</li>
+              <li>Discover job openings from businesses you'd trust to hire yourself</li>
             </ul>
           </div>
         </div>

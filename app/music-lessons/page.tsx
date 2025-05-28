@@ -84,10 +84,10 @@ export default function MusicLessonsPage() {
           <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Verified and experienced music instructors</li>
-              <li>Read reviews from other students</li>
-              <li>Compare rates and availability</li>
-              <li>Find lessons for all skill levels</li>
+              <li>Read reviews from other customers</li>
+              <li>View business videos showcasing work and staff</li>
+              <li>Access exclusive coupons directly on each business listing</li>
+              <li>Discover job openings from businesses you'd trust to hire yourself</li>
             </ul>
           </div>
         </div>

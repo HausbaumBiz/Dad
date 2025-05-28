@@ -191,10 +191,10 @@ export default function HomeImprovementPage() {
           <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Verified local professionals</li>
-              <li>Read customer reviews before hiring</li>
-              <li>Compare quotes from multiple providers</li>
-              <li>Secure payment options</li>
+              <li>Read reviews from other customers</li>
+              <li>View business videos showcasing work and staff</li>
+              <li>Access exclusive coupons directly on each business listing</li>
+              <li>Discover job openings from businesses you'd trust to hire yourself</li>
             </ul>
           </div>
         </div>
