@@ -5,9 +5,10 @@ import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
-import { ChevronLeft, Search, MapPin, Download, Share2 } from "lucide-react"
+import { ChevronLeft, Search, MapPin, Download, Share2, Calendar, Tag, Sparkles } from "lucide-react"
 import { ZipCodeDialog } from "@/components/zip-code-dialog"
+import { MainHeader } from "@/components/main-header"
+import { MainFooter } from "@/components/main-footer"
 
 export default function PennySaverPage() {
   const [zipCode, setZipCode] = useState("")
@@ -36,35 +37,80 @@ export default function PennySaverPage() {
     setSavedZipCode(zipCodeValue)
   }
 
-  // Real deals will be loaded from the database
-  const deals: any[] = []
+  // Sample deals for demonstration
+  const sampleDeals = [
+    {
+      id: "1",
+      businessName: "Joe's Pizza",
+      title: "Weekend Special",
+      discount: "20% OFF",
+      description: "Get 20% off on all large pizzas every weekend. Valid for dine-in and takeout orders.",
+      code: "WEEKEND20",
+      expires: "2025-06-30",
+      category: "Food & Dining",
+    },
+    {
+      id: "2",
+      businessName: "Green Thumb Garden Center",
+      title: "Spring Planting Sale",
+      discount: "Buy 2 Get 1 FREE",
+      description: "Buy any two plants and get the third one free of equal or lesser value.",
+      code: "PLANT3",
+      expires: "2025-05-15",
+      category: "Home & Garden",
+    },
+    {
+      id: "3",
+      businessName: "Sparkle Auto Detailing",
+      title: "First-Time Customer",
+      discount: "$25 OFF",
+      description: "First-time customers receive $25 off our premium detailing package.",
+      code: "NEWCUSTOMER",
+      expires: "2025-07-31",
+      category: "Automotive",
+    },
+    {
+      id: "4",
+      businessName: "Fitness First Gym",
+      title: "Summer Membership",
+      discount: "50% OFF First Month",
+      description: "Join now and get 50% off your first month of membership. No contracts required.",
+      code: "SUMMER50",
+      expires: "2025-08-15",
+      category: "Health & Fitness",
+    },
+    {
+      id: "5",
+      businessName: "Tech Solutions",
+      title: "Computer Repair",
+      discount: "$15 OFF",
+      description: "Get $15 off any computer repair service. Diagnostics included.",
+      code: "FIXMYPC",
+      expires: "2025-09-30",
+      category: "Technology",
+    },
+    {
+      id: "6",
+      businessName: "Cozy Corner Bookstore",
+      title: "Book Lover's Deal",
+      discount: "Buy 3 Pay for 2",
+      description: "Purchase any three books and only pay for two. Cheapest book is free.",
+      code: "BOOKWORM",
+      expires: "2025-06-15",
+      category: "Retail",
+    },
+  ]
+
+  // Format date from YYYY-MM-DD to MM/DD/YYYY
+  const formatDate = (dateString: string) => {
+    if (!dateString) return ""
+    const [year, month, day] = dateString.split("-")
+    return `${month}/${day}/${year}`
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-6 flex flex-col md:flex-row items-center justify-between">
-          <div className="flex items-center mb-4 md:mb-0">
-            <Link href="/">
-              <Image
-                src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png"
-                alt="Hausbaum Logo"
-                width={600}
-                height={300}
-                className="h-64 w-auto"
-              />
-            </Link>
-          </div>
-
-          <div className="flex space-x-4">
-            <Button variant="ghost" asChild>
-              <Link href="/">Home</Link>
-            </Button>
-            <Button variant="ghost" asChild>
-              <Link href="/contact-us">Contact Us</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <MainHeader />
 
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="mb-6">
@@ -76,6 +122,7 @@ export default function PennySaverPage() {
           </Button>
         </div>
 
+        {/* Hero Section with Festive Design */}
         <div className="relative overflow-hidden rounded-xl mb-10 bg-gradient-to-r from-amber-100 to-yellow-100">
           <div
             className="absolute inset-0 opacity-30"
@@ -105,6 +152,7 @@ export default function PennySaverPage() {
           </div>
         </div>
 
+        {/* Zip Code Search Section */}
         <div className="max-w-xl mx-auto mb-10 bg-white rounded-lg shadow-md p-6">
           <div className="flex flex-col items-center">
             <h2 className="text-xl font-semibold mb-4">Find Local Deals by Zip Code</h2>
@@ -133,44 +181,108 @@ export default function PennySaverPage() {
           </div>
         </div>
 
+        {/* Festive Coupon Display Section */}
         <div className="mb-12">
-          <h2 className="text-2xl font-bold text-center mb-8">Featured Deals</h2>
-          {deals.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg mb-4">No deals available at this time.</p>
-              <p className="text-gray-400">Check back soon for new savings opportunities!</p>
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-amber-800 inline-flex items-center">
+              <Sparkles className="h-6 w-6 mr-2 text-amber-500" />
+              Featured Deals
+              <Sparkles className="h-6 w-6 ml-2 text-amber-500" />
+            </h2>
+          </div>
+
+          {/* Decorative Festive Border Container */}
+          <div className="relative p-1 md:p-3 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 rounded-lg shadow-lg">
+            {/* Decorative Corner Elements */}
+            <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-white rounded-tl-lg"></div>
+            <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-white rounded-tr-lg"></div>
+            <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-white rounded-bl-lg"></div>
+            <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-white rounded-br-lg"></div>
+
+            {/* Decorative Elements */}
+            <div className="absolute top-1/2 left-0 transform -translate-y-1/2 -translate-x-1/2">
+              <div className="bg-white rounded-full p-2 shadow-md">
+                <Tag className="h-6 w-6 text-amber-500" />
+              </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {deals.map((deal, index) => (
-                <Card key={index} className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col h-full">
-                      <div className="bg-amber-50 px-3 py-1 rounded-full text-amber-800 text-sm font-medium self-start mb-2">
-                        Expires: {deal.expires}
-                      </div>
-                      <h3 className="text-xl font-semibold mb-1">{deal.title}</h3>
-                      <p className="text-primary font-medium mb-3">{deal.business}</p>
-                      <p className="text-gray-600 mb-4 flex-grow">{deal.description}</p>
-                      <div className="flex justify-between mt-4">
-                        <Button variant="outline" size="sm" className="flex items-center">
-                          <Download className="mr-1 h-4 w-4" />
-                          Save
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex items-center">
-                          <Share2 className="mr-1 h-4 w-4" />
-                          Share
-                        </Button>
+            <div className="absolute top-1/2 right-0 transform -translate-y-1/2 translate-x-1/2">
+              <div className="bg-white rounded-full p-2 shadow-md">
+                <Tag className="h-6 w-6 text-amber-500" />
+              </div>
+            </div>
+
+            {/* Inner Content Area with Pattern Background */}
+            <div className="bg-white rounded-lg p-6 relative">
+              <div
+                className="absolute inset-0 opacity-5"
+                style={{
+                  backgroundImage: "url('/texture0079.png')",
+                  backgroundRepeat: "repeat",
+                }}
+              ></div>
+
+              {/* Coupon Grid */}
+              {sampleDeals.length === 0 ? (
+                <div className="text-center py-12 relative z-10">
+                  <p className="text-gray-500 text-lg mb-4">No deals available at this time.</p>
+                  <p className="text-gray-400">Check back soon for new savings opportunities!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+                  {sampleDeals.map((deal) => (
+                    <div key={deal.id} className="relative">
+                      <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="absolute -top-2 -right-2">
+                          <div className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full border border-amber-300 shadow-sm">
+                            {deal.category}
+                          </div>
+                        </div>
+
+                        <div className="text-center mb-2">
+                          <h4 className="font-bold text-lg text-teal-700">{deal.businessName}</h4>
+                        </div>
+
+                        <div className="text-center mb-3">
+                          <div className="font-bold text-xl">{deal.title}</div>
+                          <div className="text-2xl font-extrabold text-red-600">{deal.discount}</div>
+                        </div>
+
+                        <div className="text-sm mb-3">{deal.description}</div>
+
+                        {deal.code && (
+                          <div className="text-center mb-2">
+                            <span className="inline-block bg-gray-100 px-2 py-1 rounded font-mono text-sm">
+                              Code: {deal.code}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="text-xs text-gray-600 mt-2 font-semibold flex items-center justify-center">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          Expires: {formatDate(deal.expires)}
+                        </div>
+
+                        <div className="flex justify-between mt-4">
+                          <Button variant="outline" size="sm" className="flex items-center">
+                            <Download className="mr-1 h-4 w-4" />
+                            Save
+                          </Button>
+                          <Button variant="outline" size="sm" className="flex items-center">
+                            <Share2 className="mr-1 h-4 w-4" />
+                            Share
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
-        <div className="bg-amber-50 rounded-lg p-6 mb-12">
+        {/* About Section */}
+        <div className="bg-amber-50 rounded-lg p-6 mb-12 border border-amber-200">
           <h2 className="text-2xl font-bold mb-4 text-amber-800">About The Penny Saver</h2>
           <p className="text-gray-700 mb-4">
             The Penny Saver is your weekly guide to the best deals and discounts from local businesses in your area.
@@ -183,24 +295,7 @@ export default function PennySaverPage() {
         </div>
       </main>
 
-      <footer className="bg-primary text-white py-8 relative">
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage: "url('/texture0079.png')",
-            backgroundRepeat: "repeat",
-            mixBlendMode: "multiply",
-          }}
-        ></div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <h2 className="text-xl font-bold">Hausbaum</h2>
-              <p className="text-sm mt-2">© {new Date().getFullYear()} Hausbaum. All rights reserved.</p>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <MainFooter />
 
       {/* Zip Code Dialog */}
       <ZipCodeDialog
