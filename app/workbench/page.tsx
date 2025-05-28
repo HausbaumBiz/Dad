@@ -114,21 +114,21 @@ export default function WorkbenchPage() {
               ) : (
                 <div className="space-y-4">
                   <WorkbenchButton
-                    href="/business-focus"
-                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/business-cards-icon-X09H698yJZQiK1Ve9bMp9fK3NmIZBt.png"
-                    label="Your Business Focus"
-                  />
-
-                  <WorkbenchButton
                     href="/ad-design"
                     iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/ad-workbench-icon-scOKMCrsO5iu98jnDvZGHdJrb0TNeJ.png"
                     label="Ad Workbench"
                   />
 
                   <WorkbenchButton
+                    href="/business-focus"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/business-cards-icon-X09H698yJZQiK1Ve9bMp9fK3NmIZBt.png"
+                    label="Your Business Focus"
+                  />
+
+                  <WorkbenchButton
                     href="/coupons"
                     iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png"
-                    label="Penny Saver Workbench"
+                    label="Penny Saver"
                   />
 
                   <WorkbenchButton
@@ -147,16 +147,17 @@ export default function WorkbenchPage() {
                     iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/VideoWorkbenchsm-YrIJQbd7zwVz1lHvneZM793EzVaKe0.png"
                     label="Video"
                   />
-                  <WorkbenchButton
-                    href="/statistics"
-                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/stats002-gW6ZaTQQkxNHACfsxA0LoZMnih5oax.png"
-                    label="Statistics Dashboard"
-                  />
 
                   <WorkbenchButton
                     href="/custom-button-workbench"
                     iconSrc="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/custom%20button02-2xZ348ksSBLZaql05dru0A4P6c5K27.png"
-                    label="Custom Button Workbench"
+                    label="Custom Button"
+                  />
+
+                  <WorkbenchButton
+                    href="/statistics"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/stats002-gW6ZaTQQkxNHACfsxA0LoZMnih5oax.png"
+                    label="Statistics Dashboard"
                   />
 
                   <WorkbenchButton

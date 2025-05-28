@@ -23,6 +23,9 @@ import BusinessJobsDialog from "@/components/business-jobs-dialog"
 import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
 import { DocumentsDialog } from "@/components/documents-dialog"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+// First, add the import for the new FinalizeBusinessDialog component
+// Add this with the other dialog imports around line 40-50
+import { FinalizeBusinessDialog } from "@/components/finalize-business-dialog"
 
 import {
   Menu,
@@ -109,6 +112,13 @@ export default function CustomizeAdDesignPage() {
     customButton: false,
     website: false,
   })
+
+  // Add state for tracking completion
+  const [isAllComplete, setIsAllComplete] = useState(false)
+
+  // Add a new state variable for the finalize dialog
+  // Add this with the other dialog state variables around line 60-70
+  const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false)
 
   // Color mapping
   const colorMap: Record<string, { primary: string; secondary: string; textColor?: string }> = {
@@ -800,6 +810,19 @@ export default function CustomizeAdDesignPage() {
 
     status.website = hasRealWebsite
 
+    // At the end of the checkCompletionStatus function, before the return statement:
+    // Check if all sections are complete or hidden
+    const allComplete =
+      (status.businessInfo || false) &&
+      (status.video || hiddenFields.video) &&
+      (status.photos || hiddenFields.photoAlbum) &&
+      (status.coupons || hiddenFields.savingsButton) &&
+      (status.jobs || hiddenFields.jobsButton) &&
+      (status.customButton || hiddenFields.customButton) &&
+      (status.website || hiddenFields.website)
+
+    setIsAllComplete(allComplete)
+
     setCompletionStatus(status)
     return status
   }
@@ -886,6 +909,35 @@ export default function CustomizeAdDesignPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Add new function to handle finalize and submit
+  // Replace the handleFinalizeAndSubmit function with this new implementation
+  // This should be around line 600-610
+  const handleFinalizeAndSubmit = async () => {
+    // Open the finalize dialog instead of showing a toast
+    setIsFinalizeDialogOpen(true)
+  }
+
+  // Add a new function to handle the actual finalization
+  // Add this after the handleFinalizeAndSubmit function
+  const handleActualFinalization = async () => {
+    try {
+      toast({
+        title: "Success",
+        description: "Your business profile has been finalized and submitted!",
+      })
+
+      // Redirect to the workbench page after successful finalization
+      window.location.href = "/workbench"
+    } catch (error) {
+      console.error("Error finalizing business profile:", error)
+      toast({
+        title: "Error",
+        description: "Failed to finalize your business profile. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -1286,6 +1338,13 @@ export default function CustomizeAdDesignPage() {
       </div>
     )
   }
+
+  // Add useEffect to check completion status when data changes
+  useEffect(() => {
+    if (businessId) {
+      checkCompletionStatus()
+    }
+  }, [formData, hiddenFields, photos, cloudflareVideo, businessId])
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -1746,7 +1805,7 @@ export default function CustomizeAdDesignPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-center pt-4">
+                <div className="flex justify-center gap-4 pt-4">
                   <button
                     type="submit"
                     className={`px-8 py-2 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 ${colorValues.textColor ? "text-black" : "text-white"}`}
@@ -1757,7 +1816,25 @@ export default function CustomizeAdDesignPage() {
                     }}
                     disabled={isLoading}
                   >
-                    {isLoading ? "Saving..." : "Save and Continue"}
+                    {isLoading ? "Saving..." : "Save"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleFinalizeAndSubmit}
+                    className={`px-8 py-2 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-opacity ${
+                      isAllComplete ? (colorValues.textColor ? "text-black" : "text-white") : "text-gray-400"
+                    }`}
+                    style={{
+                      backgroundColor: isAllComplete ? colorValues.secondary : "#e5e7eb",
+                      borderColor: isAllComplete ? (colorValues.textColor ? "#ddd" : "transparent") : "#d1d5db",
+                      borderWidth: "1px",
+                      opacity: isAllComplete ? 1 : 0.6,
+                      cursor: isAllComplete ? "pointer" : "not-allowed",
+                    }}
+                    disabled={!isAllComplete || isLoading}
+                  >
+                    Finalize and Submit
                   </button>
                 </div>
               </form>
@@ -1947,12 +2024,20 @@ export default function CustomizeAdDesignPage() {
                   color: colorValues.textColor ? "#000000" : "#ffffff",
                 }}
               >
-                {isLoading ? "Saving..." : "Save & Continue"}
+                {isLoading ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+      {/* Finalize Business Dialog */}
+      <FinalizeBusinessDialog
+        isOpen={isFinalizeDialogOpen}
+        onClose={() => setIsFinalizeDialogOpen(false)}
+        businessId={businessId}
+        onFinalize={handleActualFinalization}
+        colorValues={colorValues}
+      />
     </div>
   )
 }
