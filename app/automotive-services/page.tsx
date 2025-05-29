@@ -46,34 +46,30 @@ export default function AutomotiveServicesPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchBusinesses() {
-      try {
-        setLoading(true)
-        setError(null)
-
-        // Fetch businesses that have selected "automotive" category
-        const matchingBusinesses = await getBusinessesBySelectedCategories("/automotive-services")
-        setBusinesses(matchingBusinesses)
-
-        // Fetch ad design data for each business
-        const adDesigns: Record<string, any> = {}
-        for (const business of matchingBusinesses) {
-          const adDesign = await getBusinessAdDesignData(business.id)
-          if (adDesign) {
-            adDesigns[business.id] = adDesign
-          }
+  async function fetchBusinesses() {
+    try {
+      setLoading(true)
+      setError(null)
+      const savedZipCode = typeof window !== "undefined" ? localStorage.getItem("savedZipCode") || null : null
+      const matchingBusinesses = await getBusinessesBySelectedCategories("/automotive-services", savedZipCode)
+      setBusinesses(matchingBusinesses)
+      const adDesigns: Record<string, any> = {}
+      for (const business of matchingBusinesses) {
+        const adDesign = await getBusinessAdDesignData(business.id)
+        if (adDesign) {
+          adDesigns[business.id] = adDesign
         }
-        setBusinessAdDesigns(adDesigns)
-      } catch (err) {
-        console.error("Error fetching businesses:", err)
-        setError("Failed to load automotive services")
-      } finally {
-        setLoading(false)
       }
+      setBusinessAdDesigns(adDesigns)
+    } catch (err) {
+      console.error("Error fetching businesses:", err)
+      setError("Failed to load automotive services")
+    } finally {
+      setLoading(false)
     }
-
-    fetchBusinesses()
-  }, [])
+  }
+  fetchBusinesses()
+}, [])
 
   const handleOpenReviews = (business: Business) => {
     setSelectedProvider({
