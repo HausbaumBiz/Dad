@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, Loader2 } from "lucide-react"
 import { saveBusinessCategories, getBusinessCategories } from "@/app/actions/category-actions"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export default function BusinessFocusPage() {
   const router = useRouter()
@@ -180,10 +180,9 @@ export default function BusinessFocusPage() {
           <ServiceAreaSectionEnhanced />
 
           <KeywordsSection />
-
           <div className="mt-12 bg-white rounded-xl shadow-md p-6">
             <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
-              Please select the categories where you would like your Ad Box to be displayed
+              Please select the categories where you would like your Ad Box to appear
             </h2>
             <div className="text-center text-gray-600 mb-8">
               <p className="mb-2">
@@ -192,7 +191,7 @@ export default function BusinessFocusPage() {
               <p className="mb-2">
                 Each category features high-quality imagery representing professional services in your area.
               </p>
-              <p>When finished making your selections, press the submit button at the bottom of the page.</p>
+              <p>When finished making your selections, press the submit button at the bottom.</p>
             </div>
 
             {/* Show category change warning */}

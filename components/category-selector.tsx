@@ -5,17 +5,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { useState, useEffect, useCallback } from "react"
 import { categories, flattenSubcategories } from "@/lib/category-data"
+import type { CategorySelection } from "@/lib/definitions"
 
 interface CategorySelectorProps {
   onCategoryChange: (selection: CategorySelection, isChecked: boolean) => void
   searchTerm?: string
   initialCheckedState?: Record<string, boolean>
-}
-
-export interface CategorySelection {
-  category: string
-  subcategory: string
-  fullPath: string
 }
 
 export function CategorySelector({

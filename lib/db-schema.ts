@@ -126,6 +126,14 @@ export async function saveBusinessCategories(businessId: string, categories: Cat
 }
 
 /**
+ * Save business categories to database (alias for saveBusinessCategories)
+ * This function provides backward compatibility for existing code
+ */
+export async function saveBusinessCategoriesToDb(businessId: string, categories: CategoryData[]): Promise<boolean> {
+  return await saveBusinessCategories(businessId, categories)
+}
+
+/**
  * Save business service area with proper indexing
  */
 export async function saveBusinessServiceArea(businessId: string, serviceArea: ServiceAreaData): Promise<boolean> {
