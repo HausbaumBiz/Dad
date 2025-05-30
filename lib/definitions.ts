@@ -1,45 +1,22 @@
-// Business and category type definitions
 export interface Business {
   id: string
+  firstName: string
+  lastName: string
   businessName: string
-  email?: string
-  phone?: string
-  address?: string
-  city?: string
-  state?: string
-  zipCode?: string
-  category?: string
-  subcategory?: string
-  allCategories?: string[]
-  allSubcategories?: string[]
-  services?: string[]
-  description?: string
-  website?: string
-  isNationwide?: boolean
-  serviceRadius?: number
+  zipCode: string
+  email: string
+  passwordHash?: string
+  isEmailVerified: boolean
   createdAt?: string
   updatedAt?: string
-  categoriesCount?: number
-}
-
-export interface CategorySelection {
-  category: string
-  subcategory: string
-  fullPath: string
-}
-
-export interface CategoryData {
-  id: string
-  name: string
-  parentId?: string
-  path: string
-}
-
-export interface ServiceAreaData {
-  zipCodes: string[]
-  isNationwide: boolean
-  radius?: number
-  centralZip?: string
+  phone?: string
+  category?: string
+  services?: string[]
+  city?: string
+  state?: string
+  rating?: number
+  reviews?: number
+  reviewsData?: any[]
 }
 
 export interface User {
@@ -47,57 +24,52 @@ export interface User {
   email: string
   firstName?: string
   lastName?: string
+  passwordHash?: string
+  isEmailVerified?: boolean
   createdAt?: string
   updatedAt?: string
+  role?: string
 }
 
-export interface Job {
-  id: string
-  businessId: string
-  title: string
-  description: string
-  category?: string
-  subcategory?: string
-  zipCodes?: string[]
-  isActive: boolean
-  createdAt: string
-  updatedAt?: string
+export interface ZipCode {
+  zip: string
+  city: string
+  state: string
+  latitude: number
+  longitude: number
+  timezone: number
+  dst: number
 }
 
-export interface Review {
-  id: string
-  businessId: string
-  userId?: string
-  userName: string
-  rating: number
-  comment: string
-  createdAt: string
-  isVerified?: boolean
+export interface ZipCodeDistance {
+  zip: string
+  distance: number
+  city: string
+  state: string
 }
 
-export interface Coupon {
-  id: string
-  businessId: string
-  title: string
-  description: string
-  discountType: "percentage" | "fixed" | "bogo"
-  discountValue: number
-  expiresAt?: string
-  isActive: boolean
-  createdAt: string
-  updatedAt?: string
+export interface ZipCodeStats {
+  total: number
+  byState: Record<string, number>
 }
 
 export interface MediaItem {
   id: string
-  businessId: string
-  type: "image" | "video"
   url: string
-  title?: string
-  description?: string
+  thumbnailUrl?: string
+  type: "image" | "video"
+  name: string
+  size: number
+  width?: number
+  height?: number
+  format?: string
+  duration?: number
+  createdAt: string
+  updatedAt?: string
   tags?: string[]
   folder?: string
-  createdAt: string
+  businessId?: string
+  metadata?: Record<string, any>
 }
 
 export interface CloudflareStreamVideo {

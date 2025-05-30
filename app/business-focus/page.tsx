@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, Loader2 } from "lucide-react"
 import { saveBusinessCategories, getBusinessCategories } from "@/app/actions/category-actions"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function BusinessFocusPage() {
   const router = useRouter()
@@ -49,17 +49,8 @@ export default function BusinessFocusPage() {
     async function loadCategories() {
       setIsLoading(true)
       try {
-        console.log("[DEBUG] Loading business categories")
         const result = await getBusinessCategories()
         if (result.success && result.data) {
-          console.log(
-            "[DEBUG] Loaded categories:",
-            result.data.map((c) => ({
-              category: c.category,
-              subcategory: c.subcategory,
-              fullPath: c.fullPath,
-            })),
-          )
           setSelectedCategories(result.data)
           setInitialCategories(result.data)
 
@@ -69,11 +60,9 @@ export default function BusinessFocusPage() {
             checkedMap[cat.fullPath] = true
           })
           setCheckedItems(checkedMap)
-        } else {
-          console.error("[DEBUG] Failed to load categories:", result.message)
         }
       } catch (error) {
-        console.error("[DEBUG] Error loading categories:", error)
+        console.error("Error loading categories:", error)
         toast({
           title: "Error",
           description: "Failed to load your saved categories",
@@ -88,12 +77,6 @@ export default function BusinessFocusPage() {
   }, [])
 
   const handleCategoryChange = (selection: CategorySelection, isChecked: boolean) => {
-    console.log("[DEBUG] Category selection changed:", {
-      category: selection.category,
-      subcategory: selection.subcategory,
-      fullPath: selection.fullPath,
-      isChecked,
-    })
     setCheckedItems((prev) => ({
       ...prev,
       [selection.fullPath]: isChecked,
@@ -109,7 +92,6 @@ export default function BusinessFocusPage() {
   // Function to save selected categories
   const handleSubmit = async () => {
     if (selectedCategories.length === 0) {
-      console.warn("[DEBUG] No categories selected for submission")
       toast({
         title: "Warning",
         description: "Please select at least one category before submitting",
@@ -120,25 +102,14 @@ export default function BusinessFocusPage() {
 
     setIsSaving(true)
     try {
-      console.log(
-        "[DEBUG] Submitting categories:",
-        selectedCategories.map((c) => ({
-          category: c.category,
-          subcategory: c.subcategory,
-          fullPath: c.fullPath,
-        })),
-      )
+      // Save to server
+      console.log(`Saving ${selectedCategories.length} categories:`, selectedCategories)
       const result = await saveBusinessCategories(selectedCategories)
-      console.log("[DEBUG] saveBusinessCategories result:", {
-        success: result.success,
-        message: result.message,
-      })
 
       if (result.success) {
         // Also save to localStorage as a backup
         localStorage.setItem("selectedCategories", JSON.stringify(selectedCategories))
 
-        console.log("[DEBUG] Categories saved successfully, redirecting to /workbench")
         toast({
           title: "Success",
           description: `Your ${selectedCategories.length} category selections have been saved`,
@@ -153,7 +124,7 @@ export default function BusinessFocusPage() {
         throw new Error(result.message || "Failed to save categories")
       }
     } catch (error) {
-      console.error("[DEBUG] Error saving categories:", error)
+      console.error("Error saving categories:", error)
       toast({
         title: "Error",
         description: "Failed to save your category selections",
@@ -180,9 +151,10 @@ export default function BusinessFocusPage() {
           <ServiceAreaSectionEnhanced />
 
           <KeywordsSection />
+
           <div className="mt-12 bg-white rounded-xl shadow-md p-6">
             <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
-              Please select the categories where you would like your Ad Box to appear
+              Please select the categories where you would like your Ad Box to be displayed
             </h2>
             <div className="text-center text-gray-600 mb-8">
               <p className="mb-2">
@@ -191,7 +163,7 @@ export default function BusinessFocusPage() {
               <p className="mb-2">
                 Each category features high-quality imagery representing professional services in your area.
               </p>
-              <p>When finished making your selections, press the submit button at the bottom.</p>
+              <p>When finished making your selections, press the submit button at the bottom of the page.</p>
             </div>
 
             {/* Show category change warning */}

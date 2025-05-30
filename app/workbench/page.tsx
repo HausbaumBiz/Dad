@@ -121,8 +121,8 @@ export default function WorkbenchPage() {
 
                   <WorkbenchButton
                     href="/business-focus"
-                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/network-O2mL8VViEhGCFDfQP4kEJnTGQrqmm2.png"
-                    label="Core Business Area and Targeted Market"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/business-cards-icon-X09H698yJZQiK1Ve9bMp9fK3NmIZBt.png"
+                    label="Your Business Focus"
                   />
 
                   <WorkbenchButton
@@ -133,12 +133,12 @@ export default function WorkbenchPage() {
 
                   <WorkbenchButton
                     href="/job-listing"
-                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/jobs2-Nb85MT9cYjKQnH5MfBkc5ehLB6hQGb.png"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/jobs-icon-NE5EpebSE0Zp2qBCfvaAKSpMiNJZ9n.png"
                     label="Create A Job Listing"
                   />
                   <WorkbenchButton
                     href="/photo-album"
-                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/photoalbum2-aW3atTFItEtTb1OfeYGzPG9M7Zhnq3.png"
+                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/photoalbum01-FsC6igao1fZh4IqPiYVjWz4Yf7dfdk.png"
                     label="Photo Album"
                   />
 
@@ -150,7 +150,7 @@ export default function WorkbenchPage() {
 
                   <WorkbenchButton
                     href="/custom-button-workbench"
-                    iconSrc="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/special%20button2-lspHlW7edFnlevVa1OTX1MYUSaDHua.png"
+                    iconSrc="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/custom%20button02-2xZ348ksSBLZaql05dru0A4P6c5K27.png"
                     label="Custom Button"
                   />
 
