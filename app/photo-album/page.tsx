@@ -473,10 +473,6 @@ export default function PhotoAlbumPage() {
           </Link>
           <h1 className="text-3xl font-bold">{businessName}'s Photo Album</h1>
         </div>
-        <Button onClick={handleSyncCloudflare} disabled={isSyncing} variant="outline">
-          {isSyncing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Sync with Cloudflare
-        </Button>
       </div>
 
       {/* Cloudflare Images Status */}
