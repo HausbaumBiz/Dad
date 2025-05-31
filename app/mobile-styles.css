@@ -73,43 +73,34 @@
     font-size: 0.875rem !important;
   }
 
-  /* BUSINESS PROFILE DIALOG - Mobile fixes */
+  /* BUSINESS PROFILE DIALOG - Mobile fixes - Smaller but not full screen */
   .business-profile-dialog-content {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100% !important;
-    height: 100vh !important;
-    max-width: 100% !important;
-    max-height: 100vh !important;
-    margin: 0 !important;
+    width: 95% !important;
+    max-width: 95% !important;
+    max-height: 85vh !important;
+    margin: 2.5vh auto !important;
     padding: 0 !important;
-    border-radius: 0 !important;
-    transform: none !important;
+    border-radius: 0.5rem !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    inset: 0 !important;
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
   }
 
   /* Business profile dialog scrollable content */
   .business-profile-dialog-content > div {
-    min-height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
+    max-height: 85vh !important;
   }
 
   /* Business profile card adjustments */
   .business-profile-dialog-content .card {
-    border-radius: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    min-height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+    overflow: hidden !important;
   }
 
   /* Business profile content spacing */
@@ -125,14 +116,14 @@
   /* Business profile buttons grid */
   .business-profile-dialog-content .grid-cols-3 {
     grid-template-columns: repeat(3, 1fr) !important;
-    gap: 0.5rem !important;
+    gap: 0.375rem !important;
   }
 
   /* Business profile button sizing */
   .business-profile-dialog-content .grid-cols-3 button {
-    padding: 0.75rem 0.5rem !important;
+    padding: 0.5rem 0.25rem !important;
     font-size: 0.75rem !important;
-    min-height: 60px !important;
+    min-height: 50px !important;
   }
 
   /* Business profile video container */
@@ -147,7 +138,30 @@
     top: 0 !important;
     z-index: 50 !important;
     background-color: white !important;
-    padding: 0.5rem !important;
+    padding: 0.375rem !important;
+  }
+
+  /* Adjust padding for smaller dialog */
+  .business-profile-dialog-content .p-5 {
+    padding: 0.875rem !important;
+  }
+
+  .business-profile-dialog-content .pt-6 {
+    padding-top: 0.875rem !important;
+  }
+
+  .business-profile-dialog-content .px-6 {
+    padding-left: 0.875rem !important;
+    padding-right: 0.875rem !important;
+  }
+
+  .business-profile-dialog-content .px-4 {
+    padding-left: 0.875rem !important;
+    padding-right: 0.875rem !important;
+  }
+
+  .business-profile-dialog-content .pb-4 {
+    padding-bottom: 0.875rem !important;
   }
 
   /* FULL SCREEN JOBS DIALOG - Aggressive fix for width issues */
@@ -471,47 +485,50 @@
     box-sizing: border-box !important;
   }
 
-  /* Make business profile dialog take full screen on very small devices */
+  /* Make business profile dialog smaller on very small devices but keep modal behavior */
   .business-profile-dialog-content {
-    width: 100% !important;
-    height: 100vh !important;
-    max-width: 100% !important;
-    max-height: 100vh !important;
-    margin: 0 !important;
+    width: 98% !important;
+    max-width: 98% !important;
+    max-height: 90vh !important;
+    margin: 5vh auto !important;
     padding: 0 !important;
-    border-radius: 0 !important;
+    border-radius: 0.375rem !important;
     position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    transform: none !important;
-    inset: 0 !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
   }
 
   /* Business profile content adjustments for very small screens */
   .business-profile-dialog-content .p-5 {
-    padding: 1rem !important;
+    padding: 0.75rem !important;
   }
 
   .business-profile-dialog-content .pt-6 {
-    padding-top: 1rem !important;
+    padding-top: 0.75rem !important;
   }
 
   .business-profile-dialog-content .px-6 {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
   }
 
   .business-profile-dialog-content .px-4 {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
   }
 
   .business-profile-dialog-content .pb-4 {
-    padding-bottom: 1rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  /* Smaller buttons for very small screens */
+  .business-profile-dialog-content .grid-cols-3 button {
+    padding: 0.375rem 0.25rem !important;
+    font-size: 0.6875rem !important;
+    min-height: 45px !important;
   }
 
   /* Adjust job logo size for very small screens */
