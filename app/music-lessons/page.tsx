@@ -10,7 +10,7 @@ import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Phone } from "lucide-react"
+import { Phone, MapPin } from "lucide-react"
 
 export default function MusicLessonsPage() {
   const filterOptions = [
@@ -59,42 +59,6 @@ export default function MusicLessonsPage() {
     fetchProviders()
   }, [])
 
-  // Add helper functions after the useEffect:
-  const getPhoneNumber = (business: any) => {
-    return business?.phone || business?.adDesign?.businessInfo?.phone || ""
-  }
-
-  const getLocation = (business: any) => {
-    const address = business?.address || business?.adDesign?.businessInfo?.streetAddress || ""
-    const city = business?.city || business?.adDesign?.businessInfo?.city || ""
-    const state = business?.state || business?.adDesign?.businessInfo?.state || ""
-
-    const parts = []
-    if (address) parts.push(address)
-    if (city && state) {
-      parts.push(`${city}, ${state}`)
-    } else if (city) {
-      parts.push(city)
-    } else if (state) {
-      parts.push(state)
-    }
-
-    return parts.join(", ")
-  }
-
-  const getSubcategories = (business: any) => {
-    if (business?.subcategories && business.subcategories.length > 0) {
-      return business.subcategories
-    }
-    if (business?.services && business.services.length > 0) {
-      return business.services
-    }
-    if (business?.category) {
-      return [business.category]
-    }
-    return []
-  }
-
   // Add state for business profile dialog:
   const [isBusinessProfileOpen, setIsBusinessProfileOpen] = useState(false)
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
@@ -104,7 +68,7 @@ export default function MusicLessonsPage() {
   const handleViewProfile = (business: any) => {
     console.log("Opening profile for business:", business)
     setSelectedBusinessId(business.id)
-    setSelectedBusinessName(business.businessName || "Music Instructor")
+    setSelectedBusinessName(business.displayName || business.businessName || "Music Instructor")
     setIsBusinessProfileOpen(true)
   }
 
@@ -116,7 +80,7 @@ export default function MusicLessonsPage() {
   const handleViewReviews = (business: any) => {
     setSelectedProvider({
       id: business.id,
-      name: business.businessName || "Music Instructor",
+      name: business.displayName || business.businessName || "Music Instructor",
       reviews: [],
     })
     setIsReviewsDialogOpen(true)
@@ -184,70 +148,64 @@ export default function MusicLessonsPage() {
               </div>
             )}
 
-            {providers.map((business: any) => {
-              const phone = getPhoneNumber(business)
-              const location = getLocation(business)
-              const subcategories = getSubcategories(business)
+            {providers.map((business: any) => (
+              <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        {business.displayName || business.businessName || "Music Instructor"}
+                      </h3>
 
-              return (
-                <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col md:flex-row justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          {business.businessName || "Music Instructor"}
-                        </h3>
+                      {business.description && <p className="text-gray-600 text-sm mt-1">{business.description}</p>}
 
-                        {business.description && <p className="text-gray-600 text-sm mt-1">{business.description}</p>}
-
-                        <div className="mt-3 space-y-2">
-                          {phone && (
-                            <div className="flex items-center text-sm text-gray-600">
-                              <Phone className="h-4 w-4 mr-2 text-primary" />
-                              <a href={`tel:${phone}`} className="hover:text-primary transition-colors">
-                                {phone}
-                              </a>
-                            </div>
-                          )}
-
-                          {location && (
-                            <div className="flex items-center text-sm text-gray-600">
-                              <span className="text-primary mr-2">📍</span>
-                              <span>{location}</span>
-                            </div>
-                          )}
+                      <div className="mt-3 space-y-2">
+                        {/* Location Display */}
+                        <div className="flex items-center text-sm text-gray-600">
+                          <MapPin className="h-4 w-4 mr-2 text-primary" />
+                          <span>{business.displayLocation}</span>
                         </div>
 
-                        {subcategories.length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
-                            <div className="flex flex-wrap gap-2">
-                              {subcategories.map((subcategory: string, idx: number) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                                >
-                                  {subcategory}
-                                </span>
-                              ))}
-                            </div>
+                        {/* Phone Display */}
+                        {business.displayPhone && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Phone className="h-4 w-4 mr-2 text-primary" />
+                            <a href={`tel:${business.displayPhone}`} className="hover:text-primary transition-colors">
+                              {business.displayPhone}
+                            </a>
                           </div>
                         )}
                       </div>
 
-                      <div className="mt-4 md:mt-0 md:ml-6 flex flex-col space-y-2">
-                        <Button className="min-w-[120px]" onClick={() => handleViewReviews(business)}>
-                          Reviews
-                        </Button>
-                        <Button variant="outline" className="min-w-[120px]" onClick={() => handleViewProfile(business)}>
-                          View Profile
-                        </Button>
-                      </div>
+                      {business.subcategories && business.subcategories.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {business.subcategories.map((subcategory: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                              >
+                                {subcategory}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+
+                    <div className="mt-4 md:mt-0 md:ml-6 flex flex-col space-y-2">
+                      <Button className="min-w-[120px]" onClick={() => handleViewReviews(business)}>
+                        Reviews
+                      </Button>
+                      <Button variant="outline" className="min-w-[120px]" onClick={() => handleViewProfile(business)}>
+                        View Profile
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </>
         )}
       </div>

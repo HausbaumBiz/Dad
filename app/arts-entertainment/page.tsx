@@ -11,8 +11,8 @@ import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
-import { Loader2 } from "lucide-react"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
+import { Loader2, MapPin, Phone } from "lucide-react"
 
 export default function ArtsEntertainmentPage() {
   const { toast } = useToast()
@@ -50,34 +50,8 @@ export default function ArtsEntertainmentPage() {
     async function fetchBusinesses() {
       setIsLoading(true)
       try {
-        const categoryFormats = [
-          "artDesignEntertainment",
-          "Art, Design and Entertainment",
-          "arts-entertainment",
-          "Arts & Entertainment",
-          "art-design-entertainment",
-          "art-design-and-entertainment",
-          "arts-&-entertainment",
-        ]
-
-        let allBusinesses: any[] = []
-
-        for (const format of categoryFormats) {
-          try {
-            const result = await getBusinessesByCategory(format)
-            if (result && result.length > 0) {
-              allBusinesses = [...allBusinesses, ...result]
-            }
-          } catch (error) {
-            console.error(`Error fetching businesses for format ${format}:`, error)
-          }
-        }
-
-        const uniqueBusinesses = allBusinesses.filter(
-          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
-        )
-
-        setBusinesses(uniqueBusinesses)
+        const result = await getBusinessesBySelectedCategories("/arts-entertainment")
+        setBusinesses(result || [])
       } catch (error) {
         console.error("Error fetching businesses:", error)
         toast({
@@ -96,13 +70,8 @@ export default function ArtsEntertainmentPage() {
   // Filter businesses based on selected subcategory
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
-        if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-          return business.allSubcategories.some((sub: string) =>
-            sub.toLowerCase().includes(selectedFilter.toLowerCase()),
-          )
-        }
-        if (business.subcategory) {
-          return business.subcategory.toLowerCase().includes(selectedFilter.toLowerCase())
+        if (business.subcategories && Array.isArray(business.subcategories)) {
+          return business.subcategories.some((sub: string) => sub.toLowerCase().includes(selectedFilter.toLowerCase()))
         }
         return false
       })
@@ -166,11 +135,29 @@ export default function ArtsEntertainmentPage() {
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{business.businessName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{business.city || business.zipCode}</p>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
 
-                    <div className="flex items-center mt-2">
+                    {/* Location Display */}
+                    <div className="flex items-center mt-2 text-gray-600">
+                      <MapPin className="h-4 w-4 mr-2 text-primary" />
+                      <span className="text-sm">{business.displayLocation}</span>
+                    </div>
+
+                    {/* Phone Display */}
+                    {business.displayPhone && (
+                      <div className="flex items-center mt-1 text-gray-600">
+                        <Phone className="h-4 w-4 mr-2 text-primary" />
+                        <a
+                          href={`tel:${business.displayPhone}`}
+                          className="text-sm hover:text-primary transition-colors"
+                        >
+                          {business.displayPhone}
+                        </a>
+                      </div>
+                    )}
+
+                    <div className="flex items-center mt-3">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
                           <svg
@@ -188,36 +175,28 @@ export default function ArtsEntertainmentPage() {
                       </span>
                     </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service: string, idx: number) => (
+                    {business.subcategories && business.subcategories.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700">Services:</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {business.subcategories.map((service: string, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
                               {service}
                             </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {business.subcategory || "Arts & Entertainment"}
-                          </span>
-                        )}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
+                  <div className="mt-4 md:mt-0 md:ml-6 flex flex-col space-y-2">
+                    <Button className="min-w-[120px]" onClick={() => handleOpenReviews(business)}>
                       Reviews
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(business)}
-                    >
+                    <Button variant="outline" className="min-w-[120px]" onClick={() => handleOpenProfile(business)}>
                       View Profile
                     </Button>
                   </div>
@@ -250,7 +229,7 @@ export default function ArtsEntertainmentPage() {
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.businessName || selectedProvider.name}
+          providerName={selectedProvider.displayName || selectedProvider.businessName || selectedProvider.name}
           businessId={selectedProvider.id}
           reviews={[]}
         />

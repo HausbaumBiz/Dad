@@ -72,6 +72,80 @@ export async function getBusinessesBySelectedCategories(route: string): Promise<
           if (business) {
             console.log(`Found matching business: ${business.businessName} (${businessId})`)
 
+            // Get ad design data to get the preferred business name and location info
+            try {
+              const adDesignData = await getBusinessAdDesignData(businessId)
+              console.log(`Ad design data for ${businessId}:`, adDesignData)
+
+              // If ad design has a business name, use that instead
+              if (adDesignData?.businessInfo?.businessName) {
+                business.displayName = adDesignData.businessInfo.businessName
+                console.log(`Using ad design name: ${business.displayName}`)
+              } else {
+                business.displayName = business.businessName
+                console.log(`Using registration name: ${business.displayName}`)
+              }
+
+              // Get city and state from ad design if available, otherwise use registration data
+              if (adDesignData?.businessInfo?.city) {
+                business.displayCity = adDesignData.businessInfo.city
+                console.log(`Using ad design city: ${business.displayCity}`)
+              } else {
+                business.displayCity = business.city
+                console.log(`Using registration city: ${business.displayCity}`)
+              }
+
+              if (adDesignData?.businessInfo?.state) {
+                business.displayState = adDesignData.businessInfo.state
+                console.log(`Using ad design state: ${business.displayState}`)
+              } else {
+                business.displayState = business.state
+                console.log(`Using registration state: ${business.displayState}`)
+              }
+
+              // Get phone number from ad design if available
+              if (adDesignData?.businessInfo?.phone) {
+                business.displayPhone = adDesignData.businessInfo.phone
+                console.log(`Using ad design phone: ${business.displayPhone}`)
+              } else {
+                business.displayPhone = business.phone
+              }
+
+              // Create a combined display location
+              if (business.displayCity && business.displayState) {
+                business.displayLocation = `${business.displayCity}, ${business.displayState}`
+              } else if (business.displayCity) {
+                business.displayLocation = business.displayCity
+              } else if (business.displayState) {
+                business.displayLocation = business.displayState
+              } else {
+                business.displayLocation = `Zip: ${business.zipCode}`
+              }
+
+              console.log(`Display location for ${business.displayName}: ${business.displayLocation}`)
+
+              // Also attach the full ad design data
+              business.adDesignData = adDesignData
+            } catch (adError) {
+              console.error(`Error getting ad design for business ${businessId}:`, getErrorMessage(adError))
+              // Fallback to registration data
+              business.displayName = business.businessName
+              business.displayCity = business.city
+              business.displayState = business.state
+              business.displayPhone = business.phone
+
+              // Create fallback location
+              if (business.city && business.state) {
+                business.displayLocation = `${business.city}, ${business.state}`
+              } else if (business.city) {
+                business.displayLocation = business.city
+              } else if (business.state) {
+                business.displayLocation = business.state
+              } else {
+                business.displayLocation = `Zip: ${business.zipCode}`
+              }
+            }
+
             // Fetch subcategory names if available
             let subcategories = []
             if (selectedSubcategoryIds && selectedSubcategoryIds.length > 0) {
@@ -83,7 +157,7 @@ export async function getBusinessesBySelectedCategories(route: string): Promise<
                 })
 
                 subcategories = await Promise.all(subcategoryPromises)
-                console.log(`Fetched subcategories for ${business.businessName}:`, subcategories)
+                console.log(`Fetched subcategories for ${business.displayName}:`, subcategories)
               } catch (subcatError) {
                 console.error(`Error fetching subcategory names for ${businessId}:`, getErrorMessage(subcatError))
                 // If there's an error, just use the IDs
@@ -116,17 +190,52 @@ export async function getBusinessesBySelectedCategories(route: string): Promise<
 // Function to get business ad design data
 export async function getBusinessAdDesignData(businessId: string) {
   try {
-    const adDesign = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`)
-    if (!adDesign) return null
+    // Check if we're in a server environment
+    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      console.warn("KV environment variables not available for ad design data")
+      return null
+    }
 
-    let parsedDesign
+    // Get the main ad design data
+    const mainKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`
+    const businessInfoKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:businessInfo`
+
+    const adDesign = await kv.get(mainKey)
+    const businessInfo = await kv.get(businessInfoKey)
+
+    // Parse the data safely
+    let parsedDesign = null
+    let parsedBusinessInfo = null
+
     if (typeof adDesign === "string") {
-      parsedDesign = JSON.parse(adDesign)
-    } else {
+      try {
+        parsedDesign = JSON.parse(adDesign)
+      } catch (e) {
+        console.error("Error parsing ad design:", e)
+      }
+    } else if (adDesign && typeof adDesign === "object") {
       parsedDesign = adDesign
     }
 
-    return parsedDesign
+    if (typeof businessInfo === "string") {
+      try {
+        parsedBusinessInfo = JSON.parse(businessInfo)
+      } catch (e) {
+        console.error("Error parsing business info:", e)
+      }
+    } else if (businessInfo && typeof businessInfo === "object") {
+      parsedBusinessInfo = businessInfo
+    }
+
+    // If we have business info, return it with the design data
+    if (parsedBusinessInfo || parsedDesign) {
+      return {
+        ...parsedDesign,
+        businessInfo: parsedBusinessInfo || {},
+      }
+    }
+
+    return null
   } catch (error) {
     console.error(`Error getting ad design for business ${businessId}:`, getErrorMessage(error))
     return null

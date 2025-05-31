@@ -3,20 +3,29 @@ export interface Business {
   firstName: string
   lastName: string
   businessName: string
+  displayName?: string // Business name from ad design
+  displayCity?: string // City from ad design or registration
+  displayState?: string // State from ad design or registration
+  displayPhone?: string // Phone from ad design or registration
+  displayLocation?: string // Combined city, state display
   zipCode: string
   email: string
   passwordHash?: string
   isEmailVerified: boolean
-  createdAt?: string
-  updatedAt?: string
-  phone?: string
+  createdAt: string
+  updatedAt: string
   category?: string
-  services?: string[]
+  phone?: string
+  address?: string
   city?: string
   state?: string
   rating?: number
   reviews?: number
+  services?: string[]
+  subcategories?: string[]
+  allSubcategories?: string[]
   reviewsData?: any[]
+  adDesignData?: any // Full ad design data
 }
 
 export interface User {

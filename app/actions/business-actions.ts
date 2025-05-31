@@ -761,3 +761,131 @@ export async function getBusinessAdDesign(businessId: string) {
     return null
   }
 }
+
+// Add a new function to get businesses with ad design data
+export async function getBusinessesWithAdDesignData(): Promise<Business[]> {
+  try {
+    console.log("Fetching all businesses with ad design data")
+
+    // Check if KV environment variables are available
+    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      console.warn("KV environment variables are missing. Using mock data for development.")
+      return [
+        {
+          id: "demo-business-1",
+          firstName: "Demo",
+          lastName: "User",
+          businessName: "Demo Business 1",
+          zipCode: "12345",
+          email: "demo1@example.com",
+          isEmailVerified: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ]
+    }
+
+    // Get all business IDs from the set
+    let businessIds: string[] = []
+
+    try {
+      businessIds = (await kv.smembers(KEY_PREFIXES.BUSINESSES_SET)) as string[]
+      console.log(`Found ${businessIds.length} business IDs`)
+    } catch (error) {
+      console.error("Error fetching business IDs:", getErrorMessage(error))
+      return []
+    }
+
+    if (!businessIds || businessIds.length === 0) {
+      console.log("No business IDs found in the set")
+      return []
+    }
+
+    // Fetch each business's data with ad design data
+    const businessesPromises = businessIds.map(async (id) => {
+      try {
+        const business = (await kv.get(`${KEY_PREFIXES.BUSINESS}${id}`)) as Business | null
+        if (business && typeof business === "object") {
+          const sanitizedBusiness = sanitizeBusinessData({ ...business, id })
+
+          // Get ad design data
+          const adDesignData = await getBusinessAdDesign(id)
+
+          // If ad design has a business name, use that instead
+          if (adDesignData?.businessInfo?.businessName) {
+            sanitizedBusiness.displayName = adDesignData.businessInfo.businessName
+          } else {
+            sanitizedBusiness.displayName = sanitizedBusiness.businessName
+          }
+
+          // Also attach the full ad design data for other uses
+          sanitizedBusiness.adDesignData = adDesignData
+
+          return sanitizedBusiness
+        }
+        console.warn(`Business ${id} not found or invalid data`)
+        return null
+      } catch (err) {
+        console.error(`Error fetching business ${id}:`, getErrorMessage(err))
+        return null
+      }
+    })
+
+    const businesses = (await Promise.all(businessesPromises)).filter(Boolean) as Business[]
+
+    console.log(`Successfully fetched ${businesses.length} businesses with ad design data`)
+
+    // Sort by creation date (newest first)
+    return businesses.sort((a, b) => {
+      const dateA = new Date(a.createdAt || "").getTime()
+      const dateB = new Date(b.createdAt || "").getTime()
+      return dateB - dateA
+    })
+  } catch (error) {
+    console.error("Error fetching businesses with ad design data:", getErrorMessage(error))
+    return []
+  }
+}
+
+// Update the existing getBusinessesByCategory function to include ad design data
+export async function getBusinessesByCategoryWithAdDesign(category: string): Promise<Business[]> {
+  try {
+    console.log(`Getting businesses with ad design for category: ${category}`)
+
+    // Get businesses by category using existing function
+    const businesses = await getBusinessesByCategoryFromDb(category)
+
+    // Enhance each business with ad design data
+    const enhancedBusinesses = await Promise.all(
+      businesses.map(async (business) => {
+        try {
+          // Get ad design data
+          const adDesignData = await getBusinessAdDesign(business.id)
+
+          // If ad design has a business name, use that instead
+          if (adDesignData?.businessInfo?.businessName) {
+            business.displayName = adDesignData.businessInfo.businessName
+          } else {
+            business.displayName = business.businessName
+          }
+
+          // Also attach the full ad design data for other uses
+          business.adDesignData = adDesignData
+
+          return business
+        } catch (error) {
+          console.error(`Error getting ad design for business ${business.id}:`, getErrorMessage(error))
+          // Fallback to registration name
+          business.displayName = business.businessName
+          return business
+        }
+      }),
+    )
+
+    console.log(`Enhanced ${enhancedBusinesses.length} businesses with ad design data for category ${category}`)
+    return enhancedBusinesses
+  } catch (error) {
+    console.error(`Error getting businesses with ad design for category ${category}:`, getErrorMessage(error))
+    return []
+  }
+}

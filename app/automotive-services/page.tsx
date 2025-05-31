@@ -9,8 +9,9 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { AdBox } from "@/components/ad-box"
-import { getBusinessesBySelectedCategories, getBusinessAdDesignData } from "@/app/actions/business-category-fetcher"
+import { getBusinessAdDesignData } from "@/app/actions/business-category-fetcher"
 import type { Business } from "@/lib/definitions"
+import { getBusinessesByCategoryWithAdDesign } from "@/app/actions/business-actions"
 
 export default function AutomotiveServicesPage() {
   const filterOptions = [
@@ -52,7 +53,7 @@ export default function AutomotiveServicesPage() {
         setError(null)
 
         // Fetch businesses that have selected "automotive" category
-        const matchingBusinesses = await getBusinessesBySelectedCategories("/automotive-services")
+        const matchingBusinesses = await getBusinessesByCategoryWithAdDesign("/automotive-services")
         setBusinesses(matchingBusinesses)
 
         // Fetch ad design data for each business
@@ -78,7 +79,7 @@ export default function AutomotiveServicesPage() {
   const handleOpenReviews = (business: Business) => {
     setSelectedProvider({
       id: business.id,
-      name: business.businessName,
+      name: business.displayName || business.businessName,
       reviews: business.reviewsData || [],
     })
     setIsReviewsDialogOpen(true)
@@ -156,7 +157,7 @@ export default function AutomotiveServicesPage() {
                 {/* Business AdBox */}
                 {adDesign && (
                   <AdBox
-                    title={adDesign.businessInfo?.businessName || business.businessName}
+                    title={business.displayName || adDesign.businessInfo?.businessName || business.businessName}
                     description={adDesign.businessInfo?.freeText || "Professional automotive services"}
                     businessName={business.businessName}
                     businessId={business.id}
@@ -174,7 +175,7 @@ export default function AutomotiveServicesPage() {
                   <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row justify-between">
                       <div>
-                        <h3 className="text-xl font-semibold">{business.businessName}</h3>
+                        <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
                         <p className="text-gray-600 text-sm mt-1">
                           {business.city && business.state
                             ? `${business.city}, ${business.state}`
