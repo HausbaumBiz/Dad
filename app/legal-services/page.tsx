@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { Phone, MapPin, Tag } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { AdBox } from "@/components/ad-box"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesBySelectedCategories, getBusinessAdDesignData } from "@/app/actions/business-category-fetcher"
 import type { Business } from "@/lib/definitions"
 
@@ -39,6 +40,13 @@ export default function LegalServicesPage() {
     reviews: any[]
   } | null>(null)
 
+  // State for business profile dialog
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedBusiness, setSelectedBusiness] = useState<{
+    id: string
+    name: string
+  } | null>(null)
+
   // State for businesses and ad designs
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [businessAdDesigns, setBusinessAdDesigns] = useState<Record<string, any>>({})
@@ -53,6 +61,7 @@ export default function LegalServicesPage() {
 
         // Fetch businesses that have selected "lawyers" category
         const matchingBusinesses = await getBusinessesBySelectedCategories("/legal-services")
+        console.log("Fetched businesses:", matchingBusinesses)
         setBusinesses(matchingBusinesses)
 
         // Fetch ad design data for each business
@@ -82,6 +91,14 @@ export default function LegalServicesPage() {
       reviews: business.reviewsData || [],
     })
     setIsReviewsDialogOpen(true)
+  }
+
+  const handleViewProfile = (business: Business) => {
+    setSelectedBusiness({
+      id: business.id,
+      name: business.businessName,
+    })
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -150,37 +167,62 @@ export default function LegalServicesPage() {
           {businesses.map((business) => {
             const adDesign = businessAdDesigns[business.id]
 
+            // Get phone number from multiple sources (prioritize business data, then ad design)
+            const phoneNumber = business.phone || adDesign?.businessInfo?.phone || null
+
+            // Get location information (prioritize business data, then ad design)
+            const city = business.city || adDesign?.businessInfo?.city || null
+            const state = business.state || adDesign?.businessInfo?.state || null
+
+            // Format the location display - WITHOUT ZIP code
+            let locationDisplay = "Location not available"
+            if (city && state) {
+              locationDisplay = `${city}, ${state}`
+            } else if (city) {
+              locationDisplay = city
+            } else if (state) {
+              locationDisplay = state
+            }
+
+            // Get address information
+            const address = business.address || adDesign?.businessInfo?.address || null
+            const fullAddress = address ? `${address}, ${locationDisplay}` : locationDisplay
+
             return (
               <div key={business.id} className="space-y-4">
-                {/* Business AdBox */}
-                {adDesign && (
-                  <AdBox
-                    title={adDesign.businessInfo?.businessName || business.businessName}
-                    description={adDesign.businessInfo?.freeText || "Professional legal services"}
-                    businessName={business.businessName}
-                    businessId={business.id}
-                    phoneNumber={adDesign.businessInfo?.phone || business.phone}
-                    address={
-                      adDesign.businessInfo?.streetAddress
-                        ? `${adDesign.businessInfo.streetAddress}, ${adDesign.businessInfo.city || ""}, ${adDesign.businessInfo.state || ""} ${adDesign.businessInfo.zipCode || ""}`.trim()
-                        : undefined
-                    }
-                  />
-                )}
-
                 {/* Business Card */}
                 <Card className="overflow-hidden hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row justify-between">
-                      <div>
-                        <h3 className="text-xl font-semibold">{business.businessName}</h3>
-                        <p className="text-gray-600 text-sm mt-1">
-                          {business.city && business.state
-                            ? `${business.city}, ${business.state}`
-                            : `Zip: ${business.zipCode}`}
-                        </p>
+                      <div className="flex-1">
+                        {/* Business Name */}
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">{business.businessName}</h3>
 
-                        <div className="flex items-center mt-2">
+                        {/* Business Description */}
+                        {adDesign?.businessInfo?.freeText && (
+                          <p className="text-gray-700 mb-3 leading-relaxed">{adDesign.businessInfo.freeText}</p>
+                        )}
+
+                        {/* Phone Number with Icon */}
+                        {phoneNumber && (
+                          <div className="flex items-center mb-2">
+                            <Phone className="w-4 h-4 text-gray-500 mr-2" />
+                            <span className="text-sm text-gray-600">
+                              <a href={`tel:${phoneNumber}`} className="hover:text-blue-600 hover:underline">
+                                {phoneNumber}
+                              </a>
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Location with Icon */}
+                        <div className="flex items-center mb-3">
+                          <MapPin className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+                          <span className="text-sm text-gray-600">{fullAddress}</span>
+                        </div>
+
+                        {/* Star Rating */}
+                        <div className="flex items-center mb-3">
                           <div className="flex">
                             {[...Array(5)].map((_, i) => (
                               <svg
@@ -198,28 +240,76 @@ export default function LegalServicesPage() {
                           </span>
                         </div>
 
-                        {business.services && business.services.length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-sm font-medium text-gray-700">Specialties:</p>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {business.services.map((service, idx) => (
+                        {/* Subcategories - Primary Display */}
+                        {business.subcategories && business.subcategories.length > 0 && (
+                          <div className="mb-3">
+                            <div className="flex items-center mb-2">
+                              <Tag className="w-4 h-4 text-gray-500 mr-2" />
+                              <span className="text-sm font-medium text-gray-700">Specialties:</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {business.subcategories.map((subcategory, idx) => (
                                 <span
                                   key={idx}
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
                                 >
-                                  {service}
+                                  {subcategory}
                                 </span>
                               ))}
                             </div>
                           </div>
                         )}
+
+                        {/* Services as Backup */}
+                        {(!business.subcategories || business.subcategories.length === 0) &&
+                          business.services &&
+                          business.services.length > 0 && (
+                            <div className="mb-3">
+                              <div className="flex items-center mb-2">
+                                <Tag className="w-4 h-4 text-gray-500 mr-2" />
+                                <span className="text-sm font-medium text-gray-700">Services:</span>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {business.services.map((service, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200"
+                                  >
+                                    {service}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                        {/* Main Category as Last Resort */}
+                        {(!business.subcategories || business.subcategories.length === 0) &&
+                          (!business.services || business.services.length === 0) &&
+                          business.category && (
+                            <div className="mb-3">
+                              <div className="flex items-center mb-2">
+                                <Tag className="w-4 h-4 text-gray-500 mr-2" />
+                                <span className="text-sm font-medium text-gray-700">Category:</span>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                  {business.category}
+                                </span>
+                              </div>
+                            </div>
+                          )}
                       </div>
 
-                      <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                        <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
+                      {/* Action Buttons */}
+                      <div className="mt-4 md:mt-0 md:ml-6 flex flex-col items-start md:items-end justify-start space-y-2">
+                        <Button className="w-full md:w-auto min-w-[120px]" onClick={() => handleOpenReviews(business)}>
                           Reviews
                         </Button>
-                        <Button variant="outline" className="mt-2 w-full md:w-auto">
+                        <Button
+                          variant="outline"
+                          className="w-full md:w-auto min-w-[120px]"
+                          onClick={() => handleViewProfile(business)}
+                        >
                           View Profile
                         </Button>
                       </div>
@@ -232,6 +322,7 @@ export default function LegalServicesPage() {
         </div>
       )}
 
+      {/* Reviews Dialog */}
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
@@ -239,6 +330,16 @@ export default function LegalServicesPage() {
           providerName={selectedProvider.name}
           businessId={selectedProvider.id}
           reviews={selectedProvider.reviews}
+        />
+      )}
+
+      {/* Business Profile Dialog (AdBox functionality) */}
+      {selectedBusiness && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedBusiness.id}
+          businessName={selectedBusiness.name}
         />
       )}
 

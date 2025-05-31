@@ -71,7 +71,32 @@ export async function getBusinessesBySelectedCategories(route: string): Promise<
           const business = (await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)) as Business | null
           if (business) {
             console.log(`Found matching business: ${business.businessName} (${businessId})`)
-            matchingBusinesses.push({ ...business, id: businessId })
+
+            // Fetch subcategory names if available
+            let subcategories = []
+            if (selectedSubcategoryIds && selectedSubcategoryIds.length > 0) {
+              try {
+                // Try to get subcategory names for each ID
+                const subcategoryPromises = selectedSubcategoryIds.map(async (subcatId) => {
+                  const subcatName = await kv.get(`${KEY_PREFIXES.SUBCATEGORY}${subcatId}:name`)
+                  return subcatName || subcatId // Fall back to ID if name not found
+                })
+
+                subcategories = await Promise.all(subcategoryPromises)
+                console.log(`Fetched subcategories for ${business.businessName}:`, subcategories)
+              } catch (subcatError) {
+                console.error(`Error fetching subcategory names for ${businessId}:`, getErrorMessage(subcatError))
+                // If there's an error, just use the IDs
+                subcategories = selectedSubcategoryIds
+              }
+            }
+
+            // Add the business with its ID and subcategories
+            matchingBusinesses.push({
+              ...business,
+              id: businessId,
+              subcategories: subcategories,
+            })
           }
         }
       } catch (error) {

@@ -1,13 +1,23 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Loader2, AlertCircle, CheckCircle } from "lucide-react"
+import { Check, AlertCircle, ExternalLink } from "lucide-react"
+import { getCurrentBusiness } from "@/app/actions/auth-actions"
 import { getBusinessCategories } from "@/app/actions/category-actions"
 import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
+import { getRouteForCategoryName } from "@/lib/category-route-mapping"
 import type { CategorySelection } from "@/components/category-selector"
 import type { ZipCodeData } from "@/lib/zip-code-types"
+
+interface UniquePageInfo {
+  pageUrl: string
+  categories: Array<{
+    category: string
+    subcategory: string
+  }>
+}
 
 interface FinalizeBusinessDialogProps {
   isOpen: boolean
@@ -28,15 +38,13 @@ export function FinalizeBusinessDialog({
   onFinalize,
   colorValues,
 }: FinalizeBusinessDialogProps) {
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [businessName, setBusinessName] = useState<string>("")
   const [categories, setCategories] = useState<CategorySelection[]>([])
+  const [uniquePages, setUniquePages] = useState<UniquePageInfo[]>([])
   const [zipCodes, setZipCodes] = useState<ZipCodeData[]>([])
   const [isNationwide, setIsNationwide] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // Status flags
-  const hasCategoriesSelected = categories.length > 0
-  const hasZipCodesSelected = zipCodes.length > 0 || isNationwide
 
   useEffect(() => {
     if (isOpen) {
@@ -44,15 +52,82 @@ export function FinalizeBusinessDialog({
     }
   }, [isOpen, businessId])
 
+  const handleFinalize = async () => {
+    setIsLoading(true)
+    try {
+      await onFinalize()
+    } catch (error) {
+      console.error("Error finalizing business:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const findPageUrlForCategory = (category: CategorySelection): string => {
+    // Try with category name first
+    let pageUrl = getRouteForCategoryName(category.category)
+
+    // If that fails, try with subcategory
+    if (!pageUrl && category.subcategory) {
+      pageUrl = getRouteForCategoryName(category.subcategory)
+    }
+
+    // If that fails and we have a fullPath, try extracting from there
+    if (!pageUrl && category.fullPath) {
+      const pathParts = category.fullPath.split(" > ")
+      if (pathParts.length > 0) {
+        // Try with the main category from path
+        pageUrl = getRouteForCategoryName(pathParts[0])
+
+        // If that fails and we have a subcategory in the path, try with that
+        if (!pageUrl && pathParts.length > 1) {
+          pageUrl = getRouteForCategoryName(pathParts[pathParts.length - 1])
+        }
+      }
+    }
+
+    return pageUrl || ""
+  }
+
   const loadBusinessData = async () => {
     setIsLoading(true)
     setError(null)
 
     try {
+      // Get business info
+      const business = await getCurrentBusiness()
+      if (business) {
+        setBusinessName(business.businessName || "Your Business")
+      }
+
       // Load categories
       const categoriesResult = await getBusinessCategories()
       if (categoriesResult.success && categoriesResult.data) {
         setCategories(categoriesResult.data)
+
+        // Process all categories and group by unique page URLs
+        const pageMap = new Map<string, Array<{ category: string; subcategory: string }>>()
+
+        categoriesResult.data.forEach((category) => {
+          const pageUrl = findPageUrlForCategory(category)
+          if (pageUrl) {
+            if (!pageMap.has(pageUrl)) {
+              pageMap.set(pageUrl, [])
+            }
+            pageMap.get(pageUrl)!.push({
+              category: category.category,
+              subcategory: category.subcategory,
+            })
+          }
+        })
+
+        // Convert map to array of unique pages
+        const uniquePagesArray: UniquePageInfo[] = Array.from(pageMap.entries()).map(([pageUrl, categories]) => ({
+          pageUrl,
+          categories,
+        }))
+
+        setUniquePages(uniquePagesArray)
       }
 
       // Load ZIP codes
@@ -69,137 +144,135 @@ export function FinalizeBusinessDialog({
     }
   }
 
-  const handleFinalize = () => {
-    onFinalize()
-    onClose()
+  const handleViewCategoryPage = (pageUrl: string) => {
+    if (pageUrl) {
+      window.open(pageUrl, "_blank")
+    }
   }
 
-  const getPrimaryZipCode = () => {
-    return zipCodes.length > 0 ? zipCodes[0] : null
-  }
+  const categoriesWithoutPages = categories.filter((category) => {
+    const pageUrl = findPageUrlForCategory(category)
+    return !pageUrl
+  })
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-center">Business Profile Summary</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-center">Finalize Your Business Profile</DialogTitle>
         </DialogHeader>
 
-        {isLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-            <span className="ml-3 text-gray-500">Loading business data...</span>
-          </div>
-        ) : error ? (
-          <div className="bg-red-50 p-4 rounded-md text-red-800">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-              <p>{error}</p>
+        <div className="space-y-6 py-4">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="bg-green-100 rounded-full p-1 mt-0.5">
+                <Check className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-green-800">Ready to Submit</h3>
+                <p className="text-sm text-green-700 mt-1">
+                  Your business profile is complete and ready to be published.
+                </p>
+              </div>
             </div>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Categories Section */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${hasCategoriesSelected ? "bg-green-500" : "bg-yellow-500"}`} />
-                <h3 className="text-lg font-medium">Business Categories</h3>
-              </div>
 
-              {hasCategoriesSelected ? (
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <ul className="space-y-2">
-                    {categories.map((category, index) => (
-                      <li key={index} className="flex items-start">
-                        <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-medium">{category.category}</p>
-                          <p className="text-sm text-gray-600">{category.subcategory}</p>
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-medium mb-2">Business Information</h3>
+              <div className="bg-gray-50 rounded-md p-3 text-sm space-y-2">
+                <p>
+                  <span className="font-medium">Business Name:</span> {businessName}
+                </p>
+                <p>
+                  <span className="font-medium">Selected Categories:</span> {categories.length}
+                </p>
+              </div>
+            </div>
+
+            {uniquePages.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-medium text-blue-800 mb-3">
+                  Your ad will appear on {uniquePages.length} category page{uniquePages.length > 1 ? "s" : ""}:
+                </h3>
+                <div className="space-y-3">
+                  {uniquePages.map((pageInfo, index) => (
+                    <div key={index} className="bg-white rounded-md p-3 border">
+                      <div className="flex items-center justify-between mb-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewCategoryPage(pageInfo.pageUrl)}
+                          className="h-7 px-3 text-sm font-medium"
+                        >
+                          {pageInfo.pageUrl}
+                          <ExternalLink className="ml-2 h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        <span className="font-medium">Categories mapping to this page:</span>
+                        <div className="mt-1 space-y-1">
+                          {pageInfo.categories.map((cat, catIndex) => (
+                            <div key={catIndex} className="ml-2">
+                              • {cat.category} → {cat.subcategory}
+                            </div>
+                          ))}
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <div className="bg-yellow-50 p-4 rounded-md">
-                  <div className="flex">
-                    <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
-                    <p className="text-yellow-800">
-                      No business categories selected. Please select at least one category for your business.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ZIP Codes Section */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${hasZipCodesSelected ? "bg-green-500" : "bg-yellow-500"}`} />
-                <h3 className="text-lg font-medium">Service Area</h3>
-              </div>
-
-              {isNationwide ? (
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <div className="flex items-center">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                    <p>Nationwide service area selected</p>
-                  </div>
-                </div>
-              ) : hasZipCodesSelected ? (
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <div className="space-y-2">
-                    <div className="flex items-start">
-                      <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium">Primary Location:</p>
-                        <p>
-                          {getPrimaryZipCode()?.zip} - {getPrimaryZipCode()?.city}, {getPrimaryZipCode()?.state}
-                        </p>
                       </div>
                     </div>
-                    <p>
-                      <span className="font-medium">{zipCodes.length - 1}</span> additional ZIP codes in service area
-                    </p>
-                  </div>
+                  ))}
                 </div>
-              ) : (
-                <div className="bg-yellow-50 p-4 rounded-md">
-                  <div className="flex">
-                    <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
-                    <p className="text-yellow-800">
-                      No service area defined. Please select ZIP codes or choose nationwide service.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Summary */}
-            <div className="bg-blue-50 p-4 rounded-md">
-              <p className="text-blue-800">
-                <strong>Note:</strong> Your business profile should include both categories and a service area to be
-                properly listed in search results and category pages.
-              </p>
+            {categoriesWithoutPages.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                <h4 className="font-medium text-yellow-800 text-sm mb-2">
+                  Categories without corresponding pages ({categoriesWithoutPages.length}):
+                </h4>
+                <div className="space-y-1">
+                  {categoriesWithoutPages.map((category, index) => (
+                    <div key={index} className="text-sm text-yellow-700">
+                      • {category.category} → {category.subcategory}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="bg-blue-100 rounded-full p-1 mt-0.5">
+                  <AlertCircle className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-blue-800">What happens next?</h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    After finalizing, your business profile will be published and visible to customers on the category
+                    pages listed above. You can still make changes to your profile later.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        )}
 
-        <DialogFooter className="flex gap-3 mt-4">
-          <Button variant="outline" onClick={onClose}>
-            Continue Editing
-          </Button>
-          <Button
-            onClick={handleFinalize}
-            disabled={isLoading || (!hasCategoriesSelected && !hasZipCodesSelected)}
-            style={{
-              backgroundColor: colorValues.primary,
-              color: colorValues.textColor ? "#000000" : "#ffffff",
-            }}
-          >
-            Finalize and Submit
-          </Button>
-        </DialogFooter>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={onClose} className="flex-1">
+              Go Back
+            </Button>
+            <Button
+              onClick={handleFinalize}
+              disabled={isLoading}
+              className="flex-1"
+              style={{
+                backgroundColor: colorValues.primary,
+                color: colorValues.textColor ? "#000000" : "#ffffff",
+              }}
+            >
+              {isLoading ? "Finalizing..." : "Finalize & Submit"}
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )

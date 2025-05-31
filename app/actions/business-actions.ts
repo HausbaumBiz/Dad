@@ -31,6 +31,58 @@ function getErrorMessage(error: unknown): string {
   return "Unknown error occurred"
 }
 
+// Helper function to safely parse JSON data
+function safeJsonParse(data: any, fallback: any = null) {
+  try {
+    if (typeof data === "string") {
+      return JSON.parse(data)
+    }
+    if (typeof data === "object" && data !== null) {
+      return data
+    }
+    return fallback
+  } catch (error) {
+    console.error("Error parsing JSON:", error)
+    return fallback
+  }
+}
+
+// Helper function to sanitize business data
+function sanitizeBusinessData(business: any): Business {
+  if (!business || typeof business !== "object") {
+    throw new Error("Invalid business data")
+  }
+
+  // Ensure all required fields exist and are of correct type
+  const sanitized: Business = {
+    id: business.id || "",
+    firstName: business.firstName || "",
+    lastName: business.lastName || "",
+    businessName: business.businessName || "",
+    zipCode: business.zipCode || "",
+    email: business.email || "",
+    isEmailVerified: Boolean(business.isEmailVerified),
+    createdAt: business.createdAt || new Date().toISOString(),
+    updatedAt: business.updatedAt || new Date().toISOString(),
+  }
+
+  // Add optional fields if they exist
+  if (business.passwordHash) {
+    sanitized.passwordHash = business.passwordHash
+  }
+  if (business.category) {
+    sanitized.category = business.category
+  }
+  if (business.phone) {
+    sanitized.phone = business.phone
+  }
+  if (business.address) {
+    sanitized.address = business.address
+  }
+
+  return sanitized
+}
+
 // Get all businesses
 export async function getBusinesses(): Promise<Business[]> {
   try {
@@ -87,7 +139,7 @@ export async function getBusinesses(): Promise<Business[]> {
       try {
         const business = (await kv.get(`${KEY_PREFIXES.BUSINESS}${id}`)) as Business | null
         if (business && typeof business === "object") {
-          return { ...business, id }
+          return sanitizeBusinessData({ ...business, id })
         }
         console.warn(`Business ${id} not found or invalid data`)
         return null
@@ -124,7 +176,7 @@ export async function getBusinessById(id: string): Promise<Business | null> {
       return null
     }
 
-    return { ...business, id }
+    return sanitizeBusinessData({ ...business, id })
   } catch (error) {
     console.error(`Error fetching business with ID ${id}:`, getErrorMessage(error))
     return null
@@ -445,16 +497,18 @@ export async function getCurrentBusiness() {
     }
 
     console.log(`Fetching business with ID: ${businessId}`)
-    const business = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
+    const businessData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
 
-    if (!business) {
+    if (!businessData) {
       console.log(`No business found with ID: ${businessId}`)
       // Don't delete the cookie here, let the client handle redirection
       return null
     }
 
-    // Make sure the ID is included in the returned object
-    return { ...(business as Business), id: businessId }
+    // Sanitize and return the business data
+    const business = sanitizeBusinessData({ ...businessData, id: businessId })
+    console.log("Successfully retrieved and sanitized business data")
+    return business
   } catch (error) {
     console.error("Error getting current business:", getErrorMessage(error))
     // In case of error, return null instead of mock data to trigger proper error handling
@@ -590,7 +644,12 @@ export async function getBusinessAdDesign(businessId: string) {
       console.log(`Main design data (${mainKey}):`, designDataStr)
 
       if (designDataStr) {
-        designData = typeof designDataStr === "string" ? JSON.parse(designDataStr) : designDataStr
+        designData = safeJsonParse(designDataStr, {
+          designId: 5,
+          colorScheme: "blue",
+          texture: "gradient",
+          customButton: { type: "Menu", name: "Menu", icon: "Menu" },
+        })
       }
     } catch (error) {
       console.error("Error getting main design data:", getErrorMessage(error))
@@ -603,7 +662,7 @@ export async function getBusinessAdDesign(businessId: string) {
       console.log(`Color values (${colorsKey}):`, colorValuesStr)
 
       if (colorValuesStr) {
-        colorValues = typeof colorValuesStr === "string" ? JSON.parse(colorValuesStr) : colorValuesStr
+        colorValues = safeJsonParse(colorValuesStr, {})
       }
     } catch (error) {
       console.error("Error getting color values:", getErrorMessage(error))
@@ -616,7 +675,7 @@ export async function getBusinessAdDesign(businessId: string) {
       console.log(`Business info (${businessInfoKey}):`, businessInfoStr)
 
       if (businessInfoStr) {
-        businessInfo = typeof businessInfoStr === "string" ? JSON.parse(businessInfoStr) : businessInfoStr
+        businessInfo = safeJsonParse(businessInfoStr, {})
       }
     } catch (error) {
       console.error("Error getting business info:", getErrorMessage(error))
@@ -629,7 +688,7 @@ export async function getBusinessAdDesign(businessId: string) {
       console.log(`Hidden fields (${hiddenFieldsKey}):`, hiddenFieldsStr)
 
       if (hiddenFieldsStr) {
-        hiddenFields = typeof hiddenFieldsStr === "string" ? JSON.parse(hiddenFieldsStr) : hiddenFieldsStr
+        hiddenFields = safeJsonParse(hiddenFieldsStr, {})
       }
     } catch (error) {
       console.error("Error getting hidden fields:", getErrorMessage(error))
@@ -643,26 +702,24 @@ export async function getBusinessAdDesign(businessId: string) {
         console.log("Trying old format data:", oldFormatData)
 
         if (oldFormatData) {
-          let parsedData
-          if (typeof oldFormatData === "string") {
-            parsedData = JSON.parse(oldFormatData)
-          } else {
-            parsedData = oldFormatData
+          const parsedData = safeJsonParse(oldFormatData, {})
+
+          if (parsedData && typeof parsedData === "object") {
+            // Extract the components from the old format
+            designData = {
+              designId: parsedData.designId || 5,
+              colorScheme: parsedData.colorScheme || "blue",
+              texture: parsedData.texture || "gradient",
+              customButton: parsedData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
+              updatedAt: parsedData.updatedAt || new Date().toISOString(),
+            }
+
+            businessInfo = parsedData.businessInfo || {}
+            colorValues = parsedData.colorValues || {}
+            hiddenFields = parsedData.hiddenFields || {}
+
+            console.log("Successfully retrieved data from old format")
           }
-
-          // Extract the components from the old format
-          designData = {
-            designId: parsedData.designId || 5,
-            colorScheme: parsedData.colorScheme || "blue",
-            texture: parsedData.texture || "gradient", // Add texture loading
-            updatedAt: parsedData.updatedAt || new Date().toISOString(),
-          }
-
-          businessInfo = parsedData.businessInfo || {}
-          colorValues = parsedData.colorValues || {}
-          hiddenFields = parsedData.hiddenFields || {}
-
-          console.log("Successfully retrieved data from old format")
         }
       } catch (error) {
         console.error("Error getting data from old format:", getErrorMessage(error))

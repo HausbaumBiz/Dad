@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
@@ -40,7 +40,8 @@ import { DocumentsDialog } from "./documents-dialog"
 import { getCloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import type { CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { DialogClose } from "@radix-ui/react-dialog"
+import { kv } from "@/lib/redis"
+import { KEY_PREFIXES } from "@/lib/db-schema"
 
 // Add CSS to hide the default close button
 const hideDefaultCloseButtonStyle = `
@@ -59,6 +60,7 @@ interface BusinessProfileDialogProps {
 export function BusinessProfileDialog({ isOpen, onClose, businessId, businessName }: BusinessProfileDialogProps) {
   const [loading, setLoading] = useState(true)
   const [adDesign, setAdDesign] = useState<any>(null)
+  const [businessData, setBusinessData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPhotoAlbumOpen, setIsPhotoAlbumOpen] = useState(false)
   const [isCouponsOpen, setIsCouponsOpen] = useState(false)
@@ -69,11 +71,10 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   const [videoError, setVideoError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<any>(null)
 
-  // Debug toggle function and state removed
-
   useEffect(() => {
     if (isOpen && businessId) {
       console.log(`BusinessProfileDialog opened for business ID: ${businessId}`)
+      loadBusinessData()
       loadBusinessAdDesign()
       loadBusinessVideo()
     }
@@ -88,6 +89,31 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       setIsDocumentsOpen(false)
     }
   }, [isOpen])
+
+  const loadBusinessData = async () => {
+    try {
+      console.log(`Loading business data for business ID: ${businessId}`)
+
+      // Check if KV environment variables are available
+      if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+        console.warn("KV environment variables are missing. Skipping Redis business data fetch.")
+        return
+      }
+
+      const business = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
+
+      if (business) {
+        console.log("Loaded business data:", business)
+        setBusinessData(business)
+      } else {
+        console.log("No business data found")
+      }
+    } catch (err) {
+      console.error("Error loading business data:", err)
+      // Don't set error state, just log and continue without Redis data
+      // The component will fall back to ad design data
+    }
+  }
 
   const loadBusinessAdDesign = async () => {
     try {
@@ -169,6 +195,21 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   }
 
   const colorValues = getColorValues()
+
+  // Helper function to get phone number from Redis business data first, then ad design
+  const getPhoneNumber = () => {
+    // First try to get phone from Redis business data
+    if (businessData && typeof businessData === "object" && businessData.phone) {
+      return businessData.phone
+    }
+
+    // Fall back to ad design phone
+    if (adDesign?.businessInfo?.phone) {
+      return adDesign.businessInfo.phone
+    }
+
+    return null
+  }
 
   // Helper function to format phone number
   const formatPhone = (phone: string) => {
@@ -276,7 +317,8 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                 </div>
 
                 <div className="pt-6 px-6 space-y-4">
-                  {!adDesign.hiddenFields?.phone && adDesign.businessInfo?.phone && (
+                  {/* Phone Number - prioritize Redis data */}
+                  {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
                     <div className="flex items-start gap-3">
                       <div
                         className="h-5 w-5 mt-0.5 flex-shrink-0"
@@ -289,10 +331,10 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                       <div>
                         <p className="text-sm font-medium text-gray-500">Phone</p>
                         <button
-                          onClick={() => handlePhoneCall(adDesign.businessInfo?.phone)}
+                          onClick={() => handlePhoneCall(getPhoneNumber())}
                           className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
                         >
-                          {formatPhone(adDesign.businessInfo?.phone)}
+                          {formatPhone(getPhoneNumber())}
                         </button>
                       </div>
                     </div>
