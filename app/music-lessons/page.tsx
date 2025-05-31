@@ -8,6 +8,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { Phone } from "lucide-react"
 
 export default function MusicLessonsPage() {
   const filterOptions = [
@@ -39,13 +42,12 @@ export default function MusicLessonsPage() {
     const fetchProviders = async () => {
       try {
         setLoading(true)
-        // TODO: Replace with actual API call to fetch music lesson businesses
-        // const response = await fetch('/api/businesses/by-category?category=music-lessons')
-        // const data = await response.json()
-        // setProviders(data.businesses || [])
+        console.log("Fetching music lesson businesses...")
 
-        // For now, set empty array to remove demo data
-        setProviders([])
+        const businesses = await getBusinessesBySelectedCategories("/music-lessons")
+        console.log("Fetched music lesson businesses:", businesses)
+
+        setProviders(businesses)
       } catch (error) {
         console.error("Error fetching music lesson providers:", error)
         setProviders([])
@@ -57,8 +59,66 @@ export default function MusicLessonsPage() {
     fetchProviders()
   }, [])
 
+  // Add helper functions after the useEffect:
+  const getPhoneNumber = (business: any) => {
+    return business?.phone || business?.adDesign?.businessInfo?.phone || ""
+  }
+
+  const getLocation = (business: any) => {
+    const address = business?.address || business?.adDesign?.businessInfo?.streetAddress || ""
+    const city = business?.city || business?.adDesign?.businessInfo?.city || ""
+    const state = business?.state || business?.adDesign?.businessInfo?.state || ""
+
+    const parts = []
+    if (address) parts.push(address)
+    if (city && state) {
+      parts.push(`${city}, ${state}`)
+    } else if (city) {
+      parts.push(city)
+    } else if (state) {
+      parts.push(state)
+    }
+
+    return parts.join(", ")
+  }
+
+  const getSubcategories = (business: any) => {
+    if (business?.subcategories && business.subcategories.length > 0) {
+      return business.subcategories
+    }
+    if (business?.services && business.services.length > 0) {
+      return business.services
+    }
+    if (business?.category) {
+      return [business.category]
+    }
+    return []
+  }
+
+  // Add state for business profile dialog:
+  const [isBusinessProfileOpen, setIsBusinessProfileOpen] = useState(false)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+
+  // Update the handleViewProfile function:
+  const handleViewProfile = (business: any) => {
+    console.log("Opening profile for business:", business)
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.businessName || "Music Instructor")
+    setIsBusinessProfileOpen(true)
+  }
+
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
+    setIsReviewsDialogOpen(true)
+  }
+
+  const handleViewReviews = (business: any) => {
+    setSelectedProvider({
+      id: business.id,
+      name: business.businessName || "Music Instructor",
+      reviews: [],
+    })
     setIsReviewsDialogOpen(true)
   }
 
@@ -115,59 +175,80 @@ export default function MusicLessonsPage() {
             </p>
           </div>
         ) : (
-          providers.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+          <>
+            {providers.length > 0 && (
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Found {providers.length} Music Lesson Provider{providers.length !== 1 ? "s" : ""}
+                </h2>
+              </div>
+            )}
 
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
+            {providers.map((business: any) => {
+              const phone = getPhoneNumber(business)
+              const location = getLocation(business)
+              const subcategories = getSubcategories(business)
+
+              return (
+                <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          {business.businessName || "Music Instructor"}
+                        </h3>
+
+                        {business.description && <p className="text-gray-600 text-sm mt-1">{business.description}</p>}
+
+                        <div className="mt-3 space-y-2">
+                          {phone && (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Phone className="h-4 w-4 mr-2 text-primary" />
+                              <a href={`tel:${phone}`} className="hover:text-primary transition-colors">
+                                {phone}
+                              </a>
+                            </div>
+                          )}
+
+                          {location && (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <span className="text-primary mr-2">📍</span>
+                              <span>{location}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {subcategories.length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {subcategories.map((subcategory: string, idx: number) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                >
+                                  {subcategory}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
-                      </span>
-                    </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                      <div className="mt-4 md:mt-0 md:ml-6 flex flex-col space-y-2">
+                        <Button className="min-w-[120px]" onClick={() => handleViewReviews(business)}>
+                          Reviews
+                        </Button>
+                        <Button variant="outline" className="min-w-[120px]" onClick={() => handleViewProfile(business)}>
+                          View Profile
+                        </Button>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </>
         )}
       </div>
 
@@ -175,8 +256,18 @@ export default function MusicLessonsPage() {
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.name}
-          reviews={selectedProvider.reviewsData}
+          providerName={selectedProvider.name || ""}
+          businessId={selectedProvider.id?.toString() || ""}
+          reviews={[]}
+        />
+      )}
+
+      {selectedBusinessId && (
+        <BusinessProfileDialog
+          businessId={selectedBusinessId}
+          businessName={selectedBusinessName}
+          isOpen={isBusinessProfileOpen}
+          onClose={() => setIsBusinessProfileOpen(false)}
         />
       )}
 
