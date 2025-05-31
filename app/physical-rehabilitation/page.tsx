@@ -8,7 +8,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { MapPin, Phone } from "lucide-react"
 
 export default function PhysicalRehabilitationPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -16,37 +18,19 @@ export default function PhysicalRehabilitationPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [selectedBusiness, setSelectedBusiness] = useState<any>(null)
 
   useEffect(() => {
     async function fetchProviders() {
       try {
         setLoading(true)
-        const categoryVariants = [
-          "Physical Rehabilitation",
-          "Physical Therapists",
-          "Occupational Therapists",
-          "Massage Therapists",
-          "Speech-Language Pathologists",
-        ]
+        console.log("Fetching physical rehabilitation businesses...")
 
-        let allProviders: any[] = []
-        for (const category of categoryVariants) {
-          try {
-            const result = await getBusinessesByCategory(category)
-            if (result.success && result.businesses) {
-              allProviders = [...allProviders, ...result.businesses]
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch businesses for category: ${category}`)
-          }
-        }
+        const businesses = await getBusinessesBySelectedCategories("/physical-rehabilitation")
+        console.log("Fetched physical rehabilitation businesses:", businesses)
 
-        // Remove duplicates based on business ID
-        const uniqueProviders = allProviders.filter(
-          (provider, index, self) => index === self.findIndex((p) => p.id === provider.id),
-        )
-
-        setProviders(uniqueProviders)
+        setProviders(businesses)
       } catch (err) {
         console.error("Error fetching rehabilitation providers:", err)
         setError("Failed to load providers")
@@ -77,6 +61,11 @@ export default function PhysicalRehabilitationPage() {
       reviewsData: provider.reviews || [],
     })
     setIsReviewsDialogOpen(true)
+  }
+
+  const handleOpenProfile = (business: any) => {
+    setSelectedBusiness(business)
+    setIsProfileOpen(true)
   }
 
   return (
@@ -148,47 +137,47 @@ export default function PhysicalRehabilitationPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
-
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
-                      </span>
+                    <h3 className="text-xl font-semibold">{provider.displayName || provider.businessName}</h3>
+                    <div className="flex items-center mt-2 text-gray-600">
+                      <MapPin className="w-4 h-4 mr-1" />
+                      <span className="text-sm">{provider.displayLocation}</span>
                     </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                    {provider.displayPhone && (
+                      <div className="flex items-center mt-1 text-gray-600">
+                        <Phone className="w-4 h-4 mr-1" />
+                        <a href={`tel:${provider.displayPhone}`} className="text-sm hover:text-primary">
+                          {provider.displayPhone}
+                        </a>
                       </div>
-                    </div>
+                    )}
+
+                    {provider.subcategories && provider.subcategories.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700">Services:</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {provider.subcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleOpenProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -205,6 +194,15 @@ export default function PhysicalRehabilitationPage() {
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.name}
           reviews={selectedProvider?.reviewsData || []}
+        />
+      )}
+
+      {selectedBusiness && (
+        <BusinessProfileDialog
+          isOpen={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          businessId={selectedBusiness.id}
+          businessName={selectedBusiness.displayName || selectedBusiness.businessName}
         />
       )}
 

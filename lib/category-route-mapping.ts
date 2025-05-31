@@ -38,6 +38,16 @@ export const getCategoryIdsForRoute = (route: string): string[] => {
       return ["Security System Companies"]
     case "/tailoring-clothing":
       return ["Tailors, Dressmakers, and Fabric and Clothes Cleaning and Repair"]
+    case "/physical-rehabilitation":
+      return [
+        "Physical Rehabilitation",
+        "Physical Therapists",
+        "Occupational Therapists",
+        "Massage Therapists",
+        "Speech-Language Pathologists",
+      ]
+    case "/financial-services":
+      return ["financeInsurance", "Insurance, Finance, Debt and Sales"]
     default:
       return []
   }
@@ -145,6 +155,19 @@ const categoryNameVariations: { [key: string]: string } = {
   "Security System Installer": "/security-systems",
   Tailor: "/tailoring-clothing",
   Dressmaker: "/tailoring-clothing",
+  financialServices: "/financial-services",
+  "Financial Services": "/financial-services",
+  "Financial Advisor": "/financial-services",
+  "Financial Planning": "/financial-services",
+  Accounting: "/financial-services",
+  "Tax Services": "/financial-services",
+  Bookkeeping: "/financial-services",
+  Investment: "/financial-services",
+  Insurance: "/financial-services",
+  financeInsurance: "/financial-services",
+  "Insurance, Finance, Debt and Sales": "/financial-services",
+  Finance: "/financial-services",
+  Insurance: "/financial-services",
 }
 
 export const categoryIdToPageMapping: { [key: string]: { name: string; page: string } } = {
@@ -173,4 +196,12 @@ export const categoryIdToPageMapping: { [key: string]: { name: string; page: str
     name: "Tailors, Dressmakers, and Fabric and Clothes Cleaning and Repair",
     page: "/tailoring-clothing",
   },
+  "Physical Rehabilitation": { name: "Physical Rehabilitation", page: "/physical-rehabilitation" },
+  "Physical Therapists": { name: "Physical Therapists", page: "/physical-rehabilitation" },
+  "Occupational Therapists": { name: "Occupational Therapists", page: "/physical-rehabilitation" },
+  "Massage Therapists": { name: "Massage Therapists", page: "/physical-rehabilitation" },
+  "Speech-Language Pathologists": { name: "Speech-Language Pathologists", page: "/physical-rehabilitation" },
+  financeInsurance: { name: "Insurance, Finance, Debt and Sales", page: "/financial-services" },
+  "Insurance, Finance, Debt and Sales": { name: "Insurance, Finance, Debt and Sales", page: "/financial-services" },
+  financialServices: { name: "Financial Services", page: "/financial-services" },
 }

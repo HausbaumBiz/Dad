@@ -10,8 +10,20 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
-import { Loader2 } from "lucide-react"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
+import { Loader2, MapPin, Phone } from "lucide-react"
+
+interface Business {
+  id: string
+  displayName: string
+  businessName: string
+  displayLocation: string
+  displayPhone: string
+  allSubcategories?: string[]
+  subcategory?: string
+  rating?: number
+  reviews?: number
+}
 
 export default function FinancialServicesPage() {
   const { toast } = useToast()
@@ -25,52 +37,29 @@ export default function FinancialServicesPage() {
     { id: "finance7", label: "Cryptocurrency", value: "Cryptocurrency" },
   ]
 
-  const [selectedProvider, setSelectedProvider] = useState<any>(null)
+  const [selectedProvider, setSelectedProvider] = useState<Business | null>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-  const [businesses, setBusinesses] = useState<any[]>([])
+  const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchBusinesses() {
+      console.log("Fetching financial services businesses...")
       setIsLoading(true)
       try {
-        const categoryFormats = [
-          "financial-services",
-          "Financial Services",
-          "financialServices",
-          "Insurance, Finance, Debt and Sales",
-          "insurance-finance-debt-sales",
-          "finance",
-          "Finance",
-        ]
-
-        let allBusinesses: any[] = []
-
-        for (const format of categoryFormats) {
-          try {
-            const result = await getBusinessesByCategory(format)
-            if (result && result.length > 0) {
-              allBusinesses = [...allBusinesses, ...result]
-            }
-          } catch (error) {
-            console.error(`Error fetching businesses for format ${format}:`, error)
-          }
-        }
-
-        const uniqueBusinesses = allBusinesses.filter(
-          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
-        )
-
-        setBusinesses(uniqueBusinesses)
+        const result = await getBusinessesBySelectedCategories("/financial-services")
+        console.log("Fetched financial services businesses:", result)
+        setBusinesses(result || [])
       } catch (error) {
-        console.error("Error fetching businesses:", error)
+        console.error("Error fetching financial services businesses:", error)
         toast({
           title: "Error loading businesses",
           description: "There was a problem loading businesses. Please try again later.",
           variant: "destructive",
         })
+        setBusinesses([])
       } finally {
         setIsLoading(false)
       }
@@ -93,12 +82,12 @@ export default function FinancialServicesPage() {
       })
     : businesses
 
-  const handleOpenReviews = (provider: any) => {
+  const handleOpenReviews = (provider: Business) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
   }
 
-  const handleOpenProfile = (provider: any) => {
+  const handleOpenProfile = (provider: Business) => {
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
   }
@@ -143,7 +132,7 @@ export default function FinancialServicesPage() {
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-          <p>Loading businesses...</p>
+          <p>Loading financial service providers...</p>
         </div>
       ) : filteredBusinesses.length > 0 ? (
         <div className="space-y-6">
@@ -152,8 +141,23 @@ export default function FinancialServicesPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{business.businessName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{business.city || business.zipCode}</p>
+                    <h3 className="text-xl font-semibold">{business.displayName}</h3>
+
+                    {business.displayLocation && (
+                      <div className="flex items-center mt-2 text-gray-600">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        <span className="text-sm">{business.displayLocation}</span>
+                      </div>
+                    )}
+
+                    {business.displayPhone && (
+                      <div className="flex items-center mt-1 text-gray-600">
+                        <Phone className="h-4 w-4 mr-1" />
+                        <a href={`tel:${business.displayPhone}`} className="text-sm hover:text-primary">
+                          {business.displayPhone}
+                        </a>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
@@ -235,7 +239,7 @@ export default function FinancialServicesPage() {
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.businessName || selectedProvider.name}
+          providerName={selectedProvider.displayName || selectedProvider.businessName}
           businessId={selectedProvider.id}
           reviews={[]}
         />
@@ -246,6 +250,7 @@ export default function FinancialServicesPage() {
           isOpen={isProfileDialogOpen}
           onClose={() => setIsProfileDialogOpen(false)}
           businessId={selectedProvider.id}
+          businessName={selectedProvider.displayName || selectedProvider.businessName}
         />
       )}
 
