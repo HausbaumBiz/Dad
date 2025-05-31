@@ -48,6 +48,16 @@ export const getCategoryIdsForRoute = (route: string): string[] => {
       ]
     case "/financial-services":
       return ["financeInsurance", "Insurance, Finance, Debt and Sales"]
+    case "/mental-health":
+      return [
+        "counseling",
+        "Counselors, Psychologists, Addiction Specialists, Team Building",
+        "Mental Health",
+        "Counselors",
+        "Psychologists",
+        "Addiction Specialists",
+        "Team Building",
+      ]
     default:
       return []
   }
@@ -168,6 +178,17 @@ const categoryNameVariations: { [key: string]: string } = {
   "Insurance, Finance, Debt and Sales": "/financial-services",
   Finance: "/financial-services",
   Insurance: "/financial-services",
+  "Mental Health": "/mental-health",
+  Counselors: "/mental-health",
+  Psychologists: "/mental-health",
+  "Addiction Specialists": "/mental-health",
+  "Team Building": "/mental-health",
+  counseling: "/mental-health",
+  "Counselors, Psychologists, Addiction Specialists, Team Building": "/mental-health",
+  "Clinical and Counseling Psychologists": "/mental-health",
+  "Suboxone/Methadone Clinics": "/mental-health",
+  "Industrial-Organizational Psychologists": "/mental-health",
+  "Motivational Speakers": "/mental-health",
 }
 
 export const categoryIdToPageMapping: { [key: string]: { name: string; page: string } } = {
@@ -204,4 +225,14 @@ export const categoryIdToPageMapping: { [key: string]: { name: string; page: str
   financeInsurance: { name: "Insurance, Finance, Debt and Sales", page: "/financial-services" },
   "Insurance, Finance, Debt and Sales": { name: "Insurance, Finance, Debt and Sales", page: "/financial-services" },
   financialServices: { name: "Financial Services", page: "/financial-services" },
+  counseling: { name: "Counselors, Psychologists, Addiction Specialists, Team Building", page: "/mental-health" },
+  "Counselors, Psychologists, Addiction Specialists, Team Building": {
+    name: "Counselors, Psychologists, Addiction Specialists, Team Building",
+    page: "/mental-health",
+  },
+  "Mental Health": { name: "Mental Health", page: "/mental-health" },
+  Counselors: { name: "Counselors", page: "/mental-health" },
+  Psychologists: { name: "Psychologists", page: "/mental-health" },
+  "Addiction Specialists": { name: "Addiction Specialists", page: "/mental-health" },
+  "Team Building": { name: "Team Building", page: "/mental-health" },
 }

@@ -8,7 +8,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
+import { MapPin, Phone } from "lucide-react"
 
 export default function MentalHealthPage() {
   const filterOptions = [
@@ -37,32 +39,24 @@ export default function MentalHealthPage() {
     async function fetchProviders() {
       try {
         setLoading(true)
-        const categoryVariants = [
-          "Counselors, Psychologists & Addiction Specialists",
-          "Mental Health",
-          "Counselors",
-          "Psychologists",
-          "Addiction Specialists",
-        ]
+        console.log("Fetching mental health providers...")
 
-        let allProviders: any[] = []
-        for (const category of categoryVariants) {
-          try {
-            const result = await getBusinessesByCategory(category)
-            if (result.success && result.businesses) {
-              allProviders = [...allProviders, ...result.businesses]
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch businesses for category: ${category}`)
-          }
-        }
+        const businesses = await getBusinessesBySelectedCategories("/mental-health")
+        console.log("Fetched mental health providers:", businesses)
 
-        // Remove duplicates based on business ID
-        const uniqueProviders = allProviders.filter(
-          (provider, index, self) => index === self.findIndex((p) => p.id === provider.id),
-        )
+        // Transform the data to match the expected format
+        const transformedProviders = businesses.map((business) => ({
+          id: business.id,
+          name: business.displayName || business.businessName,
+          location: business.displayLocation || `${business.city}, ${business.state}`,
+          phone: business.displayPhone || business.phone,
+          rating: 4.5, // Default rating since we don't have reviews yet
+          reviews: 0, // Default review count
+          services: business.subcategories || ["Mental Health Services"],
+          adDesignData: business.adDesignData,
+        }))
 
-        setProviders(uniqueProviders)
+        setProviders(transformedProviders)
       } catch (err) {
         console.error("Error fetching mental health providers:", err)
         setError("Failed to load providers")
@@ -74,9 +68,10 @@ export default function MentalHealthPage() {
     fetchProviders()
   }, [])
 
-  // State for reviews dialog
+  // State for dialogs
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
   // Handle opening reviews dialog
   const handleOpenReviews = (provider: any) => {
@@ -85,6 +80,12 @@ export default function MentalHealthPage() {
       reviews: provider.reviews || [],
     })
     setIsReviewsDialogOpen(true)
+  }
+
+  // Handle opening profile dialog
+  const handleOpenProfile = (provider: any) => {
+    setSelectedProvider(provider)
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -155,9 +156,24 @@ export default function MentalHealthPage() {
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+
+                    {provider.location && (
+                      <div className="flex items-center text-gray-600 text-sm mt-1">
+                        <MapPin className="w-4 h-4 mr-1" />
+                        <span>{provider.location}</span>
+                      </div>
+                    )}
+
+                    {provider.phone && (
+                      <div className="flex items-center text-gray-600 text-sm mt-1">
+                        <Phone className="w-4 h-4 mr-1" />
+                        <a href={`tel:${provider.phone}`} className="hover:text-primary">
+                          {provider.phone}
+                        </a>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
@@ -177,26 +193,28 @@ export default function MentalHealthPage() {
                       </span>
                     </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                    {provider.services && provider.services.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700">Services:</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {provider.services.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between space-y-2">
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button variant="outline" className="w-full md:w-auto" onClick={() => handleOpenProfile(provider)}>
                       View Profile
                     </Button>
                   </div>
@@ -214,6 +232,16 @@ export default function MentalHealthPage() {
         providerName={selectedProvider?.name}
         reviews={selectedProvider?.reviews || []}
       />
+
+      {/* Business Profile Dialog */}
+      {selectedProvider && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedProvider.id}
+          businessName={selectedProvider.name}
+        />
+      )}
 
       <Toaster />
     </CategoryLayout>

@@ -3,7 +3,14 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogClose,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
@@ -12,7 +19,6 @@ import {
   ImageIcon,
   Ticket,
   Briefcase,
-  AlertCircle,
   X,
   Phone,
   MapPin,
@@ -39,7 +45,6 @@ import { BusinessJobsDialog } from "./business-jobs-dialog"
 import { DocumentsDialog } from "./documents-dialog"
 import { getCloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import type { CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { kv } from "@/lib/redis"
 import { KEY_PREFIXES } from "@/lib/db-schema"
 
@@ -196,6 +201,83 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
   const colorValues = getColorValues()
 
+  // Get texture options
+  const textureOptions = [
+    {
+      name: "None",
+      value: "none",
+      style: {
+        backgroundColor: "",
+        backgroundImage: "none",
+        backgroundSize: "auto",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Gradient",
+      value: "gradient",
+      style: {
+        backgroundColor: "",
+        backgroundImage: "none",
+        backgroundSize: "auto",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Dots",
+      value: "dots",
+      style: {
+        backgroundColor: "",
+        backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+        backgroundSize: "10px 10px",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Lines",
+      value: "lines",
+      style: {
+        backgroundColor: "",
+        backgroundImage:
+          "repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)",
+        backgroundSize: "auto",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Grid",
+      value: "grid",
+      style: {
+        backgroundColor: "",
+        backgroundImage:
+          "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+        backgroundSize: "10px 10px",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Diagonal",
+      value: "diagonal",
+      style: {
+        backgroundColor: "",
+        backgroundImage:
+          "repeating-linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.1) 10px, transparent 10px, transparent 20px)",
+        backgroundSize: "auto",
+        backgroundRepeat: "repeat",
+      },
+    },
+    {
+      name: "Waves",
+      value: "waves",
+      style: {
+        backgroundColor: "",
+        backgroundImage: "radial-gradient(ellipse at center, rgba(255,255,255,0.1) 0%, transparent 50%)",
+        backgroundSize: "20px 10px",
+        backgroundRepeat: "repeat",
+      },
+    },
+  ]
+
   // Helper function to get phone number from Redis business data first, then ad design
   const getPhoneNumber = () => {
     // First try to get phone from Redis business data
@@ -280,14 +362,14 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       </style>
 
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent
-          className="business-profile-dialog-content w-full p-0 m-0"
-          aria-describedby="business-profile-description"
-        >
-          {/* Hidden description for accessibility */}
-          <div id="business-profile-description" className="sr-only">
-            Business profile dialog showing detailed information, contact details, and services for {businessName}
-          </div>
+        <DialogContent className="business-profile-dialog-content w-full p-0 m-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{businessName}</DialogTitle>
+            <DialogDescription>
+              Business profile dialog showing detailed information, contact details, and services for {businessName}
+            </DialogDescription>
+          </DialogHeader>
+
           {/* Custom close button - centered above content */}
           <div className="flex justify-center w-full py-1 border-b">
             <DialogClose className="rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
@@ -314,7 +396,15 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                 <div
                   className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
                   style={{
-                    background: `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`,
+                    backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
+                    backgroundImage:
+                      adDesign.texture === "gradient"
+                        ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                        : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
+                    backgroundSize:
+                      textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                    backgroundRepeat:
+                      textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
                   }}
                 >
                   <h3 className="text-2xl font-bold">{adDesign.businessInfo?.businessName || businessName}</h3>
@@ -324,7 +414,6 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                 </div>
 
                 <div className="pt-6 px-6 space-y-4">
-                  {/* Phone Number - prioritize Redis data */}
                   {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
                     <div className="flex items-start gap-3">
                       <div
@@ -406,81 +495,120 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                   )}
                 </div>
 
-                {/* Business Video */}
-                {businessVideo && businessVideo.cloudflareVideoId && (
+                {/* Video Section - Using Cloudflare Video or Image Placeholder */}
+                {!adDesign.hiddenFields?.video && (
                   <div className="border-t pt-4 mt-4 px-4">
-                    <p className="text-sm font-medium text-gray-500 mb-2">Business Video</p>
+                    <div className="relative w-full pb-[56.25%]">
+                      {(() => {
+                        console.log("Video render check:", {
+                          businessVideo,
+                          hasVideoId: businessVideo?.cloudflareVideoId,
+                          isReady: businessVideo?.cloudflareVideoReadyToStream,
+                          fullCondition:
+                            businessVideo &&
+                            businessVideo.cloudflareVideoId &&
+                            businessVideo.cloudflareVideoReadyToStream,
+                        })
 
-                    {/* Using iframe embed for maximum compatibility */}
-                    <div
-                      className={`relative ${businessVideo.videoAspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-video"} w-full overflow-hidden rounded-md`}
-                    >
-                      <iframe
-                        src={`https://iframe.cloudflarestream.com/${businessVideo.cloudflareVideoId}`}
-                        className="absolute top-0 left-0 w-full h-full"
-                        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        title={`${businessName} Video`}
-                      ></iframe>
+                        if (businessVideo && businessVideo.cloudflareVideoId) {
+                          // Use Cloudflare Stream iframe embed for better compatibility
+                          const embedUrl = `https://customer-5093uhykxo17njhi.cloudflarestream.com/${businessVideo.cloudflareVideoId}/iframe`
+
+                          console.log("Rendering video with embed URL:", embedUrl)
+
+                          return (
+                            /* Cloudflare Video using iframe embed */
+                            <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                              <iframe
+                                src={embedUrl}
+                                className="w-full h-full"
+                                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                                allowFullScreen
+                                style={{ border: "none" }}
+                                title="Business Video"
+                              />
+                            </div>
+                          )
+                        } else {
+                          console.log("Rendering placeholder image instead of video")
+                          return (
+                            /* Image Placeholder */
+                            <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                              <img
+                                src="https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public"
+                                alt="Business image"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )
+                        }
+                      })()}
                     </div>
                   </div>
                 )}
 
-                {videoLoading && (
-                  <div className="flex justify-center items-center py-2 mb-2">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
-                    <span className="text-sm">Loading video...</span>
-                  </div>
-                )}
-
-                {videoError && !videoLoading && !businessVideo && (
-                  <Alert className="mb-3 bg-yellow-50 border-yellow-200">
-                    <AlertCircle className="h-4 w-4 text-yellow-600" />
-                    <AlertDescription className="text-yellow-700 text-sm">{videoError}</AlertDescription>
-                  </Alert>
-                )}
-
                 {/* Footer with buttons */}
                 <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
-                  {/* Buttons for Photo Album, Coupons, and Jobs */}
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    <Button
-                      variant="outline"
-                      className="flex flex-col items-center justify-center gap-1 h-auto py-3"
-                      onClick={() => setIsPhotoAlbumOpen(true)}
-                    >
-                      <ImageIcon className="h-5 w-5" />
-                      <span className="text-xs">Photo Album</span>
-                    </Button>
+                  {/* Grid layout for buttons - matching the AdBox dialog layout */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {!adDesign.hiddenFields?.photoAlbum && (
+                      <Button
+                        variant="outline"
+                        className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+                        onClick={() => setIsPhotoAlbumOpen(true)}
+                      >
+                        <ImageIcon
+                          className="h-5 w-5"
+                          style={{
+                            color: colorValues.textColor ? "#000000" : colorValues.primary,
+                          }}
+                        />
+                        <span className="text-xs">Photo Album</span>
+                      </Button>
+                    )}
 
-                    <Button
-                      variant="outline"
-                      className="flex flex-col items-center justify-center gap-1 h-auto py-3"
-                      onClick={() => setIsCouponsOpen(true)}
-                    >
-                      <Ticket className="h-5 w-5" />
-                      <span className="text-xs">Coupons</span>
-                    </Button>
+                    {!adDesign.hiddenFields?.savingsButton && (
+                      <Button
+                        variant="outline"
+                        className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+                        onClick={() => setIsCouponsOpen(true)}
+                      >
+                        <Ticket
+                          className="h-5 w-5"
+                          style={{
+                            color: colorValues.textColor ? "#000000" : colorValues.primary,
+                          }}
+                        />
+                        <span className="text-xs">Coupons</span>
+                      </Button>
+                    )}
 
-                    <Button
-                      variant="outline"
-                      className="flex flex-col items-center justify-center gap-1 h-auto py-3"
-                      onClick={() => setIsJobsOpen(true)}
-                    >
-                      <Briefcase className="h-5 w-5" />
-                      <span className="text-xs">Jobs</span>
-                    </Button>
+                    {!adDesign.hiddenFields?.jobsButton && (
+                      <Button
+                        variant="outline"
+                        className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+                        onClick={() => setIsJobsOpen(true)}
+                      >
+                        <Briefcase
+                          className="h-5 w-5"
+                          style={{
+                            color: colorValues.textColor ? "#000000" : colorValues.primary,
+                          }}
+                        />
+                        <span className="text-xs">Jobs</span>
+                      </Button>
+                    )}
                   </div>
 
                   {/* Custom Button */}
-                  {adDesign && adDesign.customButton && !adDesign.hiddenFields?.customButton && (
+                  {!adDesign.hiddenFields?.customButton && (
                     <Button
                       variant="outline"
                       className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2"
                       onClick={() => setIsDocumentsOpen(true)}
                     >
                       {(() => {
-                        const IconComponent = getIconComponent(adDesign.customButton.icon || "Menu")
+                        const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
                         return (
                           <IconComponent
                             className="h-5 w-5"
@@ -490,7 +618,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                           />
                         )
                       })()}
-                      <span className="text-xs">{adDesign.customButton.name || "Menu"}</span>
+                      <span className="text-xs">{adDesign.customButton?.name || "Menu"}</span>
                     </Button>
                   )}
 
@@ -498,9 +626,22 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                   {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
                     <button
                       onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
-                      className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90 mt-2"
+                      className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
                       style={{
-                        backgroundColor: colorValues.textColor ? "#000000" : colorValues.primary,
+                        backgroundColor:
+                          adDesign.texture === "gradient"
+                            ? ""
+                            : colorValues.textColor
+                              ? "#000000"
+                              : colorValues.primary,
+                        backgroundImage:
+                          adDesign.texture === "gradient"
+                            ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                            : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
+                        backgroundSize:
+                          textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                        backgroundRepeat:
+                          textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
                       }}
                     >
                       <svg
