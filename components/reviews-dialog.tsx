@@ -24,7 +24,7 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [businessReviews, setBusinessReviews] = useState<Review[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     // Check if user is logged in
@@ -42,9 +42,11 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
     // Fetch reviews from database
     const fetchReviews = async () => {
       if (businessId && isOpen) {
+        console.log("Fetching reviews for business:", businessId)
         setIsLoading(true)
         try {
           const fetchedReviews = await getBusinessReviews(businessId)
+          console.log("Fetched reviews:", fetchedReviews)
           setBusinessReviews(fetchedReviews)
         } catch (error) {
           console.error("Error fetching reviews:", error)
@@ -53,15 +55,24 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
             description: "There was a problem loading reviews.",
             variant: "destructive",
           })
+          setBusinessReviews([]) // Set empty array on error
         } finally {
           setIsLoading(false)
         }
+      } else {
+        setIsLoading(false)
+        setBusinessReviews([])
       }
     }
 
     if (isOpen) {
       checkLoginStatus()
       fetchReviews()
+    } else {
+      // Reset state when dialog closes
+      setIsLoading(false)
+      setBusinessReviews([])
+      setActiveTab("reviews")
     }
   }, [isOpen, businessId, toast])
 
@@ -73,12 +84,18 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
     }
   }
 
-  const handleReviewSuccess = () => {
+  const handleReviewSuccess = async () => {
     setActiveTab("reviews")
     // Refresh reviews
-    getBusinessReviews(businessId).then((reviews) => {
-      setBusinessReviews(reviews)
-    })
+    try {
+      setIsLoading(true)
+      const refreshedReviews = await getBusinessReviews(businessId)
+      setBusinessReviews(refreshedReviews)
+    } catch (error) {
+      console.error("Error refreshing reviews:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Use either database reviews or provided mock reviews
@@ -87,10 +104,15 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+        <DialogContent
+          className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto"
+          aria-describedby="reviews-dialog-description"
+        >
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">{providerName} Reviews</DialogTitle>
-            <DialogDescription>Customer reviews and experiences with {providerName}</DialogDescription>
+            <DialogDescription id="reviews-dialog-description">
+              Customer reviews and experiences with {providerName}
+            </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="reviews" value={activeTab} onValueChange={setActiveTab}>

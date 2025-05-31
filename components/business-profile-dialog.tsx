@@ -280,7 +280,14 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       </style>
 
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="business-profile-dialog-content w-full p-0 m-0" closeButton={false}>
+        <DialogContent
+          className="business-profile-dialog-content w-full p-0 m-0"
+          aria-describedby="business-profile-description"
+        >
+          {/* Hidden description for accessibility */}
+          <div id="business-profile-description" className="sr-only">
+            Business profile dialog showing detailed information, contact details, and services for {businessName}
+          </div>
           {/* Custom close button - centered above content */}
           <div className="flex justify-center w-full py-1 border-b">
             <DialogClose className="rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">

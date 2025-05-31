@@ -62,7 +62,11 @@ export async function getBusinessesBySelectedCategories(route: string): Promise<
             (selectedId) =>
               selectedId === targetId ||
               selectedId.toLowerCase() === targetId.toLowerCase() ||
-              selectedId.replace(/\s+/g, "").toLowerCase() === targetId.replace(/\s+/g, "").toLowerCase(),
+              selectedId.replace(/\s+/g, "").toLowerCase() === targetId.replace(/\s+/g, "").toLowerCase() ||
+              // Handle the specific tailoring category format
+              (targetId === "Tailors, Dressmakers, and Fabric and Clothes Cleaning and Repair" &&
+                selectedId.includes("Tailors") &&
+                selectedId.includes("Dressmakers")),
           ),
         )
 

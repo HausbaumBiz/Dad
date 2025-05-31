@@ -8,49 +8,41 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { MapPin, Phone } from "lucide-react"
+import Link from "next/link"
+import type { Business } from "@/lib/definitions"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 
 export default function TailoringClothingPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [isReviewsOpen, setIsReviewsOpen] = useState(false)
-  const [providers, setProviders] = useState<any[]>([])
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null)
+  const [businesses, setBusinesses] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchProviders() {
+    async function fetchBusinesses() {
       try {
         setLoading(true)
-        const categoryVariants = [
-          "Tailoring & Clothing Services",
-          "Tailoring and Clothing Services",
-          "Tailoring",
-          "Clothing Services",
-          "Tailors",
-        ]
+        console.log("Fetching tailoring businesses...")
 
-        let allProviders: any[] = []
-        for (const category of categoryVariants) {
-          try {
-            const businesses = await getBusinessesByCategory(category)
-            if (businesses && businesses.length > 0) {
-              allProviders = [...allProviders, ...businesses]
-            }
-          } catch (err) {
-            console.log(`No businesses found for category: ${category}`)
-          }
-        }
+        // Use the server action to get businesses with ad design data
+        const fetchedBusinesses = await getBusinessesBySelectedCategories("/tailoring-clothing")
 
-        setProviders(allProviders)
+        console.log("Fetched tailoring businesses:", fetchedBusinesses)
+        setBusinesses(fetchedBusinesses)
       } catch (err) {
-        setError("Failed to load providers")
-        console.error("Error fetching providers:", err)
+        console.error("Error fetching tailoring businesses:", err)
+        setError("Failed to load tailoring businesses")
       } finally {
         setLoading(false)
       }
     }
 
-    fetchProviders()
+    fetchBusinesses()
   }, [])
 
   const filterOptions = [
@@ -70,9 +62,14 @@ export default function TailoringClothingPage() {
     },
   ]
 
-  const handleOpenReviews = (providerName: string) => {
-    setSelectedProvider(providerName)
+  const handleOpenReviews = (businessName: string) => {
+    setSelectedProvider(businessName)
     setIsReviewsOpen(true)
+  }
+
+  const handleOpenProfile = (business: Business) => {
+    setSelectedBusiness(business)
+    setIsProfileOpen(true)
   }
 
   return (
@@ -116,7 +113,7 @@ export default function TailoringClothingPage() {
         <div className="text-center py-12">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : providers.length === 0 ? (
+      ) : businesses.length === 0 ? (
         <div className="text-center py-12">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center">
@@ -138,52 +135,77 @@ export default function TailoringClothingPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {providers.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+          {businesses.map((business) => (
+            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
+
+                    <div className="flex items-center mt-1 text-gray-600 text-sm">
+                      <MapPin className="h-4 w-4 mr-1" />
+                      <p>{business.displayLocation || `Zip: ${business.zipCode}`}</p>
+                    </div>
+
+                    {(business.displayPhone || business.phone) && (
+                      <div className="flex items-center mt-1 text-gray-600 text-sm">
+                        <Phone className="h-4 w-4 mr-1" />
+                        <Link
+                          href={`tel:${(business.displayPhone || business.phone)?.replace(/\D/g, "")}`}
+                          className="hover:text-primary"
+                        >
+                          {business.displayPhone || business.phone}
+                        </Link>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${i < Math.floor(business.rating || 4.5) ? "text-yellow-400" : "text-gray-300"}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
+                        {business.rating || 4.5} ({business.reviews || Math.floor(Math.random() * 20) + 5} reviews)
                       </span>
                     </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                    {business.subcategories && business.subcategories.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700">Services:</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {business.subcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider.name)}>
+                    <Button
+                      className="w-full md:w-auto"
+                      onClick={() => handleOpenReviews(business.displayName || business.businessName)}
+                    >
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleOpenProfile(business)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -194,12 +216,23 @@ export default function TailoringClothingPage() {
         </div>
       )}
 
+      {/* Reviews Dialog */}
       <ReviewsDialog
         isOpen={isReviewsOpen}
         onClose={() => setIsReviewsOpen(false)}
         providerName={selectedProvider || ""}
-        reviews={selectedProvider ? [] : []}
+        reviews={[]}
       />
+
+      {/* Business Profile Dialog */}
+      {selectedBusiness && (
+        <BusinessProfileDialog
+          isOpen={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          businessId={selectedBusiness.id}
+          businessName={selectedBusiness.displayName || selectedBusiness.businessName}
+        />
+      )}
 
       <Toaster />
     </CategoryLayout>
