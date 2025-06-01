@@ -5,14 +5,15 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
+import type { Business } from "@/lib/definitions"
 import { Button } from "@/components/ui/button"
 import { Phone, MapPin, Star } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function PetCarePage() {
-  const [businesses, setBusinesses] = useState([])
+  const [businesses, setBusinesses] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
@@ -46,7 +47,7 @@ export default function PetCarePage() {
     async function loadBusinesses() {
       try {
         setLoading(true)
-        const fetchedBusinesses = await getBusinessesForCategoryPage("/pet-care")
+        const fetchedBusinesses = await getBusinessesBySelectedCategories("/pet-care")
         console.log("Fetched pet care businesses:", fetchedBusinesses)
         setBusinesses(fetchedBusinesses)
       } catch (error) {
@@ -59,21 +60,60 @@ export default function PetCarePage() {
     loadBusinesses()
   }, [])
 
-  const handleViewReviews = (business: any) => {
+  const handleViewReviews = (business: Business) => {
     setSelectedProvider({
       id: Number.parseInt(business.id || "0"),
-      name: business.displayName || business.businessName || "Pet Care Provider",
+      name: business.businessName || "Unknown Business",
       rating: business.rating || 0,
       reviews: business.reviewCount || 0,
     })
     setIsReviewsDialogOpen(true)
   }
 
-  const handleViewProfile = (business: any) => {
+  const handleViewProfile = (business: Business) => {
     console.log("Opening profile for business:", business.id, business.businessName)
     setSelectedBusinessId(business.id || "")
-    setSelectedBusinessName(business.displayName || business.businessName || "Pet Care Provider")
+    setSelectedBusinessName(business.businessName || "Pet Care Provider")
     setIsProfileDialogOpen(true)
+  }
+
+  const getPhoneNumber = (business: Business, adDesign?: any) => {
+    // Priority order: business.phone -> adDesign.businessInfo.phone -> business.phoneNumber
+    return business.phone || adDesign?.businessInfo?.phone || business.phoneNumber || null
+  }
+
+  const getLocation = (business: Business, adDesign?: any) => {
+    // Get address components from business data or ad design
+    const address = business.address || adDesign?.businessInfo?.address
+    const city = business.city || adDesign?.businessInfo?.city
+    const state = business.state || adDesign?.businessInfo?.state
+
+    // Build location string without ZIP code
+    const locationParts = []
+    if (address) locationParts.push(address)
+    if (city && state) {
+      locationParts.push(`${city}, ${state}`)
+    } else if (city) {
+      locationParts.push(city)
+    } else if (state) {
+      locationParts.push(state)
+    }
+
+    return locationParts.join(", ") || null
+  }
+
+  const getSubcategories = (business: Business) => {
+    // Priority: subcategories from Redis -> services -> main category
+    if (business.subcategories && business.subcategories.length > 0) {
+      return business.subcategories
+    }
+    if (business.services && business.services.length > 0) {
+      return business.services
+    }
+    if (business.category) {
+      return [business.category]
+    }
+    return []
   }
 
   return (
@@ -118,101 +158,104 @@ export default function PetCarePage() {
         <div className="mt-8 space-y-6">
           <h2 className="text-2xl font-bold text-gray-900">Pet Care Providers ({businesses.length})</h2>
           <div className="grid gap-6">
-            {businesses.map((business: any) => (
-              <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                <div className="flex flex-col space-y-4">
-                  {/* Business Name and Description */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {business.displayName || business.businessName || "Pet Care Provider"}
-                    </h3>
-                    {business.businessDescription && (
-                      <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
-                    )}
-                  </div>
+            {businesses.map((business) => {
+              const phone = getPhoneNumber(business, business.adDesign)
+              const location = getLocation(business, business.adDesign)
+              const subcategories = getSubcategories(business)
 
-                  {/* Contact and Location Info */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div className="space-y-2">
-                      {/* Phone */}
-                      {business.displayPhone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-500" />
-                          <a
-                            href={`tel:${business.displayPhone}`}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            {business.displayPhone}
-                          </a>
-                        </div>
+              return (
+                <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                  <div className="flex flex-col space-y-4">
+                    {/* Business Name and Description */}
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        {business.businessName || "Pet Care Provider"}
+                      </h3>
+                      {business.description && (
+                        <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
                       )}
+                    </div>
 
-                      {/* Location */}
-                      {business.displayLocation && (
+                    {/* Contact and Location Info */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div className="space-y-2">
+                        {/* Phone */}
+                        {phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-gray-500" />
+                            <a href={`tel:${phone}`} className="text-blue-600 hover:text-blue-800 font-medium">
+                              {phone}
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Location */}
+                        {location && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-gray-500" />
+                            <span className="text-gray-700 text-sm">{location}</span>
+                          </div>
+                        )}
+
+                        {/* Rating */}
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-gray-500" />
-                          <span className="text-gray-700 text-sm">{business.displayLocation}</span>
+                          <div className="flex items-center">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`h-4 w-4 ${
+                                  star <= (business.rating || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-sm text-gray-600">
+                            {business.rating?.toFixed(1) || "0.0"} ({business.reviewCount || 0} reviews)
+                          </span>
                         </div>
-                      )}
+                      </div>
 
-                      {/* Rating */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`h-4 w-4 ${
-                                star <= (business.rating || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
-                              }`}
-                            />
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewReviews(business)}
+                          className="text-sm"
+                        >
+                          Reviews
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleViewProfile(business)}
+                          className="text-sm"
+                        >
+                          View Profile
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Subcategories/Specialties */}
+                    {subcategories.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {subcategories.map((subcategory, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {typeof subcategory === "string" ? subcategory : subcategory.name || "Pet Care"}
+                            </span>
                           ))}
                         </div>
-                        <span className="text-sm text-gray-600">
-                          {business.rating?.toFixed(1) || "0.0"} ({business.reviewCount || 0} reviews)
-                        </span>
                       </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewReviews(business)}
-                        className="text-sm"
-                      >
-                        Reviews
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleViewProfile(business)}
-                        className="text-sm"
-                      >
-                        View Profile
-                      </Button>
-                    </div>
+                    )}
                   </div>
-
-                  {/* Subcategories/Specialties */}
-                  {business.subcategories && business.subcategories.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {business.subcategories.map((subcategory: string, index: number) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                          >
-                            {subcategory}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       ) : (

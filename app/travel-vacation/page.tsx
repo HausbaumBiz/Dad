@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
 export default function TravelVacationPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
@@ -21,11 +21,27 @@ export default function TravelVacationPage() {
     async function fetchProviders() {
       try {
         setLoading(true)
+        const categoryVariants = [
+          "Travel & Vacation Services",
+          "Travel and Vacation Services",
+          "Travel Services",
+          "Vacation Services",
+          "Travel",
+        ]
 
-        // Use the centralized system
-        const businesses = await getBusinessesForCategoryPage("/travel-vacation")
+        let allProviders: any[] = []
+        for (const category of categoryVariants) {
+          try {
+            const businesses = await getBusinessesByCategory(category)
+            if (businesses && businesses.length > 0) {
+              allProviders = [...allProviders, ...businesses]
+            }
+          } catch (err) {
+            console.log(`No businesses found for category: ${category}`)
+          }
+        }
 
-        setProviders(businesses)
+        setProviders(allProviders)
       } catch (err) {
         setError("Failed to load providers")
         console.error("Error fetching providers:", err)
@@ -123,21 +139,15 @@ export default function TravelVacationPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">
-                      {provider.displayName || provider.businessName || "Business Name"}
-                    </h3>
-                    <p className="text-gray-600 text-sm mt-1">
-                      {provider.displayLocation ||
-                        `${provider.city || ""}, ${provider.state || ""}`.trim().replace(/^,|,$/, "") ||
-                        "Location not specified"}
-                    </p>
+                    <h3 className="text-xl font-semibold">{provider.name}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -146,30 +156,27 @@ export default function TravelVacationPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || 0} ({provider.reviews || 0} reviews)
+                        {provider.rating} ({provider.reviews} reviews)
                       </span>
                     </div>
 
-                    {provider.displayPhone && (
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-600">
-                          <span className="font-medium">Phone:</span> {provider.displayPhone}
-                        </p>
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-700">Services:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {provider.services.map((service, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {service}
+                          </span>
+                        ))}
                       </div>
-                    )}
-
-                    {provider.businessDescription && (
-                      <div className="mt-3">
-                        <p className="text-sm text-gray-700">{provider.businessDescription}</p>
-                      </div>
-                    )}
+                    </div>
                   </div>
 
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button
-                      className="w-full md:w-auto"
-                      onClick={() => handleOpenReviews(provider.displayName || provider.businessName || "Business")}
-                    >
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider.name)}>
                       Reviews
                     </Button>
                     <Button variant="outline" className="mt-2 w-full md:w-auto">
@@ -187,7 +194,7 @@ export default function TravelVacationPage() {
         isOpen={isReviewsOpen}
         onClose={() => setIsReviewsOpen(false)}
         providerName={selectedProvider || ""}
-        reviews={[]}
+        reviews={selectedProvider ? [] : []}
       />
 
       <Toaster />

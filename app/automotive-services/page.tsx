@@ -9,9 +9,9 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { AdBox } from "@/components/ad-box"
+import { getBusinessAdDesignData } from "@/app/actions/business-category-fetcher"
 import type { Business } from "@/lib/definitions"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useToast } from "@/components/ui/use-toast"
+import { getBusinessesByCategoryWithAdDesign } from "@/app/actions/business-actions"
 
 export default function AutomotiveServicesPage() {
   const filterOptions = [
@@ -45,28 +45,36 @@ export default function AutomotiveServicesPage() {
   const [businessAdDesigns, setBusinessAdDesigns] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
 
   useEffect(() => {
     async function fetchBusinesses() {
-      setLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/automotive-services")
-        setBusinesses(result)
-      } catch (error) {
-        console.error("Error fetching businesses:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
+        setLoading(true)
+        setError(null)
+
+        // Fetch businesses that have selected "automotive" category
+        const matchingBusinesses = await getBusinessesByCategoryWithAdDesign("/automotive-services")
+        setBusinesses(matchingBusinesses)
+
+        // Fetch ad design data for each business
+        const adDesigns: Record<string, any> = {}
+        for (const business of matchingBusinesses) {
+          const adDesign = await getBusinessAdDesignData(business.id)
+          if (adDesign) {
+            adDesigns[business.id] = adDesign
+          }
+        }
+        setBusinessAdDesigns(adDesigns)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError("Failed to load automotive services")
       } finally {
         setLoading(false)
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+  }, [])
 
   const handleOpenReviews = (business: Business) => {
     setSelectedProvider({

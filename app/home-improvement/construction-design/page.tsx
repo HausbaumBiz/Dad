@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
 export default function ConstructionDesignPage() {
   const filterOptions = [
@@ -35,19 +35,43 @@ export default function ConstructionDesignPage() {
   const [businesses, setBusinesses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     async function fetchBusinesses() {
-      setIsLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/home-improvement/construction-design")
-        setBusinesses(result)
-      } catch (error) {
-        console.error("Error fetching businesses:", error)
+        setLoading(true)
+        const categoryVariants = [
+          "Home Construction and Design",
+          "General Contractors",
+          "Architect",
+          "Home Remodeling",
+          "Construction",
+          "Design Services",
+        ]
+
+        let allBusinesses = []
+        for (const category of categoryVariants) {
+          try {
+            const result = await getBusinessesByCategory(category)
+            if (result && Array.isArray(result)) {
+              allBusinesses = [...allBusinesses, ...result]
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch businesses for category: ${category}`)
+          }
+        }
+
+        // Remove duplicates based on business ID
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setBusinesses(uniqueBusinesses)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
       } finally {
-        setIsLoading(false)
+        setLoading(false)
       }
     }
 

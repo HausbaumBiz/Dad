@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useEffect } from "react"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
 export default function HandymenPage() {
   const filterOptions = [
@@ -27,12 +27,41 @@ export default function HandymenPage() {
 
   useEffect(() => {
     async function fetchBusinesses() {
-      setLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/home-improvement/handymen")
-        setProviders(result)
-      } catch (error) {
-        console.error("Error fetching businesses:", error)
+        setLoading(true)
+        setError(null)
+
+        // Try multiple category formats to catch businesses
+        const categoryVariants = [
+          "Handymen",
+          "handymen",
+          "Handyman",
+          "handyman",
+          "Odd Jobs and Repairs",
+          "Product Assembly",
+        ]
+
+        let allBusinesses: any[] = []
+
+        for (const category of categoryVariants) {
+          try {
+            const businesses = await getBusinessesByCategory(category)
+            if (businesses && businesses.length > 0) {
+              allBusinesses = [...allBusinesses, ...businesses]
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch businesses for category: ${category}`)
+          }
+        }
+
+        // Remove duplicates based on business ID
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setProviders(uniqueBusinesses)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
       } finally {
         setLoading(false)

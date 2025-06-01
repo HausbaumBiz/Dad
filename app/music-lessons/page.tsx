@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import { Phone, MapPin } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { Phone, MapPin } from "lucide-react"
 
 export default function MusicLessonsPage() {
   const filterOptions = [
@@ -33,22 +33,20 @@ export default function MusicLessonsPage() {
     reviews: any[]
   } | null>(null)
 
-  // State for business profile dialog
-  const [isBusinessProfileOpen, setIsBusinessProfileOpen] = useState(false)
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
-  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
-
-  // State for providers
+  // State for providers - will be fetched from database
   const [providers, setProviders] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Fetch real music lesson providers from database
   useEffect(() => {
     const fetchProviders = async () => {
       try {
         setLoading(true)
         console.log("Fetching music lesson businesses...")
-        const businesses = await getBusinessesForCategoryPage("/music-lessons")
+
+        const businesses = await getBusinessesBySelectedCategories("/music-lessons")
         console.log("Fetched music lesson businesses:", businesses)
+
         setProviders(businesses)
       } catch (error) {
         console.error("Error fetching music lesson providers:", error)
@@ -61,11 +59,22 @@ export default function MusicLessonsPage() {
     fetchProviders()
   }, [])
 
+  // Add state for business profile dialog:
+  const [isBusinessProfileOpen, setIsBusinessProfileOpen] = useState(false)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+
+  // Update the handleViewProfile function:
   const handleViewProfile = (business: any) => {
     console.log("Opening profile for business:", business)
     setSelectedBusinessId(business.id)
     setSelectedBusinessName(business.displayName || business.businessName || "Music Instructor")
     setIsBusinessProfileOpen(true)
+  }
+
+  const handleOpenReviews = (provider: any) => {
+    setSelectedProvider(provider)
+    setIsReviewsDialogOpen(true)
   }
 
   const handleViewReviews = (business: any) => {
@@ -148,15 +157,13 @@ export default function MusicLessonsPage() {
                         {business.displayName || business.businessName || "Music Instructor"}
                       </h3>
 
-                      {business.businessDescription && (
-                        <p className="text-gray-600 text-sm mt-1">{business.businessDescription}</p>
-                      )}
+                      {business.description && <p className="text-gray-600 text-sm mt-1">{business.description}</p>}
 
                       <div className="mt-3 space-y-2">
                         {/* Location Display */}
                         <div className="flex items-center text-sm text-gray-600">
                           <MapPin className="h-4 w-4 mr-2 text-primary" />
-                          <span>{business.displayLocation || "Location not specified"}</span>
+                          <span>{business.displayLocation}</span>
                         </div>
 
                         {/* Phone Display */}

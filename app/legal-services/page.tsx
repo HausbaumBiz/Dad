@@ -10,7 +10,8 @@ import Image from "next/image"
 import { Phone, MapPin, Tag } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessesBySelectedCategories, getBusinessAdDesignData } from "@/app/actions/business-category-fetcher"
+import type { Business } from "@/lib/definitions"
 
 export default function LegalServicesPage() {
   const filterOptions = [
@@ -46,8 +47,9 @@ export default function LegalServicesPage() {
     name: string
   } | null>(null)
 
-  // State for businesses
-  const [businesses, setBusinesses] = useState([])
+  // State for businesses and ad designs
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [businessAdDesigns, setBusinessAdDesigns] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,8 +58,21 @@ export default function LegalServicesPage() {
       try {
         setLoading(true)
         setError(null)
-        const fetchedBusinesses = await getBusinessesForCategoryPage("/legal-services")
-        setBusinesses(fetchedBusinesses)
+
+        // Fetch businesses that have selected "lawyers" category
+        const matchingBusinesses = await getBusinessesBySelectedCategories("/legal-services")
+        console.log("Fetched businesses:", matchingBusinesses)
+        setBusinesses(matchingBusinesses)
+
+        // Fetch ad design data for each business
+        const adDesigns: Record<string, any> = {}
+        for (const business of matchingBusinesses) {
+          const adDesign = await getBusinessAdDesignData(business.id)
+          if (adDesign) {
+            adDesigns[business.id] = adDesign
+          }
+        }
+        setBusinessAdDesigns(adDesigns)
       } catch (err) {
         console.error("Error fetching businesses:", err)
         setError("Failed to load legal services")
@@ -69,19 +84,19 @@ export default function LegalServicesPage() {
     fetchBusinesses()
   }, [])
 
-  const handleOpenReviews = (business: any) => {
+  const handleOpenReviews = (business: Business) => {
     setSelectedProvider({
       id: business.id,
-      name: business.displayName || business.businessName || "Legal Professional",
+      name: business.businessName,
       reviews: business.reviewsData || [],
     })
     setIsReviewsDialogOpen(true)
   }
 
-  const handleViewProfile = (business: any) => {
+  const handleViewProfile = (business: Business) => {
     setSelectedBusiness({
       id: business.id,
-      name: business.displayName || business.businessName || "Legal Professional",
+      name: business.businessName,
     })
     setIsProfileDialogOpen(true)
   }
@@ -149,94 +164,165 @@ export default function LegalServicesPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {businesses.map((provider: any) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {provider.displayName || provider.businessName || "Legal Professional"}
-                    </h3>
+          {businesses.map((business) => {
+            const adDesign = businessAdDesigns[business.id]
 
-                    {provider.businessDescription && (
-                      <p className="text-gray-700 mb-3 leading-relaxed">{provider.businessDescription}</p>
-                    )}
+            // Get phone number from multiple sources (prioritize business data, then ad design)
+            const phoneNumber = business.phone || adDesign?.businessInfo?.phone || null
 
-                    {provider.displayPhone && (
-                      <div className="flex items-center mb-2">
-                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
-                        <span className="text-sm text-gray-600">
-                          <a href={`tel:${provider.displayPhone}`} className="hover:text-blue-600 hover:underline">
-                            {provider.displayPhone}
-                          </a>
-                        </span>
-                      </div>
-                    )}
+            // Get location information (prioritize business data, then ad design)
+            const city = business.city || adDesign?.businessInfo?.city || null
+            const state = business.state || adDesign?.businessInfo?.state || null
 
-                    <div className="flex items-center mb-3">
-                      <MapPin className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
-                      <span className="text-sm text-gray-600">
-                        {provider.displayLocation || "Location not specified"}
-                      </span>
-                    </div>
+            // Format the location display - WITHOUT ZIP code
+            let locationDisplay = "Location not available"
+            if (city && state) {
+              locationDisplay = `${city}, ${state}`
+            } else if (city) {
+              locationDisplay = city
+            } else if (state) {
+              locationDisplay = state
+            }
 
-                    <div className="flex items-center mb-3">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || 0} ({provider.reviews || 0} reviews)
-                      </span>
-                    </div>
+            // Get address information
+            const address = business.address || adDesign?.businessInfo?.address || null
+            const fullAddress = address ? `${address}, ${locationDisplay}` : locationDisplay
 
-                    {provider.subcategories && provider.subcategories.length > 0 && (
-                      <div className="mb-3">
-                        <div className="flex items-center mb-2">
-                          <Tag className="w-4 h-4 text-gray-500 mr-2" />
-                          <span className="text-sm font-medium text-gray-700">Specialties:</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {provider.subcategories.map((subcategory: string, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
-                            >
-                              {subcategory}
+            return (
+              <div key={business.id} className="space-y-4">
+                {/* Business Card */}
+                <Card className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row justify-between">
+                      <div className="flex-1">
+                        {/* Business Name */}
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">{business.businessName}</h3>
+
+                        {/* Business Description */}
+                        {adDesign?.businessInfo?.freeText && (
+                          <p className="text-gray-700 mb-3 leading-relaxed">{adDesign.businessInfo.freeText}</p>
+                        )}
+
+                        {/* Phone Number with Icon */}
+                        {phoneNumber && (
+                          <div className="flex items-center mb-2">
+                            <Phone className="w-4 h-4 text-gray-500 mr-2" />
+                            <span className="text-sm text-gray-600">
+                              <a href={`tel:${phoneNumber}`} className="hover:text-blue-600 hover:underline">
+                                {phoneNumber}
+                              </a>
                             </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                          </div>
+                        )}
 
-                  <div className="mt-4 md:mt-0 md:ml-6 flex flex-col items-start md:items-end justify-start space-y-2">
-                    <Button className="w-full md:w-auto min-w-[120px]" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full md:w-auto min-w-[120px]"
-                      onClick={() => handleViewProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                        {/* Location with Icon */}
+                        <div className="flex items-center mb-3">
+                          <MapPin className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+                          <span className="text-sm text-gray-600">{fullAddress}</span>
+                        </div>
+
+                        {/* Star Rating */}
+                        <div className="flex items-center mb-3">
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <svg
+                                key={i}
+                                className={`w-4 h-4 ${i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                            ))}
+                          </div>
+                          <span className="text-sm text-gray-600 ml-2">
+                            {business.rating || 0} ({business.reviews || 0} reviews)
+                          </span>
+                        </div>
+
+                        {/* Subcategories - Primary Display */}
+                        {business.subcategories && business.subcategories.length > 0 && (
+                          <div className="mb-3">
+                            <div className="flex items-center mb-2">
+                              <Tag className="w-4 h-4 text-gray-500 mr-2" />
+                              <span className="text-sm font-medium text-gray-700">Specialties:</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {business.subcategories.map((subcategory, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                                >
+                                  {subcategory}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Services as Backup */}
+                        {(!business.subcategories || business.subcategories.length === 0) &&
+                          business.services &&
+                          business.services.length > 0 && (
+                            <div className="mb-3">
+                              <div className="flex items-center mb-2">
+                                <Tag className="w-4 h-4 text-gray-500 mr-2" />
+                                <span className="text-sm font-medium text-gray-700">Services:</span>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {business.services.map((service, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200"
+                                  >
+                                    {service}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                        {/* Main Category as Last Resort */}
+                        {(!business.subcategories || business.subcategories.length === 0) &&
+                          (!business.services || business.services.length === 0) &&
+                          business.category && (
+                            <div className="mb-3">
+                              <div className="flex items-center mb-2">
+                                <Tag className="w-4 h-4 text-gray-500 mr-2" />
+                                <span className="text-sm font-medium text-gray-700">Category:</span>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                  {business.category}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="mt-4 md:mt-0 md:ml-6 flex flex-col items-start md:items-end justify-start space-y-2">
+                        <Button className="w-full md:w-auto min-w-[120px]" onClick={() => handleOpenReviews(business)}>
+                          Reviews
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full md:w-auto min-w-[120px]"
+                          onClick={() => handleViewProfile(business)}
+                        >
+                          View Profile
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          })}
         </div>
       )}
 
+      {/* Reviews Dialog */}
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
@@ -247,6 +333,7 @@ export default function LegalServicesPage() {
         />
       )}
 
+      {/* Business Profile Dialog (AdBox functionality) */}
       {selectedBusiness && (
         <BusinessProfileDialog
           isOpen={isProfileDialogOpen}

@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useState } from "react"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
 import { useEffect } from "react"
 
 export default function PersonalAssistantsPage() {
@@ -141,17 +141,39 @@ export default function PersonalAssistantsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Replace the useEffect:
   useEffect(() => {
     async function fetchBusinesses() {
       try {
         setLoading(true)
         setError(null)
 
-        // Use the centralized system
-        const businesses = await getBusinessesForCategoryPage("/personal-assistants")
+        // Try multiple category formats to find businesses
+        const categoryVariants = [
+          "Personal Assistants",
+          "personal-assistants",
+          "Personal Services",
+          "Assistant Services",
+        ]
 
-        setProviders(businesses)
+        let allBusinesses: any[] = []
+
+        for (const category of categoryVariants) {
+          try {
+            const businesses = await getBusinessesByCategory(category)
+            if (businesses && businesses.length > 0) {
+              allBusinesses = [...allBusinesses, ...businesses]
+            }
+          } catch (err) {
+            console.log(`No businesses found for category: ${category}`)
+          }
+        }
+
+        // Remove duplicates based on business ID
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setProviders(uniqueBusinesses)
       } catch (err) {
         console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")

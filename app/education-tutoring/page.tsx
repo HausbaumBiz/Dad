@@ -10,8 +10,8 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesByCategoryWithAdDesign } from "@/app/actions/business-actions"
 import { Loader2 } from "lucide-react"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function EducationTutoringPage() {
   const { toast } = useToast()
@@ -40,8 +40,34 @@ export default function EducationTutoringPage() {
     async function fetchBusinesses() {
       setIsLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/education-tutoring")
-        setBusinesses(result)
+        const categoryFormats = [
+          "education-tutoring",
+          "Education & Tutoring",
+          "educationTutoring",
+          "Language Lessons",
+          "language-lessons",
+          "tutoring",
+          "Tutoring",
+        ]
+
+        let allBusinesses: any[] = []
+
+        for (const format of categoryFormats) {
+          try {
+            const result = await getBusinessesByCategoryWithAdDesign(format)
+            if (result && result.length > 0) {
+              allBusinesses = [...allBusinesses, ...result]
+            }
+          } catch (error) {
+            console.error(`Error fetching businesses for format ${format}:`, error)
+          }
+        }
+
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setBusinesses(uniqueBusinesses)
       } catch (error) {
         console.error("Error fetching businesses:", error)
         toast({
@@ -130,7 +156,7 @@ export default function EducationTutoringPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{business.businessName}</h3>
+                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
                     <p className="text-gray-600 text-sm mt-1">{business.city || business.zipCode}</p>
 
                     <div className="flex items-center mt-2">
@@ -213,7 +239,7 @@ export default function EducationTutoringPage() {
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.businessName || selectedProvider.name}
+          providerName={selectedProvider.displayName || selectedProvider.businessName || selectedProvider.name}
           businessId={selectedProvider.id}
           reviews={[]}
         />

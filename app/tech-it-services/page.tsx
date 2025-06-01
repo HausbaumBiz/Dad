@@ -15,8 +15,7 @@ import { ReviewLoginDialog } from "@/components/review-login-dialog"
 // import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
 // With this import
-// import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 
 export default function TechITServicesPage() {
   const filterOptions = [
@@ -46,8 +45,8 @@ export default function TechITServicesPage() {
       try {
         setLoading(true)
 
-        // Use the centralized system
-        const businesses = await getBusinessesForCategoryPage("/tech-it-services")
+        // Use the new category-based fetcher
+        const businesses = await getBusinessesBySelectedCategories("/tech-it-services")
 
         console.log(`Found ${businesses.length} tech businesses`)
         setProviders(businesses)

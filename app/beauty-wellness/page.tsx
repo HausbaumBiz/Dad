@@ -10,8 +10,8 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesByCategoryWithAdDesign } from "@/app/actions/business-actions"
 import { Loader2 } from "lucide-react"
-import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
 
 export default function BeautyWellnessPage() {
   const { toast } = useToast()
@@ -49,9 +49,32 @@ export default function BeautyWellnessPage() {
     async function fetchBusinesses() {
       setIsLoading(true)
       try {
-        // Use the simplified business category service
-        const result = await getBusinessesForCategoryPage("/beauty-wellness")
-        setBusinesses(result)
+        const categoryFormats = [
+          "beauty-wellness",
+          "Beauty & Wellness",
+          "beautyWellness",
+          "Personal Care Services",
+          "personal-care-services",
+        ]
+
+        let allBusinesses: any[] = []
+
+        for (const format of categoryFormats) {
+          try {
+            const result = await getBusinessesByCategoryWithAdDesign(format)
+            if (result && result.length > 0) {
+              allBusinesses = [...allBusinesses, ...result]
+            }
+          } catch (error) {
+            console.error(`Error fetching businesses for format ${format}:`, error)
+          }
+        }
+
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setBusinesses(uniqueBusinesses)
       } catch (error) {
         console.error("Error fetching businesses:", error)
         toast({
@@ -140,7 +163,7 @@ export default function BeautyWellnessPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{business.businessName}</h3>
+                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
                     <p className="text-gray-600 text-sm mt-1">{business.city || business.zipCode}</p>
 
                     <div className="flex items-center mt-2">
@@ -223,7 +246,7 @@ export default function BeautyWellnessPage() {
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.businessName || selectedProvider.name}
+          providerName={selectedProvider.displayName || selectedProvider.businessName || selectedProvider.name}
           businessId={selectedProvider.id}
           reviews={[]}
         />

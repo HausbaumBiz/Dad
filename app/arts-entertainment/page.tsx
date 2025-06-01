@@ -11,8 +11,8 @@ import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 import { Loader2, MapPin, Phone } from "lucide-react"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function ArtsEntertainmentPage() {
   const { toast } = useToast()
@@ -50,8 +50,8 @@ export default function ArtsEntertainmentPage() {
     async function fetchBusinesses() {
       setIsLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/arts-entertainment")
-        setBusinesses(result)
+        const result = await getBusinessesBySelectedCategories("/arts-entertainment")
+        setBusinesses(result || [])
       } catch (error) {
         console.error("Error fetching businesses:", error)
         toast({

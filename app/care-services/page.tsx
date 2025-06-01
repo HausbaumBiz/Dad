@@ -5,20 +5,18 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 import type { Business } from "@/lib/definitions"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Phone, MapPin, Star, Loader2 } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useToast } from "@/components/ui/use-toast"
 
 export default function CareServicesPage() {
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
 
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -40,25 +38,26 @@ export default function CareServicesPage() {
   ]
 
   useEffect(() => {
-    async function fetchBusinesses() {
-      setLoading(true)
+    const fetchBusinesses = async () => {
       try {
-        const result = await getBusinessesForCategoryPage("/care-services")
-        setBusinesses(result)
-      } catch (error) {
-        console.error("Error fetching businesses:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
+        setLoading(true)
+        setError(null)
+        console.log("Fetching care services businesses...")
+
+        const fetchedBusinesses = await getBusinessesBySelectedCategories("/care-services")
+        console.log("Fetched care services businesses:", fetchedBusinesses)
+
+        setBusinesses(fetchedBusinesses)
+      } catch (err) {
+        console.error("Error fetching care services businesses:", err)
+        setError("Failed to load care service providers")
       } finally {
         setLoading(false)
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+  }, [])
 
   // Helper function to get phone number from business data
   const getPhoneNumber = (business: Business) => {

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
 export default function AudioVisualSecurityPage() {
   const filterOptions = [
@@ -31,19 +31,48 @@ export default function AudioVisualSecurityPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     async function fetchBusinesses() {
-      setIsLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/home-improvement/audio-visual-security")
-        setProviders(result)
-      } catch (error) {
-        console.error("Error fetching businesses:", error)
+        setLoading(true)
+        setError(null)
+
+        // Try multiple category formats to catch businesses
+        const categoryVariants = [
+          "Audio/Visual and Home Security",
+          "audio visual security",
+          "Smart Home Setup",
+          "Home Security Solutions",
+          "Cinema Room Setup",
+          "Computer Repair",
+          "Telecommunication",
+        ]
+
+        let allBusinesses: any[] = []
+
+        for (const category of categoryVariants) {
+          try {
+            const businesses = await getBusinessesByCategory(category)
+            if (businesses && businesses.length > 0) {
+              allBusinesses = [...allBusinesses, ...businesses]
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch businesses for category: ${category}`)
+          }
+        }
+
+        // Remove duplicates based on business ID
+        const uniqueBusinesses = allBusinesses.filter(
+          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
+        )
+
+        setProviders(uniqueBusinesses)
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
       } finally {
-        setIsLoading(false)
+        setLoading(false)
       }
     }
 
@@ -77,7 +106,7 @@ export default function AudioVisualSecurityPage() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 002 2v8a2 2 0 002 2z"
+                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                 />
               </svg>
             </div>
