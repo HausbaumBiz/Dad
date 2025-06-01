@@ -5,11 +5,12 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
+import { Phone } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
-import { useEffect } from "react"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function RealEstatePage() {
   const filterOptions = [
@@ -29,7 +30,14 @@ export default function RealEstatePage() {
     reviews: any[]
   } | null>(null)
 
-  // Remove the mock providers state and replace with real data fetching
+  // State for business profile dialog
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedBusiness, setSelectedBusiness] = useState<{
+    id: string
+    name: string
+  } | null>(null)
+
+  // State for businesses
   const [providers, setProviders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -39,29 +47,8 @@ export default function RealEstatePage() {
       try {
         setLoading(true)
         setError(null)
-
-        // Try multiple category formats to find businesses
-        const categoryVariants = ["Real Estate", "real-estate", "Home Buying and Selling", "home-buying-and-selling"]
-
-        let allBusinesses: any[] = []
-
-        for (const category of categoryVariants) {
-          try {
-            const businesses = await getBusinessesByCategory(category)
-            if (businesses && businesses.length > 0) {
-              allBusinesses = [...allBusinesses, ...businesses]
-            }
-          } catch (err) {
-            console.log(`No businesses found for category: ${category}`)
-          }
-        }
-
-        // Remove duplicates based on business ID
-        const uniqueBusinesses = allBusinesses.filter(
-          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
-        )
-
-        setProviders(uniqueBusinesses)
+        const fetchedBusinesses = await getBusinessesForCategoryPage("/real-estate")
+        setProviders(fetchedBusinesses)
       } catch (err) {
         console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
@@ -74,8 +61,20 @@ export default function RealEstatePage() {
   }, [])
 
   const handleOpenReviews = (provider: any) => {
-    setSelectedProvider(provider)
+    setSelectedProvider({
+      id: provider.id,
+      name: provider.displayName || provider.businessName || "Real Estate Professional",
+      reviews: provider.reviewsData || [],
+    })
     setIsReviewsDialogOpen(true)
+  }
+
+  const handleViewProfile = (provider: any) => {
+    setSelectedBusiness({
+      id: provider.id,
+      name: provider.displayName || provider.businessName || "Real Estate Professional",
+    })
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -143,13 +142,26 @@ export default function RealEstatePage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {providers.map((provider) => (
+          {providers.map((provider: any) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location || "Location not specified"}</p>
+                    <h3 className="text-xl font-semibold">
+                      {provider.displayName || provider.businessName || "Real Estate Professional"}
+                    </h3>
+                    <p className="text-gray-600 text-sm mt-1">{provider.displayLocation || "Location not specified"}</p>
+
+                    {provider.displayPhone && (
+                      <div className="flex items-center mt-2">
+                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
+                        <span className="text-sm text-gray-600">
+                          <a href={`tel:${provider.displayPhone}`} className="hover:text-blue-600 hover:underline">
+                            {provider.displayPhone}
+                          </a>
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
@@ -165,20 +177,20 @@ export default function RealEstatePage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || 0} ({provider.reviewCount || 0} reviews)
+                        {provider.rating || 0} ({provider.reviews || 0} reviews)
                       </span>
                     </div>
 
-                    {provider.services && provider.services.length > 0 && (
+                    {provider.subcategories && provider.subcategories.length > 0 && (
                       <div className="mt-3">
                         <p className="text-sm font-medium text-gray-700">Services:</p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.services.map((service, idx) => (
+                          {provider.subcategories.map((subcategory: string, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {service}
+                              {subcategory}
                             </span>
                           ))}
                         </div>
@@ -190,7 +202,11 @@ export default function RealEstatePage() {
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleViewProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -206,7 +222,16 @@ export default function RealEstatePage() {
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.name}
-          reviews={selectedProvider.reviewsData}
+          reviews={selectedProvider.reviews}
+        />
+      )}
+
+      {selectedBusiness && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedBusiness.id}
+          businessName={selectedBusiness.name}
         />
       )}
 

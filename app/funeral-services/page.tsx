@@ -9,8 +9,8 @@ import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useState, useEffect } from "react"
-import { getBusinessesByCategoryWithAdDesign } from "@/app/actions/business-actions"
-import { Badge } from "@/components/ui/badge"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function FuneralServicesPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
@@ -21,112 +21,30 @@ export default function FuneralServicesPage() {
   const [loading, setLoading] = useState(true)
   const [debugInfo, setDebugInfo] = useState<string>("")
   const [debugDetails, setDebugDetails] = useState<any>(null)
+  const [businesses, setBusinesses] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const { toast } = useToast()
 
   useEffect(() => {
-    async function loadBusinesses() {
+    async function fetchBusinesses() {
+      setIsLoading(true)
       try {
-        setLoading(true)
-
-        // Try both category formats to be sure
-        const businesses = await getBusinessesByCategoryWithAdDesign("Mortuary Services")
-        console.log(`Loaded ${businesses.length} mortuary services businesses`)
-
-        // Store debug information
-        setDebugDetails({
-          totalBusinesses: businesses.length,
-          businesses: businesses.map((b) => ({
-            id: b.id,
-            name: b.businessName,
-            category: b.category,
-            zipCode: b.zipCode,
-            city: b.city,
-            state: b.state,
-            allSubcategories: b.allSubcategories || [],
-          })),
-        })
-
-        // Get categories for each business
-        const formattedBusinesses = await Promise.all(
-          businesses.map(async (business) => {
-            // Use the city and state from the business record
-            const city = business.city || "Unknown City"
-            const state = business.state || "OH"
-
-            // First check if business has allSubcategories field
-            let services: string[] = []
-
-            if (
-              business.allSubcategories &&
-              Array.isArray(business.allSubcategories) &&
-              business.allSubcategories.length > 0
-            ) {
-              // Use allSubcategories directly
-              services = business.allSubcategories
-              console.log(`Using allSubcategories for ${business.businessName}:`, services)
-            } else {
-              // Fallback to fetching from API
-              try {
-                const response = await fetch(`/api/admin/business/${business.id}/categories`)
-                if (response.ok) {
-                  const categoriesData = await response.json()
-                  console.log(`Categories for ${business.businessName}:`, categoriesData)
-
-                  // The API returns the categories directly as an array
-                  if (Array.isArray(categoriesData) && categoriesData.length > 0) {
-                    services = categoriesData.map((cat) => {
-                      // Extract the name from the category object
-                      if (typeof cat === "string") {
-                        return cat
-                      } else if (cat && typeof cat === "object") {
-                        return cat.name || cat.id || "Funeral Service"
-                      }
-                      return "Funeral Service"
-                    })
-                  }
-                }
-              } catch (error) {
-                console.error(`Error fetching categories for business ${business.id}:`, error)
-              }
-            }
-
-            // If we still don't have any services, use default
-            if (services.length === 0) {
-              services = ["Funeral Services"]
-            }
-
-            return {
-              id: business.id,
-              name: business.displayName || business.businessName,
-              services: services,
-              rating: business.rating || 4.5,
-              reviews: business.reviews || Math.floor(Math.random() * 50) + 10,
-              location: `${city}, ${state}`,
-              zipCode: business.zipCode || "Not specified",
-              serviceArea: business.serviceArea || [],
-              reviewsData: business.reviewsData || [],
-            }
-          }),
-        )
-
-        setProviders(formattedBusinesses)
-        setDebugInfo(`Found ${businesses.length} funeral businesses in the database.`)
-
-        if (formattedBusinesses.length === 0) {
-          console.log("No mortuary services businesses found")
-          setDebugInfo(
-            "No funeral businesses found in the database. You may want to add some from the admin panel or fix the category indexing at /admin/fix-categories.",
-          )
-        }
+        const result = await getBusinessesForCategoryPage("/funeral-services")
+        setBusinesses(result)
       } catch (error) {
-        console.error("Error loading funeral service businesses:", error)
-        setDebugInfo(`Error: ${error instanceof Error ? error.message : "Unknown error"}`)
+        console.error("Error fetching businesses:", error)
+        toast({
+          title: "Error loading businesses",
+          description: "There was a problem loading businesses. Please try again later.",
+          variant: "destructive",
+        })
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
 
-    loadBusinesses()
-  }, [])
+    fetchBusinesses()
+  }, [toast])
 
   const handleOpenReviews = (providerName: string) => {
     setSelectedProvider(providerName)
@@ -207,11 +125,11 @@ export default function FuneralServicesPage() {
       )}
 
       <div className="space-y-6">
-        {loading ? (
+        {isLoading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
           </div>
-        ) : providers.length === 0 ? (
+        ) : businesses.length === 0 ? (
           <div className="text-center py-12">
             <h3 className="text-xl font-medium text-gray-700">No funeral service providers found</h3>
             <p className="mt-2 text-gray-500">
@@ -233,28 +151,24 @@ export default function FuneralServicesPage() {
             </div>
           </div>
         ) : (
-          providers.map((provider) => (
+          businesses.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+                    <h3 className="text-xl font-semibold">{provider.displayName || provider.businessName}</h3>
 
-                    {/* ZIP Code Information */}
-                    <div className="mt-2">
-                      <p className="text-sm font-medium text-gray-700">Primary ZIP Code:</p>
-                      <Badge variant="outline" className="mt-1">
-                        {provider.zipCode}
-                      </Badge>
-                    </div>
+                    {/* City and State Information */}
+                    <p className="text-gray-600 text-sm mt-1">
+                      {provider.displayLocation || `${provider.city}, ${provider.state}`}
+                    </p>
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 4.5) ? "text-yellow-400" : "text-gray-300"}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -263,33 +177,42 @@ export default function FuneralServicesPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
+                        {provider.rating || 4.5} ({provider.reviews || 0} reviews)
                       </span>
                     </div>
 
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
+                        {provider.subcategories && provider.subcategories.length > 0 ? (
+                          provider.subcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            Funeral Services
                           </span>
-                        ))}
+                        )}
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider.name)}>
+                    <Button
+                      className="w-full md:w-auto"
+                      onClick={() => handleOpenReviews(provider.displayName || provider.businessName)}
+                    >
                       Reviews
                     </Button>
                     <Button
                       variant="outline"
                       className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(provider.id, provider.name)}
+                      onClick={() => handleOpenProfile(provider.id, provider.displayName || provider.businessName)}
                     >
                       View Profile
                     </Button>
@@ -306,7 +229,7 @@ export default function FuneralServicesPage() {
         onClose={() => setIsReviewsOpen(false)}
         providerName={selectedProvider || ""}
         businessId={selectedProviderId || ""}
-        reviews={selectedProvider && providers.length > 0 ? [] : []}
+        reviews={[]}
       />
 
       <BusinessProfileDialog

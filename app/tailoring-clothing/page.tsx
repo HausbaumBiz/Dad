@@ -12,7 +12,7 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { MapPin, Phone } from "lucide-react"
 import Link from "next/link"
 import type { Business } from "@/lib/definitions"
-import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function TailoringClothingPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
@@ -29,8 +29,8 @@ export default function TailoringClothingPage() {
         setLoading(true)
         console.log("Fetching tailoring businesses...")
 
-        // Use the server action to get businesses with ad design data
-        const fetchedBusinesses = await getBusinessesBySelectedCategories("/tailoring-clothing")
+        // Use the centralized system
+        const fetchedBusinesses = await getBusinessesForCategoryPage("/tailoring-clothing")
 
         console.log("Fetched tailoring businesses:", fetchedBusinesses)
         setBusinesses(fetchedBusinesses)

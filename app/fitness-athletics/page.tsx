@@ -10,8 +10,8 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesByCategoryWithAdDesign } from "@/app/actions/business-actions"
 import { Loader2 } from "lucide-react"
+import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
 
 export default function FitnessAthleticsPage() {
   const { toast } = useToast()
@@ -43,36 +43,8 @@ export default function FitnessAthleticsPage() {
     async function fetchBusinesses() {
       setIsLoading(true)
       try {
-        const categoryFormats = [
-          "fitness-athletics",
-          "Fitness & Athletics",
-          "fitnessAthletics",
-          "Athletics, Fitness & Dance Instruction",
-          "athletics-fitness-dance",
-          "fitness",
-          "Fitness",
-          "athletics",
-          "Athletics",
-        ]
-
-        let allBusinesses: any[] = []
-
-        for (const format of categoryFormats) {
-          try {
-            const result = await getBusinessesByCategoryWithAdDesign(format)
-            if (result && result.length > 0) {
-              allBusinesses = [...allBusinesses, ...result]
-            }
-          } catch (error) {
-            console.error(`Error fetching businesses for format ${format}:`, error)
-          }
-        }
-
-        const uniqueBusinesses = allBusinesses.filter(
-          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
-        )
-
-        setBusinesses(uniqueBusinesses)
+        const result = await getBusinessesForCategoryPage("/fitness-athletics")
+        setBusinesses(result)
       } catch (error) {
         console.error("Error fetching businesses:", error)
         toast({
@@ -90,13 +62,8 @@ export default function FitnessAthleticsPage() {
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
-        if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-          return business.allSubcategories.some((sub: string) =>
-            sub.toLowerCase().includes(selectedFilter.toLowerCase()),
-          )
-        }
-        if (business.subcategory) {
-          return business.subcategory.toLowerCase().includes(selectedFilter.toLowerCase())
+        if (business.subcategories && Array.isArray(business.subcategories)) {
+          return business.subcategories.some((sub: string) => sub.toLowerCase().includes(selectedFilter.toLowerCase()))
         }
         return false
       })
@@ -162,7 +129,18 @@ export default function FitnessAthleticsPage() {
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
                     <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{business.city || business.zipCode}</p>
+                    <p className="text-gray-600 text-sm mt-1">
+                      {business.displayLocation ||
+                        (business.displayCity && business.displayState
+                          ? `${business.displayCity}, ${business.displayState}`
+                          : business.city && business.state
+                            ? `${business.city}, ${business.state}`
+                            : business.displayCity ||
+                              business.city ||
+                              business.displayState ||
+                              business.state ||
+                              `Zip: ${business.zipCode}`)}
+                    </p>
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
@@ -185,8 +163,8 @@ export default function FitnessAthleticsPage() {
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service: string, idx: number) => (
+                        {business.subcategories && business.subcategories.length > 0 ? (
+                          business.subcategories.map((service: string, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
@@ -196,7 +174,7 @@ export default function FitnessAthleticsPage() {
                           ))
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {business.subcategory || "Fitness & Athletics"}
+                            Fitness & Athletics
                           </span>
                         )}
                       </div>

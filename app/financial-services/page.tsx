@@ -10,8 +10,8 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 import { Loader2, MapPin, Phone } from "lucide-react"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 interface Business {
   id: string
@@ -46,20 +46,17 @@ export default function FinancialServicesPage() {
 
   useEffect(() => {
     async function fetchBusinesses() {
-      console.log("Fetching financial services businesses...")
       setIsLoading(true)
       try {
-        const result = await getBusinessesBySelectedCategories("/financial-services")
-        console.log("Fetched financial services businesses:", result)
-        setBusinesses(result || [])
+        const result = await getBusinessesForCategoryPage("/financial-services")
+        setBusinesses(result)
       } catch (error) {
-        console.error("Error fetching financial services businesses:", error)
+        console.error("Error fetching businesses:", error)
         toast({
           title: "Error loading businesses",
           description: "There was a problem loading businesses. Please try again later.",
           variant: "destructive",
         })
-        setBusinesses([])
       } finally {
         setIsLoading(false)
       }
