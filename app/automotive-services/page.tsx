@@ -12,6 +12,23 @@ import { AdBox } from "@/components/ad-box"
 import type { Business } from "@/lib/definitions"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
+import { Phone } from "lucide-react"
+
+// Format phone number for display
+function formatPhoneNumber(phone: string): string {
+  if (!phone) return "No phone provided"
+
+  // Remove all non-numeric characters
+  const cleaned = phone.replace(/\D/g, "")
+
+  // Check if we have a valid 10-digit US phone number
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+  }
+
+  // Return original if not a standard format
+  return phone
+}
 
 export default function AutomotiveServicesPage() {
   const filterOptions = [
@@ -169,10 +186,44 @@ export default function AutomotiveServicesPage() {
                       <div>
                         <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
                         <p className="text-gray-600 text-sm mt-1">
-                          {business.city && business.state
-                            ? `${business.city}, ${business.state}`
-                            : `Zip: ${business.zipCode}`}
+                          {(() => {
+                            // Prioritize city/state from ad design data
+                            const adCity = business.adDesignData?.businessInfo?.city
+                            const adState = business.adDesignData?.businessInfo?.state
+
+                            if (adCity && adState) {
+                              return `${adCity}, ${adState}`
+                            }
+
+                            // Fall back to display city/state from centralized system
+                            if (business.displayCity && business.displayState) {
+                              return `${business.displayCity}, ${business.displayState}`
+                            }
+
+                            // Fall back to original business city/state
+                            if (business.city && business.state) {
+                              return `${business.city}, ${business.state}`
+                            }
+
+                            // Final fallback to zip code
+                            return business.zipCode ? `Zip: ${business.zipCode}` : "Location not provided"
+                          })()}
                         </p>
+
+                        {/* Phone Number */}
+                        {(business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone) && (
+                          <div className="flex items-center mt-1">
+                            <Phone className="w-4 h-4 text-gray-500 mr-1" />
+                            <span className="text-gray-600 text-sm">
+                              {formatPhoneNumber(
+                                business.adDesignData?.businessInfo?.phone ||
+                                  business.displayPhone ||
+                                  business.phone ||
+                                  "",
+                              )}
+                            </span>
+                          </div>
+                        )}
 
                         <div className="flex items-center mt-2">
                           <div className="flex">

@@ -11,6 +11,23 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useState, useEffect } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
+import { Phone } from "lucide-react"
+
+// Format phone number for display
+function formatPhoneNumber(phone: string): string {
+  if (!phone) return "No phone provided"
+
+  // Remove all non-numeric characters
+  const cleaned = phone.replace(/\D/g, "")
+
+  // Check if it's a valid 10-digit US phone number
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+  }
+
+  // Return original if not a standard format
+  return phone
+}
 
 export default function FuneralServicesPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
@@ -162,6 +179,16 @@ export default function FuneralServicesPage() {
                     <p className="text-gray-600 text-sm mt-1">
                       {provider.displayLocation || `${provider.city}, ${provider.state}`}
                     </p>
+
+                    {/* Phone Number */}
+                    {(provider.displayPhone || provider.phone) && (
+                      <div className="flex items-center mt-1">
+                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
+                        <span className="text-gray-600 text-sm">
+                          {formatPhoneNumber(provider.displayPhone || provider.phone)}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">

@@ -9,6 +9,22 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { Phone } from "lucide-react"
+
+function formatPhoneNumber(phone: string): string {
+  if (!phone) return "No phone provided"
+
+  // Remove all non-numeric characters
+  const cleaned = phone.replace(/\D/g, "")
+
+  // Check if we have a valid 10-digit US phone number
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+  }
+
+  // Return original if not a standard format
+  return phone
+}
 
 export default function TravelVacationPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
@@ -150,10 +166,11 @@ export default function TravelVacationPage() {
                       </span>
                     </div>
 
-                    {provider.displayPhone && (
-                      <div className="mt-2">
+                    {(provider.adDesignData?.businessInfo?.phone || provider.phone) && (
+                      <div className="mt-2 flex items-center">
+                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
                         <p className="text-sm text-gray-600">
-                          <span className="font-medium">Phone:</span> {provider.displayPhone}
+                          {formatPhoneNumber(provider.adDesignData?.businessInfo?.phone || provider.phone)}
                         </p>
                       </div>
                     )}

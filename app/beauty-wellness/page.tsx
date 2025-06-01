@@ -10,8 +10,26 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2 } from "lucide-react"
+import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
+
+// Format phone number to (XXX) XXX-XXXX
+function formatPhoneNumber(phoneNumberString: string) {
+  if (!phoneNumberString) return "No phone provided"
+
+  // Strip all non-numeric characters
+  const cleaned = phoneNumberString.replace(/\D/g, "")
+
+  // Check if the number is valid
+  const match = cleaned.match(/^(\d{3})(\d{3})(\d{4})$/)
+
+  if (match) {
+    return `(${match[1]}) ${match[2]}-${match[3]}`
+  }
+
+  // If the format doesn't match, return the original
+  return phoneNumberString
+}
 
 export default function BeautyWellnessPage() {
   const { toast } = useToast()
@@ -146,6 +164,10 @@ export default function BeautyWellnessPage() {
                         (business.city && business.state
                           ? `${business.city}, ${business.state}`
                           : business.city || business.state || business.zipCode)}
+                    </p>
+                    <p className="text-gray-600 text-sm mt-1 flex items-center">
+                      <Phone className="h-3 w-3 mr-1" />
+                      {formatPhoneNumber(business.adDesignData?.businessInfo?.phone || business.phone || "")}
                     </p>
 
                     <div className="flex items-center mt-2">

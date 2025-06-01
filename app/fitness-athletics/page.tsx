@@ -10,11 +10,28 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2 } from "lucide-react"
+import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
 
 export default function FitnessAthleticsPage() {
   const { toast } = useToast()
+
+  // Add phone number formatting function
+  const formatPhoneNumber = (phone: string | null | undefined): string => {
+    if (!phone) return "No phone provided"
+
+    // Remove all non-numeric characters
+    const cleaned = phone.replace(/\D/g, "")
+
+    // Check if it's a valid 10-digit US phone number
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    }
+
+    // Return original if not a standard format
+    return phone
+  }
+
   const filterOptions = [
     { id: "athletics1", label: "Baseball/Softball", value: "Baseball/Softball" },
     { id: "athletics2", label: "Golf", value: "Golf" },
@@ -141,6 +158,16 @@ export default function FitnessAthleticsPage() {
                               business.state ||
                               `Zip: ${business.zipCode}`)}
                     </p>
+
+                    {/* Add phone number display */}
+                    {(business.displayPhone || business.phone) && (
+                      <div className="flex items-center mt-1">
+                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
+                        <span className="text-gray-600 text-sm">
+                          {formatPhoneNumber(business.displayPhone || business.phone)}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">

@@ -11,6 +11,7 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useEffect } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { Phone } from "lucide-react"
 
 export default function MedicalPractitionersPage() {
   const filterOptions = [
@@ -52,11 +53,13 @@ export default function MedicalPractitionersPage() {
             rating: 4.5, // Default rating - you can enhance this later
             reviews: 12, // Default review count - you can enhance this later
             services: business.subcategories || ["General Practice"],
-            phone: business.displayPhone || business.phone,
+            // Get phone from ad design data if available, otherwise use registration phone
+            phone: business.adDesignData?.businessInfo?.phone || business.phone || "No phone provided",
             address: business.address,
             adDesignData: business.adDesignData,
           }))
 
+          console.log("Transformed providers with phone numbers:", transformedProviders)
           setProviders(transformedProviders)
         } else {
           setProviders([])
@@ -93,6 +96,22 @@ export default function MedicalPractitionersPage() {
   const handleOpenProfile = (provider: any) => {
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
+  }
+
+  // Format phone number for display
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone) return "No phone provided"
+
+    // Remove all non-digit characters
+    const cleaned = phone.replace(/\D/g, "")
+
+    // Check if we have a 10-digit number
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    }
+
+    // Return original if not a standard format
+    return phone
   }
 
   return (
@@ -166,6 +185,12 @@ export default function MedicalPractitionersPage() {
                   <div>
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
                     <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+
+                    {/* Phone number display */}
+                    <div className="flex items-center mt-2 text-sm text-gray-600">
+                      <Phone className="h-4 w-4 mr-1" />
+                      <span>{formatPhoneNumber(provider.phone)}</span>
+                    </div>
 
                     <div className="flex items-center mt-2">
                       <div className="flex">

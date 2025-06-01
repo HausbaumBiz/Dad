@@ -62,26 +62,69 @@ export default function CareServicesPage() {
 
   // Helper function to get phone number from business data
   const getPhoneNumber = (business: Business) => {
-    // Try business data first, then ad design data
+    // First try to get phone from ad design data
+    if (business.adDesignData?.businessInfo?.phone) {
+      return business.adDesignData.businessInfo.phone
+    }
+    // Then try displayPhone which might be set by the centralized system
+    if (business.displayPhone) {
+      return business.displayPhone
+    }
+    // Fall back to the business registration phone
     if (business.phone) {
       return business.phone
     }
     return null
   }
 
+  // Add a formatPhoneNumber function for better display
+  const formatPhoneNumber = (phoneNumberString: string | null | undefined) => {
+    if (!phoneNumberString) return "No phone provided"
+
+    // Strip all non-numeric characters
+    const cleaned = phoneNumberString.replace(/\D/g, "")
+
+    // Check if it's a valid 10-digit US phone number
+    if (cleaned.length === 10) {
+      return `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6, 10)}`
+    }
+
+    // Return the original if not a standard format
+    return phoneNumberString
+  }
+
   // Helper function to get location from business data
   const getLocation = (business: Business) => {
-    // Try to build location from business data
-    const parts = []
+    // First try to get location from ad design data
+    const adDesignCity = business.adDesignData?.businessInfo?.city
+    const adDesignState = business.adDesignData?.businessInfo?.state
 
-    if (business.city) parts.push(business.city)
-    if (business.state) parts.push(business.state)
+    // Then try displayCity/displayState which might be set by the centralized system
+    const displayCity = business.displayCity
+    const displayState = business.displayState
+
+    // Finally fall back to registration data
+    const registrationCity = business.city
+    const registrationState = business.state
+
+    // Build location string prioritizing ad design data
+    const city = adDesignCity || displayCity || registrationCity
+    const state = adDesignState || displayState || registrationState
+
+    const parts = []
+    if (city) parts.push(city)
+    if (state) parts.push(state)
 
     if (parts.length > 0) {
       return parts.join(", ")
     }
 
-    return null
+    // If no city/state available, show zip code as fallback
+    if (business.zipCode) {
+      return `Zip: ${business.zipCode}`
+    }
+
+    return "Location not provided"
   }
 
   // Helper function to get subcategories
@@ -102,7 +145,7 @@ export default function CareServicesPage() {
   const handleViewReviews = (business: Business) => {
     console.log("Opening reviews for business:", business)
     setSelectedProvider({
-      name: business.businessName,
+      name: business.displayName || business.businessName,
       id: business.id || "",
     })
     setIsReviewsDialogOpen(true)
@@ -111,7 +154,7 @@ export default function CareServicesPage() {
   const handleViewProfile = (business: Business) => {
     console.log("Opening profile for business:", business)
     setSelectedBusinessId(business.id || "")
-    setSelectedBusinessName(business.businessName)
+    setSelectedBusinessName(business.displayName || business.businessName)
     setIsProfileDialogOpen(true)
   }
 
@@ -169,7 +212,9 @@ export default function CareServicesPage() {
                   <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row justify-between">
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">{business.businessName}</h3>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          {business.displayName || business.businessName}
+                        </h3>
 
                         {business.description && <p className="text-gray-600 mb-3">{business.description}</p>}
 
@@ -179,7 +224,7 @@ export default function CareServicesPage() {
                             <div className="flex items-center text-sm text-gray-600">
                               <Phone className="h-4 w-4 mr-2 text-primary" />
                               <a href={`tel:${getPhoneNumber(business)}`} className="text-blue-600 hover:underline">
-                                {getPhoneNumber(business)}
+                                {formatPhoneNumber(getPhoneNumber(business))}
                               </a>
                             </div>
                           )}

@@ -50,7 +50,16 @@ export default function TechITServicesPage() {
         const businesses = await getBusinessesForCategoryPage("/tech-it-services")
 
         console.log(`Found ${businesses.length} tech businesses`)
-        setProviders(businesses)
+
+        // Ensure each business has a services array
+        const processedBusinesses = businesses.map((business) => ({
+          ...business,
+          services: business.services || business.subcategories || [],
+          reviews: business.reviews || [],
+          rating: business.rating || 0,
+        }))
+
+        setProviders(processedBusinesses)
       } catch (err) {
         console.error("Error fetching tech providers:", err)
         setError("Failed to load providers")
@@ -157,21 +166,25 @@ export default function TechITServicesPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
+                        {provider.rating || 0} ({provider.reviews?.length || 0} reviews)
                       </span>
                     </div>
 
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                        {provider.services && Array.isArray(provider.services) ? (
+                          provider.services.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-500">No services listed</span>
+                        )}
                       </div>
                     </div>
                   </div>

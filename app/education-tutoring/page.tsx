@@ -10,8 +10,24 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2 } from "lucide-react"
+import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+
+// Format phone number to (XXX) XXX-XXXX
+function formatPhoneNumber(phoneNumberString: string | undefined | null): string {
+  if (!phoneNumberString) return "No phone provided"
+
+  // Strip all non-numeric characters
+  const cleaned = phoneNumberString.replace(/\D/g, "")
+
+  // Check if it's a valid 10-digit number
+  if (cleaned.length === 10) {
+    return `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6, 10)}`
+  }
+
+  // Return original if not 10 digits
+  return phoneNumberString
+}
 
 export default function EducationTutoringPage() {
   const { toast } = useToast()
@@ -137,6 +153,13 @@ export default function EducationTutoringPage() {
                           ? `${business.city}, ${business.state}`
                           : business.city || business.state || `Zip: ${business.zipCode}`)}
                     </p>
+
+                    {(business.displayPhone || business.phone) && (
+                      <div className="flex items-center text-gray-600 text-sm mt-1">
+                        <Phone className="h-3 w-3 mr-1" />
+                        <span>{formatPhoneNumber(business.displayPhone || business.phone)}</span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
