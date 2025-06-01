@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { Phone, MapPin } from "lucide-react"
 
 // Import the ReviewsDialog component
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 // Replace this import
 // import { getBusinessesByCategory } from "@/app/actions/business-actions"
 
@@ -36,9 +38,57 @@ export default function TechITServicesPage() {
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
 
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{ id: string; name: string } | null>(null)
+
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Phone number formatting function
+  const formatPhoneNumber = (phone: string): string => {
+    if (!phone) return "No phone provided"
+
+    // Remove all non-numeric characters
+    const cleaned = phone.replace(/\D/g, "")
+
+    // Check if it's a valid 10-digit US phone number
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    }
+
+    // Return original if not a standard format
+    return phone
+  }
+
+  // Location formatting function
+  const getLocation = (provider: any): string => {
+    // First priority: city and state from ad design data
+    const adDesignCity = provider.adDesignData?.businessInfo?.city
+    const adDesignState = provider.adDesignData?.businessInfo?.state
+
+    if (adDesignCity && adDesignState) {
+      return `${adDesignCity}, ${adDesignState}`
+    }
+
+    // Second priority: display city and state from centralized system
+    if (provider.displayCity && provider.displayState) {
+      return `${provider.displayCity}, ${provider.displayState}`
+    }
+
+    // Third priority: original business city and state
+    if (provider.city && provider.state) {
+      return `${provider.city}, ${provider.state}`
+    }
+
+    // Fourth priority: ZIP code if available
+    if (provider.zipCode) {
+      return provider.zipCode
+    }
+
+    // Final fallback
+    return "Location not specified"
+  }
 
   // Replace the entire useEffect function with:
   useEffect(() => {
@@ -75,9 +125,18 @@ export default function TechITServicesPage() {
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
       ...provider,
+      name: provider.displayName || provider.name,
       reviews: provider.reviews || [],
     })
     setIsReviewsDialogOpen(true)
+  }
+
+  const handleOpenProfile = (provider: any) => {
+    setSelectedBusinessProfile({
+      id: provider.id,
+      name: provider.displayName || provider.name,
+    })
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -149,8 +208,25 @@ export default function TechITServicesPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+                    <h3 className="text-xl font-semibold">{provider.displayName || provider.name}</h3>
+
+                    {/* Location Display */}
+                    <div className="flex items-center text-gray-600 text-sm mt-1">
+                      <MapPin className="w-4 h-4 mr-1" />
+                      <span>{getLocation(provider)}</span>
+                    </div>
+
+                    {/* Phone Number Display */}
+                    {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
+                      <div className="flex items-center text-gray-600 text-sm mt-1">
+                        <Phone className="w-4 h-4 mr-1" />
+                        <span>
+                          {formatPhoneNumber(
+                            provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
+                          )}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
@@ -193,7 +269,11 @@ export default function TechITServicesPage() {
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleOpenProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -210,6 +290,15 @@ export default function TechITServicesPage() {
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.name}
           reviews={selectedProvider?.reviews || []}
+        />
+      )}
+
+      {selectedBusinessProfile && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedBusinessProfile.id}
+          businessName={selectedBusinessProfile.name}
         />
       )}
 

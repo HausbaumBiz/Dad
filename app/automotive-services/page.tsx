@@ -9,6 +9,7 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { AdBox } from "@/components/ad-box"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import type { Business } from "@/lib/definitions"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
@@ -57,6 +58,13 @@ export default function AutomotiveServicesPage() {
     reviews: any[]
   } | null>(null)
 
+  // State for business profile dialog
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{
+    id: string
+    name: string
+  } | null>(null)
+
   // State for businesses and ad designs
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [businessAdDesigns, setBusinessAdDesigns] = useState<Record<string, any>>({})
@@ -92,6 +100,14 @@ export default function AutomotiveServicesPage() {
       reviews: business.reviewsData || [],
     })
     setIsReviewsDialogOpen(true)
+  }
+
+  const handleOpenProfile = (business: Business) => {
+    setSelectedBusinessProfile({
+      id: business.id,
+      name: business.displayName || business.businessName,
+    })
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -264,7 +280,11 @@ export default function AutomotiveServicesPage() {
                         <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
                           Reviews
                         </Button>
-                        <Button variant="outline" className="mt-2 w-full md:w-auto">
+                        <Button
+                          variant="outline"
+                          className="mt-2 w-full md:w-auto"
+                          onClick={() => handleOpenProfile(business)}
+                        >
                           View Profile
                         </Button>
                       </div>
@@ -277,6 +297,7 @@ export default function AutomotiveServicesPage() {
         </div>
       )}
 
+      {/* Reviews Dialog */}
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
@@ -284,6 +305,16 @@ export default function AutomotiveServicesPage() {
           providerName={selectedProvider.name}
           businessId={selectedProvider.id}
           reviews={selectedProvider.reviews}
+        />
+      )}
+
+      {/* Business Profile Dialog */}
+      {selectedBusinessProfile && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedBusinessProfile.id}
+          businessName={selectedBusinessProfile.name}
         />
       )}
 

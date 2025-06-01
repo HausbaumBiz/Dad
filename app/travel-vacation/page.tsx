@@ -10,6 +10,7 @@ import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { Phone } from "lucide-react"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 
 function formatPhoneNumber(phone: string): string {
   if (!phone) return "No phone provided"
@@ -32,6 +33,13 @@ export default function TravelVacationPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Add state for profile dialog
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{ id: string; name: string }>({
+    id: "",
+    name: "",
+  })
 
   useEffect(() => {
     async function fetchProviders() {
@@ -69,6 +77,15 @@ export default function TravelVacationPage() {
   const handleOpenReviews = (providerName: string) => {
     setSelectedProvider(providerName)
     setIsReviewsOpen(true)
+  }
+
+  // Add handler for opening profile dialog
+  const handleOpenProfile = (provider: any) => {
+    setSelectedBusinessProfile({
+      id: provider.id,
+      name: provider.displayName || provider.businessName || "Business",
+    })
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -189,7 +206,11 @@ export default function TravelVacationPage() {
                     >
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleOpenProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -205,6 +226,14 @@ export default function TravelVacationPage() {
         onClose={() => setIsReviewsOpen(false)}
         providerName={selectedProvider || ""}
         reviews={[]}
+      />
+
+      {/* Add BusinessProfileDialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusinessProfile.id}
+        businessName={selectedBusinessProfile.name}
       />
 
       <Toaster />

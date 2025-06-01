@@ -10,10 +10,16 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useState } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useEffect } from "react"
+import { MapPin, Phone } from "lucide-react"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 
 export default function PersonalAssistantsPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [isReviewsOpen, setIsReviewsOpen] = useState(false)
+
+  // State for profile dialog
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{ id: string; name: string } | null>(null)
 
   const mockReviews = {
     "Elite Personal Assistants": [
@@ -123,6 +129,30 @@ export default function PersonalAssistantsPage() {
   const handleOpenReviews = (providerName: string) => {
     setSelectedProvider(providerName)
     setIsReviewsOpen(true)
+  }
+
+  const handleOpenProfile = (provider: any) => {
+    setSelectedBusinessProfile({
+      id: provider.id,
+      name: provider.displayName || provider.name,
+    })
+    setIsProfileDialogOpen(true)
+  }
+
+  // Function to format phone numbers
+  const formatPhoneNumber = (phone: string): string => {
+    if (!phone) return "No phone provided"
+
+    // Remove all non-numeric characters
+    const cleaned = phone.replace(/\D/g, "")
+
+    // Check if it's a valid 10-digit US phone number
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    }
+
+    // Return original if not a standard format
+    return phone
   }
 
   const filterOptions = [
@@ -237,8 +267,33 @@ export default function PersonalAssistantsPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location || "Location not specified"}</p>
+                    <h3 className="text-xl font-semibold">{provider.displayName || provider.name}</h3>
+                    <div className="flex items-center text-gray-600 text-sm mt-1">
+                      <MapPin className="w-4 h-4 mr-1" />
+                      <span>
+                        {provider.adDesignData?.businessInfo?.city && provider.adDesignData?.businessInfo?.state
+                          ? `${provider.adDesignData.businessInfo.city}, ${provider.adDesignData.businessInfo.state}`
+                          : provider.displayCity && provider.displayState
+                            ? `${provider.displayCity}, ${provider.displayState}`
+                            : provider.city && provider.state
+                              ? `${provider.city}, ${provider.state}`
+                              : provider.zipCode
+                                ? `ZIP: ${provider.zipCode}`
+                                : "Location not specified"}
+                      </span>
+                    </div>
+
+                    {/* Phone Number Display */}
+                    {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
+                      <div className="flex items-center text-gray-600 text-sm mt-1">
+                        <Phone className="w-4 h-4 mr-1" />
+                        <span>
+                          {formatPhoneNumber(
+                            provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
+                          )}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
@@ -276,10 +331,17 @@ export default function PersonalAssistantsPage() {
                   </div>
 
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider.name)}>
+                    <Button
+                      className="w-full md:w-auto"
+                      onClick={() => handleOpenReviews(provider.displayName || provider.name)}
+                    >
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleOpenProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -296,6 +358,15 @@ export default function PersonalAssistantsPage() {
           onClose={() => setIsReviewsOpen(false)}
           providerName={selectedProvider || ""}
           reviews={selectedProvider ? mockReviews[selectedProvider] || [] : []}
+        />
+      )}
+
+      {selectedBusinessProfile && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedBusinessProfile.id}
+          businessName={selectedBusinessProfile.name}
         />
       )}
 
