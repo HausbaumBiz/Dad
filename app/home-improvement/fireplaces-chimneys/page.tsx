@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function FireplacesChimneysPage() {
   const filterOptions = [
@@ -30,41 +30,12 @@ export default function FireplacesChimneysPage() {
 
   useEffect(() => {
     async function fetchBusinesses() {
+      setLoading(true)
       try {
-        setLoading(true)
-        setError(null)
-
-        // Try multiple category formats to catch businesses
-        const categoryVariants = [
-          "Fireplaces and Chimneys",
-          "fireplaces and chimneys",
-          "Chimney Sweep",
-          "Fireplace Services",
-          "Gas Fireplace Repair",
-          "Firewood Suppliers",
-        ]
-
-        let allBusinesses: any[] = []
-
-        for (const category of categoryVariants) {
-          try {
-            const businesses = await getBusinessesByCategory(category)
-            if (businesses && businesses.length > 0) {
-              allBusinesses = [...allBusinesses, ...businesses]
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch businesses for category: ${category}`)
-          }
-        }
-
-        // Remove duplicates based on business ID
-        const uniqueBusinesses = allBusinesses.filter(
-          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
-        )
-
-        setProviders(uniqueBusinesses)
-      } catch (err) {
-        console.error("Error fetching businesses:", err)
+        const result = await getBusinessesForCategoryPage("/home-improvement/fireplaces-chimneys")
+        setProviders(result)
+      } catch (error) {
+        console.error("Error fetching businesses:", error)
         setError("Failed to load businesses")
       } finally {
         setLoading(false)

@@ -8,8 +8,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useEffect } from "react"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function MedicalPractitionersPage() {
   const filterOptions = [
@@ -35,35 +36,35 @@ export default function MedicalPractitionersPage() {
     async function fetchProviders() {
       try {
         setLoading(true)
-        const categoryVariants = [
-          "Medical Practitioners (non MD/DO)",
-          "Medical Practitioners",
-          "Chiropractors",
-          "Dentists",
-          "Orthodontists",
-        ]
 
-        let allProviders: any[] = []
-        for (const category of categoryVariants) {
-          try {
-            const result = await getBusinessesByCategory(category)
-            if (result.success && result.businesses) {
-              allProviders = [...allProviders, ...result.businesses]
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch businesses for category: ${category}`)
-          }
+        // Use the centralized system
+        const result = await getBusinessesForCategoryPage("/medical-practitioners")
+
+        if (result && result.length > 0) {
+          // Transform the business data to match the expected provider format
+          const transformedProviders = result.map((business) => ({
+            id: business.id,
+            name: business.displayName || business.businessName,
+            location:
+              business.displayLocation ||
+              `${business.displayCity || ""}, ${business.displayState || ""}`.trim() ||
+              `Zip: ${business.zipCode}`,
+            rating: 4.5, // Default rating - you can enhance this later
+            reviews: 12, // Default review count - you can enhance this later
+            services: business.subcategories || ["General Practice"],
+            phone: business.displayPhone || business.phone,
+            address: business.address,
+            adDesignData: business.adDesignData,
+          }))
+
+          setProviders(transformedProviders)
+        } else {
+          setProviders([])
         }
-
-        // Remove duplicates based on business ID
-        const uniqueProviders = allProviders.filter(
-          (provider, index, self) => index === self.findIndex((p) => p.id === provider.id),
-        )
-
-        setProviders(uniqueProviders)
       } catch (err) {
         console.error("Error fetching medical practitioners:", err)
         setError("Failed to load providers")
+        setProviders([])
       } finally {
         setLoading(false)
       }
@@ -76,6 +77,9 @@ export default function MedicalPractitionersPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
 
+  // State for business profile dialog
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
   // Handle opening reviews dialog
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
@@ -83,6 +87,12 @@ export default function MedicalPractitionersPage() {
       reviews: provider.reviews || [],
     })
     setIsReviewsDialogOpen(true)
+  }
+
+  // Handle opening profile dialog
+  const handleOpenProfile = (provider: any) => {
+    setSelectedProvider(provider)
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -194,7 +204,11 @@ export default function MedicalPractitionersPage() {
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleOpenProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -212,6 +226,16 @@ export default function MedicalPractitionersPage() {
         providerName={selectedProvider?.name}
         reviews={selectedProvider?.reviews || []}
       />
+
+      {/* Business Profile Dialog */}
+      {selectedProvider && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedProvider.id}
+          businessName={selectedProvider.name}
+        />
+      )}
 
       <Toaster />
     </CategoryLayout>

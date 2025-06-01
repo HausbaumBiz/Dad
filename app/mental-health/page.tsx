@@ -9,8 +9,8 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 import { MapPin, Phone } from "lucide-react"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function MentalHealthPage() {
   const filterOptions = [
@@ -41,7 +41,7 @@ export default function MentalHealthPage() {
         setLoading(true)
         console.log("Fetching mental health providers...")
 
-        const businesses = await getBusinessesBySelectedCategories("/mental-health")
+        const businesses = await getBusinessesForCategoryPage("/mental-health")
         console.log("Fetched mental health providers:", businesses)
 
         // Transform the data to match the expected format

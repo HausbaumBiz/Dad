@@ -10,8 +10,8 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
 import { Loader2 } from "lucide-react"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function EducationTutoringPage() {
   const { toast } = useToast()
@@ -40,34 +40,8 @@ export default function EducationTutoringPage() {
     async function fetchBusinesses() {
       setIsLoading(true)
       try {
-        const categoryFormats = [
-          "education-tutoring",
-          "Education & Tutoring",
-          "educationTutoring",
-          "Language Lessons",
-          "language-lessons",
-          "tutoring",
-          "Tutoring",
-        ]
-
-        let allBusinesses: any[] = []
-
-        for (const format of categoryFormats) {
-          try {
-            const result = await getBusinessesByCategory(format)
-            if (result && result.length > 0) {
-              allBusinesses = [...allBusinesses, ...result]
-            }
-          } catch (error) {
-            console.error(`Error fetching businesses for format ${format}:`, error)
-          }
-        }
-
-        const uniqueBusinesses = allBusinesses.filter(
-          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
-        )
-
-        setBusinesses(uniqueBusinesses)
+        const result = await getBusinessesForCategoryPage("/education-tutoring")
+        setBusinesses(result)
       } catch (error) {
         console.error("Error fetching businesses:", error)
         toast({

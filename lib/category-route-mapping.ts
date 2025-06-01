@@ -58,6 +58,23 @@ export const getCategoryIdsForRoute = (route: string): string[] => {
         "Addiction Specialists",
         "Team Building",
       ]
+    case "/medical-practitioners":
+      return [
+        "Medical Practitioners (non MD/DO)",
+        "medical-practitioners---non-md/do",
+        "Chiropractors",
+        "Dentists",
+        "Orthodontists",
+        "Optometrists",
+        "Podiatrists",
+        "Audiologists",
+        "Dietitians and Nutritionists",
+        "Naturopaths",
+        "Herbalists",
+        "Acupuncturist",
+        "Orthotists and Prosthetists",
+        "Midwives and Doulas",
+      ]
     default:
       return []
   }
@@ -235,4 +252,12 @@ export const categoryIdToPageMapping: { [key: string]: { name: string; page: str
   Psychologists: { name: "Psychologists", page: "/mental-health" },
   "Addiction Specialists": { name: "Addiction Specialists", page: "/mental-health" },
   "Team Building": { name: "Team Building", page: "/mental-health" },
+  "medical-practitioners---non-md/do": {
+    name: "Medical Practitioners (non MD/DO)",
+    page: "/medical-practitioners",
+  },
+  "Medical Practitioners (non MD/DO)": {
+    name: "Medical Practitioners (non MD/DO)",
+    page: "/medical-practitioners",
+  },
 }

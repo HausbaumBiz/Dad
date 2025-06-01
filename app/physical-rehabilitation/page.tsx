@@ -8,9 +8,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { MapPin, Phone } from "lucide-react"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
 export default function PhysicalRehabilitationPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -27,7 +27,7 @@ export default function PhysicalRehabilitationPage() {
         setLoading(true)
         console.log("Fetching physical rehabilitation businesses...")
 
-        const businesses = await getBusinessesBySelectedCategories("/physical-rehabilitation")
+        const businesses = await getBusinessesForCategoryPage("/physical-rehabilitation")
         console.log("Fetched physical rehabilitation businesses:", businesses)
 
         setProviders(businesses)
