@@ -9,6 +9,8 @@ import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
+import { getBusinessAdDesign } from "@/app/actions/business-actions"
+import { Phone } from "lucide-react"
 
 export default function AsphaltConcretePage() {
   const filterOptions = [
@@ -31,7 +33,8 @@ export default function AsphaltConcretePage() {
   const [error, setError] = useState(null)
 
   // State for dialogs
-  const [selectedBusiness, setSelectedBusiness] = useState(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState(null)
+  const [selectedBusinessName, setSelectedBusinessName] = useState("")
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
@@ -47,7 +50,53 @@ export default function AsphaltConcretePage() {
         const result = await getBusinessesForSubcategory(subcategoryPath)
         console.log(`Found ${result.length} businesses for base path: ${subcategoryPath}`)
 
-        setBusinesses(result)
+        // Enhance businesses with ad design data to get phone numbers
+        const enhancedBusinesses = await Promise.all(
+          result.map(async (business) => {
+            try {
+              // Fetch ad design data for this business
+              console.log(`Fetching ad design data for business: ${business.id}`)
+              const adDesignData = await getBusinessAdDesign(business.id)
+
+              // Extract phone number from ad design data if available
+              let displayPhone = null
+              if (adDesignData?.businessInfo?.phone) {
+                displayPhone = adDesignData.businessInfo.phone
+                console.log(`Found phone from ad design: ${displayPhone}`)
+              } else if (business.phone) {
+                displayPhone = business.phone
+                console.log(`Using business registration phone: ${displayPhone}`)
+              } else {
+                console.log(`No phone number found for business: ${business.id}`)
+              }
+
+              // Determine display name (prefer ad design name over registration name)
+              const displayName =
+                adDesignData?.businessInfo?.businessName || business.businessName || "Unknown Business"
+
+              // Determine display location
+              const displayLocation = business.displayLocation || `Zip: ${business.zipCode}`
+
+              return {
+                ...business,
+                displayName,
+                displayLocation,
+                displayPhone,
+                adDesignData,
+              }
+            } catch (err) {
+              console.error(`Error enhancing business ${business.id}:`, err)
+              return {
+                ...business,
+                displayName: business.businessName || "Unknown Business",
+                displayLocation: business.displayLocation || `Zip: ${business.zipCode}`,
+                displayPhone: business.phone || null,
+              }
+            }
+          }),
+        )
+
+        setBusinesses(enhancedBusinesses)
       } catch (err) {
         console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
@@ -61,13 +110,16 @@ export default function AsphaltConcretePage() {
 
   // Handler for opening reviews dialog
   const handleOpenReviews = (business) => {
-    setSelectedBusiness(business)
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.displayName)
     setIsReviewsDialogOpen(true)
   }
 
   // Handler for opening profile dialog
   const handleViewProfile = (business) => {
-    setSelectedBusiness(business)
+    console.log("Opening profile for:", business.id, business.displayName)
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.displayName)
     setIsProfileDialogOpen(true)
   }
 
@@ -91,6 +143,7 @@ export default function AsphaltConcretePage() {
         return parts[parts.length - 1].trim()
       })
       .filter(Boolean) // Remove nulls
+      .slice(0, 3) // Limit to 3 tags for cleaner display
   }
 
   return (
@@ -134,6 +187,14 @@ export default function AsphaltConcretePage() {
                   <div>
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
                     <p className="text-gray-600 text-sm mt-1">{business.displayLocation}</p>
+
+                    {/* Display phone number if available */}
+                    {business.displayPhone && (
+                      <div className="flex items-center text-sm text-gray-600 mt-1">
+                        <Phone className="h-3.5 w-3.5 mr-1" />
+                        <span>{business.displayPhone}</span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
@@ -191,7 +252,7 @@ export default function AsphaltConcretePage() {
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
-        providerName={selectedBusiness?.displayName}
+        providerName={selectedBusinessName}
         reviews={[]}
       />
 
@@ -199,8 +260,8 @@ export default function AsphaltConcretePage() {
       <BusinessProfileDialog
         isOpen={isProfileDialogOpen}
         onClose={() => setIsProfileDialogOpen(false)}
-        businessId={selectedBusiness?.id}
-        businessName={selectedBusiness?.displayName}
+        businessId={selectedBusinessId}
+        businessName={selectedBusinessName}
       />
 
       <Toaster />

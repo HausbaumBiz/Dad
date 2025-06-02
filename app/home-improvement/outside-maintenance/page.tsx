@@ -9,6 +9,7 @@ import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
+import { getBusinessAdDesign } from "@/app/actions/business-actions"
 
 export default function OutsideMaintenancePage() {
   const filterOptions = [
@@ -33,7 +34,8 @@ export default function OutsideMaintenancePage() {
   const [error, setError] = useState(null)
 
   // State for dialogs
-  const [selectedBusiness, setSelectedBusiness] = useState(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState(null)
+  const [selectedBusinessName, setSelectedBusinessName] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
@@ -49,7 +51,42 @@ export default function OutsideMaintenancePage() {
         const result = await getBusinessesForSubcategory(subcategoryPath)
         console.log(`Found ${result.length} businesses for base path: ${subcategoryPath}`)
 
-        setBusinesses(result)
+        // Enhance each business with ad design data (including phone numbers)
+        const enhancedBusinesses = await Promise.all(
+          result.map(async (business) => {
+            try {
+              console.log(`Fetching ad design data for business: ${business.id}`)
+              const adDesignData = await getBusinessAdDesign(business.id)
+
+              let displayPhone = null
+
+              if (adDesignData?.businessInfo?.phone) {
+                displayPhone = adDesignData.businessInfo.phone
+                console.log(`Found phone in ad design for ${business.displayName}: ${displayPhone}`)
+              } else if (business.phone) {
+                displayPhone = business.phone
+                console.log(`Using registration phone for ${business.displayName}: ${displayPhone}`)
+              } else {
+                console.log(`No phone found for ${business.displayName}`)
+              }
+
+              return {
+                ...business,
+                displayPhone,
+                adDesignData,
+              }
+            } catch (error) {
+              console.error(`Error fetching ad design for business ${business.id}:`, error)
+              return {
+                ...business,
+                displayPhone: business.phone || null,
+              }
+            }
+          }),
+        )
+
+        console.log(`Enhanced ${enhancedBusinesses.length} businesses with ad design data`)
+        setBusinesses(enhancedBusinesses)
       } catch (err) {
         console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
@@ -63,13 +100,16 @@ export default function OutsideMaintenancePage() {
 
   // Handler for opening reviews dialog
   const handleOpenReviews = (business) => {
-    setSelectedBusiness(business)
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.displayName)
     setIsReviewsDialogOpen(true)
   }
 
   // Handler for opening profile dialog
   const handleViewProfile = (business) => {
-    setSelectedBusiness(business)
+    console.log(`Opening profile for business: ${business.id} - ${business.displayName}`)
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.displayName)
     setIsProfileDialogOpen(true)
   }
 
@@ -93,6 +133,7 @@ export default function OutsideMaintenancePage() {
         return parts[parts.length - 1].trim()
       })
       .filter(Boolean) // Remove nulls
+      .slice(0, 3) // Limit to 3 services for clean display
   }
 
   return (
@@ -140,6 +181,26 @@ export default function OutsideMaintenancePage() {
                   <div>
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
                     <p className="text-gray-600 text-sm mt-1">{business.displayLocation}</p>
+
+                    {/* Phone Number Display */}
+                    {business.displayPhone && (
+                      <div className="flex items-center mt-1">
+                        <svg
+                          className="w-4 h-4 text-gray-500 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                          />
+                        </svg>
+                        <span className="text-sm text-gray-600">{business.displayPhone}</span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
@@ -197,7 +258,7 @@ export default function OutsideMaintenancePage() {
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
-        providerName={selectedBusiness?.displayName}
+        providerName={selectedBusinessName}
         reviews={[]}
       />
 
@@ -205,8 +266,8 @@ export default function OutsideMaintenancePage() {
       <BusinessProfileDialog
         isOpen={isProfileDialogOpen}
         onClose={() => setIsProfileDialogOpen(false)}
-        businessId={selectedBusiness?.id}
-        businessName={selectedBusiness?.displayName}
+        businessId={selectedBusinessId}
+        businessName={selectedBusinessName}
       />
 
       <Toaster />

@@ -13,7 +13,7 @@ function getErrorMessage(error: unknown): string {
   if (typeof error === "string") {
     return error
   }
-  return "Unknown error occurred"
+  return JSON.stringify(error, Object.getOwnPropertyNames(error))
 }
 
 // Helper function to safely parse JSON
@@ -27,9 +27,30 @@ function safeJsonParse(data: any, fallback: any = null) {
     }
     return fallback
   } catch (error) {
-    console.error("Error parsing JSON:", error)
+    console.error("Error parsing JSON:", getErrorMessage(error))
     return fallback
   }
+}
+
+// Helper function to safely ensure array with detailed logging
+function ensureArray(data: any, context = ""): any[] {
+  console.log(`ensureArray called with data type: ${typeof data}, context: ${context}`, data)
+
+  if (Array.isArray(data)) {
+    console.log(`Data is already an array with length: ${data.length}`)
+    return data
+  }
+  if (data === null || data === undefined) {
+    console.log(`Data is null/undefined, returning empty array`)
+    return []
+  }
+  // If it's a single object, wrap it in an array
+  if (typeof data === "object") {
+    console.log(`Data is object, wrapping in array:`, [data])
+    return [data]
+  }
+  console.log(`Data is primitive type, returning empty array`)
+  return []
 }
 
 // Save business categories (simplified - only saves the exact category names)
@@ -181,7 +202,7 @@ async function getBusinessSubcategories(businessId: string): Promise<string[]> {
 
     if (subcategoriesData) {
       const subcategories = safeJsonParse(subcategoriesData, [])
-      return Array.isArray(subcategories) ? subcategories : []
+      return ensureArray(subcategories, `getBusinessSubcategories-${businessId}`)
     }
 
     return []
@@ -198,7 +219,7 @@ export async function getBusinessSelectedCategories(businessId: string): Promise
 
     if (categoriesData) {
       const categories = safeJsonParse(categoriesData, [])
-      return Array.isArray(categories) ? categories : []
+      return ensureArray(categories, `getBusinessSelectedCategories-${businessId}`)
     }
 
     return []
@@ -248,27 +269,39 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
       try {
         const businessId = key.replace(`${KEY_PREFIXES.BUSINESS}`, "").replace(":allSubcategories", "")
         const subcategoriesData = await kv.get(key)
-        const subcategories = safeJsonParse(subcategoriesData, [])
 
-        console.log(`Business ${businessId} allSubcategories:`, subcategories)
+        const parsedSubcategories = safeJsonParse(subcategoriesData, [])
+        const subcategories = ensureArray(parsedSubcategories, `allSubcategories-${businessId}`)
 
-        if (Array.isArray(subcategories)) {
-          const hasMatchingSubcategory = subcategories.some((subcat) => {
-            if (typeof subcat === "string") {
-              return subcat.includes(subcategoryPath) || subcat.startsWith(subcategoryPath)
-            }
-            if (typeof subcat === "object" && subcat?.fullPath) {
-              return subcat.fullPath.includes(subcategoryPath) || subcat.fullPath.startsWith(subcategoryPath)
-            }
-            return false
-          })
+        console.log(`Business ${businessId} subcategories after ensureArray:`, subcategories)
 
-          if (hasMatchingSubcategory) {
-            const business = await buildBusinessObject(businessId, subcategories)
-            if (business) {
-              businesses.push(business)
-              console.log(`✅ Found matching business ${businessId} in allSubcategories`)
-            }
+        // Check each subcategory for matches
+        let hasMatchingSubcategory = false
+        for (const subcat of subcategories) {
+          let pathToCheck = ""
+
+          if (typeof subcat === "string") {
+            pathToCheck = subcat
+          } else if (typeof subcat === "object" && subcat?.fullPath) {
+            pathToCheck = subcat.fullPath
+          } else if (typeof subcat === "object" && subcat?.name) {
+            pathToCheck = subcat.name
+          }
+
+          console.log(`Checking path: "${pathToCheck}" against target: "${subcategoryPath}"`)
+
+          if (pathToCheck && (pathToCheck.includes(subcategoryPath) || pathToCheck.includes("Pest Control"))) {
+            console.log(`✅ MATCH FOUND for business ${businessId}: "${pathToCheck}"`)
+            hasMatchingSubcategory = true
+            break
+          }
+        }
+
+        if (hasMatchingSubcategory) {
+          const business = await buildBusinessObject(businessId, subcategories)
+          if (business) {
+            businesses.push(business)
+            console.log(`✅ Added matching business ${businessId} from allSubcategories`)
           }
         }
       } catch (error) {
@@ -287,29 +320,59 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
         }
 
         const categoriesData = await kv.get(key)
-        const categories = safeJsonParse(categoriesData, [])
+        const parsedCategories = safeJsonParse(categoriesData, [])
+        const categories = ensureArray(parsedCategories, `categories-${businessId}`)
 
-        console.log(`Business ${businessId} categories:`, categories)
+        console.log(`Business ${businessId} categories after ensureArray:`, categories)
 
-        if (Array.isArray(categories)) {
-          const hasMatchingCategory = categories.some((cat) => {
-            if (typeof cat === "object" && cat?.fullPath) {
-              return cat.fullPath.includes(subcategoryPath) || cat.fullPath.startsWith(subcategoryPath)
-            }
-            return false
-          })
+        // Add extra safety check before using array methods
+        if (!Array.isArray(categories)) {
+          console.error(`Categories is not an array for ${businessId}:`, typeof categories, categories)
+          continue
+        }
 
-          if (hasMatchingCategory) {
-            // Extract fullPaths for subcategories
-            const fullPaths = categories
-              .filter((cat) => cat?.fullPath?.includes(subcategoryPath))
-              .map((cat) => cat.fullPath)
+        // Check each category for matches
+        let hasMatchingCategory = false
+        for (const cat of categories) {
+          let pathToCheck = ""
 
-            const business = await buildBusinessObject(businessId, fullPaths)
-            if (business) {
-              businesses.push(business)
-              console.log(`✅ Found matching business ${businessId} in categories`)
-            }
+          if (typeof cat === "object" && cat?.fullPath) {
+            pathToCheck = cat.fullPath
+          } else if (typeof cat === "object" && cat?.name) {
+            pathToCheck = cat.name
+          } else if (typeof cat === "string") {
+            pathToCheck = cat
+          }
+
+          console.log(`Checking category path: "${pathToCheck}" against target: "${subcategoryPath}"`)
+
+          if (pathToCheck && (pathToCheck.includes(subcategoryPath) || pathToCheck.includes("Pest Control"))) {
+            console.log(`✅ CATEGORY MATCH FOUND for business ${businessId}: "${pathToCheck}"`)
+            hasMatchingCategory = true
+            break
+          }
+        }
+
+        if (hasMatchingCategory) {
+          // Extract fullPaths for subcategories - with extra safety
+          let fullPaths: string[] = []
+          try {
+            fullPaths = categories
+              .filter((cat) => {
+                const path = cat?.fullPath || cat?.name || cat
+                return path && (path.includes(subcategoryPath) || path.includes("Pest Control"))
+              })
+              .map((cat) => cat?.fullPath || cat?.name || cat)
+              .filter((path) => path) // Remove any undefined/null values
+          } catch (mapError) {
+            console.error(`Error in map operation for ${businessId}:`, getErrorMessage(mapError))
+            continue
+          }
+
+          const business = await buildBusinessObject(businessId, fullPaths)
+          if (business) {
+            businesses.push(business)
+            console.log(`✅ Added matching business ${businessId} from categories`)
           }
         }
       } catch (error) {
@@ -321,7 +384,7 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
     return businesses
   } catch (error) {
     console.error(`Error getting businesses for subcategory ${subcategoryPath}:`, getErrorMessage(error))
-    return []
+    throw new Error(`Error getting businesses for subcategory ${subcategoryPath}: ${getErrorMessage(error)}`)
   }
 }
 
@@ -341,7 +404,7 @@ async function buildBusinessObject(businessId: string, subcategories: any[]): Pr
         displayState: adDesignData?.businessInfo?.state || businessData.state,
         displayPhone: adDesignData?.businessInfo?.phone || businessData.phone,
         adDesignData: adDesignData,
-        subcategories: subcategories,
+        subcategories: ensureArray(subcategories, `buildBusinessObject-${businessId}`),
       } as Business
 
       // Create display location

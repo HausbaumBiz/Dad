@@ -9,6 +9,8 @@ import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
+import { getBusinessAdDesign } from "@/app/actions/business-actions"
+import { Phone } from "lucide-react"
 
 export default function ConstructionDesignPage() {
   const filterOptions = [
@@ -31,7 +33,8 @@ export default function ConstructionDesignPage() {
   const [error, setError] = useState(null)
 
   // State for dialogs
-  const [selectedBusiness, setSelectedBusiness] = useState(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState(null)
+  const [selectedBusinessName, setSelectedBusinessName] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
@@ -47,7 +50,42 @@ export default function ConstructionDesignPage() {
         const result = await getBusinessesForSubcategory(subcategoryPath)
         console.log(`Found ${result.length} businesses for base path: ${subcategoryPath}`)
 
-        setBusinesses(result)
+        // Fetch ad design data for each business to get phone numbers
+        const enhancedBusinesses = await Promise.all(
+          result.map(async (business) => {
+            try {
+              // Fetch ad design data from Redis
+              const adDesignData = await getBusinessAdDesign(business.id)
+              console.log(`Fetched ad design data for business ${business.id}:`, adDesignData)
+
+              // Extract phone number from ad design data if available
+              let displayPhone = null
+              if (adDesignData?.businessInfo?.phone) {
+                displayPhone = adDesignData.businessInfo.phone
+                console.log(`Found phone from ad design: ${displayPhone}`)
+              } else if (business.phone) {
+                displayPhone = business.phone
+                console.log(`Using registration phone: ${displayPhone}`)
+              } else {
+                console.log(`No phone found for business ${business.id}`)
+              }
+
+              return {
+                ...business,
+                displayPhone,
+                adDesignData,
+              }
+            } catch (err) {
+              console.error(`Error fetching ad design data for business ${business.id}:`, err)
+              return {
+                ...business,
+                displayPhone: business.phone || null,
+              }
+            }
+          }),
+        )
+
+        setBusinesses(enhancedBusinesses)
       } catch (err) {
         console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
@@ -61,13 +99,16 @@ export default function ConstructionDesignPage() {
 
   // Handler for opening reviews dialog
   const handleOpenReviews = (business) => {
-    setSelectedBusiness(business)
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.displayName)
     setIsReviewsDialogOpen(true)
   }
 
   // Handler for opening profile dialog
   const handleViewProfile = (business) => {
-    setSelectedBusiness(business)
+    console.log("Opening profile for business:", business.id, business.displayName)
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.displayName)
     setIsProfileDialogOpen(true)
   }
 
@@ -91,6 +132,7 @@ export default function ConstructionDesignPage() {
         return parts[parts.length - 1].trim()
       })
       .filter(Boolean) // Remove nulls
+      .slice(0, 3) // Limit to 3 tags for cleaner display
   }
 
   return (
@@ -130,6 +172,14 @@ export default function ConstructionDesignPage() {
                   <div>
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
                     <p className="text-gray-600 text-sm mt-1">{business.displayLocation}</p>
+
+                    {/* Display phone number if available */}
+                    {business.displayPhone && (
+                      <div className="flex items-center mt-1 text-sm text-gray-600">
+                        <Phone className="h-3.5 w-3.5 mr-1" />
+                        <span>{business.displayPhone}</span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
@@ -187,7 +237,7 @@ export default function ConstructionDesignPage() {
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
-        providerName={selectedBusiness?.displayName}
+        providerName={selectedBusinessName}
         reviews={[]}
       />
 
@@ -195,8 +245,8 @@ export default function ConstructionDesignPage() {
       <BusinessProfileDialog
         isOpen={isProfileDialogOpen}
         onClose={() => setIsProfileDialogOpen(false)}
-        businessId={selectedBusiness?.id}
-        businessName={selectedBusiness?.displayName}
+        businessId={selectedBusinessId}
+        businessName={selectedBusinessName}
       />
 
       <Toaster />
