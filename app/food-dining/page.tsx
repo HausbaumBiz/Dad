@@ -13,10 +13,6 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone, Star } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
-// Add these exports at the top of the file, before the component
-export const dynamic = "force-dynamic"
-export const revalidate = false
-
 // Format phone number to (XXX) XXX-XXXX
 function formatPhoneNumber(phoneNumberString: string) {
   if (!phoneNumberString) return "No phone provided"
