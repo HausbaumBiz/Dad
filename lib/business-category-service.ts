@@ -56,7 +56,7 @@ export async function saveBusinessCategories(businessId: string, selectedCategor
 // Get businesses for a specific category page
 export async function getBusinessesForCategoryPage(pagePath: string): Promise<Business[]> {
   try {
-    console.log(`Getting businesses for page: ${pagePath}`)
+    console.log(`Getting businesses for page: ${pagePath} at ${new Date().toISOString()}`)
 
     // Get the exact category name for this page
     const categoryName = getCategoryNameForPagePath(pagePath)
@@ -93,8 +93,8 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
           const business = {
             ...businessData,
             id: businessId,
-            // Use ad design business name if available, otherwise use registration name
-            displayName: adDesignData?.businessInfo?.businessName || businessData.businessName,
+            // PRIORITIZE ad design business name over registration name
+            displayName: adDesignData?.businessInfo?.businessName || businessData.businessName || "Unnamed Business",
             // Use ad design location if available
             displayCity: adDesignData?.businessInfo?.city || businessData.city,
             displayState: adDesignData?.businessInfo?.state || businessData.state,
@@ -113,6 +113,11 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
           } else {
             business.displayLocation = `Zip: ${business.zipCode}`
           }
+
+          // Log what we're using for the business name
+          console.log(
+            `Business ${businessId}: Registration name: "${businessData.businessName}", Ad design name: "${adDesignData?.businessInfo?.businessName}", Using: "${business.displayName}"`,
+          )
 
           businesses.push(business)
         }
@@ -133,15 +138,34 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
 // Get business ad design data
 async function getBusinessAdDesignData(businessId: string) {
   try {
+    // Try to get the business info from ad design first
     const businessInfoKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:businessInfo`
     const businessInfo = await kv.get(businessInfoKey)
 
     if (businessInfo) {
+      const parsedBusinessInfo = safeJsonParse(businessInfo, {})
+      console.log(`Found ad design data for business ${businessId}:`, parsedBusinessInfo)
+
       return {
-        businessInfo: safeJsonParse(businessInfo, {}),
+        businessInfo: parsedBusinessInfo,
       }
     }
 
+    // If no ad design business info, try to get from the main ad design data
+    const mainAdDesignKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`
+    const mainAdDesignData = await kv.get(mainAdDesignKey)
+
+    if (mainAdDesignData) {
+      const parsedData = safeJsonParse(mainAdDesignData, {})
+      if (parsedData && parsedData.businessInfo) {
+        console.log(`Found business info in main ad design data for ${businessId}:`, parsedData.businessInfo)
+        return {
+          businessInfo: parsedData.businessInfo,
+        }
+      }
+    }
+
+    console.log(`No ad design data found for business ${businessId}`)
     return null
   } catch (error) {
     console.error(`Error getting ad design for business ${businessId}:`, getErrorMessage(error))
