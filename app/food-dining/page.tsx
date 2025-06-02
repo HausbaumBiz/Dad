@@ -15,7 +15,7 @@ import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-
 
 // Add these exports at the top of the file, before the component
 export const dynamic = "force-dynamic"
-export const revalidate = 0
+export const revalidate = false
 
 // Format phone number to (XXX) XXX-XXXX
 function formatPhoneNumber(phoneNumberString: string) {
