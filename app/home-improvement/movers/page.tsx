@@ -8,7 +8,8 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useEffect } from "react"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
+import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 
 export default function MoversPage() {
   const filterOptions = [
@@ -22,6 +23,11 @@ export default function MoversPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
 
+  // State for business profile dialog
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,35 +38,41 @@ export default function MoversPage() {
         setLoading(true)
         setError(null)
 
-        // Try multiple category formats to catch businesses
-        const categoryVariants = [
-          "Movers",
-          "movers",
-          "Moving Services",
-          "Moving Truck Rental",
-          "Piano Movers",
-          "Movers/Moving Trucks",
-        ]
+        console.log("Fetching businesses for subcategory: Home, Lawn, and Manual Labor > Movers/Moving Trucks")
 
-        let allBusinesses: any[] = []
+        const businesses = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Movers/Moving Trucks")
 
-        for (const category of categoryVariants) {
-          try {
-            const businesses = await getBusinessesByCategory(category)
-            if (businesses && businesses.length > 0) {
-              allBusinesses = [...allBusinesses, ...businesses]
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch businesses for category: ${category}`)
+        console.log("Raw businesses data:", businesses)
+
+        // Transform the data for display
+        const transformedBusinesses = businesses.map((business: any) => {
+          // Extract service tags from subcategories
+          const serviceTags =
+            business.subcategories
+              ?.filter((sub: any) => {
+                const fullPath = typeof sub === "string" ? sub : sub.fullPath
+                return fullPath?.includes("Movers") || fullPath?.includes("Moving")
+              })
+              ?.map((sub: any) => {
+                const fullPath = typeof sub === "string" ? sub : sub.fullPath
+                const parts = fullPath.split(" > ")
+                return parts[parts.length - 1] // Get the last part
+              })
+              ?.slice(0, 3) || [] // Limit to 3 tags
+
+          return {
+            id: business.id,
+            name: business.displayName || business.businessName || "Business Name",
+            location: business.displayLocation || "Service Area",
+            rating: business.rating || 4.5,
+            reviews: business.reviewCount || 0,
+            services: serviceTags,
+            phone: business.displayPhone,
           }
-        }
+        })
 
-        // Remove duplicates based on business ID
-        const uniqueBusinesses = allBusinesses.filter(
-          (business, index, self) => index === self.findIndex((b) => b.id === business.id),
-        )
-
-        setProviders(uniqueBusinesses)
+        console.log("Transformed businesses:", transformedBusinesses)
+        setProviders(transformedBusinesses)
       } catch (err) {
         console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
@@ -76,6 +88,14 @@ export default function MoversPage() {
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
+  }
+
+  // Function to handle opening profile dialog
+  const handleViewProfile = (provider: any) => {
+    console.log("Opening profile for provider:", provider)
+    setSelectedBusinessId(provider.id)
+    setSelectedBusinessName(provider.name)
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -136,6 +156,8 @@ export default function MoversPage() {
                       </span>
                     </div>
 
+                    {provider.phone && <p className="text-sm text-gray-600 mt-1">📞 {provider.phone}</p>}
+
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
@@ -155,7 +177,11 @@ export default function MoversPage() {
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleViewProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -172,6 +198,14 @@ export default function MoversPage() {
         onClose={() => setIsReviewsDialogOpen(false)}
         provider={selectedProvider}
         reviews={selectedProvider?.reviews || []}
+      />
+
+      {/* Business Profile Dialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusinessId}
+        businessName={selectedBusinessName}
       />
 
       <Toaster />

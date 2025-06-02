@@ -5,10 +5,10 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { useEffect } from "react"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 
 export default function FlooringPage() {
   const filterOptions = [
@@ -31,6 +31,10 @@ export default function FlooringPage() {
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
 
+  // State for business profile dialog
+  const [selectedBusiness, setSelectedBusiness] = useState(null)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
   const [businesses, setBusinesses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -39,7 +43,11 @@ export default function FlooringPage() {
     async function fetchBusinesses() {
       setLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/home-improvement/flooring")
+        console.log("Fetching businesses for Floor/Carpet Care subcategory...")
+        const result = await getBusinessesForSubcategory(
+          "Home, Lawn, and Manual Labor > Floor/Carpet Care and Installation",
+        )
+        console.log(`Found ${result.length} businesses for flooring`)
         setBusinesses(result)
       } catch (error) {
         console.error("Error fetching businesses:", error)
@@ -52,16 +60,34 @@ export default function FlooringPage() {
     fetchBusinesses()
   }, [])
 
-  // Mock service providers - in a real app, these would come from an API
-  const [providers] = useState([])
-
-  // Mock reviews data
-  const mockReviews = {}
-
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
+  }
+
+  // Function to handle opening business profile dialog
+  const handleViewProfile = (business) => {
+    setSelectedBusiness(business)
+    setIsProfileDialogOpen(true)
+  }
+
+  // Function to extract service tags from subcategories
+  const getServiceTags = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    return subcategories
+      .filter((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        return path && path.includes("Floor/Carpet Care and Installation")
+      })
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+        return parts[parts.length - 1]
+      })
+      .slice(0, 3) // Limit to 3 tags for display
   }
 
   return (
@@ -99,8 +125,9 @@ export default function FlooringPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{business.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{business.location || "Location not specified"}</p>
+                    <h3 className="text-xl font-semibold">{business.displayName}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{business.displayLocation || "Location not specified"}</p>
+                    {business.displayPhone && <p className="text-gray-600 text-sm mt-1">📞 {business.displayPhone}</p>}
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
@@ -118,11 +145,11 @@ export default function FlooringPage() {
                         {business.rating || 0} ({business.reviewCount || 0} reviews)
                       </span>
                     </div>
-                    {business.services && (
+                    {business.subcategories && getServiceTags(business.subcategories).length > 0 && (
                       <div className="mt-3">
                         <p className="text-sm font-medium text-gray-700">Services:</p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {business.services.map((service, idx) => (
+                          {getServiceTags(business.subcategories).map((service, idx) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
@@ -138,7 +165,11 @@ export default function FlooringPage() {
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleViewProfile(business)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -153,8 +184,16 @@ export default function FlooringPage() {
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
-        providerName={selectedProvider}
-        reviews={selectedProvider ? mockReviews[selectedProvider] : []}
+        providerName={selectedProvider?.displayName}
+        reviews={selectedProvider?.reviews || []}
+      />
+
+      {/* Business Profile Dialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusiness?.id}
+        businessName={selectedBusiness?.displayName}
       />
 
       <Toaster />

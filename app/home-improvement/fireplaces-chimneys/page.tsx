@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 
 export default function FireplacesChimneysPage() {
   const filterOptions = [
@@ -23,6 +24,8 @@ export default function FireplacesChimneysPage() {
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedBusiness, setSelectedBusiness] = useState(null)
 
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,8 +35,29 @@ export default function FireplacesChimneysPage() {
     async function fetchBusinesses() {
       setLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/home-improvement/fireplaces-chimneys")
-        setProviders(result)
+        console.log("Fetching fireplaces and chimneys businesses with subcategory path...")
+        const result = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Fireplaces and Chimneys")
+
+        // Transform the data for display
+        const transformedProviders = result.map((business) => {
+          // Extract service tags from subcategories
+          const serviceTags = getServiceTags(business.subcategories || [])
+
+          return {
+            id: business.id,
+            name: business.displayName || business.businessName,
+            location: business.displayLocation || `${business.city || ""}, ${business.state || ""}`,
+            phone: business.displayPhone || business.phone,
+            rating: business.rating || 4.5,
+            reviews: business.reviewCount || 0,
+            services: serviceTags,
+            // Keep the original business data for the profile dialog
+            businessData: business,
+          }
+        })
+
+        setProviders(transformedProviders)
+        console.log(`Found ${transformedProviders.length} fireplaces and chimneys businesses`)
       } catch (error) {
         console.error("Error fetching businesses:", error)
         setError("Failed to load businesses")
@@ -45,10 +69,33 @@ export default function FireplacesChimneysPage() {
     fetchBusinesses()
   }, [])
 
+  // Extract service tags from subcategories
+  const getServiceTags = (subcategories) => {
+    return subcategories
+      .filter((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        return path && path.includes("Fireplaces and Chimneys")
+      })
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return "Fireplace Services"
+
+        const parts = path.split(" > ")
+        return parts[parts.length - 1] // Get just the service name
+      })
+      .slice(0, 3) // Limit to 3 for display
+  }
+
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
+  }
+
+  // Handle opening profile dialog
+  const handleViewProfile = (provider) => {
+    setSelectedBusiness(provider.businessData)
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -91,6 +138,8 @@ export default function FireplacesChimneysPage() {
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
                     <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
 
+                    {provider.phone && <p className="text-gray-600 text-sm mt-1">{provider.phone}</p>}
+
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
@@ -112,14 +161,20 @@ export default function FireplacesChimneysPage() {
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
+                        {provider.services.length > 0 ? (
+                          provider.services.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            Fireplace Services
                           </span>
-                        ))}
+                        )}
                       </div>
                     </div>
                   </div>
@@ -128,7 +183,11 @@ export default function FireplacesChimneysPage() {
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleViewProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -145,6 +204,14 @@ export default function FireplacesChimneysPage() {
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.name}
         reviews={selectedProvider?.reviews || []}
+      />
+
+      {/* Business Profile Dialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusiness?.id}
+        businessName={selectedBusiness?.displayName || selectedBusiness?.businessName}
       />
 
       <Toaster />

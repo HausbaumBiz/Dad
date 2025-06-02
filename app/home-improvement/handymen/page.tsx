@@ -8,7 +8,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useEffect } from "react"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getZipCode } from "@/lib/zip-code-db"
 
 export default function HandymenPage() {
   const filterOptions = [
@@ -21,24 +23,101 @@ export default function HandymenPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
 
+  // Add after the reviews dialog state
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function fetchBusinesses() {
+  async function fetchBusinesses() {
+    try {
       setLoading(true)
-      try {
-        const result = await getBusinessesForCategoryPage("/home-improvement/handymen")
-        setProviders(result)
-      } catch (error) {
-        console.error("Error fetching businesses:", error)
-        setError("Failed to load businesses")
-      } finally {
-        setLoading(false)
-      }
-    }
+      setError(null)
 
+      console.log("Fetching businesses for subcategory: Home, Lawn, and Manual Labor > Handymen")
+
+      const businesses = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Handymen")
+
+      console.log("Raw businesses data:", businesses)
+
+      // Transform the data for display with city/state lookup
+      const transformedBusinesses = await Promise.all(
+        businesses.map(async (business: any) => {
+          // Extract service tags from subcategories
+          const serviceTags =
+            business.subcategories
+              ?.filter((sub: any) => {
+                const fullPath = typeof sub === "string" ? sub : sub.fullPath
+                return (
+                  fullPath?.includes("Handymen") || fullPath?.includes("Odd Jobs") || fullPath?.includes("Assembly")
+                )
+              })
+              ?.map((sub: any) => {
+                const fullPath = typeof sub === "string" ? sub : sub.fullPath
+                const parts = fullPath.split(" > ")
+                return parts[parts.length - 1] // Get the last part
+              })
+              ?.slice(0, 3) || [] // Limit to 3 tags
+
+          // Fetch city and state from ZIP code database
+          let location = "Service Area"
+
+          // First try to use ad design location if available
+          if (business.adDesignData?.businessInfo?.city && business.adDesignData?.businessInfo?.state) {
+            location = `${business.adDesignData.businessInfo.city}, ${business.adDesignData.businessInfo.state}`
+          }
+          // Otherwise, look up ZIP code in database
+          else if (business.zipCode) {
+            try {
+              console.log(`Looking up ZIP code ${business.zipCode} for business ${business.id}`)
+              const zipData = await getZipCode(business.zipCode)
+              if (zipData && zipData.city && zipData.state) {
+                location = `${zipData.city}, ${zipData.state}`
+                console.log(`Found location for ${business.zipCode}: ${location}`)
+              } else {
+                console.log(`No ZIP data found for ${business.zipCode}, using ZIP code as fallback`)
+                location = `Zip: ${business.zipCode}`
+              }
+            } catch (zipError) {
+              console.error(`Error looking up ZIP code ${business.zipCode}:`, zipError)
+              location = `Zip: ${business.zipCode}`
+            }
+          }
+          // Fallback to display location if available
+          else if (business.displayLocation) {
+            location = business.displayLocation
+          }
+
+          return {
+            id: business.id,
+            name:
+              business.displayName ||
+              business.adDesignData?.businessInfo?.businessName ||
+              business.businessName ||
+              "Business Name",
+            location: location,
+            rating: business.rating || 4.5,
+            reviews: business.reviewCount || 0,
+            services: serviceTags,
+            phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
+          }
+        }),
+      )
+
+      console.log("Transformed businesses with city/state lookup:", transformedBusinesses)
+      setProviders(transformedBusinesses)
+    } catch (err) {
+      console.error("Error fetching businesses:", err)
+      setError("Failed to load businesses")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchBusinesses()
   }, [])
 
@@ -46,6 +125,14 @@ export default function HandymenPage() {
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
+  }
+
+  // Function to handle opening profile dialog
+  const handleViewProfile = (provider: any) => {
+    console.log("Opening profile for business:", provider.id, provider.name)
+    setSelectedBusinessId(provider.id)
+    setSelectedBusinessName(provider.name)
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -106,6 +193,8 @@ export default function HandymenPage() {
                       </span>
                     </div>
 
+                    {provider.phone && <p className="text-sm text-gray-600 mt-1">📞 {provider.phone}</p>}
+
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
@@ -125,7 +214,11 @@ export default function HandymenPage() {
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleViewProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -142,6 +235,14 @@ export default function HandymenPage() {
         onClose={() => setIsReviewsDialogOpen(false)}
         provider={selectedProvider}
         reviews={selectedProvider?.reviews || []}
+      />
+
+      {/* Business Profile Dialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusinessId}
+        businessName={selectedBusinessName}
       />
 
       <Toaster />

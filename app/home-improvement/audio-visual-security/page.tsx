@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 
 export default function AudioVisualSecurityPage() {
   const filterOptions = [
@@ -28,32 +29,63 @@ export default function AudioVisualSecurityPage() {
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
 
-  const [providers, setProviders] = useState<any[]>([])
+  // State for business profile dialog
+  const [selectedBusiness, setSelectedBusiness] = useState(null)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
+  const [businesses, setBusinesses] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     async function fetchBusinesses() {
-      setIsLoading(true)
+      setLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/home-improvement/audio-visual-security")
-        setProviders(result)
+        console.log("Fetching businesses for Audio/Visual and Home Security subcategory...")
+        const result = await getBusinessesForSubcategory(
+          "Home, Lawn, and Manual Labor > Audio/Visual and Home Security",
+        )
+        console.log(`Found ${result.length} businesses for audio/visual security`)
+        setBusinesses(result)
       } catch (error) {
         console.error("Error fetching businesses:", error)
         setError("Failed to load businesses")
       } finally {
-        setIsLoading(false)
+        setLoading(false)
       }
     }
 
     fetchBusinesses()
   }, [])
 
-  // Handle opening reviews dialog
+  // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
+  }
+
+  // Function to handle opening business profile dialog
+  const handleViewProfile = (business) => {
+    setSelectedBusiness(business)
+    setIsProfileDialogOpen(true)
+  }
+
+  // Function to extract service tags from subcategories
+  const getServiceTags = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    return subcategories
+      .filter((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        return path && path.includes("Audio/Visual and Home Security")
+      })
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+        return parts[parts.length - 1]
+      })
+      .slice(0, 3) // Limit to 3 tags for display
   }
 
   return (
@@ -69,7 +101,7 @@ export default function AudioVisualSecurityPage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : businesses.length === 0 ? (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,52 +121,56 @@ export default function AudioVisualSecurityPage() {
             <Button>Register Your AV/Security Business</Button>
           </div>
         ) : (
-          providers.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+          businesses.map((business) => (
+            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
-
+                    <h3 className="text-xl font-semibold">{business.displayName}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{business.displayLocation || "Location not specified"}</p>
+                    {business.displayPhone && <p className="text-gray-600 text-sm mt-1">📞 {business.displayPhone}</p>}
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
+                        {business.rating || 0} ({business.reviewCount || 0} reviews)
                       </span>
                     </div>
-
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                    {business.subcategories && getServiceTags(business.subcategories).length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700">Services:</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {getServiceTags(business.subcategories).map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleViewProfile(business)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -149,8 +185,16 @@ export default function AudioVisualSecurityPage() {
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
-        providerName={selectedProvider?.name}
+        providerName={selectedProvider?.displayName}
         reviews={selectedProvider?.reviews || []}
+      />
+
+      {/* Business Profile Dialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusiness?.id}
+        businessName={selectedBusiness?.displayName}
       />
 
       <Toaster />
