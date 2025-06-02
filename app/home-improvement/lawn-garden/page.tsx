@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { getBusinessesByCategory } from "@/app/actions/business-actions"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 
 export default function LawnGardenPage() {
   const filterOptions = [
@@ -33,27 +34,14 @@ export default function LawnGardenPage() {
     async function fetchProviders() {
       try {
         setLoading(true)
-        const categoryVariants = [
-          "Lawn, Garden and Snow Removal",
-          "Lawn Garden and Snow Removal",
-          "Lawn & Garden",
-          "Landscaping",
-          "Lawn Care",
-        ]
+        console.log("Fetching businesses for Lawn, Garden and Snow Removal subcategory with prefix matching...")
 
-        let allProviders: any[] = []
-        for (const category of categoryVariants) {
-          try {
-            const businesses = await getBusinessesByCategory(category)
-            if (businesses && businesses.length > 0) {
-              allProviders = [...allProviders, ...businesses]
-            }
-          } catch (err) {
-            console.log(`No businesses found for category: ${category}`)
-          }
-        }
+        // Use the base path - the function will now find all subcategories that start with this path
+        const basePath = "Home, Lawn, and Manual Labor > Lawn, Garden and Snow Removal"
+        const businesses = await getBusinessesForSubcategory(basePath)
 
-        setProviders(allProviders)
+        console.log(`Found ${businesses.length} businesses for base path: ${basePath}`)
+        setProviders(businesses)
       } catch (err) {
         setError("Failed to load providers")
         console.error("Error fetching providers:", err)
@@ -69,10 +57,20 @@ export default function LawnGardenPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
 
+  // State for business profile dialog
+  const [selectedBusiness, setSelectedBusiness] = useState<any>(null)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
   // Handler for opening reviews dialog
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
+  }
+
+  // Handler for opening business profile dialog
+  const handleViewProfile = (provider: any) => {
+    setSelectedBusiness(provider)
+    setIsProfileDialogOpen(true)
   }
 
   return (
@@ -114,15 +112,15 @@ export default function LawnGardenPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
+                    <h3 className="text-xl font-semibold">{provider.displayName}</h3>
+                    <p className="text-gray-600 text-sm mt-1">{provider.displayLocation}</p>
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -131,30 +129,54 @@ export default function LawnGardenPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
+                        {provider.rating || 0} ({provider.reviews || 0} reviews)
                       </span>
                     </div>
 
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
+                        {provider.subcategories && provider.subcategories.length > 0 ? (
+                          provider.subcategories
+                            .filter((service) => service.includes("Lawn, Garden and Snow Removal"))
+                            .map((service, idx) => {
+                              // Extract just the specific service name from the full path
+                              const serviceName = service.split(" > ").pop() || service
+                              return (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                                >
+                                  {serviceName}
+                                </span>
+                              )
+                            })
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            Lawn, Garden and Snow Removal
                           </span>
-                        ))}
+                        )}
                       </div>
                     </div>
+
+                    {provider.displayPhone && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Phone:</span> {provider.displayPhone}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
                     <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
-                    <Button variant="outline" className="mt-2 w-full md:w-auto">
+                    <Button
+                      variant="outline"
+                      className="mt-2 w-full md:w-auto"
+                      onClick={() => handleViewProfile(provider)}
+                    >
                       View Profile
                     </Button>
                   </div>
@@ -169,8 +191,16 @@ export default function LawnGardenPage() {
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
-        providerName={selectedProvider?.name}
+        providerName={selectedProvider?.displayName}
         reviews={selectedProvider ? [] : []}
+      />
+
+      {/* Business Profile Dialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusiness?.id || ""}
+        businessName={selectedBusiness?.displayName || ""}
       />
 
       <Toaster />

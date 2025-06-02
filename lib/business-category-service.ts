@@ -227,3 +227,140 @@ export async function removeBusinessFromCategoryIndexes(businessId: string): Pro
     console.error(`Error removing business ${businessId} from category indexes:`, getErrorMessage(error))
   }
 }
+
+// Get businesses for a specific subcategory (updated to handle category selection objects)
+export async function getBusinessesForSubcategory(subcategoryPath: string): Promise<Business[]> {
+  try {
+    console.log(`Getting businesses for subcategory: ${subcategoryPath} at ${new Date().toISOString()}`)
+
+    // Get all business IDs from Redis - check both allSubcategories and categories keys
+    const allSubcategoriesKeys = await kv.keys(`${KEY_PREFIXES.BUSINESS}*:allSubcategories`)
+    const categoriesKeys = await kv.keys(`${KEY_PREFIXES.BUSINESS}*:categories`)
+
+    console.log(
+      `Found ${allSubcategoriesKeys.length} allSubcategories keys and ${categoriesKeys.length} categories keys`,
+    )
+
+    const businesses: Business[] = []
+
+    // Check allSubcategories first (this might contain string arrays)
+    for (const key of allSubcategoriesKeys) {
+      try {
+        const businessId = key.replace(`${KEY_PREFIXES.BUSINESS}`, "").replace(":allSubcategories", "")
+        const subcategoriesData = await kv.get(key)
+        const subcategories = safeJsonParse(subcategoriesData, [])
+
+        console.log(`Business ${businessId} allSubcategories:`, subcategories)
+
+        if (Array.isArray(subcategories)) {
+          const hasMatchingSubcategory = subcategories.some((subcat) => {
+            if (typeof subcat === "string") {
+              return subcat.includes(subcategoryPath) || subcat.startsWith(subcategoryPath)
+            }
+            if (typeof subcat === "object" && subcat?.fullPath) {
+              return subcat.fullPath.includes(subcategoryPath) || subcat.fullPath.startsWith(subcategoryPath)
+            }
+            return false
+          })
+
+          if (hasMatchingSubcategory) {
+            const business = await buildBusinessObject(businessId, subcategories)
+            if (business) {
+              businesses.push(business)
+              console.log(`✅ Found matching business ${businessId} in allSubcategories`)
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing allSubcategories from key ${key}:`, getErrorMessage(error))
+      }
+    }
+
+    // Check categories keys (this contains CategorySelection objects)
+    for (const key of categoriesKeys) {
+      try {
+        const businessId = key.replace(`${KEY_PREFIXES.BUSINESS}`, "").replace(":categories", "")
+
+        // Skip if we already found this business
+        if (businesses.some((b) => b.id === businessId)) {
+          continue
+        }
+
+        const categoriesData = await kv.get(key)
+        const categories = safeJsonParse(categoriesData, [])
+
+        console.log(`Business ${businessId} categories:`, categories)
+
+        if (Array.isArray(categories)) {
+          const hasMatchingCategory = categories.some((cat) => {
+            if (typeof cat === "object" && cat?.fullPath) {
+              return cat.fullPath.includes(subcategoryPath) || cat.fullPath.startsWith(subcategoryPath)
+            }
+            return false
+          })
+
+          if (hasMatchingCategory) {
+            // Extract fullPaths for subcategories
+            const fullPaths = categories
+              .filter((cat) => cat?.fullPath?.includes(subcategoryPath))
+              .map((cat) => cat.fullPath)
+
+            const business = await buildBusinessObject(businessId, fullPaths)
+            if (business) {
+              businesses.push(business)
+              console.log(`✅ Found matching business ${businessId} in categories`)
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing categories from key ${key}:`, getErrorMessage(error))
+      }
+    }
+
+    console.log(`Successfully retrieved ${businesses.length} businesses for subcategory: ${subcategoryPath}`)
+    return businesses
+  } catch (error) {
+    console.error(`Error getting businesses for subcategory ${subcategoryPath}:`, getErrorMessage(error))
+    return []
+  }
+}
+
+// Helper function to build business object
+async function buildBusinessObject(businessId: string, subcategories: any[]): Promise<Business | null> {
+  try {
+    const businessData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
+
+    if (businessData && typeof businessData === "object") {
+      const adDesignData = await getBusinessAdDesignData(businessId)
+
+      const business = {
+        ...businessData,
+        id: businessId,
+        displayName: adDesignData?.businessInfo?.businessName || businessData.businessName || "Unnamed Business",
+        displayCity: adDesignData?.businessInfo?.city || businessData.city,
+        displayState: adDesignData?.businessInfo?.state || businessData.state,
+        displayPhone: adDesignData?.businessInfo?.phone || businessData.phone,
+        adDesignData: adDesignData,
+        subcategories: subcategories,
+      } as Business
+
+      // Create display location
+      if (business.displayCity && business.displayState) {
+        business.displayLocation = `${business.displayCity}, ${business.displayState}`
+      } else if (business.displayCity) {
+        business.displayLocation = business.displayCity
+      } else if (business.displayState) {
+        business.displayLocation = business.displayState
+      } else {
+        business.displayLocation = `Zip: ${business.zipCode}`
+      }
+
+      return business
+    }
+
+    return null
+  } catch (error) {
+    console.error(`Error building business object for ${businessId}:`, getErrorMessage(error))
+    return null
+  }
+}
