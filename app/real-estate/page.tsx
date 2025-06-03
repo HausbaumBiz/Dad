@@ -11,8 +11,6 @@ import { Phone } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 export default function RealEstatePage() {
   const filterOptions = [
@@ -44,61 +42,23 @@ export default function RealEstatePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const { zipCode, isLoading: zipCodeLoading } = useUserZipCode()
-
   useEffect(() => {
-    const controller = new AbortController()
-
     async function fetchBusinesses() {
-      // Skip fetch if zip code is still loading
-      if (zipCodeLoading) {
-        console.log("Zip code still loading, skipping fetch")
-        return
-      }
-
-      // Skip fetch if no zip code is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping fetch")
-        setProviders([])
-        setLoading(false)
-        return
-      }
-
       try {
         setLoading(true)
         setError(null)
-        console.log(`Fetching real-estate businesses for zipCode: ${zipCode}`)
-
-        const fetchedBusinesses = await getBusinessesForCategoryPage("/real-estate", zipCode)
-
-        // Check if request was aborted
-        if (controller.signal.aborted) {
-          console.log("Request was aborted")
-          return
-        }
-
-        console.log(`Found ${fetchedBusinesses.length} real-estate businesses for zipCode: ${zipCode}`)
+        const fetchedBusinesses = await getBusinessesForCategoryPage("/real-estate")
         setProviders(fetchedBusinesses)
       } catch (err) {
-        if (err.name === "AbortError") {
-          console.log("Fetch aborted")
-          return
-        }
         console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     fetchBusinesses()
-
-    return () => {
-      controller.abort()
-    }
-  }, [zipCode, zipCodeLoading])
+  }, [])
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
@@ -150,8 +110,6 @@ export default function RealEstatePage() {
 
       <CategoryFilter options={filterOptions} />
 
-      <ZipCodeFilterIndicator businessCount={providers.length} />
-
       {loading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -160,11 +118,6 @@ export default function RealEstatePage() {
       ) : error ? (
         <div className="text-center py-8">
           <p className="text-red-600">{error}</p>
-        </div>
-      ) : !zipCode ? (
-        <div className="text-center py-12">
-          <h3 className="text-xl font-medium text-gray-700">Set Your Location</h3>
-          <p className="mt-2 text-gray-500">Please set your zip code to see real estate professionals in your area.</p>
         </div>
       ) : providers.length === 0 ? (
         <div className="text-center py-12">
@@ -179,9 +132,10 @@ export default function RealEstatePage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Real Estate Professionals Found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Real Estate Professionals Yet</h3>
             <p className="text-gray-600 mb-4">
-              There are currently no real estate professionals that service zip code {zipCode}.
+              Be the first real estate professional to join our platform and connect with potential clients in your
+              area.
             </p>
             <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
           </div>

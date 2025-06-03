@@ -11,13 +11,10 @@ import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone } from "lucide-react"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
+import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
 
 export default function FitnessAthleticsPage() {
   const { toast } = useToast()
-  const { zipCode } = useUserZipCode()
 
   // Add phone number formatting function
   const formatPhoneNumber = (phone: string | null | undefined): string => {
@@ -56,39 +53,16 @@ export default function FitnessAthleticsPage() {
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [businesses, setBusinesses] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
 
   useEffect(() => {
-    const controller = new AbortController()
-
     async function fetchBusinesses() {
-      // Skip fetch if no zip code is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping fetch")
-        return
-      }
-
-      console.log(`Fetching fitness-athletics businesses for zipCode: ${zipCode}`)
       setIsLoading(true)
-
       try {
-        const result = await getBusinessesForCategoryPage("/fitness-athletics", zipCode)
-
-        // Check if request was aborted
-        if (controller.signal.aborted) {
-          console.log("Request was aborted")
-          return
-        }
-
-        console.log(`Found ${result.length} fitness-athletics businesses for zipCode: ${zipCode}`)
+        const result = await getBusinessesForCategoryPage("/fitness-athletics")
         setBusinesses(result)
       } catch (error) {
-        if (controller.signal.aborted) {
-          console.log("Request was aborted during error handling")
-          return
-        }
-
         console.error("Error fetching businesses:", error)
         toast({
           title: "Error loading businesses",
@@ -96,19 +70,12 @@ export default function FitnessAthleticsPage() {
           variant: "destructive",
         })
       } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false)
-        }
+        setIsLoading(false)
       }
     }
 
     fetchBusinesses()
-
-    // Cleanup function to abort the request if component unmounts or zipCode changes
-    return () => {
-      controller.abort()
-    }
-  }, [zipCode, toast])
+  }, [toast])
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
@@ -163,8 +130,6 @@ export default function FitnessAthleticsPage() {
           </div>
         </div>
       </div>
-
-      <ZipCodeFilterIndicator />
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 

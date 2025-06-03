@@ -12,8 +12,6 @@ import { useState, useEffect } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
 import { Phone } from "lucide-react"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 // Format phone number for display
 function formatPhoneNumber(phone: string): string {
@@ -44,45 +42,13 @@ export default function FuneralServicesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
-  const { zipCode, isLoading: zipCodeLoading } = useUserZipCode()
-
   useEffect(() => {
-    const controller = new AbortController()
-
     async function fetchBusinesses() {
-      // Skip fetch if zip code is still loading
-      if (zipCodeLoading) {
-        console.log("Zip code still loading, skipping fetch")
-        return
-      }
-
-      // Skip fetch if no zip code is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping fetch")
-        setBusinesses([])
-        setIsLoading(false)
-        return
-      }
-
+      setIsLoading(true)
       try {
-        setIsLoading(true)
-        console.log(`Fetching funeral-services businesses for zipCode: ${zipCode}`)
-
-        const result = await getBusinessesForCategoryPage("/funeral-services", zipCode)
-
-        // Check if request was aborted
-        if (controller.signal.aborted) {
-          console.log("Request was aborted")
-          return
-        }
-
-        console.log(`Found ${result.length} funeral-services businesses for zipCode: ${zipCode}`)
+        const result = await getBusinessesForCategoryPage("/funeral-services")
         setBusinesses(result)
       } catch (error) {
-        if (error.name === "AbortError") {
-          console.log("Fetch aborted")
-          return
-        }
         console.error("Error fetching businesses:", error)
         toast({
           title: "Error loading businesses",
@@ -90,18 +56,12 @@ export default function FuneralServicesPage() {
           variant: "destructive",
         })
       } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false)
-        }
+        setIsLoading(false)
       }
     }
 
     fetchBusinesses()
-
-    return () => {
-      controller.abort()
-    }
-  }, [zipCode, zipCodeLoading, toast])
+  }, [toast])
 
   const handleOpenReviews = (providerName: string) => {
     setSelectedProvider(providerName)
@@ -156,30 +116,55 @@ export default function FuneralServicesPage() {
 
       <CategoryFilter options={filterOptions} />
 
-      <ZipCodeFilterIndicator businessCount={businesses.length} />
+      {/* Debug information - only visible in development */}
+      {process.env.NODE_ENV !== "production" && debugInfo && (
+        <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-md mb-6">
+          <h4 className="font-medium text-yellow-800">Debug Information:</h4>
+          <p className="text-sm text-yellow-700">{debugInfo}</p>
+
+          {debugDetails && (
+            <div className="mt-2">
+              <details>
+                <summary className="cursor-pointer text-sm font-medium text-yellow-800">Show Details</summary>
+                <pre className="mt-2 bg-yellow-100 p-2 rounded text-xs overflow-auto">
+                  {JSON.stringify(debugDetails, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
+
+          <div className="mt-2">
+            <Button variant="outline" size="sm" onClick={() => (window.location.href = "/admin/fix-categories")}>
+              Go to Category Fix Tool
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-6">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
           </div>
-        ) : !zipCode ? (
-          <div className="text-center py-12">
-            <h3 className="text-xl font-medium text-gray-700">Set Your Location</h3>
-            <p className="mt-2 text-gray-500">
-              Please set your zip code to see funeral service providers in your area.
-            </p>
-          </div>
         ) : businesses.length === 0 ? (
           <div className="text-center py-12">
             <h3 className="text-xl font-medium text-gray-700">No funeral service providers found</h3>
             <p className="mt-2 text-gray-500">
-              There are currently no funeral service providers that service zip code {zipCode}.
+              There are currently no funeral service providers registered in this category.
             </p>
             <div className="mt-4">
               <Button variant="outline" onClick={() => (window.location.href = "/business-register")}>
                 Register Your Funeral Service Business
               </Button>
+              {process.env.NODE_ENV !== "production" && (
+                <Button
+                  variant="outline"
+                  className="ml-2"
+                  onClick={() => (window.location.href = "/admin/fix-categories")}
+                >
+                  Fix Category Indexing
+                </Button>
+              )}
             </div>
           </div>
         ) : (

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Search, MapPin, ChevronRight, Facebook, Twitter, Linkedin, X } from "lucide-react"
+import { Search, MapPin, ChevronRight, Facebook, Twitter, Linkedin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -70,13 +70,6 @@ export default function HomePage() {
 
     fetchUserData()
   }, [toast])
-
-  const handleClearZipCode = () => {
-    setZipCode("")
-    setSavedZipCode("")
-    setCategoriesActive(false)
-    localStorage.removeItem("savedZipCode")
-  }
 
   const handleZipSubmit = () => {
     if (zipCode) {
@@ -390,24 +383,14 @@ export default function HomePage() {
             )}
 
             <div className="w-full flex space-x-2 items-center">
-              <div className="flex-grow relative">
+              <div className="flex-grow">
                 <Input
                   type="text"
                   placeholder="Enter your zip code"
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
-                  className="w-full pr-8"
+                  className="w-full"
                 />
-                {zipCode && (
-                  <button
-                    onClick={handleClearZipCode}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                    type="button"
-                    aria-label="Clear zip code and reset search area"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
               </div>
               <Button onClick={handleZipSubmit}>
                 <Search className="mr-2 h-4 w-4" />

@@ -12,8 +12,6 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 // Format phone number to (XXX) XXX-XXXX
 function formatPhoneNumber(phoneNumberString: string) {
@@ -64,49 +62,15 @@ export default function BeautyWellnessPage() {
   const [businesses, setBusinesses] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
-  const { zipCode, hasZipCode } = useUserZipCode()
 
   useEffect(() => {
-    let abortController: AbortController | null = null
-
     async function fetchBusinesses() {
-      // Skip initial fetch if no zipCode is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping fetch")
-        setIsLoading(false)
-        return
-      }
-
-      // Cancel any previous request
-      if (abortController) {
-        abortController.abort()
-      }
-
-      // Create new abort controller for this request
-      abortController = new AbortController()
-
       setIsLoading(true)
       try {
-        console.log(`Fetching beauty-wellness businesses for zipCode: ${zipCode}`)
-
-        // Use the simplified business category service with zip code filtering
-        const result = await getBusinessesForCategoryPage("/beauty-wellness", zipCode)
-
-        // Check if request was aborted
-        if (abortController.signal.aborted) {
-          console.log("Request was aborted")
-          return
-        }
-
-        console.log(`Found ${result.length} beauty-wellness businesses for zipCode: ${zipCode}`)
+        // Use the simplified business category service
+        const result = await getBusinessesForCategoryPage("/beauty-wellness")
         setBusinesses(result)
       } catch (error) {
-        // Don't show error if request was just aborted
-        if (abortController?.signal.aborted) {
-          console.log("Request aborted, ignoring error")
-          return
-        }
-
         console.error("Error fetching businesses:", error)
         toast({
           title: "Error loading businesses",
@@ -114,22 +78,12 @@ export default function BeautyWellnessPage() {
           variant: "destructive",
         })
       } finally {
-        // Only update loading state if request wasn't aborted
-        if (!abortController?.signal.aborted) {
-          setIsLoading(false)
-        }
+        setIsLoading(false)
       }
     }
 
     fetchBusinesses()
-
-    // Cleanup function
-    return () => {
-      if (abortController) {
-        abortController.abort()
-      }
-    }
-  }, [zipCode, toast]) // Remove hasZipCode from dependencies since we check zipCode directly
+  }, [toast])
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
@@ -191,7 +145,6 @@ export default function BeautyWellnessPage() {
       </div>
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
-      <ZipCodeFilterIndicator />
 
       {isLoading ? (
         <div className="flex justify-center items-center py-12">

@@ -11,8 +11,6 @@ import { Phone, MapPin } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 export default function MusicLessonsPage() {
   const filterOptions = [
@@ -44,60 +42,24 @@ export default function MusicLessonsPage() {
   const [providers, setProviders] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const { zipCode, isLoading: zipCodeLoading } = useUserZipCode()
-
   useEffect(() => {
-    const controller = new AbortController()
-
     const fetchProviders = async () => {
-      // Skip fetch if zip code is still loading
-      if (zipCodeLoading) {
-        console.log("Zip code still loading, skipping fetch")
-        return
-      }
-
-      // Skip fetch if no zip code is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping fetch")
-        setProviders([])
-        setLoading(false)
-        return
-      }
-
       try {
         setLoading(true)
-        console.log(`Fetching music-lessons businesses for zipCode: ${zipCode}`)
-
-        const businesses = await getBusinessesForCategoryPage("/music-lessons", zipCode)
-
-        // Check if request was aborted
-        if (controller.signal.aborted) {
-          console.log("Request was aborted")
-          return
-        }
-
-        console.log(`Found ${businesses.length} music-lessons businesses for zipCode: ${zipCode}`)
+        console.log("Fetching music lesson businesses...")
+        const businesses = await getBusinessesForCategoryPage("/music-lessons")
+        console.log("Fetched music lesson businesses:", businesses)
         setProviders(businesses)
       } catch (error) {
-        if (error.name === "AbortError") {
-          console.log("Fetch aborted")
-          return
-        }
         console.error("Error fetching music lesson providers:", error)
         setProviders([])
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     fetchProviders()
-
-    return () => {
-      controller.abort()
-    }
-  }, [zipCode, zipCodeLoading])
+  }, [])
 
   const handleViewProfile = (business: any) => {
     console.log("Opening profile for business:", business)
@@ -148,23 +110,16 @@ export default function MusicLessonsPage() {
 
       <CategoryFilter options={filterOptions} />
 
-      <ZipCodeFilterIndicator businessCount={providers.length} />
-
       <div className="space-y-6">
         {loading ? (
           <div className="text-center py-8">
             <p className="text-gray-600">Loading music lesson providers...</p>
           </div>
-        ) : !zipCode ? (
-          <div className="text-center py-12">
-            <h3 className="text-xl font-medium text-gray-700">Set Your Location</h3>
-            <p className="mt-2 text-gray-500">Please set your zip code to see music lesson providers in your area.</p>
-          </div>
         ) : providers.length === 0 ? (
           <div className="text-center py-12">
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Music Lesson Providers Found</h3>
             <p className="text-gray-600 mb-4">
-              There are currently no music instructors that service zip code {zipCode}.
+              We're currently building our network of music instructors in your area.
             </p>
             <p className="text-sm text-gray-500">
               Are you a music instructor?{" "}

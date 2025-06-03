@@ -11,14 +11,8 @@ import { Phone, MapPin } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
-import { useToast } from "@/components/ui/use-toast"
 
 export default function WeddingsEventsPage() {
-  const { zipCode } = useUserZipCode()
-  const { toast } = useToast()
-
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
     id: number
@@ -34,7 +28,7 @@ export default function WeddingsEventsPage() {
   } | null>(null)
 
   const [providers, setProviders] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const filterOptions = [
     { id: "weddings1", label: "Event Halls", value: "Event Halls" },
@@ -57,56 +51,21 @@ export default function WeddingsEventsPage() {
   ]
 
   useEffect(() => {
-    const controller = new AbortController()
-
-    async function fetchProviders() {
-      // Skip fetch if no zip code is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping fetch")
-        return
-      }
-
-      console.log(`Fetching weddings-events businesses for zipCode: ${zipCode}`)
-      setLoading(true)
-
+    const fetchProviders = async () => {
       try {
-        const businesses = await getBusinessesForCategoryPage("/weddings-events", zipCode)
-
-        // Check if request was aborted
-        if (controller.signal.aborted) {
-          console.log("Request was aborted")
-          return
-        }
-
-        console.log(`Found ${businesses.length} weddings-events businesses for zipCode: ${zipCode}`)
+        setLoading(true)
+        const businesses = await getBusinessesForCategoryPage("/weddings-events")
         setProviders(businesses)
       } catch (error) {
-        if (controller.signal.aborted) {
-          console.log("Request was aborted during error handling")
-          return
-        }
-
         console.error("Error fetching wedding providers:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
         setProviders([])
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     fetchProviders()
-
-    // Cleanup function to abort the request if component unmounts or zipCode changes
-    return () => {
-      controller.abort()
-    }
-  }, [zipCode, toast])
+  }, [])
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
@@ -156,8 +115,6 @@ export default function WeddingsEventsPage() {
           </div>
         </div>
       </div>
-
-      <ZipCodeFilterIndicator />
 
       <CategoryFilter options={filterOptions} />
 

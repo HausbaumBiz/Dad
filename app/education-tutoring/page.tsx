@@ -12,8 +12,6 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 // Format phone number to (XXX) XXX-XXXX
 function formatPhoneNumber(phoneNumberString: string | undefined | null): string {
@@ -54,45 +52,13 @@ export default function EducationTutoringPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
 
-  const { zipCode, isLoading: zipCodeLoading } = useUserZipCode()
-
   useEffect(() => {
-    const controller = new AbortController()
-
     async function fetchBusinesses() {
-      // Skip fetch if zip code is still loading
-      if (zipCodeLoading) {
-        console.log("Zip code still loading, skipping fetch")
-        return
-      }
-
-      // Skip fetch if no zip code is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping fetch")
-        setBusinesses([])
-        setIsLoading(false)
-        return
-      }
-
+      setIsLoading(true)
       try {
-        setIsLoading(true)
-        console.log(`Fetching education-tutoring businesses for zipCode: ${zipCode}`)
-
-        const result = await getBusinessesForCategoryPage("/education-tutoring", zipCode)
-
-        // Check if request was aborted
-        if (controller.signal.aborted) {
-          console.log("Request was aborted")
-          return
-        }
-
-        console.log(`Found ${result.length} education-tutoring businesses for zipCode: ${zipCode}`)
+        const result = await getBusinessesForCategoryPage("/education-tutoring")
         setBusinesses(result)
       } catch (error) {
-        if (error.name === "AbortError") {
-          console.log("Fetch aborted")
-          return
-        }
         console.error("Error fetching businesses:", error)
         toast({
           title: "Error loading businesses",
@@ -100,18 +66,12 @@ export default function EducationTutoringPage() {
           variant: "destructive",
         })
       } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false)
-        }
+        setIsLoading(false)
       }
     }
 
     fetchBusinesses()
-
-    return () => {
-      controller.abort()
-    }
-  }, [zipCode, zipCodeLoading, toast])
+  }, [toast])
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
@@ -174,19 +134,10 @@ export default function EducationTutoringPage() {
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 
-      <ZipCodeFilterIndicator businessCount={filteredBusinesses.length} />
-
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
           <p>Loading businesses...</p>
-        </div>
-      ) : !zipCode ? (
-        <div className="text-center py-12">
-          <h3 className="text-xl font-medium text-gray-700">Set Your Location</h3>
-          <p className="mt-2 text-gray-500">
-            Please set your zip code to see tutors and language instructors in your area.
-          </p>
         </div>
       ) : filteredBusinesses.length > 0 ? (
         <div className="space-y-6">
@@ -271,7 +222,7 @@ export default function EducationTutoringPage() {
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-8 max-w-2xl mx-auto">
             <h3 className="text-xl font-medium text-purple-800 mb-2">No Education & Tutoring Providers Found</h3>
             <p className="text-purple-700 mb-4">
-              There are currently no tutors or language instructors that service zip code {zipCode}.
+              We're building our network of qualified tutors and language instructors in your area.
             </p>
             <div className="bg-white rounded border border-purple-100 p-4">
               <p className="text-gray-700 font-medium">Are you a tutor or language instructor?</p>

@@ -5,19 +5,14 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Phone } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 export default function RetailStoresPage() {
-  const { zipCode, hasZipCode } = useUserZipCode()
-  const isInitialMount = useRef(true)
-
   const filterOptions = [
     { id: "retail1", label: "Supermarkets/Grocery Stores", value: "Supermarkets/Grocery Stores" },
     { id: "retail2", label: "Department Store", value: "Department Store" },
@@ -62,55 +57,22 @@ export default function RetailStoresPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Skip the initial fetch if zipCode is null
-    if (isInitialMount.current && zipCode === null) {
-      isInitialMount.current = false
-      setLoading(false)
-      return
-    }
-    isInitialMount.current = false
-
-    const controller = new AbortController()
-
     async function fetchBusinesses() {
       try {
         setLoading(true)
         setError(null)
-        console.log(`[PAGE] Fetching retail stores with zipCode: "${zipCode}", hasZipCode: ${hasZipCode}`)
-
-        const zipCodeToUse = zipCode || undefined
-        console.log(`[PAGE] Using zipCode for API call: "${zipCodeToUse}"`)
-
-        const fetchedBusinesses = await getBusinessesForCategoryPage("/retail-stores", zipCodeToUse)
-
-        // Check if this request was aborted
-        if (controller.signal.aborted) {
-          console.log(`[PAGE] Request was aborted`)
-          return
-        }
-
-        console.log(`[PAGE] API returned ${fetchedBusinesses.length} businesses`)
+        const fetchedBusinesses = await getBusinessesForCategoryPage("/retail-stores")
         setProviders(fetchedBusinesses)
       } catch (err) {
-        if (controller.signal.aborted) {
-          console.log(`[PAGE] Request was aborted during error handling`)
-          return
-        }
         console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     fetchBusinesses()
-
-    return () => {
-      controller.abort()
-    }
-  }, [zipCode, hasZipCode])
+  }, [])
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
@@ -159,8 +121,6 @@ export default function RetailStoresPage() {
         </div>
       </div>
 
-      <ZipCodeFilterIndicator businessCount={providers.length} />
-
       <CategoryFilter options={filterOptions} />
 
       {loading ? (
@@ -185,13 +145,9 @@ export default function RetailStoresPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {hasZipCode ? `No Retail Stores in ${zipCode}` : "No Retail Stores Yet"}
-            </h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Retail Stores Yet</h3>
             <p className="text-gray-600 mb-4">
-              {hasZipCode
-                ? `Be the first retail store to join our platform in the ${zipCode} area.`
-                : "Be the first retail store to join our platform and connect with local customers in your area."}
+              Be the first retail store to join our platform and connect with local customers in your area.
             </p>
             <Button className="bg-purple-600 hover:bg-purple-700">Register Your Store</Button>
           </div>

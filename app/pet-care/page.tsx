@@ -10,16 +10,10 @@ import { Phone, MapPin, Star } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
-import { useToast } from "@/components/ui/use-toast"
 
 export default function PetCarePage() {
-  const { zipCode } = useUserZipCode()
-  const { toast } = useToast()
-
   const [businesses, setBusinesses] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
@@ -49,55 +43,21 @@ export default function PetCarePage() {
   ]
 
   useEffect(() => {
-    const controller = new AbortController()
-
     async function loadBusinesses() {
-      // Skip fetch if no zip code is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping fetch")
-        return
-      }
-
-      console.log(`Fetching pet-care businesses for zipCode: ${zipCode}`)
-      setLoading(true)
-
       try {
-        const fetchedBusinesses = await getBusinessesForCategoryPage("/pet-care", zipCode)
-
-        // Check if request was aborted
-        if (controller.signal.aborted) {
-          console.log("Request was aborted")
-          return
-        }
-
-        console.log(`Found ${fetchedBusinesses.length} pet-care businesses for zipCode: ${zipCode}`)
+        setLoading(true)
+        const fetchedBusinesses = await getBusinessesForCategoryPage("/pet-care")
+        console.log("Fetched pet care businesses:", fetchedBusinesses)
         setBusinesses(fetchedBusinesses)
       } catch (error) {
-        if (controller.signal.aborted) {
-          console.log("Request was aborted during error handling")
-          return
-        }
-
         console.error("Error loading pet care businesses:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     loadBusinesses()
-
-    // Cleanup function to abort the request if component unmounts or zipCode changes
-    return () => {
-      controller.abort()
-    }
-  }, [zipCode, toast])
+  }, [])
 
   const handleViewReviews = (business: any) => {
     setSelectedProvider({
@@ -146,8 +106,6 @@ export default function PetCarePage() {
           </div>
         </div>
       </div>
-
-      <ZipCodeFilterIndicator />
 
       <CategoryFilter options={filterOptions} />
 

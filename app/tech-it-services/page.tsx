@@ -19,7 +19,6 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 // With this import
 // import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
 
 export default function TechITServicesPage() {
   const filterOptions = [
@@ -45,8 +44,6 @@ export default function TechITServicesPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const { zipCode, hasZipCode } = useUserZipCode()
 
   // Phone number formatting function
   const formatPhoneNumber = (phone: string): string => {
@@ -95,38 +92,14 @@ export default function TechITServicesPage() {
 
   // Replace the entire useEffect function with:
   useEffect(() => {
-    let abortController: AbortController | null = null
-
     async function fetchProviders() {
-      // Skip initial fetch if no zipCode is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping tech providers fetch")
-        setLoading(false)
-        return
-      }
-
-      // Cancel any previous request
-      if (abortController) {
-        abortController.abort()
-      }
-
-      // Create new abort controller for this request
-      abortController = new AbortController()
-
-      setLoading(true)
       try {
-        console.log(`Fetching tech-it-services businesses for zipCode: ${zipCode}`)
+        setLoading(true)
 
-        // Use the centralized system with zip code filtering
-        const businesses = await getBusinessesForCategoryPage("/tech-it-services", zipCode)
+        // Use the centralized system
+        const businesses = await getBusinessesForCategoryPage("/tech-it-services")
 
-        // Check if request was aborted
-        if (abortController.signal.aborted) {
-          console.log("Tech providers request was aborted")
-          return
-        }
-
-        console.log(`Found ${businesses.length} tech businesses for zipCode: ${zipCode}`)
+        console.log(`Found ${businesses.length} tech businesses`)
 
         // Ensure each business has a services array
         const processedBusinesses = businesses.map((business) => ({
@@ -137,33 +110,16 @@ export default function TechITServicesPage() {
         }))
 
         setProviders(processedBusinesses)
-        setError(null)
       } catch (err) {
-        // Don't show error if request was just aborted
-        if (abortController?.signal.aborted) {
-          console.log("Tech providers request aborted, ignoring error")
-          return
-        }
-
         console.error("Error fetching tech providers:", err)
         setError("Failed to load providers")
       } finally {
-        // Only update loading state if request wasn't aborted
-        if (!abortController?.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     fetchProviders()
-
-    // Cleanup function
-    return () => {
-      if (abortController) {
-        abortController.abort()
-      }
-    }
-  }, [zipCode])
+  }, [])
 
   // Add a handler function for opening the reviews dialog
   const handleOpenReviews = (provider: any) => {
@@ -235,7 +191,7 @@ export default function TechITServicesPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 002 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+                    d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
                   />
                 </svg>
               </div>

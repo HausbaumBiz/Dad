@@ -12,7 +12,6 @@ import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-
 import { useEffect } from "react"
 import { MapPin, Phone } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
 
 export default function PersonalAssistantsPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
@@ -172,70 +171,27 @@ export default function PersonalAssistantsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const { zipCode, hasZipCode } = useUserZipCode()
-
   // Replace the useEffect:
   useEffect(() => {
-    let abortController: AbortController | null = null
-
     async function fetchBusinesses() {
-      // Skip initial fetch if no zipCode is set
-      if (!zipCode) {
-        console.log("No zipCode set, skipping personal assistants fetch")
-        setLoading(false)
-        return
-      }
-
-      // Cancel any previous request
-      if (abortController) {
-        abortController.abort()
-      }
-
-      // Create new abort controller for this request
-      abortController = new AbortController()
-
-      setLoading(true)
       try {
-        console.log(`Fetching personal-assistants businesses for zipCode: ${zipCode}`)
-
-        // Use the centralized system with zip code filtering
-        const businesses = await getBusinessesForCategoryPage("/personal-assistants", zipCode)
-
-        // Check if request was aborted
-        if (abortController.signal.aborted) {
-          console.log("Personal assistants request was aborted")
-          return
-        }
-
-        console.log(`Found ${businesses.length} personal assistant businesses for zipCode: ${zipCode}`)
-        setProviders(businesses)
+        setLoading(true)
         setError(null)
-      } catch (err) {
-        // Don't show error if request was just aborted
-        if (abortController?.signal.aborted) {
-          console.log("Personal assistants request aborted, ignoring error")
-          return
-        }
 
+        // Use the centralized system
+        const businesses = await getBusinessesForCategoryPage("/personal-assistants")
+
+        setProviders(businesses)
+      } catch (err) {
         console.error("Error fetching businesses:", err)
         setError("Failed to load businesses")
       } finally {
-        // Only update loading state if request wasn't aborted
-        if (!abortController?.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     fetchBusinesses()
-
-    // Cleanup function
-    return () => {
-      if (abortController) {
-        abortController.abort()
-      }
-    }
-  }, [zipCode])
+  }, [])
 
   const handleOpenReviewsOld = (provider: any) => {
     setSelectedProvider(provider)
@@ -244,25 +200,6 @@ export default function PersonalAssistantsPage() {
 
   return (
     <CategoryLayout title="Personal Assistants" backLink="/" backText="Categories">
-      {hasZipCode && (
-        <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
-          <p className="text-sm text-primary">
-            📍 Showing businesses that service zip code: <strong>{zipCode}</strong>
-          </p>
-        </div>
-      )}
-
-      {!hasZipCode && (
-        <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-          <p className="text-sm text-yellow-800">
-            ⚠️ No location set.{" "}
-            <a href="/" className="underline font-medium">
-              Set your zip code
-            </a>{" "}
-            to see businesses in your area.
-          </p>
-        </div>
-      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image

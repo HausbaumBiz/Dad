@@ -5,19 +5,14 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { MapPin, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { useUserZipCode } from "@/hooks/use-user-zipcode"
-import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 export default function MentalHealthPage() {
-  const { zipCode, hasZipCode } = useUserZipCode()
-  const isInitialMount = useRef(true)
-
   const filterOptions = [
     { id: "counselors1", label: "Counselors", value: "Counselors" },
     {
@@ -41,34 +36,13 @@ export default function MentalHealthPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Skip the initial fetch if zipCode is null
-    if (isInitialMount.current && zipCode === null) {
-      isInitialMount.current = false
-      setLoading(false)
-      return
-    }
-    isInitialMount.current = false
-
-    const controller = new AbortController()
-
     async function fetchProviders() {
       try {
         setLoading(true)
-        setError(null)
-        console.log(`[PAGE] Fetching mental health providers with zipCode: "${zipCode}", hasZipCode: ${hasZipCode}`)
+        console.log("Fetching mental health providers...")
 
-        const zipCodeToUse = zipCode || undefined
-        console.log(`[PAGE] Using zipCode for API call: "${zipCodeToUse}"`)
-
-        const businesses = await getBusinessesForCategoryPage("/mental-health", zipCodeToUse)
-
-        // Check if this request was aborted
-        if (controller.signal.aborted) {
-          console.log(`[PAGE] Request was aborted`)
-          return
-        }
-
-        console.log(`[PAGE] API returned ${businesses.length} businesses`)
+        const businesses = await getBusinessesForCategoryPage("/mental-health")
+        console.log("Fetched mental health providers:", businesses)
 
         // Transform the data to match the expected format
         const transformedProviders = businesses.map((business) => ({
@@ -84,25 +58,15 @@ export default function MentalHealthPage() {
 
         setProviders(transformedProviders)
       } catch (err) {
-        if (controller.signal.aborted) {
-          console.log(`[PAGE] Request was aborted during error handling`)
-          return
-        }
         console.error("Error fetching mental health providers:", err)
         setError("Failed to load providers")
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     fetchProviders()
-
-    return () => {
-      controller.abort()
-    }
-  }, [zipCode, hasZipCode])
+  }, [])
 
   // State for dialogs
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
@@ -155,8 +119,6 @@ export default function MentalHealthPage() {
         </div>
       </div>
 
-      <ZipCodeFilterIndicator businessCount={providers.length} />
-
       <CategoryFilter options={filterOptions} />
 
       <div className="space-y-6">
@@ -182,13 +144,9 @@ export default function MentalHealthPage() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {hasZipCode ? `No Mental Health Providers in ${zipCode}` : "No Mental Health Providers Yet"}
-              </h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Mental Health Providers Yet</h3>
               <p className="text-gray-600 mb-4">
-                {hasZipCode
-                  ? `Be the first mental health professional to join our platform in the ${zipCode} area.`
-                  : "Be the first mental health professional to join our platform and connect with clients in your area."}
+                Be the first mental health professional to join our platform and connect with clients in your area.
               </p>
               <Button className="bg-blue-600 hover:bg-blue-700">Register Your Practice</Button>
             </div>

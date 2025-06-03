@@ -75,20 +75,9 @@ export async function saveBusinessCategories(businessId: string, selectedCategor
 }
 
 // Get businesses for a specific category page
-export async function getBusinessesForCategoryPage(pagePath: string, zipCode?: string): Promise<Business[]> {
+export async function getBusinessesForCategoryPage(pagePath: string): Promise<Business[]> {
   try {
-    console.log(
-      `Getting businesses for page: ${pagePath}${zipCode ? ` with zip code filter: ${zipCode}` : " (no zip code filter)"} at ${new Date().toISOString()}`,
-    )
-
-    // If zip code is provided, use the filtered function
-    if (zipCode && zipCode.trim() !== "") {
-      console.log(`Using zip code filtered function for: ${zipCode}`)
-      return await getBusinessesForCategoryPageByZipCode(pagePath, zipCode)
-    }
-
-    // Otherwise, use the unfiltered function
-    console.log(`Using unfiltered function (no zip code provided)`)
+    console.log(`Getting businesses for page: ${pagePath} at ${new Date().toISOString()}`)
 
     // Get the exact category name for this page
     const categoryName = getCategoryNameForPagePath(pagePath)
@@ -397,122 +386,6 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
     console.error(`Error getting businesses for subcategory ${subcategoryPath}:`, getErrorMessage(error))
     throw new Error(`Error getting businesses for subcategory ${subcategoryPath}: ${getErrorMessage(error)}`)
   }
-}
-
-// Get businesses for a category page filtered by zip code
-export async function getBusinessesForCategoryPageByZipCode(pagePath: string, zipCode: string): Promise<Business[]> {
-  try {
-    console.log(`Getting businesses for page: ${pagePath} and zip code: ${zipCode} at ${new Date().toISOString()}`)
-
-    // Get the exact category name for this page
-    const categoryName = getCategoryNameForPagePath(pagePath)
-    if (!categoryName) {
-      console.log(`No category mapping found for page: ${pagePath}`)
-      return []
-    }
-
-    console.log(`Looking for businesses in category: ${categoryName} that service zip code: ${zipCode}`)
-
-    // Get all business IDs that selected this category
-    const categoryBusinessIds = (await kv.smembers(`${KEY_PREFIXES.CATEGORY}${categoryName}:businesses`)) as string[]
-
-    if (!categoryBusinessIds || categoryBusinessIds.length === 0) {
-      console.log(`No businesses found for category: ${categoryName}`)
-      return []
-    }
-
-    console.log(`Found ${categoryBusinessIds.length} businesses for category: ${categoryName}`)
-
-    // Get businesses that service the specific zip code
-    const zipCodeBusinessIds = (await kv.smembers(`zipcode:${zipCode}:businesses`)) as string[]
-
-    // Get nationwide businesses
-    const nationwideBusinessIds = (await kv.smembers("businesses:nationwide")) as string[]
-
-    console.log(`Found ${zipCodeBusinessIds.length} businesses for zip code: ${zipCode}`)
-    console.log(`Found ${nationwideBusinessIds.length} nationwide businesses`)
-
-    // Find intersection: businesses that are both in the category AND service the zip code (or are nationwide)
-    const serviceAreaBusinessIds = [...zipCodeBusinessIds, ...nationwideBusinessIds]
-    const filteredBusinessIds = categoryBusinessIds.filter((id) => serviceAreaBusinessIds.includes(id))
-
-    console.log(`Found ${filteredBusinessIds.length} businesses that match both category and zip code criteria`)
-    console.log(`Filtered business IDs:`, filteredBusinessIds)
-
-    // IMPORTANT: Return empty array if no matches
-    if (filteredBusinessIds.length === 0) {
-      console.log(`No businesses match the zip code criteria - returning empty array`)
-      return []
-    }
-
-    // This code should NOT execute if filteredBusinessIds.length === 0
-    console.log(`ERROR: This should not execute if no filtered businesses found!`)
-
-    // Fetch each business's full data
-    const businesses: Business[] = []
-
-    for (const businessId of filteredBusinessIds) {
-      try {
-        const businessData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
-        if (businessData && typeof businessData === "object") {
-          // Get ad design data for display name and location
-          const adDesignData = await getBusinessAdDesignData(businessId)
-
-          // Get subcategories for this business
-          const subcategories = await getBusinessSubcategories(businessId)
-
-          const business = {
-            ...businessData,
-            id: businessId,
-            // PRIORITIZE ad design business name over registration name
-            displayName: adDesignData?.businessInfo?.businessName || businessData.businessName || "Unnamed Business",
-            // Use ad design location if available
-            displayCity: adDesignData?.businessInfo?.city || businessData.city,
-            displayState: adDesignData?.businessInfo?.state || businessData.state,
-            displayPhone: adDesignData?.businessInfo?.phone || businessData.phone,
-            adDesignData: adDesignData,
-            subcategories: subcategories,
-          } as Business
-
-          // Create display location
-          if (business.displayCity && business.displayState) {
-            business.displayLocation = `${business.displayCity}, ${business.displayState}`
-          } else if (business.displayCity) {
-            business.displayLocation = business.displayCity
-          } else if (business.displayState) {
-            business.displayLocation = business.displayState
-          } else {
-            business.displayLocation = `Zip: ${business.zipCode}`
-          }
-
-          // Log what we're using for the business name
-          console.log(
-            `Business ${businessId}: Registration name: "${businessData.businessName}", Ad design name: "${adDesignData?.businessInfo?.businessName}", Using: "${business.displayName}"`,
-          )
-
-          businesses.push(business)
-        }
-      } catch (error) {
-        console.error(`Error fetching business ${businessId}:`, getErrorMessage(error))
-        continue
-      }
-    }
-
-    console.log(`Successfully retrieved ${businesses.length} businesses for page ${pagePath} and zip code ${zipCode}`)
-    return businesses
-  } catch (error) {
-    console.error(`Error getting businesses for page ${pagePath} and zip code ${zipCode}:`, getErrorMessage(error))
-    return []
-  }
-}
-
-// Helper function to get user's saved zip code from localStorage (client-side)
-export async function getUserZipCode(): Promise<string | null> {
-  // This will be called from client-side components
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("savedZipCode")
-  }
-  return null
 }
 
 // Helper function to build business object

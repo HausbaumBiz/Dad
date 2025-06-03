@@ -261,6 +261,3 @@ export const categoryIdToPageMapping: { [key: string]: { name: string; page: str
     page: "/medical-practitioners",
   },
 }
-
-// Export the mapping for external use
-export const CATEGORY_ROUTE_MAPPING = categoryIdToPageMapping
