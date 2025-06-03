@@ -5,7 +5,7 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
@@ -13,8 +13,13 @@ import { MapPin, Phone } from "lucide-react"
 import Link from "next/link"
 import type { Business } from "@/lib/definitions"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { useUserZipCode } from "@/hooks/use-user-zipcode"
+import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 export default function TailoringClothingPage() {
+  const { zipCode, hasZipCode } = useUserZipCode()
+  const isInitialMount = useRef(true)
+
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [isReviewsOpen, setIsReviewsOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -24,26 +29,55 @@ export default function TailoringClothingPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Skip the initial fetch if zipCode is null
+    if (isInitialMount.current && zipCode === null) {
+      isInitialMount.current = false
+      setLoading(false)
+      return
+    }
+    isInitialMount.current = false
+
+    const controller = new AbortController()
+
     async function fetchBusinesses() {
       try {
         setLoading(true)
-        console.log("Fetching tailoring businesses...")
+        setError(null)
+        console.log(`[PAGE] Fetching tailoring businesses with zipCode: "${zipCode}", hasZipCode: ${hasZipCode}`)
 
-        // Use the centralized system
-        const fetchedBusinesses = await getBusinessesForCategoryPage("/tailoring-clothing")
+        const zipCodeToUse = zipCode || undefined
+        console.log(`[PAGE] Using zipCode for API call: "${zipCodeToUse}"`)
 
-        console.log("Fetched tailoring businesses:", fetchedBusinesses)
+        const fetchedBusinesses = await getBusinessesForCategoryPage("/tailoring-clothing", zipCodeToUse)
+
+        // Check if this request was aborted
+        if (controller.signal.aborted) {
+          console.log(`[PAGE] Request was aborted`)
+          return
+        }
+
+        console.log(`[PAGE] API returned ${fetchedBusinesses.length} businesses`)
         setBusinesses(fetchedBusinesses)
       } catch (err) {
+        if (controller.signal.aborted) {
+          console.log(`[PAGE] Request was aborted during error handling`)
+          return
+        }
         console.error("Error fetching tailoring businesses:", err)
         setError("Failed to load tailoring businesses")
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [])
+
+    return () => {
+      controller.abort()
+    }
+  }, [zipCode, hasZipCode])
 
   const filterOptions = [
     {
@@ -103,6 +137,8 @@ export default function TailoringClothingPage() {
         </div>
       </div>
 
+      <ZipCodeFilterIndicator businessCount={businesses.length} />
+
       <CategoryFilter options={filterOptions} />
 
       {loading ? (
@@ -126,9 +162,13 @@ export default function TailoringClothingPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tailoring Services Found</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {hasZipCode ? `No Tailoring Services Found in ${zipCode}` : "No Tailoring Services Found"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              We're currently building our network of tailoring and clothing service professionals in your area.
+              {hasZipCode
+                ? `We're currently building our network of tailoring and clothing service professionals in the ${zipCode} area.`
+                : "We're currently building our network of tailoring and clothing service professionals in your area."}
             </p>
             <Button className="bg-purple-600 hover:bg-purple-700">Register Your Business</Button>
           </div>

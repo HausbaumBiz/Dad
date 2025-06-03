@@ -1,68 +1,77 @@
+// app/actions/simplified-category-actions.ts
 "use server"
 
-import { getBusinessesForCategoryPage as getBusinessesFromService } from "@/lib/business-category-service"
+import {
+  getBusinessesForCategoryPage as getBusinessesForCategoryPageService,
+  getBusinessesForCategoryPageByZipCode,
+} from "@/lib/business-category-service"
 
-// Helper function to safely extract error messages
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  if (typeof error === "string") {
-    return error
-  }
-  return JSON.stringify(error, Object.getOwnPropertyNames(error))
+export type Business = {
+  id: string
+  businessName: string
+  city: string
+  state: string
+  zipCode: string
+  phone: string
+  website: string
+  email: string
+  description: string
+  category: string
+  subcategories: string[]
+  createdAt: string
+  updatedAt: string
+  userId: string
+  displayName?: string
+  displayCity?: string
+  displayState?: string
+  displayPhone?: string
+  displayLocation?: string
+  adDesignData?: any
 }
 
-// Simple action to get businesses for a category page
-export async function getBusinessesForCategoryPage(pagePath: string) {
+// Server action wrapper for the business category service
+export async function getBusinessesForCategoryPage(pagePath: string, zipCode?: string) {
+  console.log(
+    `[MAIN] Getting businesses for page: ${pagePath}${zipCode ? ` filtered by zip code: ${zipCode}` : " (no zip code filter)"} at ${new Date().toISOString()}`,
+  )
+
   try {
-    console.log(`[${new Date().toISOString()}] Fetching businesses for ${pagePath}`)
-
-    const businesses = await getBusinessesFromService(pagePath)
-
-    // Log the business names being returned
-    console.log(`[${new Date().toISOString()}] Returning ${businesses.length} businesses:`)
-    businesses.forEach((business) => {
-      console.log(
-        `  - ${business.id}: "${business.displayName}" (from ${business.adDesignData?.businessInfo?.businessName ? "ad-design" : "registration"})`,
-      )
-    })
-
-    return businesses
+    if (zipCode) {
+      console.log(`[MAIN] Using filtered function for zip code: ${zipCode}`)
+      const businesses = await getBusinessesForCategoryPageByZipCode(pagePath, zipCode)
+      console.log(`[MAIN] Filtered function returned ${businesses.length} businesses`)
+      return businesses
+    } else {
+      console.log(`[MAIN] Using unfiltered function (no zip code provided)`)
+      const businesses = await getBusinessesForCategoryPageService(pagePath)
+      console.log(`[MAIN] Unfiltered function returned ${businesses.length} businesses`)
+      return businesses
+    }
   } catch (error) {
-    console.error(`Error getting businesses for page ${pagePath}:`, getErrorMessage(error))
+    console.error(`[MAIN] Error getting businesses for page ${pagePath}:`, error)
     return []
   }
 }
 
-// Simple action to get businesses for a specific subcategory
-export async function getBusinessesForSubcategory(subcategoryName: string) {
+// Export the individual functions for direct use if needed
+export async function getBusinessesForCategoryPageUnfiltered(pagePath: string): Promise<Business[]> {
+  console.log(`[UNFILTERED] Called for page: ${pagePath}`)
+  return await getBusinessesForCategoryPageService(pagePath)
+}
+
+// Function to get businesses for a specific subcategory
+export async function getBusinessesForSubcategory(subcategory: string, zipCode?: string): Promise<Business[]> {
   try {
-    console.log(`[${new Date().toISOString()}] Fetching businesses for subcategory: ${subcategoryName}`)
+    console.log(
+      `Getting businesses for subcategory: ${subcategory}${zipCode ? ` filtered by zip code: ${zipCode}` : ""}`,
+    )
 
-    const { getBusinessesForSubcategory: getBusinessesFromService } = await import("@/lib/business-category-service")
-
-    try {
-      const businesses = await getBusinessesFromService(subcategoryName)
-
-      // Log the business names being returned
-      console.log(`[${new Date().toISOString()}] Returning ${businesses.length} businesses for subcategory:`)
-      businesses.forEach((business) => {
-        console.log(
-          `  - ${business.id}: "${business.displayName}" (from ${business.adDesignData?.businessInfo?.businessName ? "ad-design" : "registration"})`,
-        )
-      })
-
-      return businesses
-    } catch (serviceError) {
-      console.error(
-        `Service error getting businesses for subcategory ${subcategoryName}:`,
-        getErrorMessage(serviceError),
-      )
-      return []
-    }
+    // This would need to be implemented based on your subcategory data structure
+    // For now, return empty array as placeholder
+    console.log(`Subcategory filtering not yet implemented for: ${subcategory}`)
+    return []
   } catch (error) {
-    console.error(`Error getting businesses for subcategory ${subcategoryName}:`, getErrorMessage(error))
+    console.error(`Error getting businesses for subcategory ${subcategory}:`, error)
     return []
   }
 }

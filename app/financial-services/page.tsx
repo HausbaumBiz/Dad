@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,6 +12,8 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, MapPin, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { useUserZipCode } from "@/hooks/use-user-zipcode"
+import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 interface Business {
   id: string
@@ -27,6 +29,8 @@ interface Business {
 
 export default function FinancialServicesPage() {
   const { toast } = useToast()
+  const { zipCode, hasZipCode } = useUserZipCode()
+
   const filterOptions = [
     { id: "finance1", label: "Accountants", value: "Accountants" },
     { id: "finance2", label: "Insurance", value: "Insurance" },
@@ -44,26 +48,77 @@ export default function FinancialServicesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
 
+  // Use refs to track the current request and prevent race conditions
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const isInitialMount = useRef(true)
+
   useEffect(() => {
+    // Skip the first render if zipCode is null (initial state)
+    if (isInitialMount.current && zipCode === null) {
+      console.log("[PAGE] Skipping initial fetch with null zipCode")
+      isInitialMount.current = false
+      setIsLoading(false)
+      return
+    }
+
+    isInitialMount.current = false
+
     async function fetchBusinesses() {
+      // Cancel any previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController()
+      const signal = abortControllerRef.current.signal
+
       setIsLoading(true)
+
       try {
-        const result = await getBusinessesForCategoryPage("/financial-services")
+        console.log(`[PAGE] Fetching businesses with zipCode: "${zipCode}", hasZipCode: ${hasZipCode}`)
+
+        // Only pass zipCode if it exists and is not empty
+        const zipCodeToUse = hasZipCode && zipCode && zipCode.trim() !== "" ? zipCode : undefined
+        console.log(`[PAGE] Using zipCode for API call: "${zipCodeToUse}"`)
+
+        const result = await getBusinessesForCategoryPage("/financial-services", zipCodeToUse)
+
+        // Check if request was aborted
+        if (signal.aborted) {
+          console.log("[PAGE] Request was aborted")
+          return
+        }
+
+        console.log(`[PAGE] API returned ${result.length} businesses`)
         setBusinesses(result)
       } catch (error) {
-        console.error("Error fetching businesses:", error)
+        if (signal.aborted) {
+          console.log("[PAGE] Request was aborted during error handling")
+          return
+        }
+        console.error("[PAGE] Error fetching businesses:", error)
         toast({
           title: "Error loading businesses",
           description: "There was a problem loading businesses. Please try again later.",
           variant: "destructive",
         })
       } finally {
-        setIsLoading(false)
+        if (!signal.aborted) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+
+    // Cleanup function to abort request on unmount or dependency change
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [zipCode, hasZipCode, toast])
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
@@ -123,6 +178,8 @@ export default function FinancialServicesPage() {
           </div>
         </div>
       </div>
+
+      <ZipCodeFilterIndicator businessCount={filteredBusinesses.length} />
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 
@@ -215,9 +272,15 @@ export default function FinancialServicesPage() {
       ) : (
         <div className="text-center py-12">
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-8 max-w-2xl mx-auto">
-            <h3 className="text-xl font-medium text-emerald-800 mb-2">No Financial Service Providers Found</h3>
+            <h3 className="text-xl font-medium text-emerald-800 mb-2">
+              {hasZipCode
+                ? `No Financial Service Providers Found in ${zipCode}`
+                : "No Financial Service Providers Found"}
+            </h3>
             <p className="text-emerald-700 mb-4">
-              We're building our network of licensed financial professionals in your area.
+              {hasZipCode
+                ? `We're building our network of licensed financial professionals in the ${zipCode} area.`
+                : "We're building our network of licensed financial professionals in your area."}
             </p>
             <div className="bg-white rounded border border-emerald-100 p-4">
               <p className="text-gray-700 font-medium">Are you a financial professional?</p>

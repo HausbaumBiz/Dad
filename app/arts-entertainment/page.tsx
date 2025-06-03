@@ -13,9 +13,13 @@ import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, MapPin, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { useUserZipCode } from "@/hooks/use-user-zipcode"
+import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 export default function ArtsEntertainmentPage() {
   const { toast } = useToast()
+  const { zipCode, hasZipCode } = useUserZipCode()
+
   const filterOptions = [
     {
       id: "arts1",
@@ -47,25 +51,56 @@ export default function ArtsEntertainmentPage() {
 
   // Fetch businesses in this category
   useEffect(() => {
+    // Create an AbortController for this request
+    const controller = new AbortController()
+    const signal = controller.signal
+
     async function fetchBusinesses() {
+      // Skip the fetch if no zip code is set
+      if (!zipCode) {
+        console.log("No zipCode set, skipping fetch")
+        setIsLoading(false)
+        return
+      }
+
       setIsLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/arts-entertainment")
+        console.log(`Fetching arts-entertainment businesses for zipCode: ${zipCode}`)
+        const result = await getBusinessesForCategoryPage("/arts-entertainment", zipCode)
+
+        // Check if the request was aborted
+        if (signal.aborted) {
+          console.log("Request was aborted, not updating state")
+          return
+        }
+
+        console.log(`Found ${result.length} arts-entertainment businesses for zipCode: ${zipCode}`)
         setBusinesses(result)
       } catch (error) {
-        console.error("Error fetching businesses:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
+        // Only show error if request wasn't aborted
+        if (!signal.aborted) {
+          console.error("Error fetching businesses:", error)
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading businesses. Please try again later.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setIsLoading(false)
+        if (!signal.aborted) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+
+    // Cleanup function to abort the request if component unmounts or dependencies change
+    return () => {
+      console.log("Aborting previous request")
+      controller.abort()
+    }
+  }, [toast, zipCode])
 
   // Filter businesses based on selected subcategory
   const filteredBusinesses = selectedFilter
@@ -93,6 +128,8 @@ export default function ArtsEntertainmentPage() {
 
   return (
     <CategoryLayout title="Arts & Entertainment" backLink="/" backText="Categories">
+      <ZipCodeFilterIndicator />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image

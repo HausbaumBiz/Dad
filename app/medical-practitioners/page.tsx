@@ -5,15 +5,19 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { useEffect } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { Phone } from "lucide-react"
+import { useUserZipCode } from "@/hooks/use-user-zipcode"
+import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 export default function MedicalPractitionersPage() {
+  const { zipCode, hasZipCode } = useUserZipCode()
+  const isInitialMount = useRef(true)
+
   const filterOptions = [
     { id: "medical1", label: "Chiropractors", value: "Chiropractors" },
     { id: "medical2", label: "Dentists", value: "Dentists" },
@@ -34,12 +38,34 @@ export default function MedicalPractitionersPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Skip the initial fetch if zipCode is null
+    if (isInitialMount.current && zipCode === null) {
+      isInitialMount.current = false
+      setLoading(false)
+      return
+    }
+    isInitialMount.current = false
+
+    const controller = new AbortController()
+
     async function fetchProviders() {
       try {
         setLoading(true)
+        setError(null)
+        console.log(`[PAGE] Fetching medical practitioners with zipCode: "${zipCode}", hasZipCode: ${hasZipCode}`)
 
-        // Use the centralized system
-        const result = await getBusinessesForCategoryPage("/medical-practitioners")
+        const zipCodeToUse = zipCode || undefined
+        console.log(`[PAGE] Using zipCode for API call: "${zipCodeToUse}"`)
+
+        const result = await getBusinessesForCategoryPage("/medical-practitioners", zipCodeToUse)
+
+        // Check if this request was aborted
+        if (controller.signal.aborted) {
+          console.log(`[PAGE] Request was aborted`)
+          return
+        }
+
+        console.log(`[PAGE] API returned ${result.length} businesses`)
 
         if (result && result.length > 0) {
           // Transform the business data to match the expected provider format
@@ -65,16 +91,26 @@ export default function MedicalPractitionersPage() {
           setProviders([])
         }
       } catch (err) {
+        if (controller.signal.aborted) {
+          console.log(`[PAGE] Request was aborted during error handling`)
+          return
+        }
         console.error("Error fetching medical practitioners:", err)
         setError("Failed to load providers")
         setProviders([])
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchProviders()
-  }, [])
+
+    return () => {
+      controller.abort()
+    }
+  }, [zipCode, hasZipCode])
 
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
@@ -145,6 +181,8 @@ export default function MedicalPractitionersPage() {
         </div>
       </div>
 
+      <ZipCodeFilterIndicator businessCount={providers.length} />
+
       <CategoryFilter options={filterOptions} />
 
       <div className="space-y-6">
@@ -170,9 +208,13 @@ export default function MedicalPractitionersPage() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Medical Practitioners Yet</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {hasZipCode ? `No Medical Practitioners in ${zipCode}` : "No Medical Practitioners Yet"}
+              </h3>
               <p className="text-gray-600 mb-4">
-                Be the first healthcare professional to join our platform and connect with patients in your area.
+                {hasZipCode
+                  ? `Be the first healthcare professional to join our platform in the ${zipCode} area.`
+                  : "Be the first healthcare professional to join our platform and connect with patients in your area."}
               </p>
               <Button className="bg-green-600 hover:bg-green-700">Register Your Practice</Button>
             </div>

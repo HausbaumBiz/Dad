@@ -13,12 +13,16 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
+import { useUserZipCode } from "@/hooks/use-user-zipcode"
+import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 export default function CareServicesPage() {
-  const [businesses, setBusinesses] = useState<Business[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { zipCode } = useUserZipCode()
   const { toast } = useToast()
+
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -40,25 +44,57 @@ export default function CareServicesPage() {
   ]
 
   useEffect(() => {
+    const controller = new AbortController()
+
     async function fetchBusinesses() {
+      // Skip fetch if no zip code is set
+      if (!zipCode) {
+        console.log("No zipCode set, skipping fetch")
+        return
+      }
+
+      console.log(`Fetching care-services businesses for zipCode: ${zipCode}`)
       setLoading(true)
+      setError(null)
+
       try {
-        const result = await getBusinessesForCategoryPage("/care-services")
+        const result = await getBusinessesForCategoryPage("/care-services", zipCode)
+
+        // Check if request was aborted
+        if (controller.signal.aborted) {
+          console.log("Request was aborted")
+          return
+        }
+
+        console.log(`Found ${result.length} care-services businesses for zipCode: ${zipCode}`)
         setBusinesses(result)
       } catch (error) {
+        if (controller.signal.aborted) {
+          console.log("Request was aborted during error handling")
+          return
+        }
+
         console.error("Error fetching businesses:", error)
+        setError("Failed to load care service providers")
         toast({
           title: "Error loading businesses",
           description: "There was a problem loading businesses. Please try again later.",
           variant: "destructive",
         })
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+
+    // Cleanup function to abort the request if component unmounts or zipCode changes
+    return () => {
+      controller.abort()
+    }
+  }, [zipCode, toast])
 
   // Helper function to get phone number from business data
   const getPhoneNumber = (business: Business) => {
@@ -188,6 +224,8 @@ export default function CareServicesPage() {
           </div>
         </div>
       </div>
+
+      <ZipCodeFilterIndicator />
 
       <CategoryFilter options={filterOptions} />
 

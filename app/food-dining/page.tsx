@@ -12,6 +12,8 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone, Star } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { useUserZipCode } from "@/hooks/use-user-zipcode"
+import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 // Format phone number to (XXX) XXX-XXXX
 function formatPhoneNumber(phoneNumberString: string) {
@@ -62,29 +64,45 @@ export default function FoodDiningPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
 
+  const { zipCode, isLoading: zipCodeLoading } = useUserZipCode()
+
   useEffect(() => {
+    const controller = new AbortController()
+
     async function fetchBusinesses() {
-      setIsLoading(true)
+      // Skip fetch if zip code is still loading
+      if (zipCodeLoading) {
+        console.log("Zip code still loading, skipping fetch")
+        return
+      }
+
+      // Skip fetch if no zip code is set
+      if (!zipCode) {
+        console.log("No zipCode set, skipping fetch")
+        setBusinesses([])
+        setIsLoading(false)
+        return
+      }
+
       try {
-        // Add timestamp for cache busting
-        const timestamp = Date.now()
-        console.log(`[Food Dining] Fetching businesses at ${timestamp}`)
+        setIsLoading(true)
+        console.log(`Fetching food-dining businesses for zipCode: ${zipCode}`)
 
-        const result = await getBusinessesForCategoryPage("/food-dining")
+        const result = await getBusinessesForCategoryPage("/food-dining", zipCode)
 
-        console.log(
-          "Food dining businesses fetched:",
-          result.map((b) => ({
-            id: b.id,
-            registrationName: b.businessName,
-            displayName: b.displayName,
-            adDesignName: b.adDesignData?.businessInfo?.businessName,
-            source: b.adDesignData?.businessInfo?.businessName ? "ad-design" : "registration",
-          })),
-        )
+        // Check if request was aborted
+        if (controller.signal.aborted) {
+          console.log("Request was aborted")
+          return
+        }
 
+        console.log(`Found ${result.length} food-dining businesses for zipCode: ${zipCode}`)
         setBusinesses(result)
       } catch (error) {
+        if (error.name === "AbortError") {
+          console.log("Fetch aborted")
+          return
+        }
         console.error("Error fetching businesses:", error)
         toast({
           title: "Error loading businesses",
@@ -92,12 +110,18 @@ export default function FoodDiningPage() {
           variant: "destructive",
         })
       } finally {
-        setIsLoading(false)
+        if (!controller.signal.aborted) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+
+    return () => {
+      controller.abort()
+    }
+  }, [zipCode, zipCodeLoading, toast])
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
@@ -230,10 +254,17 @@ export default function FoodDiningPage() {
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 
+      <ZipCodeFilterIndicator businessCount={filteredBusinesses.length} />
+
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
           <p>Loading restaurants...</p>
+        </div>
+      ) : !zipCode ? (
+        <div className="text-center py-12">
+          <h3 className="text-xl font-medium text-gray-700">Set Your Location</h3>
+          <p className="mt-2 text-gray-500">Please set your zip code to see restaurants in your area.</p>
         </div>
       ) : filteredBusinesses.length > 0 ? (
         <div className="space-y-6 mt-6">

@@ -5,14 +5,19 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Phone, MapPin, Tag } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { useUserZipCode } from "@/hooks/use-user-zipcode"
+import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 export default function LegalServicesPage() {
+  const { zipCode, hasZipCode } = useUserZipCode()
+  const isInitialMount = useRef(true)
+
   const filterOptions = [
     { id: "lawyer1", label: "Family Lawyer", value: "Family Lawyer" },
     { id: "lawyer2", label: "Criminal Defense Lawyer", value: "Criminal Defense Lawyer" },
@@ -52,22 +57,55 @@ export default function LegalServicesPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Skip the initial fetch if zipCode is null
+    if (isInitialMount.current && zipCode === null) {
+      isInitialMount.current = false
+      setLoading(false)
+      return
+    }
+    isInitialMount.current = false
+
+    const controller = new AbortController()
+
     async function fetchBusinesses() {
       try {
         setLoading(true)
         setError(null)
-        const fetchedBusinesses = await getBusinessesForCategoryPage("/legal-services")
+        console.log(`[PAGE] Fetching legal services with zipCode: "${zipCode}", hasZipCode: ${hasZipCode}`)
+
+        const zipCodeToUse = zipCode || undefined
+        console.log(`[PAGE] Using zipCode for API call: "${zipCodeToUse}"`)
+
+        const fetchedBusinesses = await getBusinessesForCategoryPage("/legal-services", zipCodeToUse)
+
+        // Check if this request was aborted
+        if (controller.signal.aborted) {
+          console.log(`[PAGE] Request was aborted`)
+          return
+        }
+
+        console.log(`[PAGE] API returned ${fetchedBusinesses.length} businesses`)
         setBusinesses(fetchedBusinesses)
       } catch (err) {
+        if (controller.signal.aborted) {
+          console.log(`[PAGE] Request was aborted during error handling`)
+          return
+        }
         console.error("Error fetching businesses:", err)
         setError("Failed to load legal services")
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [])
+
+    return () => {
+      controller.abort()
+    }
+  }, [zipCode, hasZipCode])
 
   const handleOpenReviews = (business: any) => {
     setSelectedProvider({
@@ -116,6 +154,8 @@ export default function LegalServicesPage() {
         </div>
       </div>
 
+      <ZipCodeFilterIndicator businessCount={businesses.length} />
+
       <CategoryFilter options={filterOptions} />
 
       {loading ? (
@@ -140,9 +180,13 @@ export default function LegalServicesPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Legal Professionals Yet</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {hasZipCode ? `No Legal Professionals in ${zipCode}` : "No Legal Professionals Yet"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              Be the first legal professional to join our platform and connect with potential clients in your area.
+              {hasZipCode
+                ? `Be the first legal professional to join our platform in the ${zipCode} area.`
+                : "Be the first legal professional to join our platform and connect with potential clients in your area."}
             </p>
             <Button className="bg-slate-600 hover:bg-slate-700">Register Your Practice</Button>
           </div>

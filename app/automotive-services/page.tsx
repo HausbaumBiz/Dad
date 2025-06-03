@@ -14,6 +14,8 @@ import type { Business } from "@/lib/definitions"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
 import { Phone } from "lucide-react"
+import { useUserZipCode } from "@/hooks/use-user-zipcode"
+import { ZipCodeFilterIndicator } from "@/components/zip-code-filter-indicator"
 
 // Format phone number for display
 function formatPhoneNumber(phone: string): string {
@@ -32,6 +34,9 @@ function formatPhoneNumber(phone: string): string {
 }
 
 export default function AutomotiveServicesPage() {
+  const { zipCode } = useUserZipCode()
+  const { toast } = useToast()
+
   const filterOptions = [
     { id: "auto1", label: "Auto Repair", value: "Auto Repair" },
     { id: "auto2", label: "Oil Change", value: "Oil Change" },
@@ -68,30 +73,61 @@ export default function AutomotiveServicesPage() {
   // State for businesses and ad designs
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [businessAdDesigns, setBusinessAdDesigns] = useState<Record<string, any>>({})
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
 
   useEffect(() => {
+    const controller = new AbortController()
+
     async function fetchBusinesses() {
+      // Skip fetch if no zip code is set
+      if (!zipCode) {
+        console.log("No zipCode set, skipping fetch")
+        return
+      }
+
+      console.log(`Fetching automotive-services businesses for zipCode: ${zipCode}`)
       setLoading(true)
+      setError(null)
+
       try {
-        const result = await getBusinessesForCategoryPage("/automotive-services")
+        const result = await getBusinessesForCategoryPage("/automotive-services", zipCode)
+
+        // Check if request was aborted
+        if (controller.signal.aborted) {
+          console.log("Request was aborted")
+          return
+        }
+
+        console.log(`Found ${result.length} automotive-services businesses for zipCode: ${zipCode}`)
         setBusinesses(result)
       } catch (error) {
+        if (controller.signal.aborted) {
+          console.log("Request was aborted during error handling")
+          return
+        }
+
         console.error("Error fetching businesses:", error)
+        setError("Failed to load automotive service providers")
         toast({
           title: "Error loading businesses",
           description: "There was a problem loading businesses. Please try again later.",
           variant: "destructive",
         })
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+
+    // Cleanup function to abort the request if component unmounts or zipCode changes
+    return () => {
+      controller.abort()
+    }
+  }, [zipCode, toast])
 
   const handleOpenReviews = (business: Business) => {
     setSelectedProvider({
@@ -140,6 +176,8 @@ export default function AutomotiveServicesPage() {
           </div>
         </div>
       </div>
+
+      <ZipCodeFilterIndicator />
 
       <CategoryFilter options={filterOptions} />
 
@@ -250,7 +288,7 @@ export default function AutomotiveServicesPage() {
                                 fill="currentColor"
                                 viewBox="0 0 20 20"
                               >
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                               </svg>
                             ))}
                           </div>
