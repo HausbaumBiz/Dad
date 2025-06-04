@@ -5,14 +5,34 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone } from "lucide-react"
+import { Phone, X } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
+// Enhanced Business interface with service area
+interface Business {
+  id: string
+  displayName?: string
+  businessName: string
+  displayLocation?: string
+  displayPhone?: string
+  zipCode: string
+  serviceArea?: {
+    isNationwide: boolean
+    zipCodes: string[]
+  }
+  subcategories?: string[]
+  rating?: number
+  reviewCount?: number
+  reviewsData?: any[]
+}
+
 export default function RetailStoresPage() {
+  const fetchIdRef = useRef(0)
+
   const filterOptions = [
     { id: "retail1", label: "Supermarkets/Grocery Stores", value: "Supermarkets/Grocery Stores" },
     { id: "retail2", label: "Department Store", value: "Department Store" },
@@ -52,43 +72,125 @@ export default function RetailStoresPage() {
   } | null>(null)
 
   // State for businesses
-  const [providers, setProviders] = useState([])
+  const [providers, setProviders] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+    }
+  }, [])
+
+  // Helper function to check if a business serves a specific zip code
+  const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
+    // Check if business is nationwide
+    if (business.serviceArea?.isNationwide) {
+      console.log(`  - ${business.displayName || business.businessName}: nationwide=true, matches=true`)
+      return true
+    }
+
+    // Check if zip code is in service area
+    if (business.serviceArea?.zipCodes && business.serviceArea.zipCodes.length > 0) {
+      const matches = business.serviceArea.zipCodes.includes(targetZipCode)
+      console.log(
+        `  - ${business.displayName || business.businessName}: serviceArea=[${business.serviceArea.zipCodes.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
+      )
+      return matches
+    }
+
+    // Fall back to primary zip code
+    const matches = business.zipCode === targetZipCode
+    console.log(
+      `  - ${business.displayName || business.businessName}: primaryZip="${business.zipCode}", userZip="${targetZipCode}", matches=${matches}`,
+    )
+    return matches
+  }
+
   useEffect(() => {
     async function fetchBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[${new Date().toISOString()}] Fetching businesses for /retail-stores (request #${currentFetchId})`)
+
       try {
         setLoading(true)
         setError(null)
+
         const fetchedBusinesses = await getBusinessesForCategoryPage("/retail-stores")
-        setProviders(fetchedBusinesses)
+        console.log(
+          `[${new Date().toISOString()}] Retrieved ${fetchedBusinesses.length} total businesses (request #${currentFetchId})`,
+        )
+
+        // Check if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
+          return
+        }
+
+        fetchedBusinesses.forEach((business: Business) => {
+          console.log(
+            `  - ${business.id}: "${business.displayName || business.businessName}" (zipCode: ${business.zipCode})`,
+          )
+        })
+
+        // Filter by zip code if available
+        let filteredBusinesses = fetchedBusinesses
+        if (userZipCode) {
+          console.log(
+            `[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${currentFetchId})`,
+          )
+          filteredBusinesses = fetchedBusinesses.filter((business: Business) =>
+            businessServesZipCode(business, userZipCode),
+          )
+          console.log(
+            `[${new Date().toISOString()}] After filtering: ${filteredBusinesses.length} businesses (request #${currentFetchId})`,
+          )
+        }
+
+        setProviders(filteredBusinesses)
       } catch (err) {
         console.error("Error fetching businesses:", err)
-        setError("Failed to load businesses")
+        if (currentFetchId === fetchIdRef.current) {
+          setError("Failed to load businesses")
+        }
       } finally {
-        setLoading(false)
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [])
+  }, [userZipCode])
 
-  const handleOpenReviews = (provider: any) => {
+  const handleOpenReviews = (provider: Business) => {
     setSelectedProvider({
-      id: provider.id,
+      id: Number.parseInt(provider.id),
       name: provider.displayName || provider.businessName || "Retail Store",
       reviews: provider.reviewsData || [],
     })
     setIsReviewsDialogOpen(true)
   }
 
-  const handleViewProfile = (provider: any) => {
+  const handleViewProfile = (provider: Business) => {
     setSelectedBusiness({
       id: provider.id,
       name: provider.displayName || provider.businessName || "Retail Store",
     })
     setIsProfileDialogOpen(true)
+  }
+
+  // Handle clearing zip code filter
+  const handleClearZipCode = () => {
+    localStorage.removeItem("savedZipCode")
+    setUserZipCode(null)
   }
 
   return (
@@ -123,6 +225,43 @@ export default function RetailStoresPage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-blue-800">Showing businesses that service: {userZipCode}</p>
+                <p className="text-sm text-blue-700">Including businesses with this ZIP code in their service area</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearZipCode}
+              className="text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -145,16 +284,20 @@ export default function RetailStoresPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Retail Stores Yet</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {userZipCode ? `No Retail Stores Found in ${userZipCode}` : "No Retail Stores Yet"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              Be the first retail store to join our platform and connect with local customers in your area.
+              {userZipCode
+                ? `No retail stores found serving ZIP code ${userZipCode}. Try clearing the filter to see all stores.`
+                : "Be the first retail store to join our platform and connect with local customers in your area."}
             </p>
             <Button className="bg-purple-600 hover:bg-purple-700">Register Your Store</Button>
           </div>
         </div>
       ) : (
         <div className="space-y-6">
-          {providers.map((provider: any) => (
+          {providers.map((provider: Business) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -163,6 +306,21 @@ export default function RetailStoresPage() {
                       {provider.displayName || provider.businessName || "Retail Store"}
                     </h3>
                     <p className="text-gray-600 text-sm mt-1">{provider.displayLocation || "Location not specified"}</p>
+
+                    {/* Service Area Indicator */}
+                    {userZipCode && provider.serviceArea && (
+                      <div className="mt-2">
+                        {provider.serviceArea.isNationwide ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Serves nationwide
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Serves {userZipCode} area
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {provider.displayPhone && (
                       <div className="flex items-center mt-2">

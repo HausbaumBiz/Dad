@@ -5,22 +5,46 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useToast } from "@/components/ui/use-toast"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, MapPin } from "lucide-react"
-
-// Import the ReviewsDialog component
+import { Phone, MapPin, Loader2 } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-// Replace this import
-// import { getBusinessesByCategory } from "@/app/actions/business-actions"
-
-// With this import
-// import { getBusinessesBySelectedCategories } from "@/app/actions/business-category-fetcher"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
+// Enhanced Business interface with service area support
+interface Business {
+  id: string
+  businessName: string
+  displayName?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  displayCity?: string
+  displayState?: string
+  displayPhone?: string
+  phone?: string
+  rating?: number
+  reviews?: number
+  services?: string[]
+  subcategories?: string[]
+  adDesignData?: {
+    businessInfo?: {
+      phone?: string
+      city?: string
+      state?: string
+    }
+  }
+  serviceArea?: string[]
+  isNationwide?: boolean
+}
+
 export default function TechITServicesPage() {
+  const { toast } = useToast()
+  const fetchIdRef = useRef(0)
+
   const filterOptions = [
     { id: "computers1", label: "Computer Network Specialists", value: "Computer Network Specialists" },
     { id: "computers2", label: "Database Administrators", value: "Database Administrators" },
@@ -33,17 +57,50 @@ export default function TechITServicesPage() {
     { id: "computers9", label: "Technology Consultants", value: "Technology Consultants" },
   ]
 
-  // Add state variables for tracking the selected provider and dialog open state
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
-
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{ id: string; name: string } | null>(null)
-
-  const [providers, setProviders] = useState<any[]>([])
+  const [providers, setProviders] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Helper function to check if business serves a zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    console.log(
+      `[Tech Services] Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`,
+      {
+        isNationwide: business.isNationwide,
+        serviceArea: business.serviceArea,
+        primaryZip: business.zipCode,
+      },
+    )
+
+    // Check if business serves nationwide
+    if (business.isNationwide) {
+      console.log(`[Tech Services] Business serves nationwide`)
+      return true
+    }
+
+    // Check if business service area includes the zip code
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const serves = business.serviceArea.some((area) => {
+        if (typeof area === "string") {
+          return area.toLowerCase().includes("nationwide") || area === zipCode
+        }
+        return false
+      })
+      console.log(`[Tech Services] Service area check result: ${serves}`)
+      if (serves) return true
+    }
+
+    // Fall back to primary zip code comparison
+    const primaryMatch = business.zipCode === zipCode
+    console.log(`[Tech Services] Primary zip code match: ${primaryMatch}`)
+    return primaryMatch
+  }
 
   // Phone number formatting function
   const formatPhoneNumber = (phone: string): string => {
@@ -62,7 +119,7 @@ export default function TechITServicesPage() {
   }
 
   // Location formatting function
-  const getLocation = (provider: any): string => {
+  const getLocation = (provider: Business): string => {
     // First priority: city and state from ad design data
     const adDesignCity = provider.adDesignData?.businessInfo?.city
     const adDesignState = provider.adDesignData?.businessInfo?.state
@@ -90,38 +147,85 @@ export default function TechITServicesPage() {
     return "Location not specified"
   }
 
-  // Replace the entire useEffect function with:
+  // Clear zip code filter
+  const clearZipCodeFilter = () => {
+    setUserZipCode(null)
+    localStorage.removeItem("savedZipCode")
+  }
+
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
+
   useEffect(() => {
     async function fetchProviders() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[Tech Services] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+
       try {
         setLoading(true)
+        setError(null)
 
         // Use the centralized system
         const businesses = await getBusinessesForCategoryPage("/tech-it-services")
 
-        console.log(`Found ${businesses.length} tech businesses`)
+        // Check if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[Tech Services] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[Tech Services] Fetch ${currentFetchId} completed, got ${businesses.length} businesses`)
 
         // Ensure each business has a services array
-        const processedBusinesses = businesses.map((business) => ({
+        const processedBusinesses = businesses.map((business: any) => ({
           ...business,
           services: business.services || business.subcategories || [],
           reviews: business.reviews || [],
           rating: business.rating || 0,
         }))
 
-        setProviders(processedBusinesses)
+        // Filter by zip code if available
+        if (userZipCode) {
+          console.log(`[Tech Services] Filtering by zip code: ${userZipCode}`)
+          const filteredByZip = processedBusinesses.filter((business: Business) => {
+            const serves = businessServesZipCode(business, userZipCode)
+            console.log(
+              `[Tech Services] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
+              business,
+            )
+            return serves
+          })
+          console.log(`[Tech Services] After filtering: ${filteredByZip.length} businesses`)
+          setProviders(filteredByZip)
+        } else {
+          setProviders(processedBusinesses)
+        }
       } catch (err) {
-        console.error("Error fetching tech providers:", err)
-        setError("Failed to load providers")
+        // Only update error state if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error("Error fetching tech providers:", err)
+          setError("Failed to load providers")
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading tech service providers. Please try again later.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setLoading(false)
+        // Only update loading state if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchProviders()
-  }, [])
+  }, [userZipCode])
 
-  // Add a handler function for opening the reviews dialog
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
       ...provider,
@@ -172,11 +276,33 @@ export default function TechITServicesPage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-blue-800 text-sm">
+                <strong>Showing results for ZIP code: {userZipCode}</strong>
+                <br />
+                <span className="text-blue-600">Including businesses that serve your area or operate nationwide.</span>
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearZipCodeFilter}
+              className="text-blue-600 border-blue-300 hover:bg-blue-100"
+            >
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading tech providers...</p>
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+            <p>Loading tech providers...</p>
           </div>
         ) : error ? (
           <div className="text-center py-8">
@@ -191,13 +317,17 @@ export default function TechITServicesPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+                    d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 002 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Tech Providers Yet</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {userZipCode ? `No Tech Providers in ${userZipCode}` : "No Tech Providers Yet"}
+              </h3>
               <p className="text-gray-600 mb-4">
-                Be the first technology professional to join our platform and connect with clients in your area.
+                {userZipCode
+                  ? `We're building our network of technology professionals in the ${userZipCode} area.`
+                  : "Be the first technology professional to join our platform and connect with clients in your area."}
               </p>
               <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
             </div>
@@ -208,7 +338,14 @@ export default function TechITServicesPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{provider.displayName || provider.name}</h3>
+                    <h3 className="text-xl font-semibold">{provider.displayName || provider.businessName}</h3>
+
+                    {/* Service Area Indicator */}
+                    {provider.isNationwide ? (
+                      <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
+                    ) : userZipCode && provider.serviceArea?.includes(userZipCode) ? (
+                      <div className="text-xs text-green-600 font-medium mb-1">✓ Serves {userZipCode} area</div>
+                    ) : null}
 
                     {/* Location Display */}
                     <div className="flex items-center text-gray-600 text-sm mt-1">
@@ -222,7 +359,7 @@ export default function TechITServicesPage() {
                         <Phone className="w-4 h-4 mr-1" />
                         <span>
                           {formatPhoneNumber(
-                            provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
+                            provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone || "",
                           )}
                         </span>
                       </div>
@@ -233,7 +370,7 @@ export default function TechITServicesPage() {
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -242,7 +379,7 @@ export default function TechITServicesPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || 0} ({provider.reviews?.length || 0} reviews)
+                        {provider.rating || 0} ({provider.reviews || 0} reviews)
                       </span>
                     </div>
 
@@ -289,6 +426,7 @@ export default function TechITServicesPage() {
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.name}
+          businessId={selectedProvider.id}
           reviews={selectedProvider?.reviews || []}
         />
       )}

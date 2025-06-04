@@ -5,7 +5,7 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Phone } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
@@ -37,28 +37,111 @@ export default function RealEstatePage() {
     name: string
   } | null>(null)
 
+  // Add fetchIdRef for race condition prevention
+  const fetchIdRef = useRef(0)
+
+  // Enhanced Business interface
+  interface Business {
+    id: string
+    displayName?: string
+    businessName?: string
+    displayLocation?: string
+    zipCode?: string
+    displayPhone?: string
+    rating?: number
+    reviews?: number
+    subcategories?: string[]
+    serviceArea?: string[]
+    isNationwide?: boolean
+  }
+
+  // Helper function to check if business serves the zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
+      isNationwide: business.isNationwide,
+      serviceArea: business.serviceArea,
+      primaryZip: business.zipCode,
+    })
+
+    // Check if business serves nationwide
+    if (business.isNationwide) {
+      console.log(`✓ Business serves nationwide`)
+      return true
+    }
+
+    // Check if zip code is in service area
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const serves = business.serviceArea.includes(zipCode)
+      console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
+      return serves
+    }
+
+    // Fallback to primary zip code
+    const matches = business.zipCode === zipCode
+    console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
+    return matches
+  }
+
   // State for businesses
-  const [providers, setProviders] = useState([])
+  const [providers, setProviders] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
+
   useEffect(() => {
     async function fetchBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[RealEstate] Starting fetch ${currentFetchId} for zip code:`, userZipCode)
+
       try {
         setLoading(true)
         setError(null)
-        const fetchedBusinesses = await getBusinessesForCategoryPage("/real-estate")
+        let fetchedBusinesses = await getBusinessesForCategoryPage("/real-estate")
+
+        // Only update if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[RealEstate] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[RealEstate] Fetch ${currentFetchId} got ${fetchedBusinesses.length} businesses`)
+
+        // Filter by zip code if available
+        if (userZipCode) {
+          const originalCount = fetchedBusinesses.length
+          fetchedBusinesses = fetchedBusinesses.filter((business: Business) =>
+            businessServesZipCode(business, userZipCode),
+          )
+          console.log(
+            `[RealEstate] Filtered from ${originalCount} to ${fetchedBusinesses.length} businesses for zip ${userZipCode}`,
+          )
+        }
+
         setProviders(fetchedBusinesses)
       } catch (err) {
-        console.error("Error fetching businesses:", err)
-        setError("Failed to load businesses")
+        // Only update error if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error(`[RealEstate] Fetch ${currentFetchId} error:`, err)
+          setError("Failed to load businesses")
+        }
       } finally {
-        setLoading(false)
+        // Only update loading if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [])
+  }, [userZipCode])
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
@@ -110,6 +193,26 @@ export default function RealEstatePage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {userZipCode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Showing businesses that serve zip code:</span> {userZipCode}
+            <span className="text-xs block mt-1">Includes businesses with {userZipCode} in their service area</span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem("savedZipCode")
+              setUserZipCode(null)
+            }}
+            className="text-blue-700 border-blue-300 hover:bg-blue-100"
+          >
+            Clear Filter
+          </Button>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -134,8 +237,9 @@ export default function RealEstatePage() {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Real Estate Professionals Yet</h3>
             <p className="text-gray-600 mb-4">
-              Be the first real estate professional to join our platform and connect with potential clients in your
-              area.
+              {userZipCode
+                ? `Be the first real estate professional to join our platform and connect with potential clients in the ${userZipCode} area.`
+                : "Be the first real estate professional to join our platform and connect with potential clients in your area."}
             </p>
             <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
           </div>
@@ -163,6 +267,19 @@ export default function RealEstatePage() {
                       </div>
                     )}
 
+                    {/* Service Area Indicator */}
+                    {userZipCode && (
+                      <div className="text-xs text-green-600 mt-1">
+                        {provider.isNationwide ? (
+                          <span>✓ Serves nationwide</span>
+                        ) : provider.serviceArea?.includes(userZipCode) ? (
+                          <span>✓ Serves {userZipCode} area</span>
+                        ) : provider.zipCode === userZipCode ? (
+                          <span>✓ Located in {userZipCode}</span>
+                        ) : null}
+                      </div>
+                    )}
+
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
@@ -172,7 +289,7 @@ export default function RealEstatePage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>

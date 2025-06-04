@@ -12,6 +12,7 @@ import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-
 import { useEffect } from "react"
 import { MapPin, Phone } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { useRef } from "react"
 
 export default function PersonalAssistantsPage() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
@@ -171,26 +172,117 @@ export default function PersonalAssistantsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Add after existing state declarations:
+  const fetchIdRef = useRef(0)
+
+  // Enhanced Business interface
+  interface Business {
+    id: string
+    name?: string
+    displayName?: string
+    displayPhone?: string
+    displayCity?: string
+    displayState?: string
+    city?: string
+    state?: string
+    phone?: string
+    rating?: number
+    reviewCount?: number
+    services?: string[]
+    zipCode?: string
+    serviceArea?: string[]
+    adDesignData?: {
+      businessInfo?: {
+        phone?: string
+        city?: string
+        state?: string
+      }
+    }
+  }
+
+  // Helper function to check if business serves a zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    // If business has no service area defined, fall back to primary zip code
+    if (!business.serviceArea || business.serviceArea.length === 0) {
+      return business.zipCode === zipCode
+    }
+
+    // Check if business serves nationwide (indicated by having "nationwide" in service area)
+    if (business.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))) {
+      return true
+    }
+
+    // Check if the zip code is in the business's service area
+    return business.serviceArea.includes(zipCode)
+  }
+
   // Replace the useEffect:
   useEffect(() => {
     async function fetchBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+
       try {
         setLoading(true)
         setError(null)
 
-        // Use the centralized system
+        console.log(`[Personal Assistants] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+
         const businesses = await getBusinessesForCategoryPage("/personal-assistants")
 
-        setProviders(businesses)
+        // Check if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(
+            `[Personal Assistants] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`,
+          )
+          return
+        }
+
+        console.log(`[Personal Assistants] Fetch ${currentFetchId} completed, got ${businesses.length} businesses`)
+
+        // Filter by zip code if available
+        let filteredBusinesses = businesses
+        if (userZipCode) {
+          console.log(`[Personal Assistants] Filtering by zip code: ${userZipCode}`)
+          filteredBusinesses = businesses.filter((business: Business) => {
+            const serves = businessServesZipCode(business, userZipCode)
+            console.log(
+              `[Personal Assistants] Business ${business.displayName || business.name} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
+              {
+                serviceArea: business.serviceArea,
+                primaryZip: business.zipCode,
+              },
+            )
+            return serves
+          })
+          console.log(`[Personal Assistants] After filtering: ${filteredBusinesses.length} businesses`)
+        }
+
+        setProviders(filteredBusinesses)
       } catch (err) {
-        console.error("Error fetching businesses:", err)
-        setError("Failed to load businesses")
+        // Only update error if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error(`[Personal Assistants] Error in fetch ${currentFetchId}:`, err)
+          setError("Failed to load businesses")
+        }
       } finally {
-        setLoading(false)
+        // Only update loading if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
+  }, [userZipCode])
+
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
   }, [])
 
   const handleOpenReviewsOld = (provider: any) => {
@@ -231,6 +323,28 @@ export default function PersonalAssistantsPage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {userZipCode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-blue-700">
+              <span className="font-medium">Showing personal assistants for zip code:</span> {userZipCode}
+              <span className="text-xs block mt-1">(Includes businesses with {userZipCode} in their service area)</span>
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.removeItem("savedZipCode")
+                setUserZipCode(null)
+              }}
+              className="text-xs"
+            >
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -253,9 +367,13 @@ export default function PersonalAssistantsPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Personal Assistants Yet</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {userZipCode ? `No Personal Assistants in ${userZipCode} Area` : "No Personal Assistants Yet"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              Be the first personal assistant service to join our platform and connect with clients in your area.
+              {userZipCode
+                ? `We're building our network of personal assistant services in the ${userZipCode} area.`
+                : "Be the first personal assistant service to join our platform and connect with clients in your area."}
             </p>
             <Button className="bg-indigo-600 hover:bg-indigo-700">Register Your Service</Button>
           </div>
@@ -291,6 +409,16 @@ export default function PersonalAssistantsPage() {
                           {formatPhoneNumber(
                             provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
                           )}
+                        </span>
+                      </div>
+                    )}
+
+                    {provider.serviceArea && provider.serviceArea.length > 0 && (
+                      <div className="flex items-center text-gray-600 text-xs mt-1">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800">
+                          {provider.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))
+                            ? "Serves nationwide"
+                            : `Serves ${userZipCode} area`}
                         </span>
                       </div>
                     )}

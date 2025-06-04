@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,6 +12,65 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone, Star } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+
+// Enhanced Business interface
+interface Business {
+  id: string
+  businessName?: string
+  displayName?: string
+  displayPhone?: string
+  displayCity?: string
+  displayState?: string
+  city?: string
+  state?: string
+  phone?: string
+  rating?: number
+  reviews?: any[]
+  description?: string
+  subcategory?: string
+  subcategories?: string[]
+  allSubcategories?: string[]
+  services?: string[]
+  zipCode?: string
+  serviceArea?: string[]
+  isNationwide?: boolean
+  adDesignData?: {
+    businessInfo?: {
+      businessName?: string
+      phone?: string
+      city?: string
+      state?: string
+    }
+  }
+}
+
+// Helper function to check if business serves a zip code
+const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+  console.log(`[Food Dining] Checking if business serves ${zipCode}:`, {
+    businessName: business.displayName || business.businessName,
+    isNationwide: business.isNationwide,
+    serviceArea: business.serviceArea,
+    primaryZip: business.zipCode,
+  })
+
+  // Check if business serves nationwide
+  if (business.isNationwide) {
+    console.log(`[Food Dining] Business serves nationwide`)
+    return true
+  }
+
+  // Check if the zip code is in the business's service area
+  if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
+    const serves = business.serviceArea.includes(zipCode)
+    console.log(`[Food Dining] Service area check: ${serves}`)
+    return serves
+  }
+
+  // Fall back to primary zip code comparison
+  const primaryMatch = business.zipCode === zipCode
+  console.log(`[Food Dining] Primary zip code check: ${primaryMatch}`)
+  return primaryMatch
+}
 
 // Format phone number to (XXX) XXX-XXXX
 function formatPhoneNumber(phoneNumberString: string) {
@@ -33,6 +92,8 @@ function formatPhoneNumber(phoneNumberString: string) {
 
 export default function FoodDiningPage() {
   const { toast } = useToast()
+  const fetchIdRef = useRef(0)
+
   const filterOptions = [
     { id: "restaurant1", label: "Asian", value: "Asian" },
     { id: "restaurant2", label: "Indian", value: "Indian" },
@@ -58,46 +119,77 @@ export default function FoodDiningPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-  const [businesses, setBusinesses] = useState<any[]>([])
+  const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchBusinesses() {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
+
+  const fetchBusinesses = async () => {
+    const currentFetchId = ++fetchIdRef.current
+
+    try {
       setIsLoading(true)
-      try {
-        // Add timestamp for cache busting
-        const timestamp = Date.now()
-        console.log(`[Food Dining] Fetching businesses at ${timestamp}`)
 
-        const result = await getBusinessesForCategoryPage("/food-dining")
+      console.log(`[Food Dining] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
 
-        console.log(
-          "Food dining businesses fetched:",
-          result.map((b) => ({
-            id: b.id,
-            registrationName: b.businessName,
-            displayName: b.displayName,
-            adDesignName: b.adDesignData?.businessInfo?.businessName,
-            source: b.adDesignData?.businessInfo?.businessName ? "ad-design" : "registration",
-          })),
-        )
+      const result = await getBusinessesForCategoryPage("/food-dining")
 
-        setBusinesses(result)
-      } catch (error) {
-        console.error("Error fetching businesses:", error)
+      // Check if this is still the current request
+      if (currentFetchId !== fetchIdRef.current) {
+        console.log(`[Food Dining] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+        return
+      }
+
+      console.log(`[Food Dining] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+
+      // Filter by zip code if available
+      let filteredResult = result
+      if (userZipCode) {
+        console.log(`[Food Dining] Filtering by zip code: ${userZipCode}`)
+        filteredResult = result.filter((business: Business) => {
+          const serves = businessServesZipCode(business, userZipCode)
+          console.log(
+            `[Food Dining] Business ${business.displayName || business.adDesignData?.businessInfo?.businessName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
+            {
+              serviceArea: business.serviceArea,
+              primaryZip: business.zipCode,
+              isNationwide: business.isNationwide,
+            },
+          )
+          return serves
+        })
+        console.log(`[Food Dining] After filtering: ${filteredResult.length} businesses`)
+      }
+
+      setBusinesses(filteredResult)
+    } catch (error) {
+      // Only update error if this is still the current request
+      if (currentFetchId === fetchIdRef.current) {
+        console.error(`[Food Dining] Error in fetch ${currentFetchId}:`, error)
         toast({
           title: "Error loading businesses",
           description: "There was a problem loading businesses. Please try again later.",
           variant: "destructive",
         })
-      } finally {
+      }
+    } finally {
+      // Only update loading if this is still the current request
+      if (currentFetchId === fetchIdRef.current) {
         setIsLoading(false)
       }
     }
+  }
 
+  useEffect(() => {
     fetchBusinesses()
-  }, [toast])
+  }, [userZipCode])
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
@@ -114,7 +206,7 @@ export default function FoodDiningPage() {
     : businesses
 
   // Helper function to get phone number from business data
-  const getPhoneNumber = (business: any) => {
+  const getPhoneNumber = (business: Business) => {
     // First try to get phone from ad design data
     if (business.adDesignData?.businessInfo?.phone) {
       return business.adDesignData.businessInfo.phone
@@ -131,7 +223,7 @@ export default function FoodDiningPage() {
   }
 
   // Helper function to get location from business data
-  const getLocation = (business: any) => {
+  const getLocation = (business: Business) => {
     // First try to get location from ad design data
     const adDesignCity = business.adDesignData?.businessInfo?.city
     const adDesignState = business.adDesignData?.businessInfo?.state
@@ -165,7 +257,7 @@ export default function FoodDiningPage() {
   }
 
   // Helper function to get subcategories
-  const getSubcategories = (business: any) => {
+  const getSubcategories = (business: Business) => {
     // Prioritize subcategories from Redis
     if (business.subcategories && business.subcategories.length > 0) {
       return business.subcategories
@@ -184,18 +276,23 @@ export default function FoodDiningPage() {
     return []
   }
 
-  const handleReviewsClick = (provider: any) => {
+  const handleReviewsClick = (provider: Business) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
   }
 
-  const handleProfileClick = (provider: any) => {
+  const handleProfileClick = (provider: Business) => {
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
   }
 
   const handleFilterChange = (value: string) => {
     setSelectedFilter(value === selectedFilter ? null : value)
+  }
+
+  const clearZipCodeFilter = () => {
+    localStorage.removeItem("savedZipCode")
+    setUserZipCode(null)
   }
 
   return (
@@ -230,6 +327,20 @@ export default function FoodDiningPage() {
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 
+      {userZipCode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-blue-700">
+              <span className="font-medium">Showing restaurants for zip code:</span> {userZipCode}
+              <span className="text-xs block mt-1">(Includes businesses with {userZipCode} in their service area)</span>
+            </p>
+            <Button variant="outline" size="sm" onClick={clearZipCodeFilter} className="text-xs">
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
@@ -253,7 +364,16 @@ export default function FoodDiningPage() {
                     {getPhoneNumber(business) && (
                       <div className="flex items-center mt-1">
                         <Phone className="w-4 h-4 text-gray-500 mr-1" />
-                        <span className="text-gray-600 text-sm">{formatPhoneNumber(getPhoneNumber(business))}</span>
+                        <span className="text-gray-600 text-sm">{formatPhoneNumber(getPhoneNumber(business)!)}</span>
+                      </div>
+                    )}
+
+                    {/* Service Area Indicator */}
+                    {(business.isNationwide || (business.serviceArea && business.serviceArea.length > 0)) && (
+                      <div className="flex items-center mt-1">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
+                          {business.isNationwide ? "Serves nationwide" : `Serves ${userZipCode} area`}
+                        </span>
                       </div>
                     )}
 
@@ -321,9 +441,13 @@ export default function FoodDiningPage() {
       ) : (
         <div className="text-center py-12">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 max-w-2xl mx-auto">
-            <h3 className="text-xl font-medium text-amber-800 mb-2">No Restaurants Found</h3>
+            <h3 className="text-xl font-medium text-amber-800 mb-2">
+              {userZipCode ? `No Restaurants Found in ${userZipCode} Area` : "No Restaurants Found"}
+            </h3>
             <p className="text-amber-700 mb-4">
-              We're building our network of restaurants and dining options in your area.
+              {userZipCode
+                ? `We're building our network of restaurants and dining options in the ${userZipCode} area.`
+                : "We're building our network of restaurants and dining options in your area."}
             </p>
             <div className="bg-white rounded border border-amber-100 p-4">
               <p className="text-gray-700 font-medium">Are you a restaurant owner?</p>

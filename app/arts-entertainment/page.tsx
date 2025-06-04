@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
@@ -11,11 +11,28 @@ import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, MapPin, Phone } from "lucide-react"
+import { Loader2, MapPin, Phone, X } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+
+// Enhanced Business interface with service area
+interface Business {
+  id: string
+  displayName?: string
+  businessName: string
+  displayLocation?: string
+  displayPhone?: string
+  zipCode: string
+  serviceArea?: string[] // Array of ZIP codes the business serves
+  isNationwide?: boolean // Whether the business serves nationwide
+  subcategories?: string[]
+  rating?: number
+  reviews?: number
+}
 
 export default function ArtsEntertainmentPage() {
   const { toast } = useToast()
+  const fetchIdRef = useRef(0)
+
   const filterOptions = [
     {
       id: "arts1",
@@ -41,31 +58,115 @@ export default function ArtsEntertainmentPage() {
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
-  const [businesses, setBusinesses] = useState<any[]>([])
+  const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+    }
+  }, [])
+
+  // Helper function to check if a business serves a specific zip code
+  const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
+    console.log(`Checking service area for ${business.displayName || business.businessName}:`)
+    console.log(`  - Primary ZIP: ${business.zipCode}`)
+    console.log(`  - Service Area: [${business.serviceArea?.join(", ") || "none"}]`)
+    console.log(`  - Nationwide: ${business.isNationwide || false}`)
+    console.log(`  - Target ZIP: ${targetZipCode}`)
+
+    // Check if business is nationwide
+    if (business.isNationwide) {
+      console.log(`  - ${business.displayName || business.businessName}: nationwide=true, matches=true`)
+      return true
+    }
+
+    // Check if zip code is in service area
+    if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
+      const matches = business.serviceArea.includes(targetZipCode)
+      console.log(
+        `  - ${business.displayName || business.businessName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
+      )
+      return matches
+    }
+
+    // Fall back to primary zip code
+    const matches = business.zipCode === targetZipCode
+    console.log(
+      `  - ${business.displayName || business.businessName}: primaryZip="${business.zipCode}", userZip="${targetZipCode}", matches=${matches}`,
+    )
+    return matches
+  }
 
   // Fetch businesses in this category
   useEffect(() => {
     async function fetchBusinesses() {
-      setIsLoading(true)
+      const currentFetchId = ++fetchIdRef.current
+      console.log(
+        `[${new Date().toISOString()}] Fetching businesses for /arts-entertainment (request #${currentFetchId})`,
+      )
+
       try {
+        setIsLoading(true)
+        setError(null)
+
         const result = await getBusinessesForCategoryPage("/arts-entertainment")
-        setBusinesses(result)
+        console.log(
+          `[${new Date().toISOString()}] Retrieved ${result.length} total businesses (request #${currentFetchId})`,
+        )
+
+        // Check if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
+          return
+        }
+
+        result.forEach((business: Business) => {
+          console.log(
+            `  - ${business.id}: "${business.displayName || business.businessName}" (zipCode: ${business.zipCode})`,
+          )
+        })
+
+        // Filter by zip code if available
+        let filteredResult = result
+        if (userZipCode) {
+          console.log(
+            `[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${currentFetchId})`,
+          )
+          filteredResult = result.filter((business: Business) => businessServesZipCode(business, userZipCode))
+          console.log(
+            `[${new Date().toISOString()}] After filtering: ${filteredResult.length} businesses (request #${currentFetchId})`,
+          )
+        }
+
+        setBusinesses(filteredResult)
       } catch (error) {
         console.error("Error fetching businesses:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
+        if (currentFetchId === fetchIdRef.current) {
+          setError("Failed to load businesses")
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading businesses. Please try again later.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setIsLoading(false)
+        if (currentFetchId === fetchIdRef.current) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+  }, [toast, userZipCode])
 
   // Filter businesses based on selected subcategory
   const filteredBusinesses = selectedFilter
@@ -89,6 +190,12 @@ export default function ArtsEntertainmentPage() {
 
   const handleFilterChange = (value: string) => {
     setSelectedFilter(value === selectedFilter ? null : value)
+  }
+
+  // Handle clearing zip code filter
+  const handleClearZipCode = () => {
+    localStorage.removeItem("savedZipCode")
+    setUserZipCode(null)
   }
 
   return (
@@ -124,10 +231,51 @@ export default function ArtsEntertainmentPage() {
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-blue-800">Showing businesses that service: {userZipCode}</p>
+                <p className="text-sm text-blue-700">Including businesses with this ZIP code in their service area</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearZipCode}
+              className="text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
           <p>Loading businesses...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-12">
+          <p className="text-red-600">{error}</p>
         </div>
       ) : filteredBusinesses.length > 0 ? (
         <div className="space-y-6">
@@ -157,6 +305,25 @@ export default function ArtsEntertainmentPage() {
                       </div>
                     )}
 
+                    {/* Service Area Indicator */}
+                    {userZipCode && (
+                      <div className="mt-2">
+                        {business.isNationwide ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Serves nationwide
+                          </span>
+                        ) : business.serviceArea && business.serviceArea.includes(userZipCode) ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Serves {userZipCode} area
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            Primary location: {business.zipCode}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center mt-3">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
@@ -166,7 +333,7 @@ export default function ArtsEntertainmentPage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
@@ -208,9 +375,15 @@ export default function ArtsEntertainmentPage() {
       ) : (
         <div className="text-center py-12">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 max-w-2xl mx-auto">
-            <h3 className="text-xl font-medium text-blue-800 mb-2">No Arts & Entertainment Providers Found</h3>
+            <h3 className="text-xl font-medium text-blue-800 mb-2">
+              {userZipCode
+                ? `No Arts & Entertainment Providers Found in ${userZipCode}`
+                : "No Arts & Entertainment Providers Found"}
+            </h3>
             <p className="text-blue-700 mb-4">
-              We're building our network of creative professionals and entertainers in your area.
+              {userZipCode
+                ? `No creative professionals found serving ZIP code ${userZipCode}. Try clearing the filter to see all providers.`
+                : "We're building our network of creative professionals and entertainers in your area."}
             </p>
             <div className="bg-white rounded border border-blue-100 p-4">
               <p className="text-gray-700 font-medium">Are you a creative professional or entertainer?</p>

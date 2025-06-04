@@ -3,7 +3,7 @@
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Phone, MapPin, Star } from "lucide-react"
@@ -11,8 +11,27 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
+// Enhanced Business interface
+interface Business {
+  id: string
+  displayName?: string
+  businessName?: string
+  businessDescription?: string
+  displayLocation?: string
+  displayPhone?: string
+  rating?: number
+  reviewCount?: number
+  subcategories?: string[]
+  zipCode?: string
+  serviceArea?: string[]
+  isNationwide?: boolean
+}
+
 export default function PetCarePage() {
-  const [businesses, setBusinesses] = useState([])
+  // Add fetchIdRef for race condition prevention
+  const fetchIdRef = useRef(0)
+
+  const [businesses, setBusinesses] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
@@ -24,6 +43,7 @@ export default function PetCarePage() {
   } | null>(null)
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
   const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
   const filterOptions = [
     { id: "pet1", label: "Veterinarians", value: "Veterinarians" },
@@ -42,24 +62,89 @@ export default function PetCarePage() {
     { id: "pet14", label: "Other Pet Care", value: "Other Pet Care" },
   ]
 
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
+
+  // Helper function to check if business serves the zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
+      isNationwide: business.isNationwide,
+      serviceArea: business.serviceArea,
+      primaryZip: business.zipCode,
+    })
+
+    // Check if business serves nationwide
+    if (business.isNationwide) {
+      console.log(`✓ Business serves nationwide`)
+      return true
+    }
+
+    // Check if zip code is in service area
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const serves = business.serviceArea.includes(zipCode)
+      console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
+      return serves
+    }
+
+    // Fallback to primary zip code
+    const matches = business.zipCode === zipCode
+    console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
+    return matches
+  }
+
+  // Fetch businesses with race condition prevention
   useEffect(() => {
     async function loadBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[PetCare] Starting fetch ${currentFetchId} for zip code:`, userZipCode)
+
       try {
         setLoading(true)
         const fetchedBusinesses = await getBusinessesForCategoryPage("/pet-care")
-        console.log("Fetched pet care businesses:", fetchedBusinesses)
-        setBusinesses(fetchedBusinesses)
+
+        // Only update if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[PetCare] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[PetCare] Fetch ${currentFetchId} got ${fetchedBusinesses.length} businesses`)
+
+        // Filter businesses by zip code if userZipCode is available
+        if (userZipCode) {
+          const originalCount = fetchedBusinesses.length
+          const filteredBusinesses = fetchedBusinesses.filter((business: Business) =>
+            businessServesZipCode(business, userZipCode),
+          )
+          console.log(
+            `[PetCare] Filtered from ${originalCount} to ${filteredBusinesses.length} businesses for zip ${userZipCode}`,
+          )
+          setBusinesses(filteredBusinesses)
+        } else {
+          setBusinesses(fetchedBusinesses)
+        }
       } catch (error) {
-        console.error("Error loading pet care businesses:", error)
+        // Only update error if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error(`[PetCare] Fetch ${currentFetchId} error:`, error)
+        }
       } finally {
-        setLoading(false)
+        // Only update loading if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     loadBusinesses()
-  }, [])
+  }, [userZipCode])
 
-  const handleViewReviews = (business: any) => {
+  const handleViewReviews = (business: Business) => {
     setSelectedProvider({
       id: Number.parseInt(business.id || "0"),
       name: business.displayName || business.businessName || "Pet Care Provider",
@@ -69,7 +154,7 @@ export default function PetCarePage() {
     setIsReviewsDialogOpen(true)
   }
 
-  const handleViewProfile = (business: any) => {
+  const handleViewProfile = (business: Business) => {
     console.log("Opening profile for business:", business.id, business.businessName)
     setSelectedBusinessId(business.id || "")
     setSelectedBusinessName(business.displayName || business.businessName || "Pet Care Provider")
@@ -107,6 +192,27 @@ export default function PetCarePage() {
         </div>
       </div>
 
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Showing businesses that serve zip code:</span> {userZipCode}
+            <span className="text-xs block mt-1">Includes businesses with {userZipCode} in their service area</span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem("savedZipCode")
+              setUserZipCode(null)
+            }}
+            className="text-blue-700 border-blue-300 hover:bg-blue-100"
+          >
+            Clear Filter
+          </Button>
+        </div>
+      )}
+
       <CategoryFilter options={filterOptions} />
 
       {loading ? (
@@ -118,7 +224,7 @@ export default function PetCarePage() {
         <div className="mt-8 space-y-6">
           <h2 className="text-2xl font-bold text-gray-900">Pet Care Providers ({businesses.length})</h2>
           <div className="grid gap-6">
-            {businesses.map((business: any) => (
+            {businesses.map((business: Business) => (
               <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
                 <div className="flex flex-col space-y-4">
                   {/* Business Name and Description */}
@@ -152,6 +258,19 @@ export default function PetCarePage() {
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-gray-500" />
                           <span className="text-gray-700 text-sm">{business.displayLocation}</span>
+                        </div>
+                      )}
+
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {business.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : business.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} area</span>
+                          ) : business.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
                         </div>
                       )}
 
@@ -218,7 +337,11 @@ export default function PetCarePage() {
       ) : (
         <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
           <h3 className="text-xl font-medium text-gray-700 mb-2">No Pet Care Providers Found</h3>
-          <p className="text-gray-600">Enter your zip code to find pet care providers in your area.</p>
+          <p className="text-gray-600">
+            {userZipCode
+              ? `No pet care providers found that serve the ${userZipCode} area.`
+              : "Enter your zip code to find pet care providers in your area."}
+          </p>
         </div>
       )}
 

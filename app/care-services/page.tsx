@@ -3,9 +3,8 @@
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import type { Business } from "@/lib/definitions"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Phone, MapPin, Star, Loader2 } from "lucide-react"
@@ -14,11 +13,42 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
 
+// Enhanced Business interface with service area support
+interface Business {
+  id?: string
+  businessName: string
+  displayName?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  displayCity?: string
+  displayState?: string
+  displayPhone?: string
+  phone?: string
+  rating?: number
+  reviews?: number
+  services?: string[]
+  subcategories?: string[]
+  description?: string
+  adDesignData?: {
+    businessInfo?: {
+      phone?: string
+      city?: string
+      state?: string
+    }
+  }
+  serviceArea?: string[]
+  isNationwide?: boolean
+}
+
 export default function CareServicesPage() {
+  const { toast } = useToast()
+  const fetchIdRef = useRef(0)
+
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -39,26 +69,111 @@ export default function CareServicesPage() {
     { id: "homecare5", label: "Rehab/Nursing/Respite and Memory Care", value: "Rehab/Nursing/Respite and Memory Care" },
   ]
 
+  // Helper function to check if business serves a zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    console.log(
+      `[Care Services] Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`,
+      {
+        isNationwide: business.isNationwide,
+        serviceArea: business.serviceArea,
+        primaryZip: business.zipCode,
+      },
+    )
+
+    // Check if business serves nationwide
+    if (business.isNationwide) {
+      console.log(`[Care Services] Business serves nationwide`)
+      return true
+    }
+
+    // Check if business service area includes the zip code
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const serves = business.serviceArea.some((area) => {
+        if (typeof area === "string") {
+          return area.toLowerCase().includes("nationwide") || area === zipCode
+        }
+        return false
+      })
+      console.log(`[Care Services] Service area check result: ${serves}`)
+      if (serves) return true
+    }
+
+    // Fall back to primary zip code comparison
+    const primaryMatch = business.zipCode === zipCode
+    console.log(`[Care Services] Primary zip code match: ${primaryMatch}`)
+    return primaryMatch
+  }
+
+  // Clear zip code filter
+  const clearZipCodeFilter = () => {
+    setUserZipCode(null)
+    localStorage.removeItem("savedZipCode")
+  }
+
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
+
   useEffect(() => {
     async function fetchBusinesses() {
-      setLoading(true)
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[Care Services] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+
       try {
+        setLoading(true)
+        setError(null)
+
         const result = await getBusinessesForCategoryPage("/care-services")
-        setBusinesses(result)
+
+        // Check if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[Care Services] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[Care Services] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+
+        // Filter businesses by zip code if userZipCode is available
+        if (userZipCode) {
+          console.log(`[Care Services] Filtering by zip code: ${userZipCode}`)
+          const filteredBusinesses = result.filter((business: Business) => {
+            const serves = businessServesZipCode(business, userZipCode)
+            console.log(
+              `[Care Services] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
+              business,
+            )
+            return serves
+          })
+          console.log(`[Care Services] After filtering: ${filteredBusinesses.length} businesses`)
+          setBusinesses(filteredBusinesses)
+        } else {
+          setBusinesses(result)
+        }
       } catch (error) {
-        console.error("Error fetching businesses:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
+        // Only update error state if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error("Error fetching businesses:", error)
+          setError("Failed to load businesses")
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading businesses. Please try again later.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setLoading(false)
+        // Only update loading state if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+  }, [userZipCode])
 
   // Helper function to get phone number from business data
   const getPhoneNumber = (business: Business) => {
@@ -189,6 +304,29 @@ export default function CareServicesPage() {
         </div>
       </div>
 
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-blue-800 text-sm">
+                <strong>Showing results for ZIP code: {userZipCode}</strong>
+                <br />
+                <span className="text-blue-600">Including businesses that serve your area or operate nationwide.</span>
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearZipCodeFilter}
+              className="text-blue-600 border-blue-300 hover:bg-blue-100"
+            >
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       <CategoryFilter options={filterOptions} />
 
       {/* Business Listings */}
@@ -215,6 +353,13 @@ export default function CareServicesPage() {
                         <h3 className="text-xl font-semibold text-gray-900 mb-2">
                           {business.displayName || business.businessName}
                         </h3>
+
+                        {/* Service Area Indicator */}
+                        {business.isNationwide ? (
+                          <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
+                        ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
+                          <div className="text-xs text-green-600 font-medium mb-1">✓ Serves {userZipCode} area</div>
+                        ) : null}
 
                         {business.description && <p className="text-gray-600 mb-3">{business.description}</p>}
 
@@ -290,9 +435,26 @@ export default function CareServicesPage() {
             </div>
           </div>
         ) : (
-          <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
-            <h3 className="text-xl font-medium text-gray-700 mb-2">No Care Service Providers Found</h3>
-            <p className="text-gray-600">Enter your zip code to find care providers in your area.</p>
+          <div className="text-center py-12">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 max-w-2xl mx-auto">
+              <h3 className="text-xl font-medium text-blue-800 mb-2">
+                {userZipCode ? `No Care Service Providers in ${userZipCode}` : "No Care Service Providers Found"}
+              </h3>
+              <p className="text-blue-700 mb-4">
+                {userZipCode
+                  ? `We're building our network of care service providers in the ${userZipCode} area.`
+                  : "Enter your zip code to find care providers in your area."}
+              </p>
+              <div className="bg-white rounded border border-blue-100 p-4">
+                <p className="text-gray-700 font-medium">Are you a care service provider?</p>
+                <p className="text-gray-600 mt-1">
+                  Join Hausbaum to showcase your services and connect with families in your area.
+                </p>
+                <Button className="mt-3" asChild>
+                  <a href="/business-register">Register Your Care Business</a>
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>

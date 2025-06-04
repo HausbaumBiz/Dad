@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,6 +12,34 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
+
+// Enhanced Business interface with service area support
+interface Business {
+  id: string
+  businessName: string
+  displayName?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  displayCity?: string
+  displayState?: string
+  displayLocation?: string
+  displayPhone?: string
+  phone?: string
+  rating?: number
+  reviews?: number
+  allSubcategories?: string[]
+  subcategory?: string
+  adDesignData?: {
+    businessInfo?: {
+      phone?: string
+      city?: string
+      state?: string
+    }
+  }
+  serviceArea?: string[]
+  isNationwide?: boolean
+}
 
 // Format phone number to (XXX) XXX-XXXX
 function formatPhoneNumber(phoneNumberString: string) {
@@ -33,6 +61,8 @@ function formatPhoneNumber(phoneNumberString: string) {
 
 export default function BeautyWellnessPage() {
   const { toast } = useToast()
+  const fetchIdRef = useRef(0)
+
   const filterOptions = [
     { id: "beauty1", label: "Barbers", value: "Barbers" },
     {
@@ -59,31 +89,117 @@ export default function BeautyWellnessPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
-  const [businesses, setBusinesses] = useState<any[]>([])
+  const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // Helper function to check if business serves a zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    console.log(
+      `[Beauty Wellness] Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`,
+      {
+        isNationwide: business.isNationwide,
+        serviceArea: business.serviceArea,
+        primaryZip: business.zipCode,
+      },
+    )
+
+    // Check if business serves nationwide
+    if (business.isNationwide) {
+      console.log(`[Beauty Wellness] Business serves nationwide`)
+      return true
+    }
+
+    // Check if business service area includes the zip code
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const serves = business.serviceArea.some((area) => {
+        if (typeof area === "string") {
+          return area.toLowerCase().includes("nationwide") || area === zipCode
+        }
+        return false
+      })
+      console.log(`[Beauty Wellness] Service area check result: ${serves}`)
+      if (serves) return true
+    }
+
+    // Fall back to primary zip code comparison
+    const primaryMatch = business.zipCode === zipCode
+    console.log(`[Beauty Wellness] Primary zip code match: ${primaryMatch}`)
+    return primaryMatch
+  }
+
+  // Clear zip code filter
+  const clearZipCodeFilter = () => {
+    setUserZipCode(null)
+    localStorage.removeItem("savedZipCode")
+  }
+
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
 
   useEffect(() => {
     async function fetchBusinesses() {
-      setIsLoading(true)
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[Beauty Wellness] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+
       try {
+        setIsLoading(true)
+        setError(null)
+
         // Use the simplified business category service
         const result = await getBusinessesForCategoryPage("/beauty-wellness")
-        setBusinesses(result)
+
+        // Check if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[Beauty Wellness] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[Beauty Wellness] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+
+        // Filter by zip code if available
+        if (userZipCode) {
+          console.log(`[Beauty Wellness] Filtering by zip code: ${userZipCode}`)
+          const filteredByZip = result.filter((business: Business) => {
+            const serves = businessServesZipCode(business, userZipCode)
+            console.log(
+              `[Beauty Wellness] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
+              business,
+            )
+            return serves
+          })
+          console.log(`[Beauty Wellness] After filtering: ${filteredByZip.length} businesses`)
+          setBusinesses(filteredByZip)
+        } else {
+          setBusinesses(result)
+        }
       } catch (error) {
-        console.error("Error fetching businesses:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
+        // Only update error state if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error("Error fetching businesses:", error)
+          setError("Failed to load businesses")
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading businesses. Please try again later.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setIsLoading(false)
+        // Only update loading state if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+  }, [userZipCode])
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
@@ -146,10 +262,36 @@ export default function BeautyWellnessPage() {
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-blue-800 text-sm">
+                <strong>Showing results for ZIP code: {userZipCode}</strong>
+                <br />
+                <span className="text-blue-600">Including businesses that serve your area or operate nationwide.</span>
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearZipCodeFilter}
+              className="text-blue-600 border-blue-300 hover:bg-blue-100"
+            >
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
           <p>Loading businesses...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-8">
+          <p className="text-red-600">{error}</p>
         </div>
       ) : filteredBusinesses.length > 0 ? (
         <div className="space-y-6">
@@ -159,6 +301,14 @@ export default function BeautyWellnessPage() {
                 <div className="flex flex-col md:flex-row justify-between">
                   <div>
                     <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
+
+                    {/* Service Area Indicator */}
+                    {business.isNationwide ? (
+                      <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
+                    ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
+                      <div className="text-xs text-green-600 font-medium mb-1">✓ Serves {userZipCode} area</div>
+                    ) : null}
+
                     <p className="text-gray-600 text-sm mt-1">
                       {business.displayLocation ||
                         (business.city && business.state
@@ -229,9 +379,15 @@ export default function BeautyWellnessPage() {
       ) : (
         <div className="text-center py-12">
           <div className="bg-pink-50 border border-pink-200 rounded-lg p-8 max-w-2xl mx-auto">
-            <h3 className="text-xl font-medium text-pink-800 mb-2">No Beauty & Wellness Providers Found</h3>
+            <h3 className="text-xl font-medium text-pink-800 mb-2">
+              {userZipCode
+                ? `No Beauty & Wellness Providers in ${userZipCode}`
+                : "No Beauty & Wellness Providers Found"}
+            </h3>
             <p className="text-pink-700 mb-4">
-              We're building our network of beauty and wellness professionals in your area.
+              {userZipCode
+                ? `We're building our network of beauty and wellness professionals in the ${userZipCode} area.`
+                : "We're building our network of beauty and wellness professionals in your area."}
             </p>
             <div className="bg-white rounded border border-pink-100 p-4">
               <p className="text-gray-700 font-medium">Are you a beauty or wellness professional?</p>

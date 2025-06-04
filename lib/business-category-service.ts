@@ -4,6 +4,7 @@ import { kv } from "@/lib/redis"
 import { KEY_PREFIXES } from "@/lib/db-schema"
 import { getCategoryNameForPagePath } from "@/lib/category-mapping"
 import type { Business } from "@/lib/definitions"
+import type { ZipCodeData } from "@/lib/zip-code-types"
 
 // Helper function to safely extract error messages
 function getErrorMessage(error: unknown): string {
@@ -53,6 +54,152 @@ function ensureArray(data: any, context = ""): any[] {
   return []
 }
 
+// COMPLETELY REWRITTEN: Helper function to safely check if a key exists and get its type
+async function safeKeyTypeCheck(key: string): Promise<string | null> {
+  try {
+    // Instead of using kv.exists (which is causing the error),
+    // try to get the key type directly
+    try {
+      const keyType = await kv.type(key)
+      console.log(`Key ${key} has type: ${keyType}`)
+
+      // Redis returns "none" for non-existent keys
+      if (keyType === "none" || !keyType) {
+        console.log(`Key ${key} does not exist`)
+        return null
+      }
+
+      return keyType
+    } catch (typeError) {
+      console.log(`Error getting type for key ${key}, trying alternative approach:`, getErrorMessage(typeError))
+
+      // If type check fails, try a direct get to see if key exists
+      try {
+        const value = await kv.get(key)
+        if (value === null || value === undefined) {
+          console.log(`Key ${key} does not exist (null value)`)
+          return null
+        }
+        // If we got a value, assume it's a string type
+        console.log(`Key ${key} exists and returned a value, assuming string type`)
+        return "string"
+      } catch (getError) {
+        console.log(`Direct get also failed for key ${key}:`, getErrorMessage(getError))
+        return null
+      }
+    }
+  } catch (error) {
+    console.error(`Error in safeKeyTypeCheck for ${key}:`, getErrorMessage(error))
+    return null
+  }
+}
+
+// SIMPLIFIED: Helper function to safely get a value from Redis
+async function safeRedisGet(key: string): Promise<any> {
+  try {
+    console.log(`Attempting to get value for key: ${key}`)
+
+    // Try direct get first (most common case)
+    try {
+      const value = await kv.get(key)
+      if (value !== null && value !== undefined) {
+        console.log(`Successfully retrieved value for key ${key} using direct get`)
+        return value
+      }
+    } catch (directError) {
+      console.log(`Direct get failed for key ${key}, trying type-specific approach:`, getErrorMessage(directError))
+    }
+
+    // If direct get fails or returns null, try to determine the key type
+    const keyType = await safeKeyTypeCheck(key)
+
+    if (!keyType) {
+      console.log(`Key ${key} does not exist or type check failed`)
+      return null
+    }
+
+    // Handle different Redis data types appropriately
+    try {
+      switch (keyType) {
+        case "string":
+          return await kv.get(key)
+
+        case "set":
+          const setMembers = await kv.smembers(key)
+          console.log(`Retrieved set with ${setMembers?.length || 0} members for key ${key}`)
+          return setMembers
+
+        case "hash":
+          const hashData = await kv.hgetall(key)
+          console.log(`Retrieved hash with keys: ${Object.keys(hashData || {}).join(", ")} for key ${key}`)
+          return hashData
+
+        case "list":
+          const listData = await kv.lrange(key, 0, -1)
+          console.log(`Retrieved list with ${listData?.length || 0} items for key ${key}`)
+          return listData
+
+        case "zset":
+          const zsetData = await kv.zrange(key, 0, -1)
+          console.log(`Retrieved sorted set with ${zsetData?.length || 0} items for key ${key}`)
+          return zsetData
+
+        default:
+          console.warn(`Unsupported Redis data type: ${keyType} for key ${key}`)
+          return null
+      }
+    } catch (typeSpecificError) {
+      console.error(`Error retrieving ${keyType} value for key ${key}:`, getErrorMessage(typeSpecificError))
+      return null
+    }
+  } catch (error) {
+    console.error(`Error getting value for key ${key}:`, getErrorMessage(error))
+    return null
+  }
+}
+
+// SIMPLIFIED: Helper function to safely get set members from Redis
+async function safeRedisSmembers(key: string): Promise<string[]> {
+  try {
+    console.log(`Attempting to get set members for key: ${key}`)
+
+    // Try direct smembers first
+    try {
+      const members = await kv.smembers(key)
+      if (Array.isArray(members)) {
+        console.log(`Successfully retrieved ${members.length} set members for key ${key}`)
+        return members
+      }
+    } catch (directError) {
+      console.log(`Direct smembers failed for ${key}:`, getErrorMessage(directError))
+    }
+
+    // If direct approach fails, check if it's actually a set
+    const keyType = await safeKeyTypeCheck(key)
+    if (!keyType) {
+      console.log(`Key ${key} does not exist`)
+      return []
+    }
+
+    if (keyType !== "set") {
+      console.warn(`Key ${key} has type ${keyType}, expected set. Returning empty array.`)
+      return []
+    }
+
+    // Try smembers again
+    try {
+      const members = await kv.smembers(key)
+      return Array.isArray(members) ? members : []
+    } catch (retryError) {
+      console.error(`Retry smembers failed for key ${key}:`, getErrorMessage(retryError))
+      return []
+    }
+  } catch (error) {
+    console.error(`Error getting set members for key ${key}:`, getErrorMessage(error))
+    return []
+  }
+}
+
 // Save business categories (simplified - only saves the exact category names)
 export async function saveBusinessCategories(businessId: string, selectedCategories: string[]): Promise<boolean> {
   try {
@@ -89,7 +236,7 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
     console.log(`Looking for businesses in category: ${categoryName}`)
 
     // Get all business IDs that selected this category
-    const businessIds = (await kv.smembers(`${KEY_PREFIXES.CATEGORY}${categoryName}:businesses`)) as string[]
+    const businessIds = await safeRedisSmembers(`${KEY_PREFIXES.CATEGORY}${categoryName}:businesses`)
 
     if (!businessIds || businessIds.length === 0) {
       console.log(`No businesses found for category: ${categoryName}`)
@@ -103,13 +250,16 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
 
     for (const businessId of businessIds) {
       try {
-        const businessData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
+        const businessData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}`)
         if (businessData && typeof businessData === "object") {
           // Get ad design data for display name and location
           const adDesignData = await getBusinessAdDesignData(businessId)
 
           // Get subcategories for this business
           const subcategories = await getBusinessSubcategories(businessId)
+
+          // Get service area data (zip codes and nationwide flag)
+          const serviceAreaData = await getBusinessServiceArea(businessId)
 
           const business = {
             ...businessData,
@@ -120,6 +270,11 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
             displayCity: adDesignData?.businessInfo?.city || businessData.city,
             displayState: adDesignData?.businessInfo?.state || businessData.state,
             displayPhone: adDesignData?.businessInfo?.phone || businessData.phone,
+            // Ensure zipCode is available for filtering - prioritize registration zipCode
+            zipCode: businessData.zipCode || adDesignData?.businessInfo?.zipCode || "",
+            // Add service area data for zip code filtering - THIS IS THE KEY FIX
+            serviceArea: serviceAreaData.zipCodes || [], // Pass the actual zip codes array
+            isNationwide: serviceAreaData.isNationwide || false,
             adDesignData: adDesignData,
             subcategories: subcategories,
           } as Business
@@ -135,9 +290,15 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
             business.displayLocation = `Zip: ${business.zipCode}`
           }
 
-          // Log what we're using for the business name
+          // Safe logging with null checks
+          const serviceAreaZips = business.serviceArea || []
+          const isNationwide = business.isNationwide || false
+
           console.log(
             `Business ${businessId}: Registration name: "${businessData.businessName}", Ad design name: "${adDesignData?.businessInfo?.businessName}", Using: "${business.displayName}"`,
+          )
+          console.log(
+            `Business ${businessId} service area: nationwide=${isNationwide}, zipCodes=[${serviceAreaZips.join(", ")}]`,
           )
 
           businesses.push(business)
@@ -149,6 +310,10 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
     }
 
     console.log(`Successfully retrieved ${businesses.length} businesses for page ${pagePath}`)
+    console.log(
+      `[${new Date().toISOString()}] Returning ${businesses.length} businesses:`,
+      businesses.map((b) => `  - ${b.id}: "${b.displayName}" (from ${b.adDesignData ? "ad-design" : "registration"})`),
+    )
     return businesses
   } catch (error) {
     console.error(`Error getting businesses for page ${pagePath}:`, getErrorMessage(error))
@@ -161,7 +326,7 @@ async function getBusinessAdDesignData(businessId: string) {
   try {
     // Try to get the business info from ad design first
     const businessInfoKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:businessInfo`
-    const businessInfo = await kv.get(businessInfoKey)
+    const businessInfo = await safeRedisGet(businessInfoKey)
 
     if (businessInfo) {
       const parsedBusinessInfo = safeJsonParse(businessInfo, {})
@@ -174,7 +339,7 @@ async function getBusinessAdDesignData(businessId: string) {
 
     // If no ad design business info, try to get from the main ad design data
     const mainAdDesignKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`
-    const mainAdDesignData = await kv.get(mainAdDesignKey)
+    const mainAdDesignData = await safeRedisGet(mainAdDesignKey)
 
     if (mainAdDesignData) {
       const parsedData = safeJsonParse(mainAdDesignData, {})
@@ -194,11 +359,105 @@ async function getBusinessAdDesignData(businessId: string) {
   }
 }
 
+// Get business service area data (zip codes and nationwide flag)
+async function getBusinessServiceArea(businessId: string) {
+  try {
+    console.log(`Getting service area for business ${businessId}`)
+
+    // Check if business is nationwide - simplified approach
+    let isNationwide = false
+    try {
+      const nationwideKey = `business:${businessId}:nationwide`
+      const nationwideValue = await safeRedisGet(nationwideKey)
+      isNationwide = Boolean(nationwideValue)
+      console.log(`Business ${businessId} nationwide flag: ${isNationwide}`)
+    } catch (error) {
+      console.warn(`Error getting nationwide flag for business ${businessId}:`, getErrorMessage(error))
+      isNationwide = false
+    }
+
+    // Get zip codes - simplified approach
+    let zipCodes: ZipCodeData[] = []
+
+    try {
+      const zipCodesKey = `business:${businessId}:zipcodes`
+      console.log(`Checking zip codes at key: ${zipCodesKey}`)
+
+      const zipCodesData = await safeRedisGet(zipCodesKey)
+
+      if (zipCodesData) {
+        if (typeof zipCodesData === "string") {
+          try {
+            zipCodes = JSON.parse(zipCodesData)
+            console.log(`Parsed ${zipCodes.length} zip codes from JSON string for business ${businessId}`)
+          } catch (parseError) {
+            console.error(`Error parsing ZIP codes JSON for business ${businessId}:`, getErrorMessage(parseError))
+          }
+        } else if (Array.isArray(zipCodesData)) {
+          // Handle case where zipCodesData is already an array
+          zipCodes = zipCodesData.map((item) => {
+            if (typeof item === "string") {
+              return { zip: item, city: "", state: "", latitude: 0, longitude: 0 }
+            }
+            return item
+          })
+          console.log(`Got ${zipCodes.length} zip codes from array for business ${businessId}`)
+        }
+      }
+    } catch (error) {
+      console.warn(`Error getting ZIP codes for business ${businessId}:`, getErrorMessage(error))
+    }
+
+    // If no zip codes yet, try the set key as fallback
+    if (zipCodes.length === 0) {
+      try {
+        const setKey = `business:${businessId}:zipcodes:set`
+        console.log(`Trying fallback zip codes set at key: ${setKey}`)
+
+        const zipCodeStrings = await safeRedisSmembers(setKey)
+        if (zipCodeStrings && zipCodeStrings.length > 0) {
+          zipCodes = zipCodeStrings.map((zip) => ({
+            zip,
+            city: "",
+            state: "",
+            latitude: 0,
+            longitude: 0,
+          }))
+          console.log(`Got ${zipCodes.length} zip codes from fallback set for business ${businessId}`)
+        }
+      } catch (error) {
+        console.warn(`Error getting ZIP codes from fallback set for business ${businessId}:`, getErrorMessage(error))
+      }
+    }
+
+    // Extract just the zip code strings for easier filtering
+    const zipCodeStrings = zipCodes
+      .map((z) => (typeof z === "string" ? z : z?.zip))
+      .filter(Boolean)
+      .map(String) // Ensure all values are strings
+
+    console.log(
+      `Business ${businessId} service area: nationwide=${isNationwide}, zipCodes=${zipCodeStrings.join(", ")}`,
+    )
+
+    return {
+      isNationwide,
+      zipCodes: zipCodeStrings,
+    }
+  } catch (error) {
+    console.error(`Error getting service area for business ${businessId}:`, getErrorMessage(error))
+    return {
+      isNationwide: false,
+      zipCodes: [],
+    }
+  }
+}
+
 // Get subcategories for a business
 async function getBusinessSubcategories(businessId: string): Promise<string[]> {
   try {
     // Try to get subcategories from the business-focus page data
-    const subcategoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
+    const subcategoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
 
     if (subcategoriesData) {
       const subcategories = safeJsonParse(subcategoriesData, [])
@@ -215,7 +474,7 @@ async function getBusinessSubcategories(businessId: string): Promise<string[]> {
 // Get selected categories for a business
 export async function getBusinessSelectedCategories(businessId: string): Promise<string[]> {
   try {
-    const categoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:selectedCategories`)
+    const categoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:selectedCategories`)
 
     if (categoriesData) {
       const categories = safeJsonParse(categoriesData, [])
@@ -259,7 +518,7 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
     console.log(`Main category extracted: ${mainCategory}`)
 
     // First, get businesses that are indexed under the main category
-    const categoryBusinessIds = (await kv.smembers(`${KEY_PREFIXES.CATEGORY}${mainCategory}:businesses`)) as string[]
+    const categoryBusinessIds = await safeRedisSmembers(`${KEY_PREFIXES.CATEGORY}${mainCategory}:businesses`)
 
     if (!categoryBusinessIds || categoryBusinessIds.length === 0) {
       console.log(`No businesses found for main category: ${mainCategory}`)
@@ -301,7 +560,7 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
 async function checkBusinessHasSubcategory(businessId: string, targetSubcategoryPath: string): Promise<boolean> {
   try {
     // Check allSubcategories first
-    const allSubcategoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
+    const allSubcategoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
     if (allSubcategoriesData) {
       const subcategories = ensureArray(
         safeJsonParse(allSubcategoriesData, []),
@@ -317,7 +576,7 @@ async function checkBusinessHasSubcategory(businessId: string, targetSubcategory
     }
 
     // Check categories data
-    const categoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)
+    const categoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)
     if (categoriesData) {
       const categories = ensureArray(safeJsonParse(categoriesData, []), `checkSubcategory-categories-${businessId}`)
 
@@ -386,10 +645,13 @@ function isSubcategoryMatch(pathToCheck: string, targetSubcategoryPath: string):
 // Helper function to build business object
 async function buildBusinessObject(businessId: string, subcategories: any[]): Promise<Business | null> {
   try {
-    const businessData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
+    const businessData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}`)
 
     if (businessData && typeof businessData === "object") {
       const adDesignData = await getBusinessAdDesignData(businessId)
+
+      // Get service area data (zip codes and nationwide flag)
+      const serviceAreaData = await getBusinessServiceArea(businessId)
 
       const business = {
         ...businessData,
@@ -398,6 +660,11 @@ async function buildBusinessObject(businessId: string, subcategories: any[]): Pr
         displayCity: adDesignData?.businessInfo?.city || businessData.city,
         displayState: adDesignData?.businessInfo?.state || businessData.state,
         displayPhone: adDesignData?.businessInfo?.phone || businessData.phone,
+        // Ensure zipCode is available for filtering - prioritize registration zipCode
+        zipCode: businessData.zipCode || adDesignData?.businessInfo?.zipCode || "",
+        // Add service area data for zip code filtering
+        serviceArea: serviceAreaData.zipCodes || [], // Pass the actual zip codes array
+        isNationwide: serviceAreaData.isNationwide || false,
         adDesignData: adDesignData,
         subcategories: ensureArray(subcategories, `buildBusinessObject-${businessId}`),
       } as Business
@@ -405,8 +672,6 @@ async function buildBusinessObject(businessId: string, subcategories: any[]): Pr
       // Create display location
       if (business.displayCity && business.displayState) {
         business.displayLocation = `${business.displayCity}, ${business.displayState}`
-      } else if (business.displayCity) {
-        business.displayLocation = business.displayCity
       } else if (business.displayState) {
         business.displayLocation = business.displayState
       } else {

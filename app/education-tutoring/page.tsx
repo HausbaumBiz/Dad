@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,6 +12,54 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+
+// Add fetchIdRef for race condition prevention
+
+// Enhanced Business interface
+interface Business {
+  id: string
+  displayName?: string
+  businessName?: string
+  displayLocation?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  displayPhone?: string
+  phone?: string
+  rating?: number
+  reviews?: number
+  allSubcategories?: string[]
+  subcategory?: string
+  serviceArea?: string[]
+  isNationwide?: boolean
+}
+
+// Helper function to check if business serves the zip code
+const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+  console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
+    isNationwide: business.isNationwide,
+    serviceArea: business.serviceArea,
+    primaryZip: business.zipCode,
+  })
+
+  // Check if business serves nationwide
+  if (business.isNationwide) {
+    console.log(`✓ Business serves nationwide`)
+    return true
+  }
+
+  // Check if zip code is in service area
+  if (business.serviceArea && Array.isArray(business.serviceArea)) {
+    const serves = business.serviceArea.includes(zipCode)
+    console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
+    return serves
+  }
+
+  // Fallback to primary zip code
+  const matches = business.zipCode === zipCode
+  console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
+  return matches
+}
 
 // Format phone number to (XXX) XXX-XXXX
 function formatPhoneNumber(phoneNumberString: string | undefined | null): string {
@@ -51,27 +99,63 @@ export default function EducationTutoringPage() {
   const [businesses, setBusinesses] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const fetchIdRef = useRef(0)
+
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
 
   useEffect(() => {
     async function fetchBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[Education] Starting fetch ${currentFetchId} for zip code:`, userZipCode)
+
       setIsLoading(true)
       try {
-        const result = await getBusinessesForCategoryPage("/education-tutoring")
+        let result = await getBusinessesForCategoryPage("/education-tutoring")
+
+        // Only update if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[Education] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[Education] Fetch ${currentFetchId} got ${result.length} businesses`)
+
+        // Filter by zip code if available
+        if (userZipCode) {
+          const originalCount = result.length
+          result = result.filter((business: Business) => businessServesZipCode(business, userZipCode))
+          console.log(
+            `[Education] Filtered from ${originalCount} to ${result.length} businesses for zip ${userZipCode}`,
+          )
+        }
+
         setBusinesses(result)
       } catch (error) {
-        console.error("Error fetching businesses:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
+        // Only update error if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error(`[Education] Fetch ${currentFetchId} error:`, error)
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading businesses. Please try again later.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setIsLoading(false)
+        // Only update loading if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+  }, [toast, userZipCode])
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
@@ -134,6 +218,26 @@ export default function EducationTutoringPage() {
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 
+      {userZipCode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Showing businesses that serve zip code:</span> {userZipCode}
+            <span className="text-xs block mt-1">Includes businesses with {userZipCode} in their service area</span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem("savedZipCode")
+              setUserZipCode(null)
+            }}
+            className="text-blue-700 border-blue-300 hover:bg-blue-100"
+          >
+            Clear Filter
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
@@ -158,6 +262,19 @@ export default function EducationTutoringPage() {
                       <div className="flex items-center text-gray-600 text-sm mt-1">
                         <Phone className="h-3 w-3 mr-1" />
                         <span>{formatPhoneNumber(business.displayPhone || business.phone)}</span>
+                      </div>
+                    )}
+
+                    {/* Service Area Indicator */}
+                    {userZipCode && (
+                      <div className="text-xs text-green-600 mt-1">
+                        {business.isNationwide ? (
+                          <span>✓ Serves nationwide</span>
+                        ) : business.serviceArea?.includes(userZipCode) ? (
+                          <span>✓ Serves {userZipCode} area</span>
+                        ) : business.zipCode === userZipCode ? (
+                          <span>✓ Located in {userZipCode}</span>
+                        ) : null}
                       </div>
                     )}
 
@@ -222,7 +339,9 @@ export default function EducationTutoringPage() {
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-8 max-w-2xl mx-auto">
             <h3 className="text-xl font-medium text-purple-800 mb-2">No Education & Tutoring Providers Found</h3>
             <p className="text-purple-700 mb-4">
-              We're building our network of qualified tutors and language instructors in your area.
+              {userZipCode
+                ? `We're building our network of qualified tutors and language instructors that serve the ${userZipCode} area.`
+                : "We're building our network of qualified tutors and language instructors in your area."}
             </p>
             <div className="bg-white rounded border border-purple-100 p-4">
               <p className="text-gray-700 font-medium">Are you a tutor or language instructor?</p>

@@ -5,14 +5,46 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useToast } from "@/components/ui/use-toast"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, MapPin } from "lucide-react"
+import { Phone, MapPin, Loader2 } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
+// Enhanced Business interface with service area support
+interface Business {
+  id: string
+  businessName: string
+  displayName?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  displayCity?: string
+  displayState?: string
+  displayLocation?: string
+  displayPhone?: string
+  phone?: string
+  rating?: number
+  reviews?: number
+  subcategories?: string[]
+  businessDescription?: string
+  adDesignData?: {
+    businessInfo?: {
+      phone?: string
+      city?: string
+      state?: string
+    }
+  }
+  serviceArea?: string[]
+  isNationwide?: boolean
+}
+
 export default function MusicLessonsPage() {
+  const { toast } = useToast()
+  const fetchIdRef = useRef(0)
+
   const filterOptions = [
     { id: "music1", label: "Piano Lessons", value: "Piano Lessons" },
     { id: "music2", label: "Guitar Lessons", value: "Guitar Lessons" },
@@ -39,38 +71,127 @@ export default function MusicLessonsPage() {
   const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
 
   // State for providers
-  const [providers, setProviders] = useState([])
+  const [providers, setProviders] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Helper function to check if business serves a zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    console.log(
+      `[Music Lessons] Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`,
+      {
+        isNationwide: business.isNationwide,
+        serviceArea: business.serviceArea,
+        primaryZip: business.zipCode,
+      },
+    )
+
+    // Check if business serves nationwide
+    if (business.isNationwide) {
+      console.log(`[Music Lessons] Business serves nationwide`)
+      return true
+    }
+
+    // Check if business service area includes the zip code
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const serves = business.serviceArea.some((area) => {
+        if (typeof area === "string") {
+          return area.toLowerCase().includes("nationwide") || area === zipCode
+        }
+        return false
+      })
+      console.log(`[Music Lessons] Service area check result: ${serves}`)
+      if (serves) return true
+    }
+
+    // Fall back to primary zip code comparison
+    const primaryMatch = business.zipCode === zipCode
+    console.log(`[Music Lessons] Primary zip code match: ${primaryMatch}`)
+    return primaryMatch
+  }
+
+  // Clear zip code filter
+  const clearZipCodeFilter = () => {
+    setUserZipCode(null)
+    localStorage.removeItem("savedZipCode")
+  }
 
   useEffect(() => {
-    const fetchProviders = async () => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
+
+  useEffect(() => {
+    async function fetchProviders() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[Music Lessons] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+
       try {
         setLoading(true)
+        setError(null)
+
         console.log("Fetching music lesson businesses...")
-        const businesses = await getBusinessesForCategoryPage("/music-lessons")
+        let businesses = await getBusinessesForCategoryPage("/music-lessons")
+
+        // Check if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[Music Lessons] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[Music Lessons] Fetch ${currentFetchId} completed, got ${businesses.length} businesses`)
+
+        // Filter by zip code if available
+        if (userZipCode) {
+          console.log(`[Music Lessons] Filtering by zip code: ${userZipCode}`)
+          businesses = businesses.filter((business: Business) => {
+            const serves = businessServesZipCode(business, userZipCode)
+            console.log(
+              `[Music Lessons] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
+              business,
+            )
+            return serves
+          })
+          console.log(`[Music Lessons] After filtering: ${businesses.length} businesses`)
+        }
+
         console.log("Fetched music lesson businesses:", businesses)
         setProviders(businesses)
       } catch (error) {
-        console.error("Error fetching music lesson providers:", error)
-        setProviders([])
+        // Only update error state if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error("Error fetching music lesson providers:", error)
+          setError("Failed to load providers")
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading music lesson providers. Please try again later.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setLoading(false)
+        // Only update loading state if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchProviders()
-  }, [])
+  }, [userZipCode])
 
-  const handleViewProfile = (business: any) => {
+  const handleViewProfile = (business: Business) => {
     console.log("Opening profile for business:", business)
     setSelectedBusinessId(business.id)
     setSelectedBusinessName(business.displayName || business.businessName || "Music Instructor")
     setIsBusinessProfileOpen(true)
   }
 
-  const handleViewReviews = (business: any) => {
+  const handleViewReviews = (business: Business) => {
     setSelectedProvider({
-      id: business.id,
+      id: Number.parseInt(business.id),
       name: business.displayName || business.businessName || "Music Instructor",
       reviews: [],
     })
@@ -110,16 +231,47 @@ export default function MusicLessonsPage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-blue-800 text-sm">
+                <strong>Showing results for ZIP code: {userZipCode}</strong>
+                <br />
+                <span className="text-blue-600">Including businesses that serve your area or operate nationwide.</span>
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearZipCodeFilter}
+              className="text-blue-600 border-blue-300 hover:bg-blue-100"
+            >
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+            <p>Loading music lesson providers...</p>
+          </div>
+        ) : error ? (
           <div className="text-center py-8">
-            <p className="text-gray-600">Loading music lesson providers...</p>
+            <p className="text-red-600">{error}</p>
           </div>
         ) : providers.length === 0 ? (
           <div className="text-center py-12">
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Music Lesson Providers Found</h3>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+              {userZipCode ? `No Music Lesson Providers in ${userZipCode}` : "No Music Lesson Providers Found"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              We're currently building our network of music instructors in your area.
+              {userZipCode
+                ? `We're building our network of music instructors in the ${userZipCode} area.`
+                : "We're currently building our network of music instructors in your area."}
             </p>
             <p className="text-sm text-gray-500">
               Are you a music instructor?{" "}
@@ -139,7 +291,7 @@ export default function MusicLessonsPage() {
               </div>
             )}
 
-            {providers.map((business: any) => (
+            {providers.map((business: Business) => (
               <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row justify-between">
@@ -147,6 +299,13 @@ export default function MusicLessonsPage() {
                       <h3 className="text-xl font-semibold text-gray-900">
                         {business.displayName || business.businessName || "Music Instructor"}
                       </h3>
+
+                      {/* Service Area Indicator */}
+                      {business.isNationwide ? (
+                        <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
+                      ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
+                        <div className="text-xs text-green-600 font-medium mb-1">✓ Serves {userZipCode} area</div>
+                      ) : null}
 
                       {business.businessDescription && (
                         <p className="text-gray-600 text-sm mt-1">{business.businessDescription}</p>

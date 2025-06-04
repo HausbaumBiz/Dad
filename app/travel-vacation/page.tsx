@@ -5,12 +5,31 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { Phone } from "lucide-react"
+import { Phone, X } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+
+// Enhanced Business interface with service area
+interface Business {
+  id: string
+  displayName?: string
+  businessName: string
+  displayLocation?: string
+  displayPhone?: string
+  zipCode: string
+  serviceArea?: string[] // Array of ZIP codes the business serves
+  isNationwide?: boolean
+  rating?: number
+  reviews?: number
+  businessDescription?: string
+  adDesignData?: any
+  phone?: string
+  city?: string
+  state?: string
+}
 
 function formatPhoneNumber(phone: string): string {
   if (!phone) return "No phone provided"
@@ -28,11 +47,13 @@ function formatPhoneNumber(phone: string): string {
 }
 
 export default function TravelVacationPage() {
+  const fetchIdRef = useRef(0)
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [isReviewsOpen, setIsReviewsOpen] = useState(false)
-  const [providers, setProviders] = useState<any[]>([])
+  const [providers, setProviders] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
   // Add state for profile dialog
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
@@ -41,25 +62,99 @@ export default function TravelVacationPage() {
     name: "",
   })
 
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+    }
+  }, [])
+
+  // FIXED: Helper function to check if a business serves a specific zip code
+  const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
+    // Check if business is nationwide
+    if (business.isNationwide) {
+      console.log(`  - ${business.displayName || business.businessName}: nationwide=true, matches=true`)
+      return true
+    }
+
+    // FIXED: Check if zip code is in service area (the main fix)
+    if (business.serviceArea && business.serviceArea.length > 0) {
+      const matches = business.serviceArea.includes(targetZipCode)
+      console.log(
+        `  - ${business.displayName || business.businessName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
+      )
+      return matches
+    }
+
+    // Fall back to primary zip code only if no service area is defined
+    const matches = business.zipCode === targetZipCode
+    console.log(
+      `  - ${business.displayName || business.businessName}: primaryZip="${business.zipCode}", userZip="${targetZipCode}", matches=${matches} (fallback)`,
+    )
+    return matches
+  }
+
   useEffect(() => {
     async function fetchProviders() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[${new Date().toISOString()}] Fetching businesses for /travel-vacation (request #${currentFetchId})`)
+
       try {
         setLoading(true)
+        setError(null)
 
         // Use the centralized system
         const businesses = await getBusinessesForCategoryPage("/travel-vacation")
+        console.log(
+          `[${new Date().toISOString()}] Retrieved ${businesses.length} total businesses (request #${currentFetchId})`,
+        )
 
-        setProviders(businesses)
+        // Check if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
+          return
+        }
+
+        businesses.forEach((business: Business) => {
+          // FIXED: Log the service area information properly
+          const serviceAreaZips = business.serviceArea || []
+          const isNationwide = business.isNationwide || false
+          console.log(
+            `  - ${business.id}: "${business.displayName || business.businessName}" (zipCode: ${business.zipCode}, serviceArea: [${serviceAreaZips.join(", ")}], nationwide: ${isNationwide})`,
+          )
+        })
+
+        // Filter by zip code if available
+        let filteredBusinesses = businesses
+        if (userZipCode) {
+          console.log(
+            `[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${currentFetchId})`,
+          )
+          filteredBusinesses = businesses.filter((business: Business) => businessServesZipCode(business, userZipCode))
+          console.log(
+            `[${new Date().toISOString()}] After filtering: ${filteredBusinesses.length} businesses (request #${currentFetchId})`,
+          )
+        }
+
+        setProviders(filteredBusinesses)
       } catch (err) {
-        setError("Failed to load providers")
         console.error("Error fetching providers:", err)
+        if (currentFetchId === fetchIdRef.current) {
+          setError("Failed to load providers")
+        }
       } finally {
-        setLoading(false)
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchProviders()
-  }, [])
+  }, [userZipCode])
 
   const filterOptions = [
     { id: "travel1", label: "Tour and Travel Guides", value: "Tour and Travel Guides" },
@@ -80,12 +175,18 @@ export default function TravelVacationPage() {
   }
 
   // Add handler for opening profile dialog
-  const handleOpenProfile = (provider: any) => {
+  const handleOpenProfile = (provider: Business) => {
     setSelectedBusinessProfile({
       id: provider.id,
       name: provider.displayName || provider.businessName || "Business",
     })
     setIsProfileDialogOpen(true)
+  }
+
+  // Handle clearing zip code filter
+  const handleClearZipCode = () => {
+    localStorage.removeItem("savedZipCode")
+    setUserZipCode(null)
   }
 
   return (
@@ -121,6 +222,43 @@ export default function TravelVacationPage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-blue-800">Showing businesses that service: {userZipCode}</p>
+                <p className="text-sm text-blue-700">Including businesses with this ZIP code in their service area</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearZipCode}
+              className="text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -142,9 +280,13 @@ export default function TravelVacationPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Travel Services Found</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {userZipCode ? `No Travel Services Found in ${userZipCode}` : "No Travel Services Found"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              We're currently building our network of travel and vacation service professionals in your area.
+              {userZipCode
+                ? `No travel services found serving ZIP code ${userZipCode}. Try clearing the filter to see all providers.`
+                : "We're currently building our network of travel and vacation service professionals in your area."}
             </p>
             <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
           </div>
@@ -164,6 +306,25 @@ export default function TravelVacationPage() {
                         `${provider.city || ""}, ${provider.state || ""}`.trim().replace(/^,|,$/, "") ||
                         "Location not specified"}
                     </p>
+
+                    {/* Service Area Indicator */}
+                    {userZipCode && (
+                      <div className="mt-2">
+                        {provider.isNationwide ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Serves nationwide
+                          </span>
+                        ) : provider.serviceArea && provider.serviceArea.includes(userZipCode) ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Serves {userZipCode} area
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            Primary location: {provider.zipCode}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex items-center mt-2">
                       <div className="flex">

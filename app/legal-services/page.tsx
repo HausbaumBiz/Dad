@@ -5,12 +5,63 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Phone, MapPin, Tag } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+
+// Enhanced Business interface
+interface Business {
+  id: string
+  businessName?: string
+  displayName?: string
+  displayPhone?: string
+  displayLocation?: string
+  rating?: number
+  reviews?: number
+  subcategories?: string[]
+  businessDescription?: string
+  zipCode?: string
+  serviceArea?: string[]
+  isNationwide?: boolean
+  adDesignData?: {
+    businessInfo?: {
+      phone?: string
+      city?: string
+      state?: string
+    }
+  }
+}
+
+// Helper function to check if business serves a zip code
+const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+  console.log(`Checking if business serves ${zipCode}:`, {
+    businessName: business.displayName || business.businessName,
+    primaryZip: business.zipCode,
+    serviceArea: business.serviceArea,
+    isNationwide: business.isNationwide,
+  })
+
+  // Check if business serves nationwide
+  if (business.isNationwide) {
+    console.log(`Business serves nationwide`)
+    return true
+  }
+
+  // If business has service area defined and it's an array, check it
+  if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
+    const serves = business.serviceArea.includes(zipCode)
+    console.log(`Service area check: ${serves}`)
+    return serves
+  }
+
+  // Fall back to primary zip code
+  const primaryZipMatch = business.zipCode === zipCode
+  console.log(`Primary zip check: ${primaryZipMatch}`)
+  return primaryZipMatch
+}
 
 export default function LegalServicesPage() {
   const filterOptions = [
@@ -51,23 +102,68 @@ export default function LegalServicesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  const fetchIdRef = useRef(0)
+
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
+
   useEffect(() => {
     async function fetchBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+
       try {
         setLoading(true)
         setError(null)
+
+        console.log(`[Legal Services] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+
         const fetchedBusinesses = await getBusinessesForCategoryPage("/legal-services")
-        setBusinesses(fetchedBusinesses)
+
+        // Check if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[Legal Services] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[Legal Services] Fetch ${currentFetchId} completed, got ${fetchedBusinesses.length} businesses`)
+
+        // Filter by zip code if available
+        let filteredBusinesses = fetchedBusinesses
+        if (userZipCode) {
+          console.log(`[Legal Services] Filtering by zip code: ${userZipCode}`)
+          filteredBusinesses = fetchedBusinesses.filter((business: Business) => {
+            const serves = businessServesZipCode(business, userZipCode)
+            console.log(
+              `[Legal Services] Business ${business.displayName || business.businessName} serves ${userZipCode}: ${serves}`,
+            )
+            return serves
+          })
+          console.log(`[Legal Services] After filtering: ${filteredBusinesses.length} businesses`)
+        }
+
+        setBusinesses(filteredBusinesses)
       } catch (err) {
-        console.error("Error fetching businesses:", err)
-        setError("Failed to load legal services")
+        // Only update error if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error(`[Legal Services] Error in fetch ${currentFetchId}:`, err)
+          setError("Failed to load legal services")
+        }
       } finally {
-        setLoading(false)
+        // Only update loading if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [])
+  }, [userZipCode])
 
   const handleOpenReviews = (business: any) => {
     setSelectedProvider({
@@ -118,6 +214,28 @@ export default function LegalServicesPage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {userZipCode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-blue-700">
+              <span className="font-medium">Showing legal services for zip code:</span> {userZipCode}
+              <span className="text-xs block mt-1">(Includes businesses with {userZipCode} in their service area)</span>
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.removeItem("savedZipCode")
+                setUserZipCode(null)
+              }}
+              className="text-xs"
+            >
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -140,9 +258,13 @@ export default function LegalServicesPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Legal Professionals Yet</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {userZipCode ? `No Legal Professionals in ${userZipCode} Area` : "No Legal Professionals Yet"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              Be the first legal professional to join our platform and connect with potential clients in your area.
+              {userZipCode
+                ? `We're building our network of legal professionals in the ${userZipCode} area.`
+                : "Be the first legal professional to join our platform and connect with potential clients in your area."}
             </p>
             <Button className="bg-slate-600 hover:bg-slate-700">Register Your Practice</Button>
           </div>
@@ -179,6 +301,14 @@ export default function LegalServicesPage() {
                         {provider.displayLocation || "Location not specified"}
                       </span>
                     </div>
+
+                    {(provider.isNationwide || (provider.serviceArea && provider.serviceArea.length > 0)) && (
+                      <div className="flex items-center text-gray-600 text-xs mt-1 mb-3">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800">
+                          {provider.isNationwide ? "Serves nationwide" : `Serves ${userZipCode} area`}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center mb-3">
                       <div className="flex">

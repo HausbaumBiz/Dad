@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,6 +23,10 @@ interface Business {
   subcategory?: string
   rating?: number
   reviews?: number
+  zipCode?: string
+  // Fix: Match the actual backend data structure
+  serviceArea?: string[] // This should be a direct array of zip codes
+  isNationwide?: boolean // This should be a direct boolean
 }
 
 export default function FinancialServicesPage() {
@@ -43,27 +47,121 @@ export default function FinancialServicesPage() {
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
+  // Use a ref to track the current fetch request
+  const fetchIdRef = useRef<number>(0)
+
+  // Get user's zip code from localStorage only once on mount
   useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+    }
+  }, [])
+
+  const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
+    // Check if business is nationwide
+    if (business.isNationwide) {
+      console.log(`  - ${business.displayName}: serves nationwide, matches=true`)
+      return true
+    }
+
+    // Check if target zip code is in the service area (direct array)
+    if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
+      const matches = business.serviceArea.includes(targetZipCode)
+      console.log(
+        `  - ${business.displayName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
+      )
+      return matches
+    }
+
+    // Fall back to checking primary zip code
+    const businessZip = business.zipCode || ""
+    const matches = businessZip === targetZipCode
+    console.log(
+      `  - ${business.displayName}: primaryZip="${businessZip}", userZip="${targetZipCode}", matches=${matches}`,
+    )
+    return matches
+  }
+
+  // Separate useEffect for fetching businesses to avoid race conditions
+  useEffect(() => {
+    // Create a unique ID for this fetch request
+    const fetchId = ++fetchIdRef.current
+
     async function fetchBusinesses() {
+      // If this isn't the latest fetch request, don't proceed
+      if (fetchId !== fetchIdRef.current) return
+
       setIsLoading(true)
       try {
+        const requestTime = new Date().toISOString()
+        console.log(`[${requestTime}] Fetching businesses for /financial-services (request #${fetchId})`)
+
         const result = await getBusinessesForCategoryPage("/financial-services")
-        setBusinesses(result)
-      } catch (error) {
-        console.error("Error fetching businesses:", error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
+
+        // If this isn't the latest fetch request, don't update state
+        if (fetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${fetchId}`)
+          return
+        }
+
+        console.log(`[${new Date().toISOString()}] Retrieved ${result.length} total businesses (request #${fetchId})`)
+
+        // Safely log business information with null/undefined checks
+        result.forEach((business) => {
+          // Safely access serviceArea properties with null checks
+          const serviceAreaZips = business.serviceArea || []
+          const isNationwide = business.isNationwide || false
+
+          const serviceAreaInfo = `nationwide=${isNationwide}, serviceZips=[${serviceAreaZips.join(", ")}]`
+
+          console.log(
+            `  - ${business.id}: "${business.displayName}" (primaryZip: ${business.zipCode || "none"}, nationwide=${business.isNationwide || false}, serviceZips=[${business.serviceArea?.join(", ") || business.zipcodes?.join(", ") || ""}])`,
+          )
         })
+
+        let filteredResult = result
+
+        if (userZipCode) {
+          console.log(`[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${fetchId})`)
+          filteredResult = result.filter((business) => businessServesZipCode(business, userZipCode))
+          console.log(
+            `[${new Date().toISOString()}] After filtering: ${filteredResult.length} businesses (request #${fetchId})`,
+          )
+        }
+
+        setBusinesses(filteredResult)
+      } catch (error) {
+        // Only show error for the latest request
+        if (fetchId === fetchIdRef.current) {
+          console.error(`[${new Date().toISOString()}] Error fetching businesses (request #${fetchId}):`, error)
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading businesses. Please try again later.",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setIsLoading(false)
+        // Only update loading state for the latest request
+        if (fetchId === fetchIdRef.current) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [toast])
+
+    // Cleanup function to handle component unmount
+    return () => {
+      // This will prevent any in-flight requests from updating state
+      fetchIdRef.current = fetchId + 1
+    }
+  }, [toast, userZipCode]) // Only re-run when toast or userZipCode changes
 
   const filteredBusinesses = selectedFilter
     ? businesses.filter((business) => {
@@ -126,6 +224,45 @@ export default function FinancialServicesPage() {
 
       <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
 
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-green-800">Showing businesses that service: {userZipCode}</p>
+                <p className="text-sm text-green-700">Includes businesses with {userZipCode} in their service area</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.removeItem("savedZipCode")
+                setUserZipCode(null)
+              }}
+              className="text-green-700 border-green-300 hover:bg-green-50"
+            >
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
@@ -153,6 +290,27 @@ export default function FinancialServicesPage() {
                         <a href={`tel:${business.displayPhone}`} className="text-sm hover:text-primary">
                           {business.displayPhone}
                         </a>
+                      </div>
+                    )}
+
+                    {/* Service Area Indicator */}
+                    {userZipCode && (
+                      <div className="flex items-center mt-1 text-blue-600">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                        <span className="text-xs">
+                          {business.isNationwide
+                            ? "Serves nationwide"
+                            : business.serviceArea?.includes(userZipCode)
+                              ? `Serves ${userZipCode} area`
+                              : `Primary location: ${business.zipCode}`}
+                        </span>
                       </div>
                     )}
 
@@ -217,7 +375,9 @@ export default function FinancialServicesPage() {
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-8 max-w-2xl mx-auto">
             <h3 className="text-xl font-medium text-emerald-800 mb-2">No Financial Service Providers Found</h3>
             <p className="text-emerald-700 mb-4">
-              We're building our network of licensed financial professionals in your area.
+              {userZipCode
+                ? `We're building our network of licensed financial professionals in the ${userZipCode} area.`
+                : "We're building our network of licensed financial professionals in your area."}
             </p>
             <div className="bg-white rounded border border-emerald-100 p-4">
               <p className="text-gray-700 font-medium">Are you a financial professional?</p>

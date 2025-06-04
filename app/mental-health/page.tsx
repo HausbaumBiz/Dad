@@ -5,12 +5,26 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { MapPin, Phone } from "lucide-react"
+import { MapPin, Phone, X } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+
+// Enhanced Business interface with service area
+interface Business {
+  id: string
+  displayName?: string
+  businessName: string
+  displayLocation?: string
+  displayPhone?: string
+  zipCode: string
+  serviceArea?: string[] // Array of ZIP codes the business serves
+  isNationwide?: boolean // Whether the business serves nationwide
+  subcategories?: string[]
+  adDesignData?: any
+}
 
 export default function MentalHealthPage() {
   const filterOptions = [
@@ -34,15 +48,89 @@ export default function MentalHealthPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const fetchIdRef = useRef(0)
+
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+    }
+  }, [])
+
+  // Helper function to check if a business serves a specific zip code
+  const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
+    console.log(`Checking if business serves ZIP ${targetZipCode}:`)
+    console.log(`  Business: ${business.displayName || business.businessName}`)
+    console.log(`  Primary ZIP: ${business.zipCode}`)
+    console.log(`  Is Nationwide: ${business.isNationwide}`)
+    console.log(`  Service Area: ${business.serviceArea ? JSON.stringify(business.serviceArea) : "none"}`)
+
+    // Check if business is nationwide
+    if (business.isNationwide) {
+      console.log(`  - ${business.displayName || business.businessName}: nationwide=true, matches=true`)
+      return true
+    }
+
+    // Check if zip code is in service area
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const matches = business.serviceArea.includes(targetZipCode)
+      console.log(
+        `  - ${business.displayName || business.businessName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
+      )
+      return matches
+    }
+
+    // Fall back to primary zip code
+    const matches = business.zipCode === targetZipCode
+    console.log(
+      `  - ${business.displayName || business.businessName}: primaryZip="${business.zipCode}", userZip="${targetZipCode}", matches=${matches}`,
+    )
+    return matches
+  }
 
   useEffect(() => {
     async function fetchProviders() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[${new Date().toISOString()}] Fetching businesses for /mental-health (request #${currentFetchId})`)
+
       try {
         setLoading(true)
-        console.log("Fetching mental health providers...")
 
-        const businesses = await getBusinessesForCategoryPage("/mental-health")
-        console.log("Fetched mental health providers:", businesses)
+        let businesses = await getBusinessesForCategoryPage("/mental-health")
+        console.log(
+          `[${new Date().toISOString()}] Retrieved ${businesses.length} total businesses (request #${currentFetchId})`,
+        )
+
+        // Check if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
+          return
+        }
+
+        businesses.forEach((business) => {
+          console.log(
+            `  - ${business.id}: "${business.displayName || business.businessName}" (zipCode: ${business.zipCode})`,
+          )
+          if (business.serviceArea) {
+            console.log(
+              `    Service area: ${Array.isArray(business.serviceArea) ? business.serviceArea.join(", ") : "unknown format"}`,
+            )
+          }
+        })
+
+        if (userZipCode) {
+          console.log(
+            `[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${currentFetchId})`,
+          )
+          businesses = businesses.filter((business) => businessServesZipCode(business, userZipCode))
+          console.log(
+            `[${new Date().toISOString()}] After filtering: ${businesses.length} businesses (request #${currentFetchId})`,
+          )
+        }
 
         // Transform the data to match the expected format
         const transformedProviders = businesses.map((business) => ({
@@ -54,19 +142,26 @@ export default function MentalHealthPage() {
           reviews: 0, // Default review count
           services: business.subcategories || ["Mental Health Services"],
           adDesignData: business.adDesignData,
+          serviceArea: business.serviceArea,
+          isNationwide: business.isNationwide,
+          zipCode: business.zipCode,
         }))
 
         setProviders(transformedProviders)
       } catch (err) {
         console.error("Error fetching mental health providers:", err)
-        setError("Failed to load providers")
+        if (currentFetchId === fetchIdRef.current) {
+          setError("Failed to load providers")
+        }
       } finally {
-        setLoading(false)
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchProviders()
-  }, [])
+  }, [userZipCode])
 
   // State for dialogs
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
@@ -86,6 +181,12 @@ export default function MentalHealthPage() {
   const handleOpenProfile = (provider: any) => {
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
+  }
+
+  // Handle clearing zip code filter
+  const handleClearZipCode = () => {
+    localStorage.removeItem("savedZipCode")
+    setUserZipCode(null)
   }
 
   return (
@@ -121,6 +222,43 @@ export default function MentalHealthPage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-green-800">Showing businesses that service: {userZipCode}</p>
+                <p className="text-sm text-green-700">Including businesses with this ZIP code in their service area</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearZipCode}
+              className="text-green-700 hover:text-green-900 hover:bg-green-100"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         {loading ? (
           <div className="text-center py-8">
@@ -144,9 +282,13 @@ export default function MentalHealthPage() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Mental Health Providers Yet</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {userZipCode ? `No Mental Health Providers Found in ${userZipCode}` : "No Mental Health Providers Yet"}
+              </h3>
               <p className="text-gray-600 mb-4">
-                Be the first mental health professional to join our platform and connect with clients in your area.
+                {userZipCode
+                  ? `No mental health professionals found serving ZIP code ${userZipCode}. Try clearing the filter to see all providers.`
+                  : "Be the first mental health professional to join our platform and connect with clients in your area."}
               </p>
               <Button className="bg-blue-600 hover:bg-blue-700">Register Your Practice</Button>
             </div>
@@ -175,6 +317,25 @@ export default function MentalHealthPage() {
                       </div>
                     )}
 
+                    {/* Service Area Indicator */}
+                    {userZipCode && (
+                      <div className="mt-2">
+                        {provider.isNationwide ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Serves nationwide
+                          </span>
+                        ) : provider.serviceArea && provider.serviceArea.includes(userZipCode) ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Serves {userZipCode} area
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            Primary location: {provider.zipCode}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
@@ -184,7 +345,7 @@ export default function MentalHealthPage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00.364-.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>

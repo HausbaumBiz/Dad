@@ -3,7 +3,7 @@
 import { CategoryLayout } from "@/components/category-layout"
 import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,123 @@ export default function WeddingsEventsPage() {
 
   const [providers, setProviders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Add fetchIdRef for race condition prevention
+  const fetchIdRef = useRef(0)
+
+  // Enhanced Business interface
+  interface Business {
+    id: string
+    displayName?: string
+    businessName?: string
+    businessDescription?: string
+    displayLocation?: string
+    displayPhone?: string
+    rating?: number
+    reviewCount?: number
+    subcategories?: string[]
+    zipCode?: string
+    serviceArea?: string[]
+    isNationwide?: boolean
+  }
+
+  // Helper function to check if business serves the zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
+      isNationwide: business.isNationwide,
+      serviceArea: business.serviceArea,
+      primaryZip: business.zipCode,
+    })
+
+    // Check if business serves nationwide
+    if (business.isNationwide) {
+      console.log(`✓ Business serves nationwide`)
+      return true
+    }
+
+    // Check if zip code is in service area
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const serves = business.serviceArea.includes(zipCode)
+      console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
+      return serves
+    }
+
+    // Fallback to primary zip code
+    const matches = business.zipCode === zipCode
+    console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
+    return matches
+  }
+
+  // Replace the useEffect for fetching businesses:
+  useEffect(() => {
+    const fetchProviders = async () => {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[Weddings] Starting fetch ${currentFetchId} for zip code:`, userZipCode)
+
+      try {
+        setLoading(true)
+        let businesses = await getBusinessesForCategoryPage("/weddings-events")
+
+        // Only update if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[Weddings] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[Weddings] Fetch ${currentFetchId} got ${businesses.length} businesses`)
+
+        // Filter by zip code if available
+        if (userZipCode) {
+          const originalCount = businesses.length
+          businesses = businesses.filter((business: Business) => businessServesZipCode(business, userZipCode))
+          console.log(
+            `[Weddings] Filtered from ${originalCount} to ${businesses.length} businesses for zip ${userZipCode}`,
+          )
+        }
+
+        setProviders(businesses)
+      } catch (error) {
+        // Only update error if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error(`[Weddings] Fetch ${currentFetchId} error:`, error)
+          setProviders([])
+        }
+      } finally {
+        // Only update loading if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchProviders()
+  }, [userZipCode])
+
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
+
+  const handleOpenReviews = (provider: any) => {
+    setSelectedProvider({
+      id: provider.id,
+      name: provider.displayName || provider.businessName || "Wedding Professional",
+      rating: provider.rating || 0,
+      reviews: provider.reviewCount || 0,
+    })
+    setIsReviewsDialogOpen(true)
+  }
+
+  const handleViewProfile = (provider: any) => {
+    setSelectedBusiness({
+      id: provider.id,
+      name: provider.displayName || provider.businessName || "Wedding Professional",
+    })
+    setIsProfileDialogOpen(true)
+  }
 
   const filterOptions = [
     { id: "weddings1", label: "Event Halls", value: "Event Halls" },
@@ -49,41 +166,6 @@ export default function WeddingsEventsPage() {
     { id: "weddings16", label: "Marriage Officiants", value: "Marriage Officiants" },
     { id: "weddings17", label: "Other Weddings and Special Events", value: "Other Weddings and Special Events" },
   ]
-
-  useEffect(() => {
-    const fetchProviders = async () => {
-      try {
-        setLoading(true)
-        const businesses = await getBusinessesForCategoryPage("/weddings-events")
-        setProviders(businesses)
-      } catch (error) {
-        console.error("Error fetching wedding providers:", error)
-        setProviders([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchProviders()
-  }, [])
-
-  const handleOpenReviews = (provider: any) => {
-    setSelectedProvider({
-      id: provider.id,
-      name: provider.displayName || provider.businessName || "Wedding Professional",
-      rating: provider.rating || 0,
-      reviews: provider.reviewCount || 0,
-    })
-    setIsReviewsDialogOpen(true)
-  }
-
-  const handleViewProfile = (provider: any) => {
-    setSelectedBusiness({
-      id: provider.id,
-      name: provider.displayName || provider.businessName || "Wedding Professional",
-    })
-    setIsProfileDialogOpen(true)
-  }
 
   return (
     <CategoryLayout title="Weddings and Special Events" backLink="/" backText="Categories">
@@ -118,6 +200,26 @@ export default function WeddingsEventsPage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {userZipCode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Showing businesses that serve zip code:</span> {userZipCode}
+            <span className="text-xs block mt-1">Includes businesses with {userZipCode} in their service area</span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem("savedZipCode")
+              setUserZipCode(null)
+            }}
+            className="text-blue-700 border-blue-300 hover:bg-blue-100"
+          >
+            Clear Filter
+          </Button>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-8">
           <p className="text-gray-600">Loading wedding and event providers...</p>
@@ -125,7 +227,11 @@ export default function WeddingsEventsPage() {
       ) : providers.length === 0 ? (
         <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
           <h3 className="text-xl font-medium text-gray-700 mb-2">No Event Providers Found</h3>
-          <p className="text-gray-600">Enter your zip code to find wedding and event professionals in your area.</p>
+          <p className="text-gray-600">
+            {userZipCode
+              ? `Enter your zip code to find wedding and event professionals that serve the ${userZipCode} area.`
+              : "Enter your zip code to find wedding and event professionals in your area."}
+          </p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -156,6 +262,19 @@ export default function WeddingsEventsPage() {
                           <a href={`tel:${provider.displayPhone}`} className="hover:text-primary transition-colors">
                             {provider.displayPhone}
                           </a>
+                        </div>
+                      )}
+
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {provider.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : provider.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} area</span>
+                          ) : provider.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
                         </div>
                       )}
                     </div>

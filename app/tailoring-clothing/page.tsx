@@ -5,45 +5,132 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { MapPin, Phone } from "lucide-react"
+import { MapPin, Phone, X } from "lucide-react"
 import Link from "next/link"
 import type { Business } from "@/lib/definitions"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 
+// Enhanced Business interface with service area
+interface EnhancedBusiness extends Business {
+  serviceArea?: string[] // Array of ZIP codes
+  isNationwide?: boolean // Nationwide flag
+}
+
 export default function TailoringClothingPage() {
+  const fetchIdRef = useRef(0)
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [isReviewsOpen, setIsReviewsOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null)
-  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [selectedBusiness, setSelectedBusiness] = useState<EnhancedBusiness | null>(null)
+  const [businesses, setBusinesses] = useState<EnhancedBusiness[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+    }
+  }, [])
+
+  // Helper function to check if a business serves a specific zip code
+  const businessServesZipCode = (business: EnhancedBusiness, targetZipCode: string): boolean => {
+    console.log(`Checking if business serves ZIP ${targetZipCode}:`)
+    console.log(`  Business: ${business.displayName || business.businessName}`)
+    console.log(`  Primary ZIP: ${business.zipCode}`)
+    console.log(`  Service Area: ${business.serviceArea ? `[${business.serviceArea.join(", ")}]` : "none"}`)
+    console.log(`  Nationwide: ${business.isNationwide}`)
+
+    // Check if business is nationwide
+    if (business.isNationwide) {
+      console.log(`  - ${business.displayName || business.businessName}: nationwide=true, matches=true`)
+      return true
+    }
+
+    // Check if zip code is in service area
+    if (business.serviceArea && business.serviceArea.length > 0) {
+      const matches = business.serviceArea.includes(targetZipCode)
+      console.log(
+        `  - ${business.displayName || business.businessName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
+      )
+      return matches
+    }
+
+    // Fall back to primary zip code
+    const matches = business.zipCode === targetZipCode
+    console.log(
+      `  - ${business.displayName || business.businessName}: primaryZip="${business.zipCode}", userZip="${targetZipCode}", matches=${matches}`,
+    )
+    return matches
+  }
 
   useEffect(() => {
     async function fetchBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(
+        `[${new Date().toISOString()}] Fetching businesses for /tailoring-clothing (request #${currentFetchId})`,
+      )
+
       try {
         setLoading(true)
-        console.log("Fetching tailoring businesses...")
+        setError(null)
 
         // Use the centralized system
         const fetchedBusinesses = await getBusinessesForCategoryPage("/tailoring-clothing")
+        console.log(
+          `[${new Date().toISOString()}] Retrieved ${fetchedBusinesses.length} total businesses (request #${currentFetchId})`,
+        )
 
-        console.log("Fetched tailoring businesses:", fetchedBusinesses)
-        setBusinesses(fetchedBusinesses)
+        // Check if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
+          return
+        }
+
+        fetchedBusinesses.forEach((business: EnhancedBusiness) => {
+          console.log(
+            `  - ${business.id}: "${business.displayName || business.businessName}" (zipCode: ${business.zipCode})`,
+          )
+        })
+
+        // Filter by zip code if available
+        let filteredBusinesses = fetchedBusinesses
+        if (userZipCode) {
+          console.log(
+            `[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${currentFetchId})`,
+          )
+          filteredBusinesses = fetchedBusinesses.filter((business: EnhancedBusiness) =>
+            businessServesZipCode(business, userZipCode),
+          )
+          console.log(
+            `[${new Date().toISOString()}] After filtering: ${filteredBusinesses.length} businesses (request #${currentFetchId})`,
+          )
+        }
+
+        setBusinesses(filteredBusinesses)
       } catch (err) {
         console.error("Error fetching tailoring businesses:", err)
-        setError("Failed to load tailoring businesses")
+        if (currentFetchId === fetchIdRef.current) {
+          setError("Failed to load tailoring businesses")
+        }
       } finally {
-        setLoading(false)
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchBusinesses()
-  }, [])
+  }, [userZipCode])
 
   const filterOptions = [
     {
@@ -67,9 +154,15 @@ export default function TailoringClothingPage() {
     setIsReviewsOpen(true)
   }
 
-  const handleOpenProfile = (business: Business) => {
+  const handleOpenProfile = (business: EnhancedBusiness) => {
     setSelectedBusiness(business)
     setIsProfileOpen(true)
+  }
+
+  // Handle clearing zip code filter
+  const handleClearZipCode = () => {
+    localStorage.removeItem("savedZipCode")
+    setUserZipCode(null)
   }
 
   return (
@@ -105,6 +198,43 @@ export default function TailoringClothingPage() {
 
       <CategoryFilter options={filterOptions} />
 
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-blue-800">Showing businesses that service: {userZipCode}</p>
+                <p className="text-sm text-blue-700">Including businesses with this ZIP code in their service area</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearZipCode}
+              className="text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Clear Filter
+            </Button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -126,9 +256,13 @@ export default function TailoringClothingPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tailoring Services Found</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {userZipCode ? `No Tailoring Services Found in ${userZipCode}` : "No Tailoring Services Found"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              We're currently building our network of tailoring and clothing service professionals in your area.
+              {userZipCode
+                ? `No tailoring services found serving ZIP code ${userZipCode}. Try clearing the filter to see all providers.`
+                : "We're currently building our network of tailoring and clothing service professionals in your area."}
             </p>
             <Button className="bg-purple-600 hover:bg-purple-700">Register Your Business</Button>
           </div>
@@ -159,6 +293,25 @@ export default function TailoringClothingPage() {
                       </div>
                     )}
 
+                    {/* Service Area Indicator */}
+                    {userZipCode && (business.serviceArea || business.isNationwide) && (
+                      <div className="mt-2">
+                        {business.isNationwide ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Serves nationwide
+                          </span>
+                        ) : business.serviceArea && business.serviceArea.includes(userZipCode) ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Serves {userZipCode} area
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            Primary location: {business.zipCode}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
@@ -168,7 +321,7 @@ export default function TailoringClothingPage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
