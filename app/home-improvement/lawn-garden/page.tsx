@@ -29,19 +29,94 @@ export default function LawnGardenPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+    }
+  }, [])
 
   useEffect(() => {
     async function fetchProviders() {
       try {
         setLoading(true)
-        console.log("Fetching businesses for Lawn, Garden and Snow Removal subcategory with prefix matching...")
+        console.log("Fetching businesses for Lawn, Garden and Snow Removal subcategory with zip code filtering...")
 
-        // Use the base path - the function will now find all subcategories that start with this path
+        // Use the base path - the function will find all subcategories that start with this path
         const basePath = "Home, Lawn, and Manual Labor > Lawn, Garden and Snow Removal"
-        const businesses = await getBusinessesForSubcategory(basePath)
+        const allBusinesses = await getBusinessesForSubcategory(basePath)
 
-        console.log(`Found ${businesses.length} businesses for base path: ${basePath}`)
-        setProviders(businesses)
+        console.log(`Found ${allBusinesses.length} total businesses for base path: ${basePath}`)
+
+        let filteredBusinesses = allBusinesses
+
+        // Filter by user's zip code if available
+        if (userZipCode) {
+          console.log(`Filtering businesses that service zip code: ${userZipCode}`)
+
+          filteredBusinesses = []
+
+          for (const business of allBusinesses) {
+            try {
+              // Check if business services the user's zip code
+              const response = await fetch(`/api/admin/business/${business.id}/service-area`)
+
+              if (response.ok) {
+                const serviceAreaData = await response.json()
+                console.log(`Service area data for ${business.displayName}:`, serviceAreaData)
+
+                // Check if the user's zip code is in the business's service area
+                if (serviceAreaData.zipCodes && Array.isArray(serviceAreaData.zipCodes)) {
+                  // Handle both possible data structures
+                  const servicesUserZip = serviceAreaData.zipCodes.some((zipData) => {
+                    // Check if zipData is a string (just the zip code)
+                    if (typeof zipData === "string") {
+                      return zipData === userZipCode
+                    }
+                    // Check if zipData is an object with zip property
+                    if (typeof zipData === "object" && zipData.zip) {
+                      return zipData.zip === userZipCode
+                    }
+                    return false
+                  })
+
+                  if (servicesUserZip) {
+                    console.log(`✅ ${business.displayName} services zip code ${userZipCode}`)
+                    filteredBusinesses.push(business)
+                  } else {
+                    console.log(`❌ ${business.displayName} does not service zip code ${userZipCode}`)
+                    console.log(`Available zip codes:`, serviceAreaData.zipCodes)
+                  }
+                } else if (serviceAreaData.isNationwide) {
+                  console.log(`✅ ${business.displayName} services nationwide (including ${userZipCode})`)
+                  filteredBusinesses.push(business)
+                } else {
+                  console.log(`⚠️ ${business.displayName} has no service area data, including by default`)
+                  filteredBusinesses.push(business)
+                }
+              } else {
+                console.log(`⚠️ Could not fetch service area for ${business.displayName}, including by default`)
+                filteredBusinesses.push(business)
+              }
+            } catch (error) {
+              console.error(`Error checking service area for ${business.displayName}:`, error)
+              // Include business by default if there's an error
+              filteredBusinesses.push(business)
+            }
+          }
+
+          console.log(`After zip code filtering: ${filteredBusinesses.length} businesses service ${userZipCode}`)
+        } else {
+          console.log("No user zip code available, showing all businesses")
+        }
+
+        setProviders(filteredBusinesses)
       } catch (err) {
         setError("Failed to load providers")
         console.error("Error fetching providers:", err)
@@ -51,7 +126,7 @@ export default function LawnGardenPage() {
     }
 
     fetchProviders()
-  }, [])
+  }, [userZipCode])
 
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
@@ -77,6 +152,27 @@ export default function LawnGardenPage() {
     <CategoryLayout title="Lawn, Garden and Snow Removal" backLink="/home-improvement" backText="Home Improvement">
       <CategoryFilter options={filterOptions} />
 
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-green-800">Showing businesses that service: {userZipCode}</p>
+              <p className="text-sm text-green-700">Only businesses available in your area are displayed</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -100,7 +196,9 @@ export default function LawnGardenPage() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Lawn & Garden Services Found</h3>
             <p className="text-gray-600 mb-4">
-              We're currently building our network of lawn, garden, and snow removal professionals in your area.
+              {userZipCode
+                ? `We're currently building our network of lawn, garden, and snow removal professionals in the ${userZipCode} area.`
+                : "We're currently building our network of lawn, garden, and snow removal professionals in your area."}
             </p>
             <Button className="bg-green-600 hover:bg-green-700">Register Your Business</Button>
           </div>
