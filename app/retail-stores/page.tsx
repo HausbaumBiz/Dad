@@ -20,10 +20,8 @@ interface Business {
   displayLocation?: string
   displayPhone?: string
   zipCode: string
-  serviceArea?: {
-    isNationwide: boolean
-    zipCodes: string[]
-  }
+  serviceArea?: string[] // Direct array of ZIP codes
+  isNationwide?: boolean // Direct boolean property
   subcategories?: string[]
   rating?: number
   reviewCount?: number
@@ -91,26 +89,28 @@ export default function RetailStoresPage() {
 
   // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
+    console.log(`  - Checking service area for ${business.displayName || business.businessName}:`)
+    console.log(`    - Primary ZIP: ${business.zipCode}`)
+    console.log(`    - Nationwide: ${business.isNationwide}`)
+    console.log(`    - Service Area: ${business.serviceArea ? JSON.stringify(business.serviceArea) : "none"}`)
+    console.log(`    - Target ZIP: ${targetZipCode}`)
+
     // Check if business is nationwide
-    if (business.serviceArea?.isNationwide) {
-      console.log(`  - ${business.displayName || business.businessName}: nationwide=true, matches=true`)
+    if (business.isNationwide) {
+      console.log(`    - Result: MATCH (nationwide)`)
       return true
     }
 
-    // Check if zip code is in service area
-    if (business.serviceArea?.zipCodes && business.serviceArea.zipCodes.length > 0) {
-      const matches = business.serviceArea.zipCodes.includes(targetZipCode)
-      console.log(
-        `  - ${business.displayName || business.businessName}: serviceArea=[${business.serviceArea.zipCodes.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
-      )
+    // Check if zip code is in service area array
+    if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
+      const matches = business.serviceArea.includes(targetZipCode)
+      console.log(`    - Result: ${matches ? "MATCH" : "NO MATCH"} (service area check)`)
       return matches
     }
 
     // Fall back to primary zip code
     const matches = business.zipCode === targetZipCode
-    console.log(
-      `  - ${business.displayName || business.businessName}: primaryZip="${business.zipCode}", userZip="${targetZipCode}", matches=${matches}`,
-    )
+    console.log(`    - Result: ${matches ? "MATCH" : "NO MATCH"} (primary ZIP fallback)`)
     return matches
   }
 
@@ -308,17 +308,23 @@ export default function RetailStoresPage() {
                     <p className="text-gray-600 text-sm mt-1">{provider.displayLocation || "Location not specified"}</p>
 
                     {/* Service Area Indicator */}
-                    {userZipCode && provider.serviceArea && (
+                    {userZipCode && (
                       <div className="mt-2">
-                        {provider.serviceArea.isNationwide ? (
+                        {provider.isNationwide ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             Serves nationwide
                           </span>
-                        ) : (
+                        ) : provider.serviceArea &&
+                          Array.isArray(provider.serviceArea) &&
+                          provider.serviceArea.includes(userZipCode) ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             Serves {userZipCode} area
                           </span>
-                        )}
+                        ) : provider.zipCode === userZipCode ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Primary location: {userZipCode}
+                          </span>
+                        ) : null}
                       </div>
                     )}
 
@@ -342,7 +348,7 @@ export default function RetailStoresPage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
