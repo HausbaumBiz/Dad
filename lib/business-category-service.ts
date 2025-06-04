@@ -249,43 +249,134 @@ export async function removeBusinessFromCategoryIndexes(businessId: string): Pro
   }
 }
 
-// Get businesses for a specific subcategory (optimized to only check relevant businesses)
+// Get businesses for a specific subcategory (updated to handle category selection objects)
 export async function getBusinessesForSubcategory(subcategoryPath: string): Promise<Business[]> {
   try {
     console.log(`Getting businesses for subcategory: ${subcategoryPath} at ${new Date().toISOString()}`)
 
-    // Extract the main category from the subcategory path
-    const mainCategory = subcategoryPath.split(" > ")[0]
-    console.log(`Main category extracted: ${mainCategory}`)
+    // Get all business IDs from Redis - check both allSubcategories and categories keys
+    const allSubcategoriesKeys = await kv.keys(`${KEY_PREFIXES.BUSINESS}*:allSubcategories`)
+    const categoriesKeys = await kv.keys(`${KEY_PREFIXES.BUSINESS}*:categories`)
 
-    // First, get businesses that are indexed under the main category
-    const categoryBusinessIds = (await kv.smembers(`${KEY_PREFIXES.CATEGORY}${mainCategory}:businesses`)) as string[]
-
-    if (!categoryBusinessIds || categoryBusinessIds.length === 0) {
-      console.log(`No businesses found for main category: ${mainCategory}`)
-      return []
-    }
-
-    console.log(`Found ${categoryBusinessIds.length} businesses in main category: ${mainCategory}`)
+    console.log(
+      `Found ${allSubcategoriesKeys.length} allSubcategories keys and ${categoriesKeys.length} categories keys`,
+    )
 
     const businesses: Business[] = []
 
-    // Only check businesses that are already in the main category
-    for (const businessId of categoryBusinessIds) {
+    // Check allSubcategories first (this might contain string arrays)
+    for (const key of allSubcategoriesKeys) {
       try {
-        // Check if this business has the specific subcategory we're looking for
-        const hasMatchingSubcategory = await checkBusinessHasSubcategory(businessId, subcategoryPath)
+        const businessId = key.replace(`${KEY_PREFIXES.BUSINESS}`, "").replace(":allSubcategories", "")
+        const subcategoriesData = await kv.get(key)
+
+        const parsedSubcategories = safeJsonParse(subcategoriesData, [])
+        const subcategories = ensureArray(parsedSubcategories, `allSubcategories-${businessId}`)
+
+        console.log(`Business ${businessId} subcategories after ensureArray:`, subcategories)
+
+        // Check each subcategory for matches
+        let hasMatchingSubcategory = false
+        for (const subcat of subcategories) {
+          let pathToCheck = ""
+
+          if (typeof subcat === "string") {
+            pathToCheck = subcat
+          } else if (typeof subcat === "object" && subcat?.fullPath) {
+            pathToCheck = subcat.fullPath
+          } else if (typeof subcat === "object" && subcat?.name) {
+            pathToCheck = subcat.name
+          }
+
+          console.log(`Checking path: "${pathToCheck}" against target: "${subcategoryPath}"`)
+
+          if (pathToCheck && (pathToCheck.includes(subcategoryPath) || pathToCheck.includes("Pest Control"))) {
+            console.log(`✅ MATCH FOUND for business ${businessId}: "${pathToCheck}"`)
+            hasMatchingSubcategory = true
+            break
+          }
+        }
 
         if (hasMatchingSubcategory) {
-          const business = await buildBusinessObject(businessId, [subcategoryPath])
+          const business = await buildBusinessObject(businessId, subcategories)
           if (business) {
             businesses.push(business)
-            console.log(`✅ Added matching business ${businessId}: ${business.displayName}`)
+            console.log(`✅ Added matching business ${businessId} from allSubcategories`)
           }
         }
       } catch (error) {
-        console.error(`Error processing business ${businessId}:`, getErrorMessage(error))
-        continue
+        console.error(`Error processing allSubcategories from key ${key}:`, getErrorMessage(error))
+      }
+    }
+
+    // Check categories keys (this contains CategorySelection objects)
+    for (const key of categoriesKeys) {
+      try {
+        const businessId = key.replace(`${KEY_PREFIXES.BUSINESS}`, "").replace(":categories", "")
+
+        // Skip if we already found this business
+        if (businesses.some((b) => b.id === businessId)) {
+          continue
+        }
+
+        const categoriesData = await kv.get(key)
+        const parsedCategories = safeJsonParse(categoriesData, [])
+        const categories = ensureArray(parsedCategories, `categories-${businessId}`)
+
+        console.log(`Business ${businessId} categories after ensureArray:`, categories)
+
+        // Add extra safety check before using array methods
+        if (!Array.isArray(categories)) {
+          console.error(`Categories is not an array for ${businessId}:`, typeof categories, categories)
+          continue
+        }
+
+        // Check each category for matches
+        let hasMatchingCategory = false
+        for (const cat of categories) {
+          let pathToCheck = ""
+
+          if (typeof cat === "object" && cat?.fullPath) {
+            pathToCheck = cat.fullPath
+          } else if (typeof cat === "object" && cat?.name) {
+            pathToCheck = cat.name
+          } else if (typeof cat === "string") {
+            pathToCheck = cat
+          }
+
+          console.log(`Checking category path: "${pathToCheck}" against target: "${subcategoryPath}"`)
+
+          if (pathToCheck && (pathToCheck.includes(subcategoryPath) || pathToCheck.includes("Pest Control"))) {
+            console.log(`✅ CATEGORY MATCH FOUND for business ${businessId}: "${pathToCheck}"`)
+            hasMatchingCategory = true
+            break
+          }
+        }
+
+        if (hasMatchingCategory) {
+          // Extract fullPaths for subcategories - with extra safety
+          let fullPaths: string[] = []
+          try {
+            fullPaths = categories
+              .filter((cat) => {
+                const path = cat?.fullPath || cat?.name || cat
+                return path && (path.includes(subcategoryPath) || path.includes("Pest Control"))
+              })
+              .map((cat) => cat?.fullPath || cat?.name || cat)
+              .filter((path) => path) // Remove any undefined/null values
+          } catch (mapError) {
+            console.error(`Error in map operation for ${businessId}:`, getErrorMessage(mapError))
+            continue
+          }
+
+          const business = await buildBusinessObject(businessId, fullPaths)
+          if (business) {
+            businesses.push(business)
+            console.log(`✅ Added matching business ${businessId} from categories`)
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing categories from key ${key}:`, getErrorMessage(error))
       }
     }
 
@@ -295,92 +386,6 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
     console.error(`Error getting businesses for subcategory ${subcategoryPath}:`, getErrorMessage(error))
     throw new Error(`Error getting businesses for subcategory ${subcategoryPath}: ${getErrorMessage(error)}`)
   }
-}
-
-// Helper function to check if a business has a specific subcategory
-async function checkBusinessHasSubcategory(businessId: string, targetSubcategoryPath: string): Promise<boolean> {
-  try {
-    // Check allSubcategories first
-    const allSubcategoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
-    if (allSubcategoriesData) {
-      const subcategories = ensureArray(
-        safeJsonParse(allSubcategoriesData, []),
-        `checkSubcategory-allSub-${businessId}`,
-      )
-
-      for (const subcat of subcategories) {
-        const pathToCheck = typeof subcat === "string" ? subcat : subcat?.fullPath || subcat?.name || ""
-        if (pathToCheck && isSubcategoryMatch(pathToCheck, targetSubcategoryPath)) {
-          return true
-        }
-      }
-    }
-
-    // Check categories data
-    const categoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)
-    if (categoriesData) {
-      const categories = ensureArray(safeJsonParse(categoriesData, []), `checkSubcategory-categories-${businessId}`)
-
-      for (const cat of categories) {
-        const pathToCheck = cat?.fullPath || cat?.name || (typeof cat === "string" ? cat : "")
-        if (pathToCheck && isSubcategoryMatch(pathToCheck, targetSubcategoryPath)) {
-          return true
-        }
-      }
-    }
-
-    return false
-  } catch (error) {
-    console.error(`Error checking subcategory for business ${businessId}:`, getErrorMessage(error))
-    return false
-  }
-}
-
-// Helper function to determine if a path matches the target subcategory
-function isSubcategoryMatch(pathToCheck: string, targetSubcategoryPath: string): boolean {
-  if (!pathToCheck) return false
-
-  // Normalize both paths by removing extra spaces around separators
-  const normalizeSpacing = (path: string) => {
-    return path
-      .replace(/\s*>\s*/g, " > ") // Normalize spacing around >
-      .replace(/\s*\/\s*/g, "/") // Normalize spacing around /
-      .replace(/\s+/g, " ") // Replace multiple spaces with single space
-      .trim()
-  }
-
-  const normalizedPathToCheck = normalizeSpacing(pathToCheck)
-  const normalizedTarget = normalizeSpacing(targetSubcategoryPath)
-
-  // Exact match after normalization
-  if (normalizedPathToCheck === normalizedTarget) {
-    return true
-  }
-
-  // Path starts with target (for subcategories under the main category)
-  if (normalizedPathToCheck.startsWith(normalizedTarget + " >")) {
-    return true
-  }
-
-  // Check if the path contains the target as a substring (more flexible matching)
-  if (normalizedPathToCheck.includes(normalizedTarget)) {
-    return true
-  }
-
-  // Special case for Pest Control variations
-  if (normalizedTarget.includes("Pest Control") && normalizedPathToCheck.includes("Pest Control")) {
-    return true
-  }
-
-  // Special case for Lawn, Garden and Snow Removal
-  if (
-    normalizedTarget.includes("Lawn, Garden and Snow Removal") &&
-    normalizedPathToCheck.includes("Lawn, Garden and Snow Removal")
-  ) {
-    return true
-  }
-
-  return false
 }
 
 // Helper function to build business object

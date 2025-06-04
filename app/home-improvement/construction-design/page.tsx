@@ -31,7 +31,6 @@ export default function ConstructionDesignPage() {
   const [businesses, setBusinesses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined) // Start as undefined
 
   // State for dialogs
   const [selectedBusinessId, setSelectedBusinessId] = useState(null)
@@ -43,84 +42,17 @@ export default function ConstructionDesignPage() {
   const subcategoryPath = "Home, Lawn, and Manual Labor > Home Construction and Design"
 
   useEffect(() => {
-    const savedZipCode = localStorage.getItem("savedZipCode")
-    if (savedZipCode) {
-      setUserZipCode(savedZipCode)
-      console.log(`User zip code loaded: ${savedZipCode}`)
-    } else {
-      setUserZipCode(null) // Set to null instead of leaving undefined
-      console.log("No user zip code found in localStorage")
-    }
-  }, [])
-
-  useEffect(() => {
     async function fetchBusinesses() {
       try {
         setLoading(true)
-        console.log(`Fetching businesses for ${subcategoryPath} subcategory with zip code filtering...`)
+        console.log(`Fetching businesses for ${subcategoryPath} subcategory...`)
 
         const result = await getBusinessesForSubcategory(subcategoryPath)
-        console.log(`Found ${result.length} total businesses for base path: ${subcategoryPath}`)
-
-        let filteredBusinesses = result
-
-        // Filter by user's zip code if available
-        if (userZipCode) {
-          console.log(`Filtering businesses that service zip code: ${userZipCode}`)
-          filteredBusinesses = []
-
-          for (const business of result) {
-            try {
-              const response = await fetch(`/api/admin/business/${business.id}/service-area`)
-              if (response.ok) {
-                const serviceAreaData = await response.json()
-                console.log(`Service area data for ${business.displayName}:`, {
-                  zipCount: serviceAreaData.zipCodes?.length || 0,
-                  isNationwide: serviceAreaData.isNationwide,
-                  businessId: serviceAreaData.businessId,
-                })
-
-                // Check if business is nationwide
-                if (serviceAreaData.isNationwide) {
-                  console.log(`✅ ${business.displayName} services nationwide (including ${userZipCode})`)
-                  filteredBusinesses.push(business)
-                  continue
-                }
-
-                // Check if the user's zip code is in the business's service area
-                if (serviceAreaData.zipCodes && Array.isArray(serviceAreaData.zipCodes)) {
-                  const servicesUserZip = serviceAreaData.zipCodes.some((zipData) => {
-                    // Handle both string and object formats
-                    const zipCode = typeof zipData === "string" ? zipData : zipData?.zip
-                    return zipCode === userZipCode
-                  })
-
-                  if (servicesUserZip) {
-                    console.log(`✅ ${business.displayName} services zip code ${userZipCode}`)
-                    filteredBusinesses.push(business)
-                  } else {
-                    console.log(`❌ ${business.displayName} does not service zip code ${userZipCode}`)
-                    console.log(
-                      `Available zip codes:`,
-                      serviceAreaData.zipCodes.slice(0, 10).map((z) => (typeof z === "string" ? z : z?.zip)),
-                    )
-                  }
-                } else {
-                  console.log(`⚠️ ${business.displayName} has no service area data, excluding by default`)
-                }
-              } else {
-                console.log(`⚠️ Could not fetch service area for ${business.displayName}, excluding by default`)
-              }
-            } catch (error) {
-              console.error(`Error checking service area for ${business.displayName}:`, error)
-            }
-          }
-        }
-        console.log(`After zip code filtering: ${filteredBusinesses.length} businesses service ${userZipCode}`)
+        console.log(`Found ${result.length} businesses for base path: ${subcategoryPath}`)
 
         // Fetch ad design data for each business to get phone numbers
         const enhancedBusinesses = await Promise.all(
-          filteredBusinesses.map(async (business) => {
+          result.map(async (business) => {
             try {
               // Fetch ad design data from Redis
               const adDesignData = await getBusinessAdDesign(business.id)
@@ -162,12 +94,8 @@ export default function ConstructionDesignPage() {
       }
     }
 
-    // Only fetch if we have loaded the userZipCode state (even if it's null)
-    // This prevents the race condition
-    if (userZipCode !== undefined) {
-      fetchBusinesses()
-    }
-  }, [subcategoryPath, userZipCode])
+    fetchBusinesses()
+  }, [subcategoryPath])
 
   // Handler for opening reviews dialog
   const handleOpenReviews = (business) => {
@@ -211,27 +139,6 @@ export default function ConstructionDesignPage() {
     <CategoryLayout title="Home Construction and Design" backLink="/home-improvement" backText="Home Improvement">
       <CategoryFilter options={filterOptions} />
 
-      {/* Zip Code Status Indicator */}
-      {userZipCode && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center">
-            <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <div>
-              <p className="text-sm font-medium text-blue-800">Showing businesses that service: {userZipCode}</p>
-              <p className="text-sm text-blue-700">Only businesses available in your area are displayed</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -253,11 +160,7 @@ export default function ConstructionDesignPage() {
             </svg>
           </div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No Construction & Design Services Found</h3>
-          <p className="text-gray-600 mb-4">
-            {userZipCode
-              ? `We're currently building our network of construction & design professionals in the ${userZipCode} area.`
-              : "Be the first contractor or designer to join our platform!"}
-          </p>
+          <p className="text-gray-600 mb-4">Be the first contractor or designer to join our platform!</p>
           <Button>Register Your Business</Button>
         </div>
       ) : (

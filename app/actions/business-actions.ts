@@ -35,15 +35,14 @@ function getErrorMessage(error: unknown): string {
 function safeJsonParse(data: any, fallback: any = null) {
   try {
     if (typeof data === "string") {
-      const parsed = JSON.parse(data)
-      return parsed
+      return JSON.parse(data)
     }
     if (typeof data === "object" && data !== null) {
       return data
     }
     return fallback
   } catch (error) {
-    console.error("Error parsing JSON:", error, "Data:", data)
+    console.error("Error parsing JSON:", error)
     return fallback
   }
 }
@@ -589,22 +588,14 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
     )
 
     // Store the color values
-    let colorValues = null
-    try {
-      const colorValuesStr = await kv.get(colorsKey)
-      console.log(`Color values (${colorsKey}):`, colorValuesStr)
-
-      if (colorValuesStr) {
-        colorValues = safeJsonParse(colorValuesStr, {})
-        // Ensure colorValues is an object, not an array
-        if (Array.isArray(colorValues)) {
-          console.warn("Color values is unexpectedly an array, converting to object")
-          colorValues = {}
-        }
-      }
-    } catch (error) {
-      console.error("Error getting color values:", getErrorMessage(error))
-      colorValues = {} // Ensure we have a fallback object
+    if (designData.colorValues) {
+      await kv.set(
+        colorsKey,
+        JSON.stringify({
+          ...designData.colorValues,
+          colorScheme: designData.colorScheme,
+        }),
+      )
     }
 
     // Store the business information
@@ -672,15 +663,9 @@ export async function getBusinessAdDesign(businessId: string) {
 
       if (colorValuesStr) {
         colorValues = safeJsonParse(colorValuesStr, {})
-        // Ensure colorValues is an object, not an array
-        if (Array.isArray(colorValues)) {
-          console.warn("Color values is unexpectedly an array, converting to object")
-          colorValues = {}
-        }
       }
     } catch (error) {
       console.error("Error getting color values:", getErrorMessage(error))
-      colorValues = {} // Ensure we have a fallback object
     }
 
     // Get the business information
