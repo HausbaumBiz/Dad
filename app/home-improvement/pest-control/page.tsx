@@ -23,17 +23,84 @@ export default function PestControlPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedBusiness, setSelectedBusiness] = useState(null)
+  const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
 
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Load user zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+      setUserZipCode(null)
+    }
+  }, [])
+
   useEffect(() => {
     async function fetchBusinesses() {
+      if (userZipCode === undefined) return // Wait until zip code is loaded (even if null)
+
       setLoading(true)
       try {
-        console.log("Fetching pest control businesses with subcategory path...")
-        const result = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Pest Control/Wildlife Removal")
+        console.log("Fetching pest control businesses...")
+
+        // Use the more efficient category-based approach
+        let result = []
+
+        if (userZipCode) {
+          // Fetch businesses by category and zip code efficiently
+          console.log(`Fetching businesses for pest control category in zip code: ${userZipCode}`)
+
+          // Try to get businesses using the category mapping system
+          result = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Pest Control/Wildlife Removal")
+
+          // Filter businesses that serve the user's zip code
+          const filteredBusinesses = []
+
+          for (const business of result) {
+            // Check if business serves this zip code
+            try {
+              const response = await fetch(`/api/admin/business/${business.id}/service-area`)
+              if (response.ok) {
+                const serviceAreaData = await response.json()
+
+                // Check if business is nationwide or serves the specific zip
+                if (serviceAreaData.isNationwide) {
+                  filteredBusinesses.push(business)
+                } else if (serviceAreaData.zipCodes && Array.isArray(serviceAreaData.zipCodes)) {
+                  const servicesUserZip = serviceAreaData.zipCodes.some((zipData) => {
+                    const zipCode = typeof zipData === "string" ? zipData : zipData?.zip
+                    return zipCode === userZipCode
+                  })
+
+                  if (servicesUserZip) {
+                    filteredBusinesses.push(business)
+                  }
+                }
+              } else {
+                // If we can't check service area, include the business
+                filteredBusinesses.push(business)
+              }
+            } catch (error) {
+              console.error(`Error checking service area for ${business.displayName}:`, error)
+              filteredBusinesses.push(business)
+            }
+          }
+
+          result = filteredBusinesses
+          console.log(`After filtering by zip code ${userZipCode}: ${result.length} businesses found`)
+        } else {
+          // No zip code, show all pest control businesses
+          console.log("No user zip code, fetching all pest control businesses")
+          result = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Pest Control/Wildlife Removal")
+        }
+
+        console.log(`Found ${result.length} total pest control businesses`)
 
         // Transform the data for display
         const transformedProviders = result.map((business) => {
@@ -43,18 +110,20 @@ export default function PestControlPage() {
           return {
             id: business.id,
             name: business.displayName || business.businessName,
-            location: business.displayLocation || `${business.city || ""}, ${business.state || ""}`,
+            location:
+              business.displayLocation ||
+              `${business.city || ""}, ${business.state || ""}`.trim().replace(/^,|,$/g, "") ||
+              "Location not specified",
             phone: business.displayPhone || business.phone,
             rating: business.rating || 4.5,
             reviews: business.reviewCount || 0,
-            services: serviceTags,
+            services: serviceTags.length > 0 ? serviceTags : ["Pest Control"],
             // Keep the original business data for the profile dialog
             businessData: business,
           }
         })
 
         setProviders(transformedProviders)
-        console.log(`Found ${transformedProviders.length} pest control businesses`)
       } catch (error) {
         console.error("Error fetching businesses:", error)
         setError("Failed to load businesses")
@@ -64,10 +133,14 @@ export default function PestControlPage() {
     }
 
     fetchBusinesses()
-  }, [])
+  }, [userZipCode])
 
-  // Extract service tags from subcategories
+  // Extract service tags from subcategories - improved version
   const getServiceTags = (subcategories) => {
+    if (!subcategories || subcategories.length === 0) {
+      return ["Pest Control"]
+    }
+
     return subcategories
       .filter((subcat) => {
         const path = typeof subcat === "string" ? subcat : subcat?.fullPath
@@ -78,8 +151,19 @@ export default function PestControlPage() {
         if (!path) return "Pest Control"
 
         const parts = path.split(" > ")
-        return parts[parts.length - 1] // Get just the service name
+        const serviceName = parts[parts.length - 1]
+
+        // Map to user-friendly names
+        const serviceMap = {
+          "Rodent/Small Animal Infestations": "Rodent Control",
+          "Wildlife Removal": "Wildlife Removal",
+          "Insect and Bug Control": "Insect Control",
+          "Other Pest Control/Wildlife Removal": "General Pest Control",
+        }
+
+        return serviceMap[serviceName] || serviceName || "Pest Control"
       })
+      .filter((service, index, array) => array.indexOf(service) === index) // Remove duplicates
       .slice(0, 3) // Limit to 3 for display
   }
 
@@ -98,6 +182,27 @@ export default function PestControlPage() {
   return (
     <CategoryLayout title="Pest Control/Wildlife Removal" backLink="/home-improvement" backText="Home Improvement">
       <CategoryFilter options={filterOptions} />
+
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-blue-800">Showing businesses that service: {userZipCode}</p>
+              <p className="text-sm text-blue-700">Only businesses available in your area are displayed</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-6">
         {loading ? (
@@ -122,7 +227,9 @@ export default function PestControlPage() {
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No Pest Control Services Found</h3>
             <p className="text-gray-600 mb-6">
-              Be the first pest control service to join our platform and help local customers with their pest problems!
+              {userZipCode
+                ? `We're currently building our network of pest control services in the ${userZipCode} area.`
+                : "Be the first pest control service to join our platform and help local customers with their pest problems!"}
             </p>
             <Button>Register Your Pest Control Business</Button>
           </div>

@@ -1,30 +1,40 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { getBusinessZipCodesById } from "@/app/actions/zip-code-actions"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const id = params.id
+    const businessId = params.id
 
-    if (!id) {
+    if (!businessId) {
       return NextResponse.json({ error: "Business ID is required" }, { status: 400 })
     }
 
-    // Use our improved function to get ZIP codes
-    const result = await getBusinessZipCodesById(id)
+    console.log(`Getting service area for business: ${businessId}`)
+
+    // Get the business's ZIP codes and nationwide flag from the zip-code-actions
+    const result = await getBusinessZipCodesById(businessId)
 
     if (!result.success) {
-      return NextResponse.json({ error: result.message || "Failed to retrieve service area" }, { status: 500 })
+      console.error(`Failed to get ZIP codes for business ${businessId}:`, result.message)
+      return NextResponse.json({ error: result.message || "Failed to get service area" }, { status: 500 })
     }
 
-    // Return the data in the expected format
+    const { zipCodes, isNationwide } = result.data || { zipCodes: [], isNationwide: false }
+
+    console.log(`Business ${businessId} service area:`, {
+      zipCodes: zipCodes.length,
+      isNationwide,
+      sampleZips: zipCodes.slice(0, 5).map((z) => z.zip),
+    })
+
+    // Return the service area data in the format the frontend expects
     return NextResponse.json({
-      isNationwide: result.data?.isNationwide || false,
-      zipCodes: result.data?.zipCodes.map((z) => z.zip) || [],
-      // Include the full ZIP code data for additional information
-      zipCodeDetails: result.data?.zipCodes || [],
+      zipCodes: zipCodes, // This includes all ZIP codes from radius selector
+      isNationwide: isNationwide,
+      businessId: businessId,
     })
   } catch (error) {
-    console.error(`Error getting zip codes for business ${params.id}:`, error)
-    return NextResponse.json({ error: "Failed to retrieve service area" }, { status: 500 })
+    console.error(`Error getting service area for business ${params.id}:`, error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
