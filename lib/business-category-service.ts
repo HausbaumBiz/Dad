@@ -276,7 +276,9 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
             serviceArea: serviceAreaData.zipCodes || [], // Pass the actual zip codes array
             isNationwide: serviceAreaData.isNationwide || false,
             adDesignData: adDesignData,
+            // Map subcategories to both properties for compatibility
             subcategories: subcategories,
+            allSubcategories: subcategories, // Add this line to ensure frontend compatibility
           } as Business
 
           // Create display location
@@ -453,18 +455,62 @@ async function getBusinessServiceArea(businessId: string) {
   }
 }
 
-// Get subcategories for a business
+// Get subcategories for a business (enhanced to get from multiple sources)
 async function getBusinessSubcategories(businessId: string): Promise<string[]> {
   try {
-    // Try to get subcategories from the business-focus page data
-    const subcategoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
+    const allSubcategories: string[] = []
 
-    if (subcategoriesData) {
-      const subcategories = safeJsonParse(subcategoriesData, [])
-      return ensureArray(subcategories, `getBusinessSubcategories-${businessId}`)
+    // Try to get subcategories from the business-focus page data (most comprehensive)
+    const businessFocusData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
+    if (businessFocusData) {
+      const subcategories = safeJsonParse(businessFocusData, [])
+      const subcategoryArray = ensureArray(subcategories, `getBusinessSubcategories-businessFocus-${businessId}`)
+
+      // Extract subcategory names from objects or use strings directly
+      subcategoryArray.forEach((item: any) => {
+        if (typeof item === "string") {
+          allSubcategories.push(item)
+        } else if (item && typeof item === "object") {
+          // Handle different object structures
+          const name = item.name || item.subcategory || item.label || item.title
+          if (name && typeof name === "string") {
+            allSubcategories.push(name)
+          }
+        }
+      })
     }
 
-    return []
+    // Also try to get from categories data as fallback
+    if (allSubcategories.length === 0) {
+      const categoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)
+      if (categoriesData) {
+        const categories = safeJsonParse(categoriesData, [])
+        const categoryArray = ensureArray(categories, `getBusinessSubcategories-categories-${businessId}`)
+
+        categoryArray.forEach((item: any) => {
+          if (typeof item === "string") {
+            allSubcategories.push(item)
+          } else if (item && typeof item === "object") {
+            const name = item.name || item.subcategory || item.label || item.title
+            if (name && typeof name === "string") {
+              allSubcategories.push(name)
+            }
+          }
+        })
+      }
+    }
+
+    // Remove duplicates and filter out empty strings
+    const uniqueSubcategories = [...new Set(allSubcategories)]
+      .filter((sub) => sub && sub.trim().length > 0)
+      .map((sub) => sub.trim())
+
+    console.log(
+      `Retrieved ${uniqueSubcategories.length} subcategories for business ${businessId}:`,
+      uniqueSubcategories,
+    )
+
+    return uniqueSubcategories
   } catch (error) {
     console.error(`Error getting subcategories for business ${businessId}:`, getErrorMessage(error))
     return []

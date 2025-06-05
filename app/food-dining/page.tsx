@@ -114,6 +114,20 @@ export default function FoodDiningPage() {
       label: "Organic/Vegan/Vegetarian/Farm to table",
       value: "Organic/Vegan/Vegetarian/Farm to table",
     },
+    { id: "restaurant16", label: "Fast Food", value: "Fast Food" },
+    { id: "restaurant17", label: "Catering", value: "Catering" },
+    { id: "restaurant18", label: "Buffet", value: "Buffet" },
+    { id: "restaurant19", label: "Bakery/Bagels/Donuts", value: "Bakery/Bagels/Donuts" },
+    { id: "restaurant20", label: "Breakfast", value: "Breakfast" },
+    { id: "restaurant21", label: "24 hour/Open Late", value: "24 hour/Open Late" },
+    { id: "restaurant22", label: "Carts/Stands/Trucks", value: "Carts/Stands/Trucks" },
+    { id: "restaurant23", label: "Dinner Theater", value: "Dinner Theater" },
+    { id: "restaurant24", label: "Sandwich Shops", value: "Sandwich Shops" },
+    { id: "restaurant25", label: "Drive-Ins", value: "Drive-Ins" },
+    { id: "restaurant26", label: "Seafood", value: "Seafood" },
+    { id: "restaurant27", label: "Steak House", value: "Steak House" },
+    { id: "restaurant28", label: "Sushi", value: "Sushi" },
+    { id: "restaurant29", label: "Cafeteria", value: "Cafeteria" },
   ]
 
   const [selectedProvider, setSelectedProvider] = useState<any>(null)

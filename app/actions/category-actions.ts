@@ -18,10 +18,36 @@ export async function saveBusinessCategories(categories: CategorySelection[]) {
       return { success: false, message: "Not authenticated" }
     }
 
+    // Add input validation
+    if (!categories) {
+      console.log("Categories parameter is null or undefined")
+      return { success: false, message: "No categories provided" }
+    }
+
+    if (!Array.isArray(categories)) {
+      console.error("Categories parameter is not an array:", typeof categories, categories)
+      return { success: false, message: "Invalid categories format" }
+    }
+
+    if (categories.length === 0) {
+      console.log("Empty categories array provided")
+      return { success: false, message: "No categories selected" }
+    }
+
     console.log(`Saving ${categories.length} categories for business ${business.id}`)
 
+    // Validate that each category has the expected structure
+    const validCategories = categories.filter(
+      (cat) => cat && typeof cat === "object" && typeof cat.category === "string" && cat.category.trim() !== "",
+    )
+
+    if (validCategories.length === 0) {
+      console.error("No valid categories found in input:", categories)
+      return { success: false, message: "No valid categories found" }
+    }
+
     // Extract just the category names (the main categories, not subcategories)
-    const selectedCategoryNames = [...new Set(categories.map((cat) => cat.category))]
+    const selectedCategoryNames = [...new Set(validCategories.map((cat) => cat.category))]
 
     console.log(`Selected category names:`, selectedCategoryNames)
 

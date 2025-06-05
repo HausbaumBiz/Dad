@@ -191,6 +191,8 @@ export default function PersonalAssistantsPage() {
     rating?: number
     reviewCount?: number
     services?: string[]
+    subcategories?: string[]
+    allSubcategories?: string[]
     zipCode?: string
     serviceArea?: string[]
     adDesignData?: {
@@ -441,20 +443,28 @@ export default function PersonalAssistantsPage() {
                       </span>
                     </div>
 
-                    {provider.services && provider.services.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-sm font-medium text-gray-700">Services:</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.services.map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {service}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
+                    {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
+                      provider.allSubcategories.map((service: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                        >
+                          {service}
+                        </span>
+                      ))
+                    ) : provider.subcategories && provider.subcategories.length > 0 ? (
+                      provider.subcategories.map((service: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                        >
+                          {service}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                        Personal Assistants
+                      </span>
                     )}
                   </div>
 

@@ -73,7 +73,7 @@ export function ServiceAreaSectionEnhanced() {
 
     try {
       // Use the API endpoint to search for ZIP codes within the radius
-      const response = await fetch(`/api/zip-codes/radius?zip=${zipCode}&radius=${radius}&limit=100`)
+      const response = await fetch(`/api/zip-codes/radius?zip=${zipCode}&radius=${radius}&limit=400`)
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -116,15 +116,25 @@ export function ServiceAreaSectionEnhanced() {
   const handleSaveZipCodes = async () => {
     setIsSaving(true)
     try {
+      // Ensure zipResults is a valid array before processing
+      if (!Array.isArray(zipResults)) {
+        console.error("zipResults is not an array:", typeof zipResults, zipResults)
+        throw new Error("Invalid ZIP code data format")
+      }
+
       // Ensure zipResults is a valid array of ZipCodeData objects
-      const validZipCodes = zipResults.map((zip) => ({
-        zip: zip.zip || "",
-        city: zip.city || "Unknown City",
-        state: zip.state || "Unknown State",
-        latitude: zip.latitude || 0,
-        longitude: zip.longitude || 0,
-        distance: zip.distance,
-      }))
+      const validZipCodes = zipResults
+        .filter((zip) => zip && typeof zip === "object" && zip.zip)
+        .map((zip) => ({
+          zip: String(zip.zip || ""),
+          city: String(zip.city || "Unknown City"),
+          state: String(zip.state || "Unknown State"),
+          latitude: Number(zip.latitude || 0),
+          longitude: Number(zip.longitude || 0),
+          distance: zip.distance !== undefined ? Number(zip.distance) : undefined,
+        }))
+
+      console.log("Saving ZIP codes:", validZipCodes.length, "valid codes")
 
       const result = await saveBusinessZipCodes(validZipCodes, isNationwide)
 
@@ -140,7 +150,7 @@ export function ServiceAreaSectionEnhanced() {
       console.error("Error saving ZIP codes:", error)
       toast({
         title: "Error",
-        description: "Failed to save your service area",
+        description: `Failed to save your service area: ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive",
       })
     } finally {

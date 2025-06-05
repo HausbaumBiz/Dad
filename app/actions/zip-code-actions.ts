@@ -62,16 +62,31 @@ export async function saveBusinessZipCodes(
       return { success: false, message: "Not authenticated" }
     }
 
-    // Ensure we have a valid array to work with
+    // Handle different input formats with comprehensive type checking
     let zipCodes: ZipCodeData[] = []
 
-    // Handle different input formats
+    console.log("saveBusinessZipCodes called with:", {
+      inputType: typeof zipCodesInput,
+      isArray: Array.isArray(zipCodesInput),
+      inputLength: Array.isArray(zipCodesInput) ? zipCodesInput.length : "N/A",
+      isNationwide,
+    })
+
+    // Ensure we have a valid array to work with
     if (zipCodesInput === null || zipCodesInput === undefined) {
+      console.log("Input is null or undefined, using empty array")
       zipCodes = []
     } else if (Array.isArray(zipCodesInput)) {
+      console.log("Input is array with", zipCodesInput.length, "items")
       // Filter out invalid entries and ensure each has required properties
       zipCodes = zipCodesInput
-        .filter((item) => item && typeof item === "object")
+        .filter((item, index) => {
+          const isValid = item && typeof item === "object" && item.zip
+          if (!isValid) {
+            console.log(`Filtering out invalid item at index ${index}:`, item)
+          }
+          return isValid
+        })
         .map((item) => ({
           zip: String(item.zip || ""),
           city: String(item.city || "Unknown City"),
@@ -80,8 +95,9 @@ export async function saveBusinessZipCodes(
           longitude: Number(item.longitude || 0),
           distance: item.distance !== undefined ? Number(item.distance) : undefined,
         }))
-        .filter((item) => item.zip) // Only keep items with a zip code
+      console.log("Processed", zipCodes.length, "valid ZIP codes")
     } else if (typeof zipCodesInput === "object" && zipCodesInput !== null) {
+      console.log("Input is single object:", zipCodesInput)
       // Handle case where a single object was passed
       const item = zipCodesInput
       if (item.zip) {
@@ -95,6 +111,25 @@ export async function saveBusinessZipCodes(
             distance: item.distance !== undefined ? Number(item.distance) : undefined,
           },
         ]
+      }
+    } else {
+      // If it's not an array or object, log the issue and return error
+      console.error("Invalid zipCodesInput type:", {
+        type: typeof zipCodesInput,
+        value: zipCodesInput,
+        constructor: zipCodesInput?.constructor?.name,
+      })
+      return {
+        success: false,
+        message: `Invalid ZIP codes data format. Expected array, got ${typeof zipCodesInput}`,
+      }
+    }
+
+    if (!Array.isArray(zipCodes)) {
+      console.error("zipCodes is still not an array after processing:", typeof zipCodes, zipCodes)
+      return {
+        success: false,
+        message: "Failed to process ZIP codes into valid array format",
       }
     }
 
