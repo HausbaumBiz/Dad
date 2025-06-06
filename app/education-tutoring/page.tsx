@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -12,6 +11,7 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Add fetchIdRef for race condition prevention
 
@@ -102,6 +102,9 @@ export default function EducationTutoringPage() {
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const fetchIdRef = useRef(0)
 
+  // Filter State Variables
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([])
+
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
@@ -157,19 +160,24 @@ export default function EducationTutoringPage() {
     fetchBusinesses()
   }, [toast, userZipCode])
 
-  const filteredBusinesses = selectedFilter
-    ? businesses.filter((business) => {
-        if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-          return business.allSubcategories.some((sub: string) =>
-            sub.toLowerCase().includes(selectedFilter.toLowerCase()),
-          )
-        }
-        if (business.subcategory) {
-          return business.subcategory.toLowerCase().includes(selectedFilter.toLowerCase())
-        }
-        return false
-      })
-    : businesses
+  // Exact subcategory matching function
+  const businessHasSubcategory = (business: Business, subcategory: string): boolean => {
+    if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+      return business.allSubcategories.includes(subcategory)
+    }
+    if (business.subcategory) {
+      return business.subcategory === subcategory
+    }
+    return false
+  }
+
+  // Filter businesses based on selected subcategories
+  const filteredBusinesses =
+    selectedSubcategories.length > 0
+      ? businesses.filter((business) =>
+          selectedSubcategories.some((subcategory) => businessHasSubcategory(business, subcategory)),
+        )
+      : businesses
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
@@ -181,8 +189,11 @@ export default function EducationTutoringPage() {
     setIsProfileDialogOpen(true)
   }
 
-  const handleFilterChange = (value: string) => {
-    setSelectedFilter(value === selectedFilter ? null : value)
+  // Filter handler
+  const handleSubcategoryChange = (subcategory: string) => {
+    setSelectedSubcategories((prev) =>
+      prev.includes(subcategory) ? prev.filter((s) => s !== subcategory) : [...prev, subcategory],
+    )
   }
 
   return (
@@ -216,7 +227,28 @@ export default function EducationTutoringPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
+      {/* Replace CategoryFilter with checkbox interface */}
+      <div className="mb-4">
+        <h4 className="text-md font-semibold mb-2">Filter by Subject:</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          {filterOptions.map((option) => (
+            <label
+              key={option.id}
+              className="flex items-center space-x-2 bg-white rounded-md border border-gray-200 shadow-sm p-2 cursor-pointer hover:bg-gray-50"
+            >
+              <Checkbox
+                id={option.id}
+                value={option.value}
+                checked={selectedSubcategories.includes(option.value)}
+                onCheckedChange={() => handleSubcategoryChange(option.value)}
+              />
+              <span className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                {option.label}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
 
       {userZipCode && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">

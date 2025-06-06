@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -30,6 +29,7 @@ interface Business {
   reviews?: number
   allSubcategories?: string[]
   subcategory?: string
+  subcategories?: string[]
   adDesignData?: {
     businessInfo?: {
       phone?: string
@@ -91,9 +91,13 @@ export default function BeautyWellnessPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Filter state management
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -176,8 +180,10 @@ export default function BeautyWellnessPage() {
           })
           console.log(`[Beauty Wellness] After filtering: ${filteredByZip.length} businesses`)
           setBusinesses(filteredByZip)
+          setAllBusinesses(filteredByZip)
         } else {
           setBusinesses(result)
+          setAllBusinesses(result)
         }
       } catch (error) {
         // Only update error state if this is still the current request
@@ -201,19 +207,73 @@ export default function BeautyWellnessPage() {
     fetchBusinesses()
   }, [userZipCode])
 
-  const filteredBusinesses = selectedFilter
-    ? businesses.filter((business) => {
-        if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-          return business.allSubcategories.some((sub: string) =>
-            sub.toLowerCase().includes(selectedFilter.toLowerCase()),
-          )
-        }
-        if (business.subcategory) {
-          return business.subcategory.toLowerCase().includes(selectedFilter.toLowerCase())
-        }
-        return false
+  // Helper function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+    // Check subcategories array
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      if (business.subcategories.includes(filterValue)) return true
+    }
+
+    // Check allSubcategories array
+    if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+      if (business.allSubcategories.includes(filterValue)) return true
+    }
+
+    // Check subcategory field
+    if (business.subcategory === filterValue) return true
+
+    return false
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All businesses:", allBusinesses)
+
+    if (selectedFilters.length === 0) {
+      setAppliedFilters([])
+      return
+    }
+
+    const filtered = allBusinesses.filter((business) => {
+      console.log(
+        `Business ${business.displayName || business.businessName} subcategories:`,
+        business.allSubcategories || business.subcategories || [business.subcategory],
+      )
+
+      const hasMatch = selectedFilters.some((filter) => {
+        const matches = hasExactSubcategoryMatch(business, filter)
+        console.log(`Filter "${filter}" matches business: ${matches}`)
+        return matches
       })
-    : businesses
+
+      console.log(`Business ${business.displayName || business.businessName} has match: ${hasMatch}`)
+      return hasMatch
+    })
+
+    console.log("Filtered results:", filtered)
+    setAppliedFilters([...selectedFilters])
+
+    toast({
+      title: "Filters Applied",
+      description: `Found ${filtered.length} businesses matching your criteria`,
+    })
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    toast({
+      title: "Filters Cleared",
+      description: `Showing all ${allBusinesses.length} businesses`,
+    })
+  }
+
+  const filteredBusinesses =
+    appliedFilters.length > 0
+      ? businesses.filter((business) => {
+          return appliedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
+        })
+      : businesses
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
@@ -223,10 +283,6 @@ export default function BeautyWellnessPage() {
   const handleOpenProfile = (provider: any) => {
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
-  }
-
-  const handleFilterChange = (value: string) => {
-    setSelectedFilter(value === selectedFilter ? null : value)
   }
 
   return (
@@ -260,7 +316,63 @@ export default function BeautyWellnessPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
+      {/* Enhanced Filter Controls */}
+      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <h3 className="text-lg font-semibold mb-4">Filter by Beauty & Wellness Services</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedFilters([...selectedFilters, option.value])
+                  } else {
+                    setSelectedFilters(selectedFilters.filter((f) => f !== option.value))
+                  }
+                }}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            onClick={applyFilters}
+            disabled={selectedFilters.length === 0}
+            className="bg-primary hover:bg-primary/90"
+          >
+            Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
+          </Button>
+
+          {appliedFilters.length > 0 && (
+            <Button onClick={clearFilters} variant="outline" className="border-gray-300">
+              Clear Filters
+            </Button>
+          )}
+
+          {selectedFilters.length > 0 && (
+            <span className="text-sm text-gray-600">
+              {selectedFilters.length} service{selectedFilters.length !== 1 ? "s" : ""} selected
+            </span>
+          )}
+        </div>
+
+        {appliedFilters.length > 0 && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            <p className="text-sm text-blue-800">
+              <strong>Active filters:</strong> {appliedFilters.join(", ")}
+            </p>
+            <p className="text-sm text-blue-600 mt-1">
+              Showing {filteredBusinesses.length} of {allBusinesses.length} businesses
+            </p>
+          </div>
+        )}
+      </div>
 
       {userZipCode && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

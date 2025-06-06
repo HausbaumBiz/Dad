@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -74,6 +73,11 @@ export default function PhysicalRehabilitationPage() {
     return matches
   }
 
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allProviders, setAllProviders] = useState<any[]>([])
+
   useEffect(() => {
     async function fetchProviders() {
       const currentFetchId = ++fetchIdRef.current
@@ -128,6 +132,7 @@ export default function PhysicalRehabilitationPage() {
         }))
 
         setProviders(transformedProviders)
+        setAllProviders(transformedProviders)
       } catch (err) {
         console.error("Error fetching rehabilitation providers:", err)
         if (currentFetchId === fetchIdRef.current) {
@@ -175,6 +180,49 @@ export default function PhysicalRehabilitationPage() {
     setUserZipCode(null)
   }
 
+  // Helper function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (provider: any, filterValue: string): boolean => {
+    // Check services array (which comes from subcategories)
+    if (provider.services && Array.isArray(provider.services)) {
+      return provider.services.some((service) => service === filterValue)
+    }
+
+    return false
+  }
+
+  // Filter functions
+  const handleFilterChange = (value: string) => {
+    setSelectedFilters((prev) => (prev.includes(value) ? prev.filter((f) => f !== value) : [...prev, value]))
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All providers:", allProviders)
+
+    if (selectedFilters.length === 0) {
+      setProviders(allProviders)
+      setAppliedFilters([])
+      return
+    }
+
+    const filtered = allProviders.filter((provider) => {
+      const hasMatch = selectedFilters.some((filter) => hasExactSubcategoryMatch(provider, filter))
+      console.log(`Provider ${provider.name} services:`, provider.services)
+      console.log(`Filter "${selectedFilters.join(", ")}" matches provider: ${hasMatch}`)
+      return hasMatch
+    })
+
+    console.log("Filtered results:", filtered)
+    setProviders(filtered)
+    setAppliedFilters([...selectedFilters])
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setProviders(allProviders)
+  }
+
   return (
     <CategoryLayout title="Physical Rehabilitation" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -206,7 +254,57 @@ export default function PhysicalRehabilitationPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      {/* Enhanced Filter Controls */}
+      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Filter by Therapy Type</h3>
+          <span className="text-sm text-gray-500">{selectedFilters.length} selected</span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={() => handleFilterChange(option.value)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            onClick={applyFilters}
+            disabled={selectedFilters.length === 0}
+            className="bg-primary hover:bg-primary/90"
+          >
+            Apply Filters ({selectedFilters.length})
+          </Button>
+
+          {appliedFilters.length > 0 && (
+            <Button onClick={clearFilters} variant="outline">
+              Clear Filters
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Active Filters Display */}
+      {appliedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-800">Active filters: {appliedFilters.join(", ")}</p>
+              <p className="text-sm text-blue-700">
+                Showing {providers.length} of {allProviders.length} rehabilitation providers
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (

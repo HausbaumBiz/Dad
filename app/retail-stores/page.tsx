@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -23,9 +22,11 @@ interface Business {
   serviceArea?: string[] // Direct array of ZIP codes
   isNationwide?: boolean // Direct boolean property
   subcategories?: string[]
+  allSubcategories?: string[]
   rating?: number
   reviewCount?: number
   reviewsData?: any[]
+  subcategory?: string
 }
 
 export default function RetailStoresPage() {
@@ -75,6 +76,11 @@ export default function RetailStoresPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allProviders, setAllProviders] = useState<Business[]>([])
 
   // Get user's zip code from localStorage
   useEffect(() => {
@@ -155,6 +161,7 @@ export default function RetailStoresPage() {
         }
 
         setProviders(filteredBusinesses)
+        setAllProviders(filteredBusinesses) // Store all providers
       } catch (err) {
         console.error("Error fetching businesses:", err)
         if (currentFetchId === fetchIdRef.current) {
@@ -193,6 +200,54 @@ export default function RetailStoresPage() {
     setUserZipCode(null)
   }
 
+  // Function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+    const subcategories = business.subcategories || []
+    const allSubcategories = business.allSubcategories || []
+
+    return (
+      subcategories.includes(filterValue) ||
+      allSubcategories.includes(filterValue) ||
+      (business as any).subcategory === filterValue
+    )
+  }
+
+  // Handle filter selection
+  const handleFilterChange = (filterId: string, filterValue: string, checked: boolean) => {
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterValue])
+    } else {
+      setSelectedFilters((prev) => prev.filter((f) => f !== filterValue))
+    }
+  }
+
+  // Apply filters
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+
+    if (selectedFilters.length === 0) {
+      setProviders(allProviders)
+      setAppliedFilters([])
+      return
+    }
+
+    const filtered = allProviders.filter((business) => {
+      return selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
+    })
+
+    console.log(`Filtered results: ${filtered.length} stores`)
+    setProviders(filtered)
+    setAppliedFilters([...selectedFilters])
+    setSelectedFilters([])
+  }
+
+  // Clear filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setProviders(allProviders)
+  }
+
   return (
     <CategoryLayout title="Retail Stores" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -223,7 +278,65 @@ export default function RetailStoresPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      {/* Enhanced Filter Interface */}
+      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <h3 className="text-lg font-semibold mb-4">Filter by Store Type</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={(e) => handleFilterChange(option.id, option.value, e.target.checked)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              onClick={applyFilters}
+              disabled={selectedFilters.length === 0}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Apply Filters ({selectedFilters.length})
+            </Button>
+
+            {appliedFilters.length > 0 && (
+              <Button onClick={clearFilters} variant="outline" className="text-gray-600 hover:text-gray-800">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {appliedFilters.length > 0 && (
+            <div className="text-sm text-gray-600">
+              Showing {providers.length} of {allProviders.length} stores
+            </div>
+          )}
+        </div>
+
+        {/* Active Filters Display */}
+        {appliedFilters.length > 0 && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm font-medium text-blue-800 mb-2">Active Filters:</p>
+            <div className="flex flex-wrap gap-2">
+              {appliedFilters.map((filter, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {filter}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (

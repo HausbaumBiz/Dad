@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
@@ -11,6 +10,7 @@ import { Phone, MapPin } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function WeddingsEventsPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -30,6 +30,10 @@ export default function WeddingsEventsPage() {
   const [providers, setProviders] = useState([])
   const [loading, setLoading] = useState(true)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Add filter state variables after existing state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [filteredProviders, setFilteredProviders] = useState([])
 
   // Add fetchIdRef for race condition prevention
   const fetchIdRef = useRef(0)
@@ -77,6 +81,22 @@ export default function WeddingsEventsPage() {
     return matches
   }
 
+  // Add exact subcategory matching function and filter handlers
+  const exactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
+    if (!business.subcategories || business.subcategories.length === 0 || filters.length === 0) {
+      return true // No subcategories to filter, so it's a match
+    }
+
+    // Check if every selected filter is present in the business's subcategories
+    return filters.every((filter) => business.subcategories?.includes(filter))
+  }
+
+  const handleFilterChange = (filterValue: string) => {
+    setSelectedFilters((prevFilters) =>
+      prevFilters.includes(filterValue) ? prevFilters.filter((f) => f !== filterValue) : [...prevFilters, filterValue],
+    )
+  }
+
   // Replace the useEffect for fetching businesses:
   useEffect(() => {
     const fetchProviders = async () => {
@@ -121,6 +141,19 @@ export default function WeddingsEventsPage() {
 
     fetchProviders()
   }, [userZipCode])
+
+  useEffect(() => {
+    // Apply filters whenever providers or selectedFilters change
+    const applyFilters = () => {
+      let filtered = providers
+      if (selectedFilters.length > 0) {
+        filtered = providers.filter((provider: Business) => exactSubcategoryMatch(provider, selectedFilters))
+      }
+      setFilteredProviders(filtered)
+    }
+
+    applyFilters()
+  }, [providers, selectedFilters])
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -198,7 +231,26 @@ export default function WeddingsEventsPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      {/* Replace CategoryFilter with checkbox interface   */}
+      <div className="mb-4">
+        <h4 className="text-lg font-semibold mb-2">Filter by Service:</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+          {filterOptions.map((option) => (
+            <label
+              key={option.id}
+              className="flex items-center space-x-2 bg-white rounded-md shadow-sm p-2 border border-gray-200 hover:border-primary-300 transition-colors cursor-pointer"
+            >
+              <Checkbox
+                id={option.id}
+                value={option.value}
+                checked={selectedFilters.includes(option.value)}
+                onCheckedChange={() => handleFilterChange(option.value)}
+              />
+              <span className="text-sm font-medium text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
 
       {userZipCode && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
@@ -224,7 +276,7 @@ export default function WeddingsEventsPage() {
         <div className="text-center py-8">
           <p className="text-gray-600">Loading wedding and event providers...</p>
         </div>
-      ) : providers.length === 0 ? (
+      ) : filteredProviders.length === 0 ? (
         <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
           <h3 className="text-xl font-medium text-gray-700 mb-2">No Event Providers Found</h3>
           <p className="text-gray-600">
@@ -235,7 +287,7 @@ export default function WeddingsEventsPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {providers.map((provider: any) => (
+          {filteredProviders.map((provider: any) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">

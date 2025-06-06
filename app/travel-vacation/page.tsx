@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -9,8 +8,9 @@ import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { Phone, X } from "lucide-react"
+import { Phone, X, Tag } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { useToast } from "@/components/ui/use-toast"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -29,6 +29,9 @@ interface Business {
   phone?: string
   city?: string
   state?: string
+  subcategories?: string[]
+  allSubcategories?: string[]
+  subcategory?: string
 }
 
 function formatPhoneNumber(phone: string): string {
@@ -54,6 +57,7 @@ export default function TravelVacationPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const { toast } = useToast()
 
   // Add state for profile dialog
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
@@ -61,6 +65,11 @@ export default function TravelVacationPage() {
     id: "",
     name: "",
   })
+
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allProviders, setAllProviders] = useState<Business[]>([])
 
   // Get user's zip code from localStorage
   useEffect(() => {
@@ -126,6 +135,10 @@ export default function TravelVacationPage() {
           console.log(
             `  - ${business.id}: "${business.displayName || business.businessName}" (zipCode: ${business.zipCode}, serviceArea: [${serviceAreaZips.join(", ")}], nationwide: ${isNationwide})`,
           )
+
+          // Log subcategories for debugging
+          const subcategories = business.subcategories || business.allSubcategories || []
+          console.log(`  - Subcategories: [${subcategories.join(", ")}]`)
         })
 
         // Filter by zip code if available
@@ -141,6 +154,7 @@ export default function TravelVacationPage() {
         }
 
         setProviders(filteredBusinesses)
+        setAllProviders(filteredBusinesses) // Store all providers
       } catch (err) {
         console.error("Error fetching providers:", err)
         if (currentFetchId === fetchIdRef.current) {
@@ -189,6 +203,77 @@ export default function TravelVacationPage() {
     setUserZipCode(null)
   }
 
+  // Function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+    const subcategories = business.subcategories || []
+    const allSubcategories = business.allSubcategories || []
+
+    return (
+      subcategories.includes(filterValue) ||
+      allSubcategories.includes(filterValue) ||
+      (business as any).subcategory === filterValue
+    )
+  }
+
+  // Helper function to get all subcategories for a business
+  const getBusinessSubcategories = (business: Business): string[] => {
+    const subcategories = business.subcategories || []
+    const allSubcategories = business.allSubcategories || []
+
+    // Combine and deduplicate subcategories
+    const allCategories = [...new Set([...subcategories, ...allSubcategories])]
+
+    // Filter out empty strings and undefined values
+    return allCategories.filter(Boolean)
+  }
+
+  // Handle filter selection
+  const handleFilterChange = (filterId: string, filterValue: string, checked: boolean) => {
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterValue])
+    } else {
+      setSelectedFilters((prev) => prev.filter((f) => f !== filterValue))
+    }
+  }
+
+  // Apply filters
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+
+    if (selectedFilters.length === 0) {
+      setProviders(allProviders)
+      setAppliedFilters([])
+      return
+    }
+
+    const filtered = allProviders.filter((business) => {
+      return selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
+    })
+
+    console.log(`Filtered results: ${filtered.length} providers`)
+    setProviders(filtered)
+    setAppliedFilters([...selectedFilters])
+
+    toast({
+      title: "Filters Applied",
+      description: `Showing ${filtered.length} of ${allProviders.length} travel services`,
+    })
+
+    setSelectedFilters([])
+  }
+
+  // Clear filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setProviders(allProviders)
+
+    toast({
+      title: "Filters Cleared",
+      description: `Showing all ${allProviders.length} travel services`,
+    })
+  }
+
   return (
     <CategoryLayout title="Travel & Vacation Services" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -220,7 +305,65 @@ export default function TravelVacationPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      {/* Enhanced Filter Interface */}
+      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <h3 className="text-lg font-semibold mb-4">Filter by Service Type</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={(e) => handleFilterChange(option.id, option.value, e.target.checked)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              onClick={applyFilters}
+              disabled={selectedFilters.length === 0}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Apply Filters ({selectedFilters.length})
+            </Button>
+
+            {appliedFilters.length > 0 && (
+              <Button onClick={clearFilters} variant="outline" className="text-gray-600 hover:text-gray-800">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {appliedFilters.length > 0 && (
+            <div className="text-sm text-gray-600">
+              Showing {providers.length} of {allProviders.length} providers
+            </div>
+          )}
+        </div>
+
+        {/* Active Filters Display */}
+        {appliedFilters.length > 0 && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm font-medium text-blue-800 mb-2">Active Filters:</p>
+            <div className="flex flex-wrap gap-2">
+              {appliedFilters.map((filter, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {filter}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -281,14 +424,26 @@ export default function TravelVacationPage() {
               </svg>
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {userZipCode ? `No Travel Services Found in ${userZipCode}` : "No Travel Services Found"}
+              {appliedFilters.length > 0
+                ? "No matching travel services found"
+                : userZipCode
+                  ? `No Travel Services Found in ${userZipCode}`
+                  : "No Travel Services Found"}
             </h3>
             <p className="text-gray-600 mb-4">
-              {userZipCode
-                ? `No travel services found serving ZIP code ${userZipCode}. Try clearing the filter to see all providers.`
-                : "We're currently building our network of travel and vacation service professionals in your area."}
+              {appliedFilters.length > 0
+                ? "Try selecting different filters or clear filters to see all travel services."
+                : userZipCode
+                  ? `No travel services found serving ZIP code ${userZipCode}. Try clearing the filter to see all providers.`
+                  : "We're currently building our network of travel and vacation service professionals in your area."}
             </p>
-            <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
+            {appliedFilters.length > 0 ? (
+              <Button onClick={clearFilters} className="bg-blue-600 hover:bg-blue-700">
+                Clear Filters
+              </Button>
+            ) : (
+              <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
+            )}
           </div>
         </div>
       ) : (
@@ -350,6 +505,26 @@ export default function TravelVacationPage() {
                         <p className="text-sm text-gray-600">
                           {formatPhoneNumber(provider.adDesignData?.businessInfo?.phone || provider.phone)}
                         </p>
+                      </div>
+                    )}
+
+                    {/* Display Business Subcategories */}
+                    {getBusinessSubcategories(provider).length > 0 && (
+                      <div className="mt-3">
+                        <div className="flex items-center mb-1">
+                          <Tag className="w-4 h-4 text-gray-500 mr-1" />
+                          <span className="text-xs font-medium text-gray-600">Services Offered:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {getBusinessSubcategories(provider).map((subcategory, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                            >
+                              {subcategory}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
+import type { FilterOption } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -12,6 +12,7 @@ import { Phone, MapPin, Loader2 } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -76,6 +77,12 @@ export default function MusicLessonsPage() {
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allProviders, setAllProviders] = useState<Business[]>([])
+  const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
+
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
     console.log(
@@ -115,6 +122,36 @@ export default function MusicLessonsPage() {
   const clearZipCodeFilter = () => {
     setUserZipCode(null)
     localStorage.removeItem("savedZipCode")
+  }
+
+  // Function to check if a business has the exact subcategory
+  const hasExactSubcategory = (business: Business, filter: string) => {
+    return business.subcategories?.some((subcategory) => subcategory.toLowerCase() === filter.toLowerCase())
+  }
+
+  // Function to handle filter changes
+  const handleFilterChange = (filter: string) => {
+    setSelectedFilters((prev) => {
+      if (prev.includes(filter)) {
+        return prev.filter((f) => f !== filter)
+      } else {
+        return [...prev, filter]
+      }
+    })
+  }
+
+  // Function to apply filters
+  const handleApplyFilters = () => {
+    setAppliedFilters([...selectedFilters])
+    let filtered = [...allProviders] // Start with all providers
+
+    if (selectedFilters.length > 0) {
+      filtered = allProviders.filter((business) => {
+        return selectedFilters.every((filter) => hasExactSubcategory(business, filter))
+      })
+    }
+
+    setFilteredProviders(filtered)
   }
 
   useEffect(() => {
@@ -159,7 +196,8 @@ export default function MusicLessonsPage() {
         }
 
         console.log("Fetched music lesson businesses:", businesses)
-        setProviders(businesses)
+        setAllProviders(businesses)
+        setFilteredProviders(businesses)
       } catch (error) {
         // Only update error state if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -181,6 +219,19 @@ export default function MusicLessonsPage() {
 
     fetchProviders()
   }, [userZipCode])
+
+  useEffect(() => {
+    // Apply filters whenever appliedFilters change
+    let filtered = [...allProviders]
+
+    if (appliedFilters.length > 0) {
+      filtered = allProviders.filter((business) => {
+        return appliedFilters.every((filter) => hasExactSubcategory(business, filter))
+      })
+    }
+
+    setFilteredProviders(filtered)
+  }, [appliedFilters, allProviders])
 
   const handleViewProfile = (business: Business) => {
     console.log("Opening profile for business:", business)
@@ -229,7 +280,27 @@ export default function MusicLessonsPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      <div className="mb-4 p-4 bg-gray-50 rounded-lg shadow-sm">
+        <h4 className="font-semibold mb-3">Filter by Category</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+          {filterOptions.map((option: FilterOption) => (
+            <label
+              key={option.id}
+              className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1"
+            >
+              <Checkbox
+                id={option.id}
+                checked={selectedFilters.includes(option.value)}
+                onCheckedChange={() => handleFilterChange(option.value)}
+              />
+              <span className="text-sm">{option.label}</span>
+            </label>
+          ))}
+        </div>
+        <Button onClick={handleApplyFilters} className="mt-4">
+          Apply Filters
+        </Button>
+      </div>
 
       {userZipCode && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -263,7 +334,7 @@ export default function MusicLessonsPage() {
           <div className="text-center py-8">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : filteredProviders.length === 0 ? (
           <div className="text-center py-12">
             <h3 className="text-xl font-semibold text-gray-700 mb-2">
               {userZipCode ? `No Music Lesson Providers in ${userZipCode}` : "No Music Lesson Providers Found"}
@@ -283,15 +354,15 @@ export default function MusicLessonsPage() {
           </div>
         ) : (
           <>
-            {providers.length > 0 && (
+            {filteredProviders.length > 0 && (
               <div className="mb-4">
                 <h2 className="text-xl font-semibold text-gray-800">
-                  Found {providers.length} Music Lesson Provider{providers.length !== 1 ? "s" : ""}
+                  Found {filteredProviders.length} Music Lesson Provider{filteredProviders.length !== 1 ? "s" : ""}
                 </h2>
               </div>
             )}
 
-            {providers.map((business: Business) => (
+            {filteredProviders.map((business: Business) => (
               <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row justify-between">

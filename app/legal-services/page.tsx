@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -11,6 +10,7 @@ import { Phone, MapPin, Tag } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { useToast } from "@/hooks/use-toast"
 
 // Enhanced Business interface
 interface Business {
@@ -33,6 +33,8 @@ interface Business {
       state?: string
     }
   }
+  allSubcategories?: string[]
+  subcategory?: string
 }
 
 // Helper function to check if business serves a zip code
@@ -104,6 +106,12 @@ export default function LegalServicesPage() {
 
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+
+  const { toast } = useToast()
+
   const fetchIdRef = useRef(0)
 
   useEffect(() => {
@@ -148,6 +156,7 @@ export default function LegalServicesPage() {
         }
 
         setBusinesses(filteredBusinesses)
+        setAllBusinesses(filteredBusinesses)
       } catch (err) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -182,6 +191,53 @@ export default function LegalServicesPage() {
     setIsProfileDialogOpen(true)
   }
 
+  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+    const subcategories = business.subcategories || []
+    const allSubcategories = business.allSubcategories || []
+    const subcategory = business.subcategory || ""
+
+    const allSubs = [...subcategories, ...allSubcategories, subcategory].filter(Boolean)
+
+    return allSubs.some((sub) => sub.toLowerCase().trim() === filterValue.toLowerCase().trim())
+  }
+
+  const handleFilterChange = (filterValue: string, checked: boolean) => {
+    setSelectedFilters((prev) => (checked ? [...prev, filterValue] : prev.filter((f) => f !== filterValue)))
+  }
+
+  const applyFilters = () => {
+    if (selectedFilters.length === 0) {
+      setBusinesses(allBusinesses)
+      setAppliedFilters([])
+      toast({
+        title: "Filters cleared",
+        description: `Showing all ${allBusinesses.length} legal professionals`,
+      })
+      return
+    }
+
+    const filtered = allBusinesses.filter((business) =>
+      selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter)),
+    )
+
+    setBusinesses(filtered)
+    setAppliedFilters([...selectedFilters])
+    toast({
+      title: "Filters applied",
+      description: `Found ${filtered.length} legal professionals matching your criteria`,
+    })
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setBusinesses(allBusinesses)
+    toast({
+      title: "Filters cleared",
+      description: `Showing all ${allBusinesses.length} legal professionals`,
+    })
+  }
+
   return (
     <CategoryLayout title="Legal Services" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -212,7 +268,57 @@ export default function LegalServicesPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-4">Filter by Legal Specialties</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={(e) => handleFilterChange(option.value, e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            {selectedFilters.length > 0 && (
+              <span>
+                {selectedFilters.length} filter{selectedFilters.length !== 1 ? "s" : ""} selected
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} size="sm">
+              Apply Filters
+            </Button>
+            {appliedFilters.length > 0 && (
+              <Button onClick={clearFilters} variant="outline" size="sm">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {appliedFilters.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-blue-700">
+                <span className="font-medium">Active filters:</span> {appliedFilters.join(", ")}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Showing {businesses.length} of {allBusinesses.length} legal professionals
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {userZipCode && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">

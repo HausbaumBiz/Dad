@@ -1,10 +1,10 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
+import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useState } from "react"
@@ -15,12 +15,19 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
 
 export default function PersonalAssistantsPage() {
+  const { toast } = useToast()
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [isReviewsOpen, setIsReviewsOpen] = useState(false)
 
   // State for profile dialog
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{ id: string; name: string } | null>(null)
+
+  // State for filtering
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allProviders, setAllProviders] = useState([])
+  const [filteredProviders, setFilteredProviders] = useState([])
 
   const mockReviews = {
     "Elite Personal Assistants": [
@@ -156,6 +163,87 @@ export default function PersonalAssistantsPage() {
     return phone
   }
 
+  // Filter handling functions
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    const filterOption = filterOptions.find((option) => option.id === filterId)
+    if (!filterOption) return
+
+    setSelectedFilters((prev) => {
+      if (checked) {
+        return [...prev, filterOption.value]
+      } else {
+        return prev.filter((filter) => filter !== filterOption.value)
+      }
+    })
+  }
+
+  // Helper function for strict subcategory matching
+  const hasExactSubcategoryMatch = (businessSubcategories: string[], filter: string): boolean => {
+    return businessSubcategories.some((subcategory) => {
+      // Normalize strings for comparison
+      const subcatNormalized = subcategory.trim().toLowerCase()
+      const filterNormalized = filter.trim().toLowerCase()
+
+      // Only exact matches
+      return subcatNormalized === filterNormalized
+    })
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All providers:", allProviders)
+
+    setAppliedFilters([...selectedFilters])
+
+    if (selectedFilters.length === 0) {
+      setFilteredProviders(allProviders)
+      return
+    }
+
+    const filtered = allProviders.filter((business: Business) => {
+      // Get all subcategories for this business
+      const businessSubcategories = [...(business.allSubcategories || []), ...(business.subcategories || [])]
+
+      console.log(`Business ${business.displayName || business.name} subcategories:`, businessSubcategories)
+
+      // Check if any selected filter matches any business subcategory
+      const hasMatch = selectedFilters.some((filter) => {
+        // Use strict matching
+        const filterMatch = hasExactSubcategoryMatch(businessSubcategories, filter)
+        console.log(`Filter "${filter}" matches business: ${filterMatch}`)
+        return filterMatch
+      })
+
+      console.log(`Business ${business.displayName || business.name} has match: ${hasMatch}`)
+      return hasMatch
+    })
+
+    console.log("Filtered results:", filtered)
+    setFilteredProviders(filtered)
+
+    // Show toast notification
+    toast({
+      title: filtered.length > 0 ? "Filters Applied" : "No Matches Found",
+      description:
+        filtered.length > 0
+          ? `Showing ${filtered.length} of ${allProviders.length} businesses`
+          : "No businesses match your selected filters",
+      duration: 3000,
+    })
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredProviders(allProviders)
+
+    toast({
+      title: "Filters Cleared",
+      description: `Showing all ${allProviders.length} businesses`,
+      duration: 3000,
+    })
+  }
+
   const filterOptions = [
     { id: "assistants1", label: "Personal Drivers", value: "Personal Drivers" },
     { id: "assistants2", label: "Personal Assistants", value: "Personal Assistants" },
@@ -242,6 +330,7 @@ export default function PersonalAssistantsPage() {
         }
 
         console.log(`[Personal Assistants] Fetch ${currentFetchId} completed, got ${businesses.length} businesses`)
+        console.log("Sample business data:", businesses[0]) // Debug log
 
         // Filter by zip code if available
         let filteredBusinesses = businesses
@@ -261,7 +350,9 @@ export default function PersonalAssistantsPage() {
           console.log(`[Personal Assistants] After filtering: ${filteredBusinesses.length} businesses`)
         }
 
-        setProviders(filteredBusinesses)
+        // Use businesses as-is without adding default subcategories
+        setAllProviders(filteredBusinesses)
+        setFilteredProviders(filteredBusinesses)
       } catch (err) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -323,7 +414,62 @@ export default function PersonalAssistantsPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      {/* Remove the CategoryFilter component that appears after the hero section: */}
+
+      {/* Enhanced Filter Controls */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+        <div className="flex flex-wrap gap-4 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                id={option.id}
+                checked={selectedFilters.includes(option.value)}
+                onChange={(e) => handleFilterChange(option.id, e.target.checked)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm font-medium text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} size="sm">
+              Apply Filters ({selectedFilters.length})
+            </Button>
+            {appliedFilters.length > 0 && (
+              <Button variant="outline" onClick={clearFilters} size="sm">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+          {selectedFilters.length > 0 && (
+            <span className="text-sm text-gray-600">
+              {selectedFilters.length} filter{selectedFilters.length !== 1 ? "s" : ""} selected
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Active Filters Display */}
+      {appliedFilters.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-blue-700">
+                <span className="font-medium">Active filters:</span> {appliedFilters.join(", ")}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Showing {filteredProviders.length} of {allProviders.length} businesses
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs">
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
 
       {userZipCode && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -356,7 +502,7 @@ export default function PersonalAssistantsPage() {
         <div className="text-center py-8">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : providers.length === 0 ? (
+      ) : filteredProviders.length === 0 ? (
         <div className="text-center py-12">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -370,19 +516,31 @@ export default function PersonalAssistantsPage() {
               </svg>
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {userZipCode ? `No Personal Assistants in ${userZipCode} Area` : "No Personal Assistants Yet"}
+              {appliedFilters.length > 0
+                ? "No Personal Assistants Match Your Filters"
+                : userZipCode
+                  ? `No Personal Assistants in ${userZipCode} Area`
+                  : "No Personal Assistants Yet"}
             </h3>
             <p className="text-gray-600 mb-4">
-              {userZipCode
-                ? `We're building our network of personal assistant services in the ${userZipCode} area.`
-                : "Be the first personal assistant service to join our platform and connect with clients in your area."}
+              {appliedFilters.length > 0
+                ? `No businesses found matching: ${appliedFilters.join(", ")}. Try adjusting your filters.`
+                : userZipCode
+                  ? `We're building our network of personal assistant services in the ${userZipCode} area.`
+                  : "Be the first personal assistant service to join our platform and connect with clients in your area."}
             </p>
-            <Button className="bg-indigo-600 hover:bg-indigo-700">Register Your Service</Button>
+            {appliedFilters.length > 0 ? (
+              <Button onClick={clearFilters} className="bg-indigo-600 hover:bg-indigo-700">
+                Clear Filters
+              </Button>
+            ) : (
+              <Button className="bg-indigo-600 hover:bg-indigo-700">Register Your Service</Button>
+            )}
           </div>
         </div>
       ) : (
         <div className="space-y-6">
-          {providers.map((provider) => (
+          {filteredProviders.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -443,29 +601,31 @@ export default function PersonalAssistantsPage() {
                       </span>
                     </div>
 
-                    {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
-                      provider.allSubcategories.map((service: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
+                        provider.allSubcategories.map((service: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {service}
+                          </span>
+                        ))
+                      ) : provider.subcategories && provider.subcategories.length > 0 ? (
+                        provider.subcategories.map((service: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {service}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          Personal Services
                         </span>
-                      ))
-                    ) : provider.subcategories && provider.subcategories.length > 0 ? (
-                      provider.subcategories.map((service: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {service}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                        Personal Assistants
-                      </span>
-                    )}
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">

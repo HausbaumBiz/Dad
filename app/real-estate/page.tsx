@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -53,6 +52,8 @@ export default function RealEstatePage() {
     subcategories?: string[]
     serviceArea?: string[]
     isNationwide?: boolean
+    allSubcategories?: string[]
+    subcategory?: string
   }
 
   // Helper function to check if business serves the zip code
@@ -89,12 +90,77 @@ export default function RealEstatePage() {
 
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allProviders, setAllProviders] = useState<Business[]>([])
+  const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
+
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
       setUserZipCode(savedZipCode)
     }
   }, [])
+
+  // Helper function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+    // Check subcategories array
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      if (business.subcategories.includes(filterValue)) return true
+    }
+
+    // Check allSubcategories array
+    if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+      if (business.allSubcategories.includes(filterValue)) return true
+    }
+
+    // Check subcategory field
+    if (business.subcategory === filterValue) return true
+
+    return false
+  }
+
+  const handleFilterChange = (filterValue: string) => {
+    setSelectedFilters((prev) =>
+      prev.includes(filterValue) ? prev.filter((f) => f !== filterValue) : [...prev, filterValue],
+    )
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All providers:", allProviders)
+
+    if (selectedFilters.length === 0) {
+      setFilteredProviders(allProviders)
+      setAppliedFilters([])
+      return
+    }
+
+    const filtered = allProviders.filter((business) => {
+      console.log(`Business ${business.displayName || business.businessName} subcategories:`, business.subcategories)
+
+      const hasMatch = selectedFilters.some((filter) => {
+        const matches = hasExactSubcategoryMatch(business, filter)
+        console.log(`Filter "${filter}" matches business: ${matches}`)
+        return matches
+      })
+
+      console.log(`Business ${business.displayName || business.businessName} has match: ${hasMatch}`)
+      return hasMatch
+    })
+
+    console.log("Filtered results:", filtered)
+    setFilteredProviders(filtered)
+    setAppliedFilters([...selectedFilters])
+    setSelectedFilters([])
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredProviders(allProviders)
+  }
 
   useEffect(() => {
     async function fetchBusinesses() {
@@ -126,6 +192,8 @@ export default function RealEstatePage() {
         }
 
         setProviders(fetchedBusinesses)
+        setAllProviders(fetchedBusinesses)
+        setFilteredProviders(fetchedBusinesses)
       } catch (err) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -191,7 +259,52 @@ export default function RealEstatePage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      {/* Enhanced Filter Interface */}
+      <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+        <h3 className="text-lg font-semibold mb-4">Filter by Services</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={() => handleFilterChange(option.value)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-600">
+            {selectedFilters.length} filter{selectedFilters.length !== 1 ? "s" : ""} selected
+          </span>
+          <div className="space-x-2">
+            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} size="sm">
+              Apply Filters
+            </Button>
+            {appliedFilters.length > 0 && (
+              <Button onClick={clearFilters} variant="outline" size="sm">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Active Filters Display */}
+      {appliedFilters.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-700 mb-2">
+            <span className="font-medium">Active filters:</span> {appliedFilters.join(", ")}
+          </p>
+          <p className="text-xs text-blue-600">
+            Showing {filteredProviders.length} of {allProviders.length} businesses
+          </p>
+        </div>
+      )}
 
       {userZipCode && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
@@ -222,7 +335,7 @@ export default function RealEstatePage() {
         <div className="text-center py-8">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : providers.length === 0 ? (
+      ) : filteredProviders.length === 0 ? (
         <div className="text-center py-12">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -246,7 +359,7 @@ export default function RealEstatePage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {providers.map((provider: any) => (
+          {filteredProviders.map((provider: any) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -12,6 +11,7 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function FitnessAthleticsPage() {
   const { toast } = useToast()
@@ -110,6 +110,22 @@ export default function FitnessAthleticsPage() {
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Add filter state variables after existing state
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([])
+
+  // Add exact subcategory matching function and filter handlers
+  const isSubcategorySelected = (subcategory: string) => selectedSubcategories.includes(subcategory)
+
+  const handleSubcategoryChange = (subcategory: string) => {
+    setSelectedSubcategories((prev) => {
+      if (prev.includes(subcategory)) {
+        return prev.filter((s) => s !== subcategory)
+      } else {
+        return [...prev, subcategory]
+      }
+    })
+  }
+
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
@@ -165,14 +181,18 @@ export default function FitnessAthleticsPage() {
     fetchBusinesses()
   }, [toast, userZipCode])
 
-  const filteredBusinesses = selectedFilter
-    ? businesses.filter((business) => {
-        if (business.subcategories && Array.isArray(business.subcategories)) {
-          return business.subcategories.some((sub: string) => sub.toLowerCase().includes(selectedFilter.toLowerCase()))
-        }
-        return false
-      })
-    : businesses
+  // Update useEffect and rendering to use filteredBusinesses
+  const filteredBusinesses = businesses.filter((business) => {
+    if (selectedSubcategories.length === 0) {
+      return true // Show all if no subcategories are selected
+    }
+
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      return business.subcategories.some((sub) => selectedSubcategories.includes(sub))
+    }
+
+    return false // Don't show if no subcategories match
+  })
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
@@ -219,7 +239,25 @@ export default function FitnessAthleticsPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
+      {/* Replace CategoryFilter with checkbox interface */}
+      <div className="mb-4">
+        <h4 className="text-lg font-semibold mb-2">Filter by Subcategory</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+          {filterOptions.map((option) => (
+            <label
+              key={option.id}
+              className="flex items-center space-x-2 bg-white rounded-md border border-gray-200 shadow-sm px-3 py-2 hover:bg-gray-50 transition-colors"
+            >
+              <Checkbox
+                id={option.id}
+                checked={isSubcategorySelected(option.value)}
+                onCheckedChange={() => handleSubcategoryChange(option.value)}
+              />
+              <span className="text-sm font-medium text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
 
       {userZipCode && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -27,6 +26,7 @@ interface Business {
   // Fix: Match the actual backend data structure
   serviceArea?: string[] // This should be a direct array of zip codes
   isNationwide?: boolean // This should be a direct boolean
+  subcategories?: string[]
 }
 
 export default function FinancialServicesPage() {
@@ -48,6 +48,12 @@ export default function FinancialServicesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
   // Use a ref to track the current fetch request
   const fetchIdRef = useRef<number>(0)
@@ -136,6 +142,8 @@ export default function FinancialServicesPage() {
         }
 
         setBusinesses(filteredResult)
+        setAllBusinesses(filteredResult)
+        setFilteredBusinesses(filteredResult)
       } catch (error) {
         // Only show error for the latest request
         if (fetchId === fetchIdRef.current) {
@@ -163,19 +171,75 @@ export default function FinancialServicesPage() {
     }
   }, [toast, userZipCode]) // Only re-run when toast or userZipCode changes
 
-  const filteredBusinesses = selectedFilter
-    ? businesses.filter((business) => {
-        if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-          return business.allSubcategories.some((sub: string) =>
-            sub.toLowerCase().includes(selectedFilter.toLowerCase()),
-          )
-        }
-        if (business.subcategory) {
-          return business.subcategory.toLowerCase().includes(selectedFilter.toLowerCase())
-        }
-        return false
+  // Helper function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+    // Check allSubcategories array
+    if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+      return business.allSubcategories.some((sub) => sub === filterValue)
+    }
+
+    // Check subcategories array
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      return business.subcategories.some((sub) => sub === filterValue)
+    }
+
+    // Check single subcategory field
+    if (business.subcategory) {
+      return business.subcategory === filterValue
+    }
+
+    return false
+  }
+
+  // Filter functions
+  const handleFilterChange = (value: string) => {
+    setSelectedFilters((prev) => (prev.includes(value) ? prev.filter((f) => f !== value) : [...prev, value]))
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All businesses:", allBusinesses)
+
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(allBusinesses)
+      setAppliedFilters([])
+      toast({
+        title: "Filters cleared",
+        description: `Showing all ${allBusinesses.length} financial service providers.`,
       })
-    : businesses
+      return
+    }
+
+    const filtered = allBusinesses.filter((business) => {
+      const hasMatch = selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
+      console.log(
+        `Business ${business.displayName} subcategories:`,
+        business.allSubcategories || business.subcategories || [business.subcategory],
+      )
+      console.log(`Filter "${selectedFilters.join(", ")}" matches business: ${hasMatch}`)
+      return hasMatch
+    })
+
+    console.log("Filtered results:", filtered)
+    setFilteredBusinesses(filtered)
+    setAppliedFilters([...selectedFilters])
+
+    toast({
+      title: "Filters applied",
+      description: `Found ${filtered.length} financial service providers matching your criteria.`,
+    })
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredBusinesses(allBusinesses)
+
+    toast({
+      title: "Filters cleared",
+      description: `Showing all ${allBusinesses.length} financial service providers.`,
+    })
+  }
 
   const handleOpenReviews = (provider: Business) => {
     setSelectedProvider(provider)
@@ -185,10 +249,6 @@ export default function FinancialServicesPage() {
   const handleOpenProfile = (provider: Business) => {
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
-  }
-
-  const handleFilterChange = (value: string) => {
-    setSelectedFilter(value === selectedFilter ? null : value)
   }
 
   return (
@@ -222,7 +282,57 @@ export default function FinancialServicesPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
+      {/* Enhanced Filter Controls */}
+      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Filter by Service Type</h3>
+          <span className="text-sm text-gray-500">{selectedFilters.length} selected</span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={() => handleFilterChange(option.value)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            onClick={applyFilters}
+            disabled={selectedFilters.length === 0}
+            className="bg-primary hover:bg-primary/90"
+          >
+            Apply Filters ({selectedFilters.length})
+          </Button>
+
+          {appliedFilters.length > 0 && (
+            <Button onClick={clearFilters} variant="outline">
+              Clear Filters
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Active Filters Display */}
+      {appliedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-800">Active filters: {appliedFilters.join(", ")}</p>
+              <p className="text-sm text-blue-700">
+                Showing {filteredBusinesses.length} of {allBusinesses.length} financial service providers
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -25,8 +24,10 @@ interface Business {
   serviceArea?: string[] // Array of ZIP codes the business serves
   isNationwide?: boolean // Whether the business serves nationwide
   subcategories?: string[]
+  allSubcategories?: string[]
   rating?: number
   reviews?: number
+  subcategory?: string
 }
 
 export default function ArtsEntertainmentPage() {
@@ -60,9 +61,13 @@ export default function ArtsEntertainmentPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
 
   // Get user's zip code from localStorage
   useEffect(() => {
@@ -148,6 +153,7 @@ export default function ArtsEntertainmentPage() {
         }
 
         setBusinesses(filteredResult)
+        setAllBusinesses(filteredResult) // Store all businesses
       } catch (error) {
         console.error("Error fetching businesses:", error)
         if (currentFetchId === fetchIdRef.current) {
@@ -168,16 +174,6 @@ export default function ArtsEntertainmentPage() {
     fetchBusinesses()
   }, [toast, userZipCode])
 
-  // Filter businesses based on selected subcategory
-  const filteredBusinesses = selectedFilter
-    ? businesses.filter((business) => {
-        if (business.subcategories && Array.isArray(business.subcategories)) {
-          return business.subcategories.some((sub: string) => sub.toLowerCase().includes(selectedFilter.toLowerCase()))
-        }
-        return false
-      })
-    : businesses
-
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
@@ -188,14 +184,58 @@ export default function ArtsEntertainmentPage() {
     setIsProfileDialogOpen(true)
   }
 
-  const handleFilterChange = (value: string) => {
-    setSelectedFilter(value === selectedFilter ? null : value)
-  }
-
   // Handle clearing zip code filter
   const handleClearZipCode = () => {
     localStorage.removeItem("savedZipCode")
     setUserZipCode(null)
+  }
+
+  // Function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+    const subcategories = business.subcategories || []
+    const allSubcategories = business.allSubcategories || []
+
+    return (
+      subcategories.includes(filterValue) ||
+      allSubcategories.includes(filterValue) ||
+      (business as any).subcategory === filterValue
+    )
+  }
+
+  // Handle filter selection
+  const handleFilterChange = (filterId: string, filterValue: string, checked: boolean) => {
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterValue])
+    } else {
+      setSelectedFilters((prev) => prev.filter((f) => f !== filterValue))
+    }
+  }
+
+  // Apply filters
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+
+    if (selectedFilters.length === 0) {
+      setBusinesses(allBusinesses)
+      setAppliedFilters([])
+      return
+    }
+
+    const filtered = allBusinesses.filter((business) => {
+      return selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
+    })
+
+    console.log(`Filtered results: ${filtered.length} businesses`)
+    setBusinesses(filtered)
+    setAppliedFilters([...selectedFilters])
+    setSelectedFilters([])
+  }
+
+  // Clear filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setBusinesses(allBusinesses)
   }
 
   return (
@@ -229,7 +269,65 @@ export default function ArtsEntertainmentPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} selectedValue={selectedFilter} onChange={handleFilterChange} />
+      {/* Enhanced Filter Interface */}
+      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <h3 className="text-lg font-semibold mb-4">Filter by Service Type</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={(e) => handleFilterChange(option.id, option.value, e.target.checked)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              onClick={applyFilters}
+              disabled={selectedFilters.length === 0}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Apply Filters ({selectedFilters.length})
+            </Button>
+
+            {appliedFilters.length > 0 && (
+              <Button onClick={clearFilters} variant="outline" className="text-gray-600 hover:text-gray-800">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {appliedFilters.length > 0 && (
+            <div className="text-sm text-gray-600">
+              Showing {businesses.length} of {allBusinesses.length} businesses
+            </div>
+          )}
+        </div>
+
+        {/* Active Filters Display */}
+        {appliedFilters.length > 0 && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm font-medium text-blue-800 mb-2">Active Filters:</p>
+            <div className="flex flex-wrap gap-2">
+              {appliedFilters.map((filter, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {filter}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -277,9 +375,9 @@ export default function ArtsEntertainmentPage() {
         <div className="text-center py-12">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : filteredBusinesses.length > 0 ? (
+      ) : businesses.length > 0 ? (
         <div className="space-y-6">
-          {filteredBusinesses.map((business) => (
+          {businesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">

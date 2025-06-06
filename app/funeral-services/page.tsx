@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -11,6 +10,7 @@ import { Phone, MapPin, Tag } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { toast } from "@/components/ui/use-toast"
 
 // Enhanced Business interface
 interface Business {
@@ -32,6 +32,8 @@ interface Business {
       state?: string
     }
   }
+  allSubcategories?: string[]
+  subcategory?: string
 }
 
 // Helper function to check if business serves a zip code
@@ -62,6 +64,7 @@ export default function FuneralServicesPage() {
     { id: "funeral6", label: "Grief Counseling", value: "Grief Counseling" },
     { id: "funeral7", label: "Cemetery Services", value: "Cemetery Services" },
     { id: "funeral8", label: "Monument & Headstone Services", value: "Monument & Headstone Services" },
+    { id: "funeral9", label: "Florists", value: "Florists" },
   ]
 
   // State for reviews dialog
@@ -85,6 +88,10 @@ export default function FuneralServicesPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -132,6 +139,7 @@ export default function FuneralServicesPage() {
         }
 
         setBusinesses(filteredBusinesses)
+        setAllBusinesses(filteredBusinesses)
       } catch (err) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -164,6 +172,53 @@ export default function FuneralServicesPage() {
       name: business.displayName || business.businessName || "Funeral Service Provider",
     })
     setIsProfileDialogOpen(true)
+  }
+
+  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+    const subcategories = business.subcategories || []
+    const allSubcategories = business.allSubcategories || []
+    const subcategory = business.subcategory || ""
+
+    const allSubs = [...subcategories, ...allSubcategories, subcategory].filter(Boolean)
+
+    return allSubs.some((sub) => sub.toLowerCase().trim() === filterValue.toLowerCase().trim())
+  }
+
+  const handleFilterChange = (filterValue: string, checked: boolean) => {
+    setSelectedFilters((prev) => (checked ? [...prev, filterValue] : prev.filter((f) => f !== filterValue)))
+  }
+
+  const applyFilters = () => {
+    if (selectedFilters.length === 0) {
+      setBusinesses(allBusinesses)
+      setAppliedFilters([])
+      toast({
+        title: "Filters cleared",
+        description: `Showing all ${allBusinesses.length} funeral service providers`,
+      })
+      return
+    }
+
+    const filtered = allBusinesses.filter((business) =>
+      selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter)),
+    )
+
+    setBusinesses(filtered)
+    setAppliedFilters([...selectedFilters])
+    toast({
+      title: "Filters applied",
+      description: `Found ${filtered.length} funeral service providers matching your criteria`,
+    })
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setBusinesses(allBusinesses)
+    toast({
+      title: "Filters cleared",
+      description: `Showing all ${allBusinesses.length} funeral service providers`,
+    })
   }
 
   return (
@@ -201,7 +256,57 @@ export default function FuneralServicesPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-4">Filter by Services</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={(e) => handleFilterChange(option.value, e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            {selectedFilters.length > 0 && (
+              <span>
+                {selectedFilters.length} filter{selectedFilters.length !== 1 ? "s" : ""} selected
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} size="sm">
+              Apply Filters
+            </Button>
+            {appliedFilters.length > 0 && (
+              <Button onClick={clearFilters} variant="outline" size="sm">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {appliedFilters.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-blue-700">
+                <span className="font-medium">Active filters:</span> {appliedFilters.join(", ")}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Showing {businesses.length} of {allBusinesses.length} funeral service providers
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {userZipCode && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -310,7 +415,7 @@ export default function FuneralServicesPage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>

@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -39,6 +38,7 @@ interface Business {
   }
   serviceArea?: string[]
   isNationwide?: boolean
+  allSubcategories?: string[]
 }
 
 export default function TechITServicesPage() {
@@ -66,6 +66,9 @@ export default function TechITServicesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
+  const [showFiltered, setShowFiltered] = useState(false)
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -186,6 +189,7 @@ export default function TechITServicesPage() {
           services: business.services || business.subcategories || [],
           reviews: business.reviews || [],
           rating: business.rating || 0,
+          allSubcategories: Array.from(new Set([...(business.subcategories || []), ...(business.services || [])])),
         }))
 
         // Filter by zip code if available
@@ -243,6 +247,102 @@ export default function TechITServicesPage() {
     setIsProfileDialogOpen(true)
   }
 
+  // Custom filter component with apply functionality
+  const TechServicesFilter = () => {
+    const handleFilterChange = (filterId: string, checked: boolean) => {
+      setSelectedFilters((prev) => {
+        if (checked) {
+          return [...prev, filterId]
+        } else {
+          return prev.filter((id) => id !== filterId)
+        }
+      })
+    }
+
+    const handleApplyFilters = () => {
+      if (selectedFilters.length === 0) {
+        setShowFiltered(false)
+        return
+      }
+
+      const filtered = providers.filter((provider) => {
+        // Check if provider has any of the selected subcategories
+        const providerSubcategories = provider.allSubcategories || provider.subcategories || []
+
+        return selectedFilters.some((selectedFilter) => {
+          return providerSubcategories.some((subcategory) => {
+            // Normalize both strings for comparison
+            const normalizedSubcategory = subcategory.toLowerCase().trim()
+            const normalizedFilter = selectedFilter.toLowerCase().trim()
+
+            // Check for exact match or partial match
+            return normalizedSubcategory.includes(normalizedFilter) || normalizedFilter.includes(normalizedSubcategory)
+          })
+        })
+      })
+
+      setFilteredProviders(filtered)
+      setShowFiltered(true)
+
+      toast({
+        title: "Filters Applied",
+        description: `Found ${filtered.length} businesses matching your criteria.`,
+      })
+    }
+
+    const handleClearFilters = () => {
+      setSelectedFilters([])
+      setShowFiltered(false)
+      setFilteredProviders([])
+    }
+
+    return (
+      <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+        <h3 className="text-lg font-semibold mb-4">Filter by Services</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+          {filterOptions.map((option) => (
+            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFilters.includes(option.value)}
+                onChange={(e) => handleFilterChange(option.value, e.target.checked)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm text-gray-700">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            onClick={handleApplyFilters}
+            disabled={selectedFilters.length === 0}
+            className="bg-primary hover:bg-primary/90"
+          >
+            Apply Filters ({selectedFilters.length})
+          </Button>
+
+          {(selectedFilters.length > 0 || showFiltered) && (
+            <Button variant="outline" onClick={handleClearFilters}>
+              Clear Filters
+            </Button>
+          )}
+        </div>
+
+        {showFiltered && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Active Filters:</strong> {selectedFilters.join(", ")}
+              <br />
+              <strong>Results:</strong> {filteredProviders.length} businesses found
+            </p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <CategoryLayout title="Tech & IT Services" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -274,7 +374,7 @@ export default function TechITServicesPage() {
         </div>
       </div>
 
-      <CategoryFilter options={filterOptions} />
+      <TechServicesFilter />
 
       {userZipCode && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -308,7 +408,7 @@ export default function TechITServicesPage() {
           <div className="text-center py-8">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : (showFiltered ? filteredProviders : providers).length === 0 ? (
           <div className="text-center py-12">
             <div className="max-w-md mx-auto">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -322,18 +422,30 @@ export default function TechITServicesPage() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {userZipCode ? `No Tech Providers in ${userZipCode}` : "No Tech Providers Yet"}
+                {showFiltered
+                  ? `No Tech Providers Match Your Filters`
+                  : userZipCode
+                    ? `No Tech Providers in ${userZipCode}`
+                    : "No Tech Providers Yet"}
               </h3>
               <p className="text-gray-600 mb-4">
-                {userZipCode
-                  ? `We're building our network of technology professionals in the ${userZipCode} area.`
-                  : "Be the first technology professional to join our platform and connect with clients in your area."}
+                {showFiltered
+                  ? "Try adjusting your filter criteria or clearing filters to see more results."
+                  : userZipCode
+                    ? `We're building our network of technology professionals in the ${userZipCode} area.`
+                    : "Be the first technology professional to join our platform and connect with clients in your area."}
               </p>
-              <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
+              {showFiltered ? (
+                <Button variant="outline" onClick={() => setShowFiltered(false)}>
+                  Show All Providers
+                </Button>
+              ) : (
+                <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
+              )}
             </div>
           </div>
         ) : (
-          providers.map((provider) => (
+          (showFiltered ? filteredProviders : providers).map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
