@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
@@ -12,6 +11,7 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -58,6 +58,12 @@ export default function CareServicesPage() {
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
   const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
   const filterOptions = [
     { id: "homecare1", label: "Non-Medical Elder Care", value: "Non-Medical Elder Care" },
@@ -118,6 +124,66 @@ export default function CareServicesPage() {
     }
   }, [])
 
+  // Helper function for exact subcategory matching
+  const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
+    if (filters.length === 0) return true
+
+    console.log(`Checking business ${business.displayName || business.businessName} subcategories:`, {
+      subcategories: business.subcategories,
+      services: business.services,
+      filters,
+    })
+
+    // Check subcategories array
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      const hasMatch = filters.some((filter) => business.subcategories!.includes(filter))
+      if (hasMatch) return true
+    }
+
+    // Check services array (fallback)
+    if (business.services && Array.isArray(business.services)) {
+      const hasMatch = filters.some((filter) => business.services!.includes(filter))
+      if (hasMatch) return true
+    }
+
+    return false
+  }
+
+  // Filter handlers
+  const handleFilterChange = (filterValue: string, checked: boolean) => {
+    setSelectedFilters((prev) => (checked ? [...prev, filterValue] : prev.filter((f) => f !== filterValue)))
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All businesses:", allBusinesses)
+
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(allBusinesses)
+      setAppliedFilters([])
+    } else {
+      const filtered = allBusinesses.filter((business) => hasExactSubcategoryMatch(business, selectedFilters))
+      console.log("Filtered results:", filtered)
+      setFilteredBusinesses(filtered)
+      setAppliedFilters([...selectedFilters])
+    }
+
+    toast({
+      title: "Filters Applied",
+      description: `${selectedFilters.length === 0 ? "Showing all" : `Found ${filteredBusinesses.length}`} care service providers`,
+    })
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredBusinesses(allBusinesses)
+    toast({
+      title: "Filters Cleared",
+      description: "Showing all care service providers",
+    })
+  }
+
   useEffect(() => {
     async function fetchBusinesses() {
       const currentFetchId = ++fetchIdRef.current
@@ -140,7 +206,7 @@ export default function CareServicesPage() {
         // Filter businesses by zip code if userZipCode is available
         if (userZipCode) {
           console.log(`[Care Services] Filtering by zip code: ${userZipCode}`)
-          const filteredBusinesses = result.filter((business: Business) => {
+          const filteredBusinessesByZip = result.filter((business: Business) => {
             const serves = businessServesZipCode(business, userZipCode)
             console.log(
               `[Care Services] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
@@ -148,10 +214,14 @@ export default function CareServicesPage() {
             )
             return serves
           })
-          console.log(`[Care Services] After filtering: ${filteredBusinesses.length} businesses`)
-          setBusinesses(filteredBusinesses)
+          console.log(`[Care Services] After filtering: ${filteredBusinessesByZip.length} businesses`)
+          setBusinesses(filteredBusinessesByZip)
+          setAllBusinesses(filteredBusinessesByZip)
+          setFilteredBusinesses(filteredBusinessesByZip)
         } else {
           setBusinesses(result)
+          setAllBusinesses(result)
+          setFilteredBusinesses(result)
         }
       } catch (error) {
         // Only update error state if this is still the current request
@@ -327,7 +397,54 @@ export default function CareServicesPage() {
         </div>
       )}
 
-      <CategoryFilter options={filterOptions} />
+      {/* Enhanced Filter Controls */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Filter by Service Type</h3>
+          <div className="text-sm text-gray-600">
+            {selectedFilters.length > 0 &&
+              `${selectedFilters.length} filter${selectedFilters.length > 1 ? "s" : ""} selected`}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filterOptions.map((option) => (
+            <label
+              key={option.id}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:border-primary/50 cursor-pointer transition-colors"
+            >
+              <Checkbox
+                checked={selectedFilters.includes(option.value)}
+                onCheckedChange={(checked) => handleFilterChange(option.value, checked as boolean)}
+              />
+              <span className="text-sm font-medium">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <Button onClick={applyFilters} disabled={selectedFilters.length === 0} className="min-w-[120px]">
+            Apply Filters
+          </Button>
+          {appliedFilters.length > 0 && (
+            <Button variant="outline" onClick={clearFilters} className="min-w-[120px]">
+              Clear Filters
+            </Button>
+          )}
+        </div>
+
+        {appliedFilters.length > 0 && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Active filters:</strong> {appliedFilters.join(", ")}
+              <br />
+              <span className="text-blue-600">
+                Showing {filteredBusinesses.length} of {allBusinesses.length} businesses
+              </span>
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Business Listings */}
       <div className="mt-8">
@@ -340,12 +457,14 @@ export default function CareServicesPage() {
           <div className="text-center py-8 text-red-500">
             <p>{error}</p>
           </div>
-        ) : businesses.length > 0 ? (
+        ) : filteredBusinesses.length > 0 ? (
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-800">Care Service Providers ({businesses.length})</h2>
+            <h2 className="text-xl font-semibold text-gray-800">
+              Care Service Providers ({filteredBusinesses.length})
+            </h2>
 
             <div className="grid gap-6">
-              {businesses.map((business) => (
+              {filteredBusinesses.map((business) => (
                 <Card key={business.id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row justify-between">

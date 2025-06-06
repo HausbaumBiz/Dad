@@ -1,12 +1,12 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Phone, MapPin, Star } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
@@ -44,6 +44,12 @@ export default function PetCarePage() {
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
   const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
   const filterOptions = [
     { id: "pet1", label: "Veterinarians", value: "Veterinarians" },
@@ -97,6 +103,50 @@ export default function PetCarePage() {
     return matches
   }
 
+  // Helper function for exact subcategory matching
+  const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
+    if (filters.length === 0) return true
+
+    console.log(`Checking business ${business.displayName || business.businessName} subcategories:`, {
+      subcategories: business.subcategories,
+      filters,
+    })
+
+    // Check subcategories array
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      const hasMatch = filters.some((filter) => business.subcategories!.includes(filter))
+      if (hasMatch) return true
+    }
+
+    return false
+  }
+
+  // Filter handlers
+  const handleFilterChange = (filterValue: string, checked: boolean) => {
+    setSelectedFilters((prev) => (checked ? [...prev, filterValue] : prev.filter((f) => f !== filterValue)))
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All businesses:", allBusinesses)
+
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(allBusinesses)
+      setAppliedFilters([])
+    } else {
+      const filtered = allBusinesses.filter((business) => hasExactSubcategoryMatch(business, selectedFilters))
+      console.log("Filtered results:", filtered)
+      setFilteredBusinesses(filtered)
+      setAppliedFilters([...selectedFilters])
+    }
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredBusinesses(allBusinesses)
+  }
+
   // Fetch businesses with race condition prevention
   useEffect(() => {
     async function loadBusinesses() {
@@ -125,8 +175,12 @@ export default function PetCarePage() {
             `[PetCare] Filtered from ${originalCount} to ${filteredBusinesses.length} businesses for zip ${userZipCode}`,
           )
           setBusinesses(filteredBusinesses)
+          setAllBusinesses(filteredBusinesses)
+          setFilteredBusinesses(filteredBusinesses)
         } else {
           setBusinesses(fetchedBusinesses)
+          setAllBusinesses(fetchedBusinesses)
+          setFilteredBusinesses(fetchedBusinesses)
         }
       } catch (error) {
         // Only update error if this is still the current request
@@ -213,18 +267,65 @@ export default function PetCarePage() {
         </div>
       )}
 
-      <CategoryFilter options={filterOptions} />
+      {/* Enhanced Filter Controls */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Filter by Service Type</h3>
+          <div className="text-sm text-gray-600">
+            {selectedFilters.length > 0 &&
+              `${selectedFilters.length} filter${selectedFilters.length > 1 ? "s" : ""} selected`}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filterOptions.map((option) => (
+            <label
+              key={option.id}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:border-primary/50 cursor-pointer transition-colors"
+            >
+              <Checkbox
+                checked={selectedFilters.includes(option.value)}
+                onCheckedChange={(checked) => handleFilterChange(option.value, checked as boolean)}
+              />
+              <span className="text-sm font-medium">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <Button onClick={applyFilters} disabled={selectedFilters.length === 0} className="min-w-[120px]">
+            Apply Filters
+          </Button>
+          {appliedFilters.length > 0 && (
+            <Button variant="outline" onClick={clearFilters} className="min-w-[120px]">
+              Clear Filters
+            </Button>
+          )}
+        </div>
+
+        {appliedFilters.length > 0 && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Active filters:</strong> {appliedFilters.join(", ")}
+              <br />
+              <span className="text-blue-600">
+                Showing {filteredBusinesses.length} of {allBusinesses.length} businesses
+              </span>
+            </p>
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div className="mt-8 p-8 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
           <p className="mt-2 text-gray-600">Loading pet care providers...</p>
         </div>
-      ) : businesses.length > 0 ? (
+      ) : filteredBusinesses.length > 0 ? (
         <div className="mt-8 space-y-6">
-          <h2 className="text-2xl font-bold text-gray-900">Pet Care Providers ({businesses.length})</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Pet Care Providers ({filteredBusinesses.length})</h2>
           <div className="grid gap-6">
-            {businesses.map((business: Business) => (
+            {filteredBusinesses.map((business: Business) => (
               <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
                 <div className="flex flex-col space-y-4">
                   {/* Business Name and Description */}

@@ -11,6 +11,7 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useToast } from "@/hooks/use-toast"
 
 export default function WeddingsEventsPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -33,7 +34,11 @@ export default function WeddingsEventsPage() {
 
   // Add filter state variables after existing state
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [filteredProviders, setFilteredProviders] = useState([])
+
+  // Add toast hook after the existing state declarations:
+  const { toast } = useToast()
 
   // Add fetchIdRef for race condition prevention
   const fetchIdRef = useRef(0)
@@ -83,12 +88,37 @@ export default function WeddingsEventsPage() {
 
   // Add exact subcategory matching function and filter handlers
   const exactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
-    if (!business.subcategories || business.subcategories.length === 0 || filters.length === 0) {
-      return true // No subcategories to filter, so it's a match
+    if (filters.length === 0) return true
+
+    console.log(`Checking business ${business.displayName || business.businessName} subcategories:`, {
+      subcategories: business.subcategories,
+      filters,
+    })
+
+    // Check subcategories array
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      const hasMatch = filters.some((filter) => business.subcategories!.includes(filter))
+      if (hasMatch) return true
     }
 
-    // Check if every selected filter is present in the business's subcategories
-    return filters.every((filter) => business.subcategories?.includes(filter))
+    return false
+  }
+
+  const handleApplyFilters = () => {
+    setAppliedFilters([...selectedFilters])
+    toast({
+      title: "Filters Applied",
+      description: `Showing businesses with ${selectedFilters.length} selected service${selectedFilters.length !== 1 ? "s" : ""}`,
+    })
+  }
+
+  const handleClearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    toast({
+      title: "Filters Cleared",
+      description: "Showing all wedding and event providers",
+    })
   }
 
   const handleFilterChange = (filterValue: string) => {
@@ -125,6 +155,10 @@ export default function WeddingsEventsPage() {
         }
 
         setProviders(businesses)
+        // Add this line to store all providers for filtering
+        if (currentFetchId === fetchIdRef.current) {
+          setFilteredProviders(businesses)
+        }
       } catch (error) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -143,17 +177,17 @@ export default function WeddingsEventsPage() {
   }, [userZipCode])
 
   useEffect(() => {
-    // Apply filters whenever providers or selectedFilters change
+    // Apply filters whenever providers or appliedFilters change
     const applyFilters = () => {
       let filtered = providers
-      if (selectedFilters.length > 0) {
-        filtered = providers.filter((provider: Business) => exactSubcategoryMatch(provider, selectedFilters))
+      if (appliedFilters.length > 0) {
+        filtered = providers.filter((provider: Business) => exactSubcategoryMatch(provider, appliedFilters))
       }
       setFilteredProviders(filtered)
     }
 
     applyFilters()
-  }, [providers, selectedFilters])
+  }, [providers, appliedFilters])
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -231,9 +265,33 @@ export default function WeddingsEventsPage() {
         </div>
       </div>
 
-      {/* Replace CategoryFilter with checkbox interface   */}
-      <div className="mb-4">
-        <h4 className="text-lg font-semibold mb-2">Filter by Service:</h4>
+      {/* Filter Section with Apply/Clear Buttons */}
+      <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="text-lg font-semibold">Filter by Service:</h4>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleApplyFilters}
+              disabled={selectedFilters.length === 0}
+              size="sm"
+              className="min-w-[100px]"
+            >
+              Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
+            </Button>
+            {appliedFilters.length > 0 && (
+              <Button onClick={handleClearFilters} variant="outline" size="sm" className="min-w-[100px]">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {appliedFilters.length > 0 && (
+          <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-700 font-medium">Active Filters: {appliedFilters.join(", ")}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {filterOptions.map((option) => (
             <label

@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
@@ -13,6 +12,7 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
 import { Phone, Loader2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -29,6 +29,8 @@ interface Business {
   rating?: number
   reviews?: number
   services?: string[]
+  subcategories?: string[]
+  allSubcategories?: string[]
   reviewsData?: any[]
   adDesignData?: {
     businessInfo?: {
@@ -104,6 +106,73 @@ export default function AutomotiveServicesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
+
+  // Helper function for exact subcategory matching
+  const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
+    if (filters.length === 0) return true
+
+    console.log(`Checking business ${business.displayName || business.businessName} subcategories:`, {
+      subcategories: business.subcategories,
+      allSubcategories: business.allSubcategories,
+      services: business.services,
+      filters,
+    })
+
+    // Check subcategories array
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      const hasMatch = filters.some((filter) => business.subcategories!.includes(filter))
+      if (hasMatch) return true
+    }
+
+    // Check services array (fallback)
+    if (business.services && Array.isArray(business.services)) {
+      const hasMatch = filters.some((filter) => business.services!.includes(filter))
+      if (hasMatch) return true
+    }
+
+    return false
+  }
+
+  // Filter handlers
+  const handleFilterChange = (filterValue: string, checked: boolean) => {
+    setSelectedFilters((prev) => (checked ? [...prev, filterValue] : prev.filter((f) => f !== filterValue)))
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All businesses:", allBusinesses)
+
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(allBusinesses)
+      setAppliedFilters([])
+    } else {
+      const filtered = allBusinesses.filter((business) => hasExactSubcategoryMatch(business, selectedFilters))
+      console.log("Filtered results:", filtered)
+      setFilteredBusinesses(filtered)
+      setAppliedFilters([...selectedFilters])
+    }
+
+    toast({
+      title: "Filters Applied",
+      description: `${selectedFilters.length === 0 ? "Showing all" : `Found ${filteredBusinesses.length}`} automotive service providers`,
+    })
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredBusinesses(allBusinesses)
+    toast({
+      title: "Filters Cleared",
+      description: "Showing all automotive service providers",
+    })
+  }
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -188,8 +257,12 @@ export default function AutomotiveServicesPage() {
           })
           console.log(`[Automotive Services] After filtering: ${filteredBusinesses.length} businesses`)
           setBusinesses(filteredBusinesses)
+          setAllBusinesses(filteredBusinesses)
+          setFilteredBusinesses(filteredBusinesses)
         } else {
           setBusinesses(result)
+          setAllBusinesses(result)
+          setFilteredBusinesses(result)
         }
       } catch (error) {
         // Only update error state if this is still the current request
@@ -284,7 +357,54 @@ export default function AutomotiveServicesPage() {
         </div>
       )}
 
-      <CategoryFilter options={filterOptions} />
+      {/* Enhanced Filter Controls */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Filter by Service Type</h3>
+          <div className="text-sm text-gray-600">
+            {selectedFilters.length > 0 &&
+              `${selectedFilters.length} filter${selectedFilters.length > 1 ? "s" : ""} selected`}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filterOptions.map((option) => (
+            <label
+              key={option.id}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:border-primary/50 cursor-pointer transition-colors"
+            >
+              <Checkbox
+                checked={selectedFilters.includes(option.value)}
+                onCheckedChange={(checked) => handleFilterChange(option.value, checked as boolean)}
+              />
+              <span className="text-sm font-medium">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <Button onClick={applyFilters} disabled={selectedFilters.length === 0} className="min-w-[120px]">
+            Apply Filters
+          </Button>
+          {appliedFilters.length > 0 && (
+            <Button variant="outline" onClick={clearFilters} className="min-w-[120px]">
+              Clear Filters
+            </Button>
+          )}
+        </div>
+
+        {appliedFilters.length > 0 && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Active filters:</strong> {appliedFilters.join(", ")}
+              <br />
+              <span className="text-blue-600">
+                Showing {filteredBusinesses.length} of {allBusinesses.length} businesses
+              </span>
+            </p>
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex justify-center items-center py-12">
@@ -321,7 +441,7 @@ export default function AutomotiveServicesPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {businesses.map((business) => {
+          {filteredBusinesses.map((business) => {
             const adDesign = businessAdDesigns[business.id]
 
             return (
@@ -414,21 +534,27 @@ export default function AutomotiveServicesPage() {
                           </span>
                         </div>
 
-                        {business.services && business.services.length > 0 && (
+                        {/* Display Subcategories */}
+                        {(business.subcategories && business.subcategories.length > 0) ||
+                        (business.services && business.services.length > 0) ? (
                           <div className="mt-3">
-                            <p className="text-sm font-medium text-gray-700">Services:</p>
+                            <p className="text-sm font-medium text-gray-700">Specializes in:</p>
                             <div className="flex flex-wrap gap-2 mt-1">
-                              {business.services.map((service, idx) => (
+                              {/* Prioritize subcategories over services */}
+                              {(business.subcategories && business.subcategories.length > 0
+                                ? business.subcategories
+                                : business.services || []
+                              ).map((subcategory, idx) => (
                                 <span
                                   key={idx}
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
                                 >
-                                  {service}
+                                  {subcategory}
                                 </span>
                               ))}
                             </div>
                           </div>
-                        )}
+                        ) : null}
                       </div>
 
                       <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">

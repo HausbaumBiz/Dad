@@ -98,12 +98,14 @@ export default function EducationTutoringPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [businesses, setBusinesses] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const fetchIdRef = useRef(0)
 
   // Filter State Variables
-  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([])
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -139,6 +141,8 @@ export default function EducationTutoringPage() {
         }
 
         setBusinesses(result)
+        setAllBusinesses(result)
+        setFilteredBusinesses(result)
       } catch (error) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -160,24 +164,49 @@ export default function EducationTutoringPage() {
     fetchBusinesses()
   }, [toast, userZipCode])
 
-  // Exact subcategory matching function
-  const businessHasSubcategory = (business: Business, subcategory: string): boolean => {
+  // Function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, subcategory: string): boolean => {
     if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-      return business.allSubcategories.includes(subcategory)
-    }
-    if (business.subcategory) {
-      return business.subcategory === subcategory
+      return business.allSubcategories.some((sub) => sub.toLowerCase() === subcategory.toLowerCase())
     }
     return false
   }
 
-  // Filter businesses based on selected subcategories
-  const filteredBusinesses =
-    selectedSubcategories.length > 0
-      ? businesses.filter((business) =>
-          selectedSubcategories.some((subcategory) => businessHasSubcategory(business, subcategory)),
-        )
-      : businesses
+  // Filter handlers
+  const handleFilterChange = (subcategory: string) => {
+    setSelectedFilters((prev) =>
+      prev.includes(subcategory) ? prev.filter((f) => f !== subcategory) : [...prev, subcategory],
+    )
+  }
+
+  const handleApplyFilters = () => {
+    setAppliedFilters([...selectedFilters])
+
+    let filtered = [...allBusinesses]
+    if (selectedFilters.length > 0) {
+      filtered = allBusinesses.filter((business) =>
+        selectedFilters.every((filter) => hasExactSubcategoryMatch(business, filter)),
+      )
+    }
+
+    setFilteredBusinesses(filtered)
+
+    toast({
+      title: "Filters Applied",
+      description: `Showing businesses with ${selectedFilters.length} selected subject${selectedFilters.length !== 1 ? "s" : ""}`,
+    })
+  }
+
+  const handleClearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredBusinesses([...allBusinesses])
+
+    toast({
+      title: "Filters Cleared",
+      description: "Showing all education & tutoring businesses",
+    })
+  }
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
@@ -187,13 +216,6 @@ export default function EducationTutoringPage() {
   const handleOpenProfile = (provider: any) => {
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
-  }
-
-  // Filter handler
-  const handleSubcategoryChange = (subcategory: string) => {
-    setSelectedSubcategories((prev) =>
-      prev.includes(subcategory) ? prev.filter((s) => s !== subcategory) : [...prev, subcategory],
-    )
   }
 
   return (
@@ -228,27 +250,43 @@ export default function EducationTutoringPage() {
       </div>
 
       {/* Replace CategoryFilter with checkbox interface */}
-      <div className="mb-4">
-        <h4 className="text-md font-semibold mb-2">Filter by Subject:</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+      <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-lg font-semibold text-gray-800">Filter by Subject</h4>
+          <div className="flex gap-2">
+            <Button onClick={handleApplyFilters} disabled={selectedFilters.length === 0} size="sm">
+              Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
+            </Button>
+            {appliedFilters.length > 0 && (
+              <Button onClick={handleClearFilters} variant="outline" size="sm">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {filterOptions.map((option) => (
             <label
               key={option.id}
-              className="flex items-center space-x-2 bg-white rounded-md border border-gray-200 shadow-sm p-2 cursor-pointer hover:bg-gray-50"
+              className="flex items-center space-x-2 bg-gray-50 rounded-md border border-gray-200 px-3 py-2 hover:bg-gray-100 transition-colors cursor-pointer"
             >
               <Checkbox
                 id={option.id}
-                value={option.value}
-                checked={selectedSubcategories.includes(option.value)}
-                onCheckedChange={() => handleSubcategoryChange(option.value)}
+                checked={selectedFilters.includes(option.value)}
+                onCheckedChange={() => handleFilterChange(option.value)}
               />
-              <span className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                {option.label}
-              </span>
+              <span className="text-sm font-medium text-gray-700">{option.label}</span>
             </label>
           ))}
         </div>
       </div>
+
+      {appliedFilters.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800 font-medium">Active Filters: {appliedFilters.join(", ")}</p>
+        </div>
+      )}
 
       {userZipCode && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">

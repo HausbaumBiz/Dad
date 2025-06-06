@@ -110,19 +110,53 @@ export default function FitnessAthleticsPage() {
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Add filter state variables after existing state
-  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([])
+  // Filter state management
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
-  // Add exact subcategory matching function and filter handlers
-  const isSubcategorySelected = (subcategory: string) => selectedSubcategories.includes(subcategory)
+  // Function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, subcategory: string): boolean => {
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      return business.subcategories.some((sub) => sub.toLowerCase() === subcategory.toLowerCase())
+    }
+    return false
+  }
 
-  const handleSubcategoryChange = (subcategory: string) => {
-    setSelectedSubcategories((prev) => {
-      if (prev.includes(subcategory)) {
-        return prev.filter((s) => s !== subcategory)
-      } else {
-        return [...prev, subcategory]
-      }
+  // Filter handlers
+  const handleFilterChange = (subcategory: string) => {
+    setSelectedFilters((prev) =>
+      prev.includes(subcategory) ? prev.filter((f) => f !== subcategory) : [...prev, subcategory],
+    )
+  }
+
+  const handleApplyFilters = () => {
+    setAppliedFilters([...selectedFilters])
+
+    let filtered = [...allBusinesses]
+    if (selectedFilters.length > 0) {
+      filtered = allBusinesses.filter((business) =>
+        selectedFilters.every((filter) => hasExactSubcategoryMatch(business, filter)),
+      )
+    }
+
+    setFilteredBusinesses(filtered)
+
+    toast({
+      title: "Filters Applied",
+      description: `Showing businesses with ${selectedFilters.length} selected service${selectedFilters.length !== 1 ? "s" : ""}`,
+    })
+  }
+
+  const handleClearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredBusinesses([...allBusinesses])
+
+    toast({
+      title: "Filters Cleared",
+      description: "Showing all fitness & athletics businesses",
     })
   }
 
@@ -158,6 +192,8 @@ export default function FitnessAthleticsPage() {
         }
 
         setBusinesses(result)
+        setAllBusinesses(result)
+        setFilteredBusinesses(result)
         setError(null)
       } catch (err) {
         // Only update error if this is still the current request
@@ -181,19 +217,6 @@ export default function FitnessAthleticsPage() {
     fetchBusinesses()
   }, [toast, userZipCode])
 
-  // Update useEffect and rendering to use filteredBusinesses
-  const filteredBusinesses = businesses.filter((business) => {
-    if (selectedSubcategories.length === 0) {
-      return true // Show all if no subcategories are selected
-    }
-
-    if (business.subcategories && Array.isArray(business.subcategories)) {
-      return business.subcategories.some((sub) => selectedSubcategories.includes(sub))
-    }
-
-    return false // Don't show if no subcategories match
-  })
-
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
@@ -202,10 +225,6 @@ export default function FitnessAthleticsPage() {
   const handleOpenProfile = (provider: any) => {
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
-  }
-
-  const handleFilterChange = (value: string) => {
-    setSelectedFilter(value === selectedFilter ? null : value)
   }
 
   return (
@@ -240,24 +259,43 @@ export default function FitnessAthleticsPage() {
       </div>
 
       {/* Replace CategoryFilter with checkbox interface */}
-      <div className="mb-4">
-        <h4 className="text-lg font-semibold mb-2">Filter by Subcategory</h4>
+      <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-lg font-semibold text-gray-800">Filter by Service Type</h4>
+          <div className="flex gap-2">
+            <Button onClick={handleApplyFilters} disabled={selectedFilters.length === 0} size="sm">
+              Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
+            </Button>
+            {appliedFilters.length > 0 && (
+              <Button onClick={handleClearFilters} variant="outline" size="sm">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {filterOptions.map((option) => (
             <label
               key={option.id}
-              className="flex items-center space-x-2 bg-white rounded-md border border-gray-200 shadow-sm px-3 py-2 hover:bg-gray-50 transition-colors"
+              className="flex items-center space-x-2 bg-gray-50 rounded-md border border-gray-200 px-3 py-2 hover:bg-gray-100 transition-colors cursor-pointer"
             >
               <Checkbox
                 id={option.id}
-                checked={isSubcategorySelected(option.value)}
-                onCheckedChange={() => handleSubcategoryChange(option.value)}
+                checked={selectedFilters.includes(option.value)}
+                onCheckedChange={() => handleFilterChange(option.value)}
               />
               <span className="text-sm font-medium text-gray-700">{option.label}</span>
             </label>
           ))}
         </div>
       </div>
+
+      {appliedFilters.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800 font-medium">Active Filters: {appliedFilters.join(", ")}</p>
+        </div>
+      )}
 
       {userZipCode && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">

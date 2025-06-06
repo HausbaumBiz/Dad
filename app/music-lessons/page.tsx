@@ -77,7 +77,7 @@ export default function MusicLessonsPage() {
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
-  // Filter state
+  // Filter state management
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allProviders, setAllProviders] = useState<Business[]>([])
@@ -124,12 +124,12 @@ export default function MusicLessonsPage() {
     localStorage.removeItem("savedZipCode")
   }
 
-  // Function to check if a business has the exact subcategory
+  // Function to check if business has exact subcategory match
   const hasExactSubcategory = (business: Business, filter: string) => {
     return business.subcategories?.some((subcategory) => subcategory.toLowerCase() === filter.toLowerCase())
   }
 
-  // Function to handle filter changes
+  // Filter handlers
   const handleFilterChange = (filter: string) => {
     setSelectedFilters((prev) => {
       if (prev.includes(filter)) {
@@ -140,10 +140,9 @@ export default function MusicLessonsPage() {
     })
   }
 
-  // Function to apply filters
   const handleApplyFilters = () => {
     setAppliedFilters([...selectedFilters])
-    let filtered = [...allProviders] // Start with all providers
+    let filtered = [...allProviders]
 
     if (selectedFilters.length > 0) {
       filtered = allProviders.filter((business) => {
@@ -152,6 +151,22 @@ export default function MusicLessonsPage() {
     }
 
     setFilteredProviders(filtered)
+
+    toast({
+      title: "Filters Applied",
+      description: `Showing businesses with ${selectedFilters.length} selected service${selectedFilters.length !== 1 ? "s" : ""}`,
+    })
+  }
+
+  const handleClearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredProviders([...allProviders])
+
+    toast({
+      title: "Filters Cleared",
+      description: "Showing all music lesson providers",
+    })
   }
 
   useEffect(() => {
@@ -220,19 +235,6 @@ export default function MusicLessonsPage() {
     fetchProviders()
   }, [userZipCode])
 
-  useEffect(() => {
-    // Apply filters whenever appliedFilters change
-    let filtered = [...allProviders]
-
-    if (appliedFilters.length > 0) {
-      filtered = allProviders.filter((business) => {
-        return appliedFilters.every((filter) => hasExactSubcategory(business, filter))
-      })
-    }
-
-    setFilteredProviders(filtered)
-  }, [appliedFilters, allProviders])
-
   const handleViewProfile = (business: Business) => {
     console.log("Opening profile for business:", business)
     setSelectedBusinessId(business.id)
@@ -280,27 +282,43 @@ export default function MusicLessonsPage() {
         </div>
       </div>
 
-      <div className="mb-4 p-4 bg-gray-50 rounded-lg shadow-sm">
-        <h4 className="font-semibold mb-3">Filter by Category</h4>
+      <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-lg font-semibold text-gray-800">Filter by Service Type</h4>
+          <div className="flex gap-2">
+            <Button onClick={handleApplyFilters} disabled={selectedFilters.length === 0} size="sm">
+              Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
+            </Button>
+            {appliedFilters.length > 0 && (
+              <Button onClick={handleClearFilters} variant="outline" size="sm">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {filterOptions.map((option: FilterOption) => (
             <label
               key={option.id}
-              className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1"
+              className="flex items-center space-x-2 bg-gray-50 rounded-md border border-gray-200 px-3 py-2 hover:bg-gray-100 transition-colors cursor-pointer"
             >
               <Checkbox
                 id={option.id}
                 checked={selectedFilters.includes(option.value)}
                 onCheckedChange={() => handleFilterChange(option.value)}
               />
-              <span className="text-sm">{option.label}</span>
+              <span className="text-sm font-medium text-gray-700">{option.label}</span>
             </label>
           ))}
         </div>
-        <Button onClick={handleApplyFilters} className="mt-4">
-          Apply Filters
-        </Button>
       </div>
+
+      {appliedFilters.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800 font-medium">Active Filters: {appliedFilters.join(", ")}</p>
+        </div>
+      )}
 
       {userZipCode && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
