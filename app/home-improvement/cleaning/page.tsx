@@ -43,6 +43,29 @@ export default function CleaningPage() {
     }
   }, [])
 
+  // Function to extract service tags from subcategories
+  const getServiceTags = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    return subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1]
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+      .slice(0, 4) // Limit to 4 tags for display
+  }
+
   useEffect(() => {
     async function fetchBusinesses() {
       if (userZipCode === undefined) return // Wait until zip code is loaded (even if null)
@@ -168,20 +191,26 @@ export default function CleaningPage() {
   }, [userZipCode])
 
   // Extract service tags from subcategories
-  const getServiceTags = (subcategories) => {
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
     return subcategories
-      .filter((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        return path && path.includes("Home and Office Cleaning")
-      })
       .map((subcat) => {
         const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        if (!path) return "Cleaning Services"
+        if (!path) return null
 
+        // Extract the specific service name (last part after the last >)
         const parts = path.split(" > ")
-        return parts[parts.length - 1] // Get just the service name
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1]
       })
-      .slice(0, 3) // Limit to 3 for display
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+    // Remove the .slice(0, 4) limit to show all subcategories
   }
 
   // Function to handle opening reviews dialog
@@ -280,13 +309,15 @@ export default function CleaningPage() {
                     </div>
 
                     <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
+                      <p className="text-sm font-medium text-gray-700">
+                        Services ({getAllTerminalSubcategories(provider.businessData.subcategories).length}):
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
                         {provider.services.length > 0 ? (
-                          provider.services.map((service, idx) => (
+                          getAllTerminalSubcategories(provider.businessData.subcategories).map((service, idx) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
                             >
                               {service}
                             </span>
@@ -297,6 +328,9 @@ export default function CleaningPage() {
                           </span>
                         )}
                       </div>
+                      {getAllTerminalSubcategories(provider.businessData.subcategories).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                      )}
                     </div>
                   </div>
 

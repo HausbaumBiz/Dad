@@ -142,22 +142,29 @@ export default function AudioVisualSecurityPage() {
     setIsProfileDialogOpen(true)
   }
 
-  // Function to extract service tags from subcategories
-  const getServiceTags = (subcategories) => {
+  // Updated function to display ALL terminal subcategories
+  const getAllTerminalSubcategories = (subcategories) => {
     if (!Array.isArray(subcategories)) return []
 
-    return subcategories
-      .filter((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        return path && path.includes("Audio/Visual and Home Security")
-      })
+    const allSubcategories = subcategories
       .map((subcat) => {
         const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
         // Extract the specific service name (last part after the last >)
         const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
         return parts[parts.length - 1]
       })
-      .slice(0, 3) // Limit to 3 tags for display
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+
+    console.log(`Extracted ${allSubcategories.length} unique subcategories for display`)
+    return allSubcategories
   }
 
   return (
@@ -215,63 +222,75 @@ export default function AudioVisualSecurityPage() {
             <Button>Register Your AV/Security Business</Button>
           </div>
         ) : (
-          businesses.map((business) => (
-            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{business.displayName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{business.displayLocation || "Location not specified"}</p>
-                    {business.displayPhone && <p className="text-gray-600 text-sm mt-1">📞 {business.displayPhone}</p>}
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {business.rating || 0} ({business.reviewCount || 0} reviews)
-                      </span>
-                    </div>
-                    {business.subcategories && getServiceTags(business.subcategories).length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-sm font-medium text-gray-700">Services:</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {getServiceTags(business.subcategories).map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+          businesses.map((business) => {
+            const allServices = getAllTerminalSubcategories(business.subcategories)
+            return (
+              <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row justify-between">
+                    <div>
+                      <h3 className="text-xl font-semibold">{business.displayName}</h3>
+                      <p className="text-gray-600 text-sm mt-1">
+                        {business.displayLocation || "Location not specified"}
+                      </p>
+                      {business.displayPhone && (
+                        <p className="text-gray-600 text-sm mt-1">📞 {business.displayPhone}</p>
+                      )}
+                      <div className="flex items-center mt-2">
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <svg
+                              key={i}
+                              className={`w-4 h-4 ${i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
                             >
-                              {service}
-                            </span>
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
                           ))}
                         </div>
+                        <span className="text-sm text-gray-600 ml-2">
+                          {business.rating || 0} ({business.reviewCount || 0} reviews)
+                        </span>
                       </div>
-                    )}
+                      {allServices.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-medium text-gray-700">Services ({allServices.length}):</p>
+                          <div className="max-h-32 overflow-y-auto">
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {allServices.map((service, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
+                                >
+                                  {service}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          {allServices.length > 8 && (
+                            <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                      <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="mt-2 w-full md:w-auto"
+                        onClick={() => handleViewProfile(business)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleViewProfile(business)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            )
+          })
         )}
       </div>
 

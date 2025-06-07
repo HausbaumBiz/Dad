@@ -5,7 +5,7 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
@@ -42,91 +42,154 @@ export default function LawnGardenPage() {
     }
   }, [])
 
-  useEffect(() => {
-    async function fetchProviders() {
-      try {
-        setLoading(true)
-        console.log("Fetching businesses for Lawn, Garden and Snow Removal subcategory with zip code filtering...")
+  const fetchProviders = useCallback(async () => {
+    try {
+      setLoading(true)
+      console.log("Fetching businesses for Lawn, Garden and Snow Removal subcategory with zip code filtering...")
 
-        // Use the base path - the function will find all subcategories that start with this path
-        const basePath = "Home, Lawn, and Manual Labor > Lawn, Garden and Snow Removal"
-        const allBusinesses = await getBusinessesForSubcategory(basePath)
+      // Use the base path - the function will find all subcategories that start with this path
+      const basePath = "Home, Lawn, and Manual Labor > Lawn, Garden and Snow Removal"
+      const allBusinesses = await getBusinessesForSubcategory(basePath)
 
-        console.log(`Found ${allBusinesses.length} total businesses for base path: ${basePath}`)
+      console.log(`Found ${allBusinesses.length} total businesses for base path: ${basePath}`)
 
-        let filteredBusinesses = allBusinesses
+      let filteredBusinesses = allBusinesses
 
-        // Filter by user's zip code if available
-        if (userZipCode) {
-          console.log(`Filtering businesses that service zip code: ${userZipCode}`)
+      // Filter by user's zip code if available
+      if (userZipCode) {
+        console.log(`Filtering businesses that service zip code: ${userZipCode}`)
 
-          filteredBusinesses = []
+        filteredBusinesses = []
 
-          for (const business of allBusinesses) {
-            try {
-              // Check if business services the user's zip code
-              const response = await fetch(`/api/admin/business/${business.id}/service-area`)
+        for (const business of allBusinesses) {
+          try {
+            // Check if business services the user's zip code
+            const response = await fetch(`/api/admin/business/${business.id}/service-area`)
 
-              if (response.ok) {
-                const serviceAreaData = await response.json()
-                console.log(`Service area data for ${business.displayName}:`, serviceAreaData)
+            if (response.ok) {
+              const serviceAreaData = await response.json()
+              console.log(`Service area data for ${business.displayName}:`, serviceAreaData)
 
-                // Check if the user's zip code is in the business's service area
-                if (serviceAreaData.zipCodes && Array.isArray(serviceAreaData.zipCodes)) {
-                  // Handle both possible data structures
-                  const servicesUserZip = serviceAreaData.zipCodes.some((zipData) => {
-                    // Check if zipData is a string (just the zip code)
-                    if (typeof zipData === "string") {
-                      return zipData === userZipCode
-                    }
-                    // Check if zipData is an object with zip property
-                    if (typeof zipData === "object" && zipData.zip) {
-                      return zipData.zip === userZipCode
-                    }
-                    return false
-                  })
-
-                  if (servicesUserZip) {
-                    console.log(`✅ ${business.displayName} services zip code ${userZipCode}`)
-                    filteredBusinesses.push(business)
-                  } else {
-                    console.log(`❌ ${business.displayName} does not service zip code ${userZipCode}`)
-                    console.log(`Available zip codes:`, serviceAreaData.zipCodes)
+              // Check if the user's zip code is in the business's service area
+              if (serviceAreaData.zipCodes && Array.isArray(serviceAreaData.zipCodes)) {
+                // Handle both possible data structures
+                const servicesUserZip = serviceAreaData.zipCodes.some((zipData) => {
+                  // Check if zipData is a string (just the zip code)
+                  if (typeof zipData === "string") {
+                    return zipData === userZipCode
                   }
-                } else if (serviceAreaData.isNationwide) {
-                  console.log(`✅ ${business.displayName} services nationwide (including ${userZipCode})`)
+                  // Check if zipData is an object with zip property
+                  if (typeof zipData === "object" && zipData.zip) {
+                    return zipData.zip === userZipCode
+                  }
+                  return false
+                })
+
+                if (servicesUserZip) {
+                  console.log(`✅ ${business.displayName} services zip code ${userZipCode}`)
                   filteredBusinesses.push(business)
                 } else {
-                  console.log(`⚠️ ${business.displayName} has no service area data, including by default`)
-                  filteredBusinesses.push(business)
+                  console.log(`❌ ${business.displayName} does not service zip code ${userZipCode}`)
+                  console.log(`Available zip codes:`, serviceAreaData.zipCodes)
                 }
+              } else if (serviceAreaData.isNationwide) {
+                console.log(`✅ ${business.displayName} services nationwide (including ${userZipCode})`)
+                filteredBusinesses.push(business)
               } else {
-                console.log(`⚠️ Could not fetch service area for ${business.displayName}, including by default`)
+                console.log(`⚠️ ${business.displayName} has no service area data, including by default`)
                 filteredBusinesses.push(business)
               }
-            } catch (error) {
-              console.error(`Error checking service area for ${business.displayName}:`, error)
-              // Include business by default if there's an error
+            } else {
+              console.log(`⚠️ Could not fetch service area for ${business.displayName}, including by default`)
               filteredBusinesses.push(business)
             }
+          } catch (error) {
+            console.error(`Error checking service area for ${business.displayName}:`, error)
+            // Include business by default if there's an error
+            filteredBusinesses.push(business)
           }
+        }
+      }
 
-          console.log(`After zip code filtering: ${filteredBusinesses.length} businesses service ${userZipCode}`)
-        } else {
-          console.log("No user zip code available, showing all businesses")
+      console.log(`After zip code filtering: ${filteredBusinesses.length} businesses service ${userZipCode}`)
+      setProviders(filteredBusinesses)
+    } catch (err) {
+      setError("Failed to load providers")
+      console.error("Error fetching providers:", err)
+    } finally {
+      setLoading(false)
+    }
+  }, [userZipCode])
+
+  useEffect(() => {
+    fetchProviders()
+  }, [fetchProviders])
+
+  // Helper function to extract ALL subcategories from ALL categories selected by the business
+  const extractAllTerminalSubcategories = (subcategories) => {
+    if (!subcategories || !Array.isArray(subcategories)) return []
+
+    console.log("Raw subcategories data:", subcategories)
+
+    const allSubcategories = subcategories
+      .map((subcat) => {
+        // Handle different data structures
+        let fullPath = null
+        let subcategoryName = null
+
+        if (typeof subcat === "string") {
+          fullPath = subcat
+        } else if (subcat?.fullPath) {
+          fullPath = subcat.fullPath
+          subcategoryName = subcat.subcategory
+        } else if (subcat?.subcategory && subcat?.category) {
+          fullPath = `${subcat.category} > ${subcat.subcategory}`
+          subcategoryName = subcat.subcategory
+        } else if (subcat?.name) {
+          fullPath = subcat.name
         }
 
-        setProviders(filteredBusinesses)
-      } catch (err) {
-        setError("Failed to load providers")
-        console.error("Error fetching providers:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
+        if (!fullPath) {
+          console.log("No fullPath found for subcategory:", subcat)
+          return null
+        }
 
-    fetchProviders()
-  }, [userZipCode])
+        console.log("Processing fullPath:", fullPath)
+
+        // Use the subcategory name if available, otherwise extract from fullPath
+        if (subcategoryName) {
+          console.log("Using subcategory name:", subcategoryName)
+          return subcategoryName
+        }
+
+        // Split by " > " and get the last meaningful part
+        const parts = fullPath.split(" > ")
+        console.log("Path parts:", parts)
+
+        // If we have 3+ parts, use the last part (most specific)
+        if (parts.length >= 3) {
+          const lastPart = parts[parts.length - 1].trim()
+          console.log("Using last part:", lastPart)
+          return lastPart
+        }
+
+        // If we have 2 parts, use the second part
+        if (parts.length === 2) {
+          const secondPart = parts[1].trim()
+          console.log("Using second part:", secondPart)
+          return secondPart
+        }
+
+        // Fallback to the full path
+        console.log("Using full path as fallback:", fullPath)
+        return fullPath
+      })
+      .filter(Boolean) // Remove nulls and empty strings
+      .filter((service, index, array) => array.indexOf(service) === index) // Remove duplicates
+
+    console.log("Final extracted subcategories:", allSubcategories)
+    return allSubcategories
+  }
 
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
@@ -205,83 +268,81 @@ export default function LawnGardenPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {providers.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{provider.displayName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.displayLocation}</p>
+          {providers.map((provider) => {
+            const terminalSubcategories = extractAllTerminalSubcategories(provider.subcategories)
 
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
+            return (
+              <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row justify-between">
+                    <div>
+                      <h3 className="text-xl font-semibold">{provider.displayName}</h3>
+                      <p className="text-gray-600 text-sm mt-1">{provider.displayLocation}</p>
+
+                      <div className="flex items-center mt-2">
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <svg
+                              key={i}
+                              className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          ))}
+                        </div>
+                        <span className="text-sm text-gray-600 ml-2">
+                          {provider.rating || 0} ({provider.reviews || 0} reviews)
+                        </span>
                       </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || 0} ({provider.reviews || 0} reviews)
-                      </span>
+
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700">All Services:</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {terminalSubcategories.length > 0 ? (
+                            terminalSubcategories.map((service, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                              >
+                                {service}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                              General Services
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {provider.displayPhone && (
+                        <div className="mt-2">
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Phone:</span> {provider.displayPhone}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.subcategories && provider.subcategories.length > 0 ? (
-                          provider.subcategories
-                            .filter((service) => service.includes("Lawn, Garden and Snow Removal"))
-                            .map((service, idx) => {
-                              // Extract just the specific service name from the full path
-                              const serviceName = service.split(" > ").pop() || service
-                              return (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                                >
-                                  {serviceName}
-                                </span>
-                              )
-                            })
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            Lawn, Garden and Snow Removal
-                          </span>
-                        )}
-                      </div>
+                    <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                      <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="mt-2 w-full md:w-auto"
+                        onClick={() => handleViewProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
                     </div>
-
-                    {provider.displayPhone && (
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-600">
-                          <span className="font-medium">Phone:</span> {provider.displayPhone}
-                        </p>
-                      </div>
-                    )}
                   </div>
-
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleViewProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
 

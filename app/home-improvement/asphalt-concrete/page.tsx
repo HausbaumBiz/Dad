@@ -200,26 +200,28 @@ export default function AsphaltConcretePage() {
   }
 
   // Helper to extract service names from full paths
-  const extractServiceNames = (subcategories) => {
+  const getAllTerminalSubcategories = (subcategories) => {
     if (!subcategories || !Array.isArray(subcategories)) return []
 
-    return subcategories
-      .filter((subcat) => {
-        // Handle both string and object formats
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        return path && path.includes(subcategoryPath)
-      })
+    const services = subcategories
       .map((subcat) => {
-        // Extract the service name from the path
         const path = typeof subcat === "string" ? subcat : subcat?.fullPath
         if (!path) return null
 
-        // Get the last part after the subcategory path
-        const parts = path.split(">")
-        return parts[parts.length - 1].trim()
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1]
       })
       .filter(Boolean) // Remove nulls
-      .slice(0, 3) // Limit to 3 tags for cleaner display
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+
+    console.log(`Found ${services.length} unique terminal subcategories`)
+    return services
   }
 
   return (
@@ -316,16 +318,32 @@ export default function AsphaltConcretePage() {
                     </div>
 
                     <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {extractServiceNames(business.subcategories).map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                      {/* Show service count */}
+                      {business.subcategories && business.subcategories.length > 0 && (
+                        <p className="text-sm font-medium text-gray-700">
+                          Services ({getAllTerminalSubcategories(business.subcategories).length}):
+                        </p>
+                      )}
+
+                      {/* Scrollable container for services */}
+                      <div className="mt-1">
+                        <div
+                          className={`flex flex-wrap gap-2 ${getAllTerminalSubcategories(business.subcategories).length > 8 ? "max-h-32 overflow-y-auto pr-2" : ""}`}
+                        >
+                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Scroll hint */}
+                        {getAllTerminalSubcategories(business.subcategories).length > 8 && (
+                          <p className="text-xs text-gray-500 mt-1 italic">Scroll to see more services</p>
+                        )}
                       </div>
                     </div>
                   </div>

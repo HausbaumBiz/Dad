@@ -151,27 +151,33 @@ export default function OutsideMaintenancePage() {
     setIsProfileDialogOpen(true)
   }
 
-  // Helper to extract service names from full paths
-  const extractServiceNames = (subcategories) => {
-    if (!subcategories || !Array.isArray(subcategories)) return []
+  // Replace this function to show ALL subcategories without limiting to 4
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
 
-    return subcategories
-      .filter((subcat) => {
-        // Handle both string and object formats
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        return path && path.includes(subcategoryPath)
-      })
+    console.log("Processing subcategories for display:", subcategories)
+
+    const allServices = subcategories
       .map((subcat) => {
-        // Extract the service name from the path
         const path = typeof subcat === "string" ? subcat : subcat?.fullPath
         if (!path) return null
 
-        // Get the last part after the subcategory path
-        const parts = path.split(">")
-        return parts[parts.length - 1].trim()
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        const terminalService = parts[parts.length - 1]
+        console.log("Extracted terminal service:", terminalService)
+        return terminalService
       })
       .filter(Boolean) // Remove nulls
-      .slice(0, 3) // Limit to 3 services for clean display
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+
+    console.log(`Found ${allServices.length} unique services:`, allServices)
+    return allServices // Remove the .slice(0, 4) limit to show ALL services
   }
 
   return (
@@ -282,17 +288,30 @@ export default function OutsideMaintenancePage() {
                     </div>
 
                     <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {extractServiceNames(business.subcategories).map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                      <p className="text-sm font-medium text-gray-700">
+                        All Services ({getAllTerminalSubcategories(business.subcategories).length}):
+                      </p>
+                      <div className="max-h-32 overflow-y-auto mt-1">
+                        <div className="flex flex-wrap gap-2">
+                          {getAllTerminalSubcategories(business.subcategories).length > 0 ? (
+                            getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
+                              >
+                                {service}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                              Outside Home Maintenance
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      {getAllTerminalSubcategories(business.subcategories).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-1">Scroll to see all services</p>
+                      )}
                     </div>
                   </div>
 

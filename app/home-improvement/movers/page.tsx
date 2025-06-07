@@ -142,6 +142,7 @@ export default function MoversPage() {
               reviews: business.reviewCount || 0,
               services: serviceTags,
               phone: business.displayPhone,
+              subcategories: business.subcategories,
             }
           })
 
@@ -173,6 +174,7 @@ export default function MoversPage() {
               reviews: business.reviewCount || 0,
               services: serviceTags,
               phone: business.displayPhone,
+              subcategories: business.subcategories,
             }
           })
 
@@ -201,6 +203,31 @@ export default function MoversPage() {
     setSelectedBusinessId(provider.id)
     setSelectedBusinessName(provider.name)
     setIsProfileDialogOpen(true)
+  }
+
+  // Add this improved function that shows all terminal subcategories
+
+  // Add this function:
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    return subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1]
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+    // Remove the .slice(0, 4) limit to show all subcategories
   }
 
   return (
@@ -287,17 +314,22 @@ export default function MoversPage() {
                     {provider.phone && <p className="text-sm text-gray-600 mt-1">📞 {provider.phone}</p>}
 
                     <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
+                      <p className="text-sm font-medium text-gray-700">
+                        Services ({getAllTerminalSubcategories(provider.subcategories || []).length}):
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
+                        {getAllTerminalSubcategories(provider.subcategories || []).map((service, idx) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
                           >
                             {service}
                           </span>
                         ))}
                       </div>
+                      {getAllTerminalSubcategories(provider.subcategories || []).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                      )}
                     </div>
                   </div>
 

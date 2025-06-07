@@ -185,26 +185,28 @@ export default function ConstructionDesignPage() {
   }
 
   // Helper to extract service names from full paths
-  const extractServiceNames = (subcategories) => {
+  const getAllTerminalSubcategories = (subcategories) => {
     if (!subcategories || !Array.isArray(subcategories)) return []
 
+    console.log(`Processing ${subcategories.length} subcategories for service extraction`)
+
     return subcategories
-      .filter((subcat) => {
-        // Handle both string and object formats
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        return path && path.includes(subcategoryPath)
-      })
       .map((subcat) => {
-        // Extract the service name from the path
         const path = typeof subcat === "string" ? subcat : subcat?.fullPath
         if (!path) return null
 
-        // Get the last part after the subcategory path
-        const parts = path.split(">")
-        return parts[parts.length - 1].trim()
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1]
       })
       .filter(Boolean) // Remove nulls
-      .slice(0, 3) // Limit to 3 tags for cleaner display
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+    // Remove the .slice(0, 4) limit to show all subcategories
   }
 
   return (
@@ -297,16 +299,23 @@ export default function ConstructionDesignPage() {
                     </div>
 
                     <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {extractServiceNames(business.subcategories).map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                      <p className="text-sm font-medium text-gray-700">
+                        Services ({getAllTerminalSubcategories(business.subcategories).length}):
+                      </p>
+                      <div className="max-h-32 overflow-y-auto">
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
+                            >
+                              {service}
+                            </span>
+                          ))}
+                        </div>
+                        {getAllTerminalSubcategories(business.subcategories).length > 8 && (
+                          <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                        )}
                       </div>
                     </div>
                   </div>

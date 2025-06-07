@@ -168,7 +168,9 @@ export default function FireplacesChimneysPage() {
     fetchBusinesses()
   }, [userZipCode])
 
-  // Extract service tags from subcategories
+  // Replace the getServiceTags function with this improved version that shows all terminal subcategories
+
+  // Replace this function:
   const getServiceTags = (subcategories) => {
     return subcategories
       .filter((subcat) => {
@@ -183,6 +185,29 @@ export default function FireplacesChimneysPage() {
         return parts[parts.length - 1] // Get just the service name
       })
       .slice(0, 3) // Limit to 3 for display
+  }
+
+  // With this improved version:
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    return subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1]
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+    // Remove the .slice(0, 4) limit to show all subcategories
   }
 
   // Function to handle opening reviews dialog
@@ -259,9 +284,7 @@ export default function FireplacesChimneysPage() {
                   <div>
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
                     <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
-
                     {provider.phone && <p className="text-gray-600 text-sm mt-1">{provider.phone}</p>}
-
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
@@ -271,7 +294,7 @@ export default function FireplacesChimneysPage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
@@ -279,15 +302,17 @@ export default function FireplacesChimneysPage() {
                         {provider.rating} ({provider.reviews} reviews)
                       </span>
                     </div>
-
+                    // Also update the JSX where the services are displayed:
                     <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
+                      <p className="text-sm font-medium text-gray-700">
+                        Services ({getAllTerminalSubcategories(provider.businessData.subcategories).length}):
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
                         {provider.services.length > 0 ? (
-                          provider.services.map((service, idx) => (
+                          getAllTerminalSubcategories(provider.businessData.subcategories).map((service, idx) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
                             >
                               {service}
                             </span>
@@ -298,6 +323,9 @@ export default function FireplacesChimneysPage() {
                           </span>
                         )}
                       </div>
+                      {getAllTerminalSubcategories(provider.businessData.subcategories).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                      )}
                     </div>
                   </div>
 

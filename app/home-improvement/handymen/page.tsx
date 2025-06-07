@@ -122,20 +122,7 @@ export default function HandymenPage() {
           const transformedBusinesses = await Promise.all(
             filteredBusinesses.map(async (business: any) => {
               // Extract service tags from subcategories
-              const serviceTags =
-                business.subcategories
-                  ?.filter((sub: any) => {
-                    const fullPath = typeof sub === "string" ? sub : sub.fullPath
-                    return (
-                      fullPath?.includes("Handymen") || fullPath?.includes("Odd Jobs") || fullPath?.includes("Assembly")
-                    )
-                  })
-                  ?.map((sub: any) => {
-                    const fullPath = typeof sub === "string" ? sub : sub.fullPath
-                    const parts = fullPath.split(" > ")
-                    return parts[parts.length - 1] // Get the last part
-                  })
-                  ?.slice(0, 3) || [] // Limit to 3 tags
+              // Add this improved function that shows all terminal subcategories
 
               // Fetch city and state from ZIP code database
               let location = "Service Area"
@@ -176,7 +163,7 @@ export default function HandymenPage() {
                 location: location,
                 rating: business.rating || 4.5,
                 reviews: business.reviewCount || 0,
-                services: serviceTags,
+                services: business.subcategories,
                 phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
               }
             }),
@@ -190,20 +177,7 @@ export default function HandymenPage() {
           const transformedBusinesses = await Promise.all(
             allBusinesses.map(async (business: any) => {
               // Extract service tags from subcategories
-              const serviceTags =
-                business.subcategories
-                  ?.filter((sub: any) => {
-                    const fullPath = typeof sub === "string" ? sub : sub.fullPath
-                    return (
-                      fullPath?.includes("Handymen") || fullPath?.includes("Odd Jobs") || fullPath?.includes("Assembly")
-                    )
-                  })
-                  ?.map((sub: any) => {
-                    const fullPath = typeof sub === "string" ? sub : sub.fullPath
-                    const parts = fullPath.split(" > ")
-                    return parts[parts.length - 1] // Get the last part
-                  })
-                  ?.slice(0, 3) || [] // Limit to 3 tags
+              // Add this improved function that shows all terminal subcategories
 
               // Fetch city and state from ZIP code database
               let location = "Service Area"
@@ -244,7 +218,7 @@ export default function HandymenPage() {
                 location: location,
                 rating: business.rating || 4.5,
                 reviews: business.reviewCount || 0,
-                services: serviceTags,
+                services: business.subcategories,
                 phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
               }
             }),
@@ -275,6 +249,29 @@ export default function HandymenPage() {
     setSelectedBusinessId(provider.id)
     setSelectedBusinessName(provider.name)
     setIsProfileDialogOpen(true)
+  }
+
+  // Add this function:
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    return subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1]
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+    // Remove the .slice(0, 4) limit to show all subcategories
   }
 
   return (
@@ -358,17 +355,22 @@ export default function HandymenPage() {
                     {provider.phone && <p className="text-sm text-gray-600 mt-1">📞 {provider.phone}</p>}
 
                     <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services.map((service, idx) => (
+                      <p className="text-sm font-medium text-gray-700">
+                        Services ({getAllTerminalSubcategories(provider.services || []).length}):
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
+                        {getAllTerminalSubcategories(provider.services || []).map((service, idx) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
                           >
                             {service}
                           </span>
                         ))}
                       </div>
+                      {getAllTerminalSubcategories(provider.services || []).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                      )}
                     </div>
                   </div>
 

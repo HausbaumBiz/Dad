@@ -255,8 +255,8 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
           // Get ad design data for display name and location
           const adDesignData = await getBusinessAdDesignData(businessId)
 
-          // Get subcategories for this business
-          const subcategories = await getBusinessSubcategories(businessId)
+          // Get ALL subcategories for this business (from ALL categories)
+          const allSubcategories = await getAllBusinessSubcategories(businessId)
 
           // Get service area data (zip codes and nationwide flag)
           const serviceAreaData = await getBusinessServiceArea(businessId)
@@ -277,8 +277,8 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
             isNationwide: serviceAreaData.isNationwide || false,
             adDesignData: adDesignData,
             // Map subcategories to both properties for compatibility
-            subcategories: subcategories,
-            allSubcategories: subcategories, // Add this line to ensure frontend compatibility
+            subcategories: allSubcategories,
+            allSubcategories: allSubcategories, // Add this line to ensure frontend compatibility
           } as Business
 
           // Create display location
@@ -455,66 +455,54 @@ async function getBusinessServiceArea(businessId: string) {
   }
 }
 
-// Get subcategories for a business (enhanced to get from multiple sources)
-async function getBusinessSubcategories(businessId: string): Promise<string[]> {
+// NEW: Get ALL subcategories for a business from ALL categories they selected
+async function getAllBusinessSubcategories(businessId: string): Promise<any[]> {
   try {
-    const allSubcategories: string[] = []
+    console.log(`Getting ALL subcategories for business ${businessId}`)
 
-    // Try to get subcategories from the business-focus page data (most comprehensive)
-    const businessFocusData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
-    if (businessFocusData) {
-      const subcategories = safeJsonParse(businessFocusData, [])
-      const subcategoryArray = ensureArray(subcategories, `getBusinessSubcategories-businessFocus-${businessId}`)
+    // FIRST: Try to get the full category selection data from business-focus page
+    const categoriesKey = `${KEY_PREFIXES.BUSINESS}${businessId}:categories`
+    const categoriesData = await safeRedisGet(categoriesKey)
 
-      // Extract subcategory names from objects or use strings directly
-      subcategoryArray.forEach((item: any) => {
-        if (typeof item === "string") {
-          allSubcategories.push(item)
-        } else if (item && typeof item === "object") {
-          // Handle different object structures
-          const name = item.name || item.subcategory || item.label || item.title
-          if (name && typeof name === "string") {
-            allSubcategories.push(name)
-          }
-        }
-      })
-    }
+    if (categoriesData) {
+      const categories = safeJsonParse(categoriesData, [])
+      const categoryArray = ensureArray(categories, `getAllBusinessSubcategories-categories-${businessId}`)
 
-    // Also try to get from categories data as fallback
-    if (allSubcategories.length === 0) {
-      const categoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)
-      if (categoriesData) {
-        const categories = safeJsonParse(categoriesData, [])
-        const categoryArray = ensureArray(categories, `getBusinessSubcategories-categories-${businessId}`)
+      console.log(`Found ${categoryArray.length} category selections for business ${businessId}:`, categoryArray)
 
-        categoryArray.forEach((item: any) => {
-          if (typeof item === "string") {
-            allSubcategories.push(item)
-          } else if (item && typeof item === "object") {
-            const name = item.name || item.subcategory || item.label || item.title
-            if (name && typeof name === "string") {
-              allSubcategories.push(name)
-            }
-          }
-        })
+      // Return the full category objects with fullPath, subcategory, etc.
+      if (categoryArray.length > 0) {
+        return categoryArray
       }
     }
 
-    // Remove duplicates and filter out empty strings
-    const uniqueSubcategories = [...new Set(allSubcategories)]
-      .filter((sub) => sub && sub.trim().length > 0)
-      .map((sub) => sub.trim())
+    // FALLBACK: Try to get from allSubcategories
+    const allSubcategoriesKey = `${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`
+    const allSubcategoriesData = await safeRedisGet(allSubcategoriesKey)
 
-    console.log(
-      `Retrieved ${uniqueSubcategories.length} subcategories for business ${businessId}:`,
-      uniqueSubcategories,
-    )
+    if (allSubcategoriesData) {
+      const subcategories = safeJsonParse(allSubcategoriesData, [])
+      const subcategoryArray = ensureArray(subcategories, `getAllBusinessSubcategories-allSub-${businessId}`)
 
-    return uniqueSubcategories
+      console.log(`Found ${subcategoryArray.length} allSubcategories for business ${businessId}:`, subcategoryArray)
+
+      if (subcategoryArray.length > 0) {
+        return subcategoryArray
+      }
+    }
+
+    console.log(`No subcategories found for business ${businessId}`)
+    return []
   } catch (error) {
-    console.error(`Error getting subcategories for business ${businessId}:`, getErrorMessage(error))
+    console.error(`Error getting ALL subcategories for business ${businessId}:`, getErrorMessage(error))
     return []
   }
+}
+
+// ENHANCED: Get subcategories for a business (now checks for full category selection data)
+async function getBusinessSubcategories(businessId: string): Promise<any[]> {
+  // This function now just calls getAllBusinessSubcategories for consistency
+  return getAllBusinessSubcategories(businessId)
 }
 
 // Get selected categories for a business
@@ -605,7 +593,21 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
 // Helper function to check if a business has a specific subcategory
 async function checkBusinessHasSubcategory(businessId: string, targetSubcategoryPath: string): Promise<boolean> {
   try {
-    // Check allSubcategories first
+    // Get the full category selection data (this should include fullPath)
+    const categoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)
+    if (categoriesData) {
+      const categories = ensureArray(safeJsonParse(categoriesData, []), `checkSubcategory-categories-${businessId}`)
+
+      for (const cat of categories) {
+        const pathToCheck = cat?.fullPath || cat?.name || (typeof cat === "string" ? cat : "")
+        if (pathToCheck && isSubcategoryMatch(pathToCheck, targetSubcategoryPath)) {
+          console.log(`✅ Business ${businessId} matches subcategory via categories data: ${pathToCheck}`)
+          return true
+        }
+      }
+    }
+
+    // Check allSubcategories as fallback
     const allSubcategoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:allSubcategories`)
     if (allSubcategoriesData) {
       const subcategories = ensureArray(
@@ -616,19 +618,7 @@ async function checkBusinessHasSubcategory(businessId: string, targetSubcategory
       for (const subcat of subcategories) {
         const pathToCheck = typeof subcat === "string" ? subcat : subcat?.fullPath || subcat?.name || ""
         if (pathToCheck && isSubcategoryMatch(pathToCheck, targetSubcategoryPath)) {
-          return true
-        }
-      }
-    }
-
-    // Check categories data
-    const categoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)
-    if (categoriesData) {
-      const categories = ensureArray(safeJsonParse(categoriesData, []), `checkSubcategory-categories-${businessId}`)
-
-      for (const cat of categories) {
-        const pathToCheck = cat?.fullPath || cat?.name || (typeof cat === "string" ? cat : "")
-        if (pathToCheck && isSubcategoryMatch(pathToCheck, targetSubcategoryPath)) {
+          console.log(`✅ Business ${businessId} matches subcategory via allSubcategories: ${pathToCheck}`)
           return true
         }
       }
@@ -699,6 +689,9 @@ async function buildBusinessObject(businessId: string, subcategories: any[]): Pr
       // Get service area data (zip codes and nationwide flag)
       const serviceAreaData = await getBusinessServiceArea(businessId)
 
+      // Get ALL subcategories for this business from ALL categories
+      const allSubcategories = await getAllBusinessSubcategories(businessId)
+
       const business = {
         ...businessData,
         id: businessId,
@@ -712,7 +705,8 @@ async function buildBusinessObject(businessId: string, subcategories: any[]): Pr
         serviceArea: serviceAreaData.zipCodes || [], // Pass the actual zip codes array
         isNationwide: serviceAreaData.isNationwide || false,
         adDesignData: adDesignData,
-        subcategories: ensureArray(subcategories, `buildBusinessObject-${businessId}`),
+        // Use ALL subcategories from ALL categories selected by the business
+        subcategories: allSubcategories,
       } as Business
 
       // Create display location
