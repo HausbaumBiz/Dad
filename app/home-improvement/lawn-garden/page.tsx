@@ -135,16 +135,13 @@ export default function LawnGardenPage() {
       .map((subcat) => {
         // Handle different data structures
         let fullPath = null
-        let subcategoryName = null
 
         if (typeof subcat === "string") {
           fullPath = subcat
         } else if (subcat?.fullPath) {
           fullPath = subcat.fullPath
-          subcategoryName = subcat.subcategory
         } else if (subcat?.subcategory && subcat?.category) {
           fullPath = `${subcat.category} > ${subcat.subcategory}`
-          subcategoryName = subcat.subcategory
         } else if (subcat?.name) {
           fullPath = subcat.name
         }
@@ -156,38 +153,19 @@ export default function LawnGardenPage() {
 
         console.log("Processing fullPath:", fullPath)
 
-        // Use the subcategory name if available, otherwise extract from fullPath
-        if (subcategoryName) {
-          console.log("Using subcategory name:", subcategoryName)
-          return subcategoryName
-        }
-
-        // Split by " > " and get the last meaningful part
+        // Split by " > " and get the last part (terminal subcategory)
         const parts = fullPath.split(" > ")
         console.log("Path parts:", parts)
 
-        // If we have 3+ parts, use the last part (most specific)
-        if (parts.length >= 3) {
-          const lastPart = parts[parts.length - 1].trim()
-          console.log("Using last part:", lastPart)
-          return lastPart
-        }
-
-        // If we have 2 parts, use the second part
-        if (parts.length === 2) {
-          const secondPart = parts[1].trim()
-          console.log("Using second part:", secondPart)
-          return secondPart
-        }
-
-        // Fallback to the full path
-        console.log("Using full path as fallback:", fullPath)
-        return fullPath
+        // Always use the last part (most specific/terminal subcategory)
+        const terminalSubcategory = parts[parts.length - 1].trim()
+        console.log("Extracted terminal subcategory:", terminalSubcategory)
+        return terminalSubcategory
       })
       .filter(Boolean) // Remove nulls and empty strings
       .filter((service, index, array) => array.indexOf(service) === index) // Remove duplicates
 
-    console.log("Final extracted subcategories:", allSubcategories)
+    console.log("Final extracted terminal subcategories:", allSubcategories)
     return allSubcategories
   }
 
@@ -288,7 +266,7 @@ export default function LawnGardenPage() {
                               fill="currentColor"
                               viewBox="0 0 20 20"
                             >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.588h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                             </svg>
                           ))}
                         </div>
@@ -298,13 +276,13 @@ export default function LawnGardenPage() {
                       </div>
 
                       <div className="mt-3">
-                        <p className="text-sm font-medium text-gray-700">All Services:</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
+                        <p className="text-sm font-medium text-gray-700">Services ({terminalSubcategories.length}):</p>
+                        <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
                           {terminalSubcategories.length > 0 ? (
                             terminalSubcategories.map((service, idx) => (
                               <span
                                 key={idx}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 whitespace-nowrap"
                               >
                                 {service}
                               </span>
@@ -313,6 +291,9 @@ export default function LawnGardenPage() {
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
                               General Services
                             </span>
+                          )}
+                          {terminalSubcategories.length > 8 && (
+                            <div className="w-full text-xs text-gray-500 mt-1">Scroll to see more services</div>
                           )}
                         </div>
                       </div>
