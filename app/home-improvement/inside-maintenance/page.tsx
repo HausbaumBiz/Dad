@@ -55,6 +55,28 @@ export default function InsideMaintenancePage() {
     },
   ]
 
+  // Function to extract terminal subcategories (defined at the top to avoid initialization errors)
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    const allServices = subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1].trim()
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+
+    console.log(`Found ${allServices.length} unique services for business`)
+    return allServices
+  }
+
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -63,12 +85,57 @@ export default function InsideMaintenancePage() {
   const [selectedBusiness, setSelectedBusiness] = useState(null)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
+  // State for businesses and filtering
   const [businesses, setBusinesses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
   const subcategoryPath = "Home, Lawn, and Manual Labor > Inside Home Maintenance and Repair"
+
+  // Handle filter changes
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
+
+  // Get filter values from filter IDs
+  const getFilterValues = () => {
+    return selectedFilters.map((filterId) => {
+      const option = filterOptions.find((opt) => opt.id === filterId)
+      return option ? option.value : filterId
+    })
+  }
+
+  // Filter businesses based on selected filters
+  const filteredBusinesses = businesses.filter((business) => {
+    // If no filters selected, show all businesses
+    if (selectedFilters.length === 0) return true
+
+    // Get the terminal subcategories for this business
+    const businessServices = getAllTerminalSubcategories(business.subcategories)
+
+    // Get the filter values (not IDs)
+    const filterValues = getFilterValues()
+
+    // Check if any of the business services match any of the selected filters
+    return businessServices.some((service) =>
+      filterValues.some(
+        (filter) =>
+          service.toLowerCase().includes(filter.toLowerCase()) || filter.toLowerCase().includes(service.toLowerCase()),
+      ),
+    )
+  })
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -162,6 +229,12 @@ export default function InsideMaintenancePage() {
     fetchBusinesses()
   }, [subcategoryPath, userZipCode])
 
+  // Log applied filters
+  useEffect(() => {
+    console.log("Applied filters:", selectedFilters)
+    console.log(`Showing ${filteredBusinesses.length} of ${businesses.length} businesses`)
+  }, [selectedFilters, filteredBusinesses.length, businesses.length])
+
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
     setSelectedProvider(provider)
@@ -174,36 +247,46 @@ export default function InsideMaintenancePage() {
     setIsProfileDialogOpen(true)
   }
 
-  // Replace the getServiceTags function with this improved version that shows all terminal subcategories
+  // Check if a service matches any of the selected filters
+  const isServiceMatching = (service) => {
+    if (selectedFilters.length === 0) return false
 
-  // With this improved version:
-  const getAllTerminalSubcategories = (subcategories) => {
-    if (!Array.isArray(subcategories)) return []
+    const filterValues = getFilterValues()
 
-    const allServices = subcategories
-      .map((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        if (!path) return null
-
-        // Extract the specific service name (last part after the last >)
-        const parts = path.split(" > ")
-
-        // Skip if it's just a top-level category
-        if (parts.length < 2) return null
-
-        // Get the terminal subcategory (most specific service)
-        return parts[parts.length - 1]
-      })
-      .filter(Boolean) // Remove nulls
-      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-
-    console.log(`Found ${allServices.length} unique services for business`)
-    return allServices
+    return filterValues.some(
+      (filter) =>
+        service.toLowerCase().includes(filter.toLowerCase()) || filter.toLowerCase().includes(service.toLowerCase()),
+    )
   }
 
   return (
     <CategoryLayout title="Inside Home Maintenance and Repair" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {/* Filter Status */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Filtering by {selectedFilters.length} {selectedFilters.length === 1 ? "service" : "services"}:{" "}
+                {getFilterValues().join(", ")}
+              </p>
+              <p className="text-sm text-blue-700">
+                Showing {filteredBusinesses.length} of {businesses.length} businesses
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="text-blue-600 border-blue-300 hover:bg-blue-50"
+            >
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -235,7 +318,7 @@ export default function InsideMaintenancePage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : businesses.length === 0 ? (
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -247,16 +330,21 @@ export default function InsideMaintenancePage() {
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Inside Maintenance Services Found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {selectedFilters.length > 0 ? "No matching services found" : "No Inside Maintenance Services Found"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              {userZipCode
-                ? `We're currently building our network of home maintenance professionals in the ${userZipCode} area.`
-                : "Be the first home maintenance professional to join our platform!"}
+              {selectedFilters.length > 0
+                ? "Try selecting different service filters or clear the current filters."
+                : userZipCode
+                  ? `We're currently building our network of home maintenance professionals in the ${userZipCode} area.`
+                  : "Be the first home maintenance professional to join our platform!"}
             </p>
-            <Button>Register Your Business</Button>
+            {selectedFilters.length > 0 && <Button onClick={clearFilters}>Clear Filters</Button>}
+            {selectedFilters.length === 0 && <Button>Register Your Business</Button>}
           </div>
         ) : (
-          businesses.map((business) => (
+          filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -291,7 +379,12 @@ export default function InsideMaintenancePage() {
                             {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
                               <span
                                 key={idx}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
+                                  ${
+                                    isServiceMatching(service)
+                                      ? "bg-green-100 text-green-800 ring-1 ring-green-400"
+                                      : "bg-primary/10 text-primary"
+                                  }`}
                               >
                                 {service}
                               </span>

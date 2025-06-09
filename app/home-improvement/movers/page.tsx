@@ -5,209 +5,21 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { useEffect } from "react"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 
+// Define filter options outside the component to prevent re-creation on every render
+const filterOptions = [
+  { id: "movers1", label: "Moving Truck Rental", value: "Moving Truck Rental" },
+  { id: "movers2", label: "Piano Movers", value: "Piano Movers" },
+  { id: "movers3", label: "Movers", value: "Movers" },
+  { id: "movers4", label: "Other Movers/Moving Trucks", value: "Other Movers/Moving Trucks" },
+]
+
 export default function MoversPage() {
-  const filterOptions = [
-    { id: "movers1", label: "Moving Truck Rental", value: "Moving Truck Rental" },
-    { id: "movers2", label: "Piano Movers", value: "Piano Movers" },
-    { id: "movers3", label: "Movers", value: "Movers" },
-    { id: "movers4", label: "Other Movers/Moving Trucks", value: "Other Movers/Moving Trucks" },
-  ]
-
-  // State for reviews dialog
-  const [selectedProvider, setSelectedProvider] = useState<any>(null)
-  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-
-  // State for business profile dialog
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
-  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
-  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-
-  const [providers, setProviders] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
-
-  // Load user zip code from localStorage
-  useEffect(() => {
-    const savedZipCode = localStorage.getItem("savedZipCode")
-    if (savedZipCode) {
-      setUserZipCode(savedZipCode)
-      console.log(`User zip code loaded: ${savedZipCode}`)
-    } else {
-      console.log("No user zip code found in localStorage")
-      setUserZipCode(null)
-    }
-  }, [])
-
-  useEffect(() => {
-    async function fetchBusinesses() {
-      if (userZipCode === undefined) return // Wait until zip code is loaded (even if null)
-
-      try {
-        setLoading(true)
-        setError(null)
-
-        console.log("Fetching businesses for subcategory: Home, Lawn, and Manual Labor > Movers/Moving Trucks")
-        const allBusinesses = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Movers/Moving Trucks")
-        console.log(`Found ${allBusinesses.length} total businesses for movers/moving trucks`)
-
-        // If we have a zip code, filter by service area
-        if (userZipCode) {
-          console.log(`Filtering businesses that service zip code: ${userZipCode}`)
-          const filteredBusinesses = []
-
-          for (const business of allBusinesses) {
-            try {
-              const response = await fetch(`/api/admin/business/${business.id}/service-area`)
-              if (response.ok) {
-                const serviceAreaData = await response.json()
-                console.log(`Service area data for ${business.displayName || business.businessName}:`, {
-                  zipCount: serviceAreaData.zipCodes?.length || 0,
-                  isNationwide: serviceAreaData.isNationwide,
-                  businessId: serviceAreaData.businessId,
-                })
-
-                // Check if business is nationwide
-                if (serviceAreaData.isNationwide) {
-                  console.log(
-                    `✅ ${business.displayName || business.businessName} services nationwide (including ${userZipCode})`,
-                  )
-                  filteredBusinesses.push(business)
-                  continue
-                }
-
-                // Check if the user's zip code is in the business's service area
-                if (serviceAreaData.zipCodes && Array.isArray(serviceAreaData.zipCodes)) {
-                  const servicesUserZip = serviceAreaData.zipCodes.some((zipData) => {
-                    // Handle both string and object formats
-                    const zipCode = typeof zipData === "string" ? zipData : zipData?.zip
-                    return zipCode === userZipCode
-                  })
-
-                  if (servicesUserZip) {
-                    console.log(`✅ ${business.displayName || business.businessName} services zip code ${userZipCode}`)
-                    filteredBusinesses.push(business)
-                  } else {
-                    console.log(
-                      `❌ ${business.displayName || business.businessName} does not service zip code ${userZipCode}`,
-                    )
-                  }
-                } else {
-                  console.log(
-                    `⚠️ ${business.displayName || business.businessName} has no service area data, including by default`,
-                  )
-                  filteredBusinesses.push(business)
-                }
-              } else {
-                console.log(
-                  `⚠️ Could not fetch service area for ${business.displayName || business.businessName}, including by default`,
-                )
-                filteredBusinesses.push(business)
-              }
-            } catch (error) {
-              console.error(`Error checking service area for ${business.displayName || business.businessName}:`, error)
-              filteredBusinesses.push(business)
-            }
-          }
-
-          console.log(`After zip code filtering: ${filteredBusinesses.length} businesses service ${userZipCode}`)
-
-          // Transform the data for display
-          const transformedBusinesses = filteredBusinesses.map((business: any) => {
-            // Extract service tags from subcategories
-            const serviceTags =
-              business.subcategories
-                ?.filter((sub: any) => {
-                  const fullPath = typeof sub === "string" ? sub : sub.fullPath
-                  return fullPath?.includes("Movers") || fullPath?.includes("Moving")
-                })
-                ?.map((sub: any) => {
-                  const fullPath = typeof sub === "string" ? sub : sub.fullPath
-                  const parts = fullPath.split(" > ")
-                  return parts[parts.length - 1] // Get the last part
-                })
-                ?.slice(0, 3) || [] // Limit to 3 tags
-
-            return {
-              id: business.id,
-              name: business.displayName || business.businessName || "Business Name",
-              location: business.displayLocation || "Service Area",
-              rating: business.rating || 4.5,
-              reviews: business.reviewCount || 0,
-              services: serviceTags,
-              phone: business.displayPhone,
-              subcategories: business.subcategories,
-            }
-          })
-
-          setProviders(transformedBusinesses)
-        } else {
-          console.log("No user zip code available, showing all businesses")
-
-          // Transform the data for display
-          const transformedBusinesses = allBusinesses.map((business: any) => {
-            // Extract service tags from subcategories
-            const serviceTags =
-              business.subcategories
-                ?.filter((sub: any) => {
-                  const fullPath = typeof sub === "string" ? sub : sub.fullPath
-                  return fullPath?.includes("Movers") || fullPath?.includes("Moving")
-                })
-                ?.map((sub: any) => {
-                  const fullPath = typeof sub === "string" ? sub : sub.fullPath
-                  const parts = fullPath.split(" > ")
-                  return parts[parts.length - 1] // Get the last part
-                })
-                ?.slice(0, 3) || [] // Limit to 3 tags
-
-            return {
-              id: business.id,
-              name: business.displayName || business.businessName || "Business Name",
-              location: business.displayLocation || "Service Area",
-              rating: business.rating || 4.5,
-              reviews: business.reviewCount || 0,
-              services: serviceTags,
-              phone: business.displayPhone,
-              subcategories: business.subcategories,
-            }
-          })
-
-          setProviders(transformedBusinesses)
-        }
-      } catch (err) {
-        console.error("Error fetching businesses:", err)
-        setError("Failed to load businesses")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchBusinesses()
-  }, [userZipCode])
-
-  // Function to handle opening reviews dialog
-  const handleOpenReviews = (provider: any) => {
-    setSelectedProvider(provider)
-    setIsReviewsDialogOpen(true)
-  }
-
-  // Function to handle opening profile dialog
-  const handleViewProfile = (provider: any) => {
-    console.log("Opening profile for provider:", provider)
-    setSelectedBusinessId(provider.id)
-    setSelectedBusinessName(provider.name)
-    setIsProfileDialogOpen(true)
-  }
-
-  // Add this improved function that shows all terminal subcategories
-
-  // Add this function:
+  // Function to extract terminal subcategories
   const getAllTerminalSubcategories = (subcategories) => {
     if (!Array.isArray(subcategories)) return []
 
@@ -227,12 +39,258 @@ export default function MoversPage() {
       })
       .filter(Boolean) // Remove nulls
       .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-    // Remove the .slice(0, 4) limit to show all subcategories
+  }
+
+  // State for reviews dialog
+  const [selectedProvider, setSelectedProvider] = useState<any>(null)
+  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+
+  // State for business profile dialog
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
+  // State for businesses and filtering
+  const [allBusinesses, setAllBusinesses] = useState<any[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<any[]>([])
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
+
+  // Load user zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+      setUserZipCode(null)
+    }
+  }, [])
+
+  // Fetch businesses
+  useEffect(() => {
+    async function fetchBusinesses() {
+      if (userZipCode === undefined) return // Wait until zip code is loaded (even if null)
+
+      try {
+        setLoading(true)
+        setError(null)
+
+        console.log("Fetching businesses for subcategory: Home, Lawn, and Manual Labor > Movers/Moving Trucks")
+        const businesses = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Movers/Moving Trucks")
+        console.log(`Found ${businesses.length} total businesses for movers/moving trucks`)
+
+        // If we have a zip code, filter by service area
+        if (userZipCode) {
+          console.log(`Filtering businesses that service zip code: ${userZipCode}`)
+          const filteredByZip = []
+
+          for (const business of businesses) {
+            try {
+              const response = await fetch(`/api/admin/business/${business.id}/service-area`)
+              if (response.ok) {
+                const serviceAreaData = await response.json()
+                console.log(`Service area data for ${business.displayName || business.businessName}:`, {
+                  zipCount: serviceAreaData.zipCodes?.length || 0,
+                  isNationwide: serviceAreaData.isNationwide,
+                  businessId: serviceAreaData.businessId,
+                })
+
+                // Check if business is nationwide
+                if (serviceAreaData.isNationwide) {
+                  console.log(
+                    `✅ ${business.displayName || business.businessName} services nationwide (including ${userZipCode})`,
+                  )
+                  filteredByZip.push(business)
+                  continue
+                }
+
+                // Check if the user's zip code is in the business's service area
+                if (serviceAreaData.zipCodes && Array.isArray(serviceAreaData.zipCodes)) {
+                  const servicesUserZip = serviceAreaData.zipCodes.some((zipData) => {
+                    // Handle both string and object formats
+                    const zipCode = typeof zipData === "string" ? zipData : zipData?.zip
+                    return zipCode === userZipCode
+                  })
+
+                  if (servicesUserZip) {
+                    console.log(`✅ ${business.displayName || business.businessName} services zip code ${userZipCode}`)
+                    filteredByZip.push(business)
+                  } else {
+                    console.log(
+                      `❌ ${business.displayName || business.businessName} does not service zip code ${userZipCode}`,
+                    )
+                  }
+                } else {
+                  console.log(
+                    `⚠️ ${business.displayName || business.businessName} has no service area data, including by default`,
+                  )
+                  filteredByZip.push(business)
+                }
+              } else {
+                console.log(
+                  `⚠️ Could not fetch service area for ${business.displayName || business.businessName}, including by default`,
+                )
+                filteredByZip.push(business)
+              }
+            } catch (error) {
+              console.error(`Error checking service area for ${business.displayName || business.businessName}:`, error)
+              filteredByZip.push(business)
+            }
+          }
+
+          console.log(`After zip code filtering: ${filteredByZip.length} businesses service ${userZipCode}`)
+
+          // Transform the data for display
+          const transformedBusinesses = filteredByZip.map((business: any) => {
+            return {
+              id: business.id,
+              name: business.displayName || business.businessName || "Business Name",
+              location: business.displayLocation || "Service Area",
+              rating: business.rating || 4.5,
+              reviews: business.reviewCount || 0,
+              phone: business.displayPhone,
+              subcategories: business.subcategories,
+            }
+          })
+
+          setAllBusinesses(transformedBusinesses)
+          setFilteredBusinesses(transformedBusinesses)
+        } else {
+          console.log("No user zip code available, showing all businesses")
+
+          // Transform the data for display
+          const transformedBusinesses = businesses.map((business: any) => {
+            return {
+              id: business.id,
+              name: business.displayName || business.businessName || "Business Name",
+              location: business.displayLocation || "Service Area",
+              rating: business.rating || 4.5,
+              reviews: business.reviewCount || 0,
+              phone: business.displayPhone,
+              subcategories: business.subcategories,
+            }
+          })
+
+          setAllBusinesses(transformedBusinesses)
+          setFilteredBusinesses(transformedBusinesses)
+        }
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError("Failed to load businesses")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBusinesses()
+  }, [userZipCode])
+
+  // Filter businesses based on selected filters
+  useEffect(() => {
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(allBusinesses)
+      return
+    }
+
+    // Map filter IDs to filter values
+    const filterValues = selectedFilters
+      .map((filterId) => {
+        const filter = filterOptions.find((option) => option.id === filterId)
+        return filter ? filter.value : null
+      })
+      .filter(Boolean)
+
+    console.log("Applied filters:", selectedFilters)
+    console.log("Looking for filter values:", filterValues)
+
+    const filtered = allBusinesses.filter((business) => {
+      const services = getAllTerminalSubcategories(business.subcategories || [])
+      console.log(`Business ${business.name} services:`, services)
+
+      // Check if any service matches any filter
+      return services.some((service) => filterValues.some((filterValue) => service === filterValue))
+    })
+
+    console.log(`Showing ${filtered.length} of ${allBusinesses.length} businesses`)
+    setFilteredBusinesses(filtered)
+  }, [selectedFilters, allBusinesses])
+
+  // Function to handle filter changes
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    setSelectedFilters((prev) => {
+      if (checked) {
+        return [...prev, filterId]
+      } else {
+        return prev.filter((id) => id !== filterId)
+      }
+    })
+  }
+
+  // Function to clear all filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
+
+  // Function to handle opening reviews dialog
+  const handleOpenReviews = (provider: any) => {
+    setSelectedProvider(provider)
+    setIsReviewsDialogOpen(true)
+  }
+
+  // Function to handle opening profile dialog
+  const handleViewProfile = (provider: any) => {
+    console.log("Opening profile for provider:", provider)
+    setSelectedBusinessId(provider.id)
+    setSelectedBusinessName(provider.name)
+    setIsProfileDialogOpen(true)
+  }
+
+  // Function to check if a service matches any selected filter
+  const isServiceMatched = (service: string) => {
+    if (selectedFilters.length === 0) return false
+
+    const filterValues = selectedFilters
+      .map((filterId) => {
+        const filter = filterOptions.find((option) => option.id === filterId)
+        return filter ? filter.value : null
+      })
+      .filter(Boolean)
+
+    return filterValues.some((filterValue) => service === filterValue)
   }
 
   return (
     <CategoryLayout title="Movers/Moving Trucks" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {/* Filter Status */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg flex justify-between items-center">
+          <div>
+            <span className="font-medium">
+              Filtering by {selectedFilters.length} {selectedFilters.length === 1 ? "service" : "services"}:
+            </span>{" "}
+            {selectedFilters
+              .map((filterId) => {
+                const filter = filterOptions.find((option) => option.id === filterId)
+                return filter ? filter.label : null
+              })
+              .filter(Boolean)
+              .join(", ")}
+            <div className="text-sm text-blue-700">
+              Showing {filteredBusinesses.length} of {allBusinesses.length} businesses
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={clearFilters}>
+            Clear Filters
+          </Button>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -264,7 +322,7 @@ export default function MoversPage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -276,16 +334,25 @@ export default function MoversPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Moving Services Found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {selectedFilters.length > 0 ? "No Moving Services Match Your Filters" : "No Moving Services Found"}
+            </h3>
             <p className="text-gray-600 mb-6">
-              {userZipCode
-                ? `We're currently building our network of moving services in the ${userZipCode} area.`
-                : "Be the first moving company to join our platform and help local customers with their moves!"}
+              {selectedFilters.length > 0
+                ? "Try adjusting your filter selections or clearing filters to see more results."
+                : userZipCode
+                  ? `We're currently building our network of moving services in the ${userZipCode} area.`
+                  : "Be the first moving company to join our platform and help local customers with their moves!"}
             </p>
-            <Button>Register Your Moving Business</Button>
+            {selectedFilters.length > 0 && (
+              <Button onClick={clearFilters} className="mb-4">
+                Clear Filters
+              </Button>
+            )}
+            <Button variant="outline">Register Your Moving Business</Button>
           </div>
         ) : (
-          providers.map((provider) => (
+          filteredBusinesses.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -321,7 +388,12 @@ export default function MoversPage() {
                         {getAllTerminalSubcategories(provider.subcategories || []).map((service, idx) => (
                           <span
                             key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
+                              ${
+                                isServiceMatched(service)
+                                  ? "bg-green-100 text-green-800 ring-1 ring-green-400"
+                                  : "bg-primary/10 text-primary"
+                              }`}
                           >
                             {service}
                           </span>

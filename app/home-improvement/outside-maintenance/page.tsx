@@ -33,6 +33,9 @@ export default function OutsideMaintenancePage() {
   const [error, setError] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
+  // State for filtering
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+
   // State for dialogs
   const [selectedBusinessId, setSelectedBusinessId] = useState(null)
   const [selectedBusinessName, setSelectedBusinessName] = useState(null)
@@ -52,6 +55,21 @@ export default function OutsideMaintenancePage() {
       console.log("No user zip code found in localStorage")
     }
   }, [])
+
+  // Handler for filter changes
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
 
   useEffect(() => {
     async function fetchBusinesses() {
@@ -136,22 +154,7 @@ export default function OutsideMaintenancePage() {
     fetchBusinesses()
   }, [subcategoryPath, userZipCode])
 
-  // Handler for opening reviews dialog
-  const handleOpenReviews = (business) => {
-    setSelectedBusinessId(business.id)
-    setSelectedBusinessName(business.displayName)
-    setIsReviewsDialogOpen(true)
-  }
-
-  // Handler for opening profile dialog
-  const handleViewProfile = (business) => {
-    console.log(`Opening profile for business: ${business.id} - ${business.displayName}`)
-    setSelectedBusinessId(business.id)
-    setSelectedBusinessName(business.displayName)
-    setIsProfileDialogOpen(true)
-  }
-
-  // Replace this function to show ALL subcategories without limiting to 4
+  // Define the function before it's used
   const getAllTerminalSubcategories = (subcategories) => {
     if (!Array.isArray(subcategories)) return []
 
@@ -180,13 +183,88 @@ export default function OutsideMaintenancePage() {
     return allServices // Remove the .slice(0, 4) limit to show ALL services
   }
 
+  // Helper function to check if a service matches selected filters
+  const isServiceHighlighted = (service: string) => {
+    if (selectedFilters.length === 0) return false
+
+    return selectedFilters.some((filterId) => {
+      const filterOption = filterOptions.find((opt) => opt.id === filterId)
+      if (!filterOption) return false
+
+      const filterValue = filterOption.value.toLowerCase()
+      const serviceLower = service.toLowerCase()
+
+      return serviceLower.includes(filterValue) || filterValue.includes(serviceLower)
+    })
+  }
+
+  // Filter businesses based on selected filters
+  const filteredBusinesses =
+    selectedFilters.length === 0
+      ? businesses
+      : businesses.filter((business) => {
+          const businessServices = getAllTerminalSubcategories(business.subcategories)
+
+          return selectedFilters.some((filterId) => {
+            const filterOption = filterOptions.find((opt) => opt.id === filterId)
+            if (!filterOption) return false
+
+            const filterValue = filterOption.value.toLowerCase()
+
+            return businessServices.some((service) => {
+              const serviceLower = service.toLowerCase()
+              return serviceLower.includes(filterValue) || filterValue.includes(serviceLower)
+            })
+          })
+        })
+
+  // Handler for opening reviews dialog
+  const handleOpenReviews = (business) => {
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.displayName)
+    setIsReviewsDialogOpen(true)
+  }
+
+  // Handler for opening profile dialog
+  const handleViewProfile = (business) => {
+    console.log(`Opening profile for business: ${business.id} - ${business.displayName}`)
+    setSelectedBusinessId(business.id)
+    setSelectedBusinessName(business.displayName)
+    setIsProfileDialogOpen(true)
+  }
+
   return (
     <CategoryLayout
       title="Outside Home Maintenance and Repair"
       backLink="/home-improvement"
       backText="Home Improvement"
     >
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {/* Filter Status */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length !== 1 ? "s" : ""}:{" "}
+                {selectedFilters
+                  .map((filterId) => {
+                    const option = filterOptions.find((opt) => opt.id === filterId)
+                    return option?.label
+                  })
+                  .join(", ")}
+              </p>
+              <p className="text-sm text-blue-700">
+                Showing {filteredBusinesses.length} of {businesses.length} businesses
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -217,7 +295,7 @@ export default function OutsideMaintenancePage() {
         <div className="text-center py-12">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : businesses.length === 0 ? (
+      ) : filteredBusinesses.length === 0 ? (
         <div className="text-center py-12">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
@@ -241,7 +319,7 @@ export default function OutsideMaintenancePage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {businesses.map((business) => (
+          {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -278,7 +356,7 @@ export default function OutsideMaintenancePage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-.118L2.98 8.72c-.783-.57-.38-1.81.588-.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-.118l1.07-3.292a1 1 0 00-.364-.118L2.98 8.72c-.783-.57-.38-1.81.588-.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
@@ -293,20 +371,18 @@ export default function OutsideMaintenancePage() {
                       </p>
                       <div className="max-h-32 overflow-y-auto mt-1">
                         <div className="flex flex-wrap gap-2">
-                          {getAllTerminalSubcategories(business.subcategories).length > 0 ? (
-                            getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                              >
-                                {service}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                              Outside Home Maintenance
+                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                isServiceHighlighted(service)
+                                  ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                  : "bg-primary/10 text-primary"
+                              }`}
+                            >
+                              {service}
                             </span>
-                          )}
+                          ))}
                         </div>
                       </div>
                       {getAllTerminalSubcategories(business.subcategories).length > 8 && (

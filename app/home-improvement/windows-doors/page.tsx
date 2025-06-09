@@ -11,17 +11,6 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 
 export default function WindowsDoorsPage() {
-  const filterOptions = [
-    { id: "windows1", label: "Window Replacement", value: "Window Replacement" },
-    { id: "windows2", label: "Door Installation", value: "Door Installation" },
-    { id: "windows3", label: "Window Security Film", value: "Window Security Film" },
-    { id: "windows4", label: "Window Tinting", value: "Window Tinting" },
-    { id: "windows5", label: "Window Dressing/Curtains", value: "Window Dressing/Curtains" },
-    { id: "windows6", label: "Blind/Drapery Cleaning", value: "Blind/Drapery Cleaning" },
-    { id: "windows7", label: "Locksmith", value: "Locksmith" },
-    { id: "windows8", label: "Other Windows and Doors", value: "Other Windows and Doors" },
-  ]
-
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -34,6 +23,83 @@ export default function WindowsDoorsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+
+  // Function to extract terminal subcategories - moved to top to avoid initialization errors
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    const services = subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Always split by " > " and take the last part (terminal subcategory)
+        const parts = path.split(" > ")
+        return parts[parts.length - 1].trim()
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+
+    console.log(`Found ${services.length} unique services for business`)
+    return services
+  }
+
+  // Filter handling functions
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
+
+  const filterOptions = [
+    { id: "windows1", label: "Window Replacement", value: "Window Replacement" },
+    { id: "windows2", label: "Door Installation", value: "Door Installation" },
+    { id: "windows3", label: "Window Security Film", value: "Window Security Film" },
+    { id: "windows4", label: "Window Tinting", value: "Window Tinting" },
+    { id: "windows5", label: "Window Dressing/Curtains", value: "Window Dressing/Curtains" },
+    { id: "windows6", label: "Blind/Drapery Cleaning", value: "Blind/Drapery Cleaning" },
+    { id: "windows7", label: "Locksmith", value: "Locksmith" },
+    { id: "windows8", label: "Other Windows and Doors", value: "Other Windows and Doors" },
+  ]
+
+  // Filter businesses based on selected filters
+  const filteredBusinesses =
+    selectedFilters.length === 0
+      ? businesses
+      : businesses.filter((business) => {
+          const businessServices = getAllTerminalSubcategories(business.subcategories)
+          console.log(`Business ${business.displayName} services:`, businessServices)
+
+          // Map filter IDs to their values
+          const selectedFilterValues = selectedFilters
+            .map((filterId) => {
+              const option = filterOptions.find((opt) => opt.id === filterId)
+              return option?.value
+            })
+            .filter(Boolean)
+
+          console.log(`Looking for services matching:`, selectedFilterValues)
+
+          // Check if any business service matches any selected filter (fuzzy matching)
+          return selectedFilterValues.some((filterValue) =>
+            businessServices.some(
+              (service) =>
+                service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                filterValue.toLowerCase().includes(service.toLowerCase()),
+            ),
+          )
+        })
+
+  console.log(`Applied filters: ${JSON.stringify(selectedFilters)}`)
+  console.log(`Showing ${filteredBusinesses.length} of ${businesses.length} businesses`)
 
   const subcategoryPath = "Home, Lawn, and Manual Labor > Windows and Doors"
 
@@ -141,36 +207,34 @@ export default function WindowsDoorsPage() {
     setIsProfileDialogOpen(true)
   }
 
-  // Replace the getServiceTags function with this improved version that shows all terminal subcategories
-
-  // With this improved version:
-  const getAllTerminalSubcategories = (subcategories) => {
-    if (!Array.isArray(subcategories)) return []
-
-    const services = subcategories
-      .map((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        if (!path) return null
-
-        // Extract the specific service name (last part after the last >)
-        const parts = path.split(" > ")
-
-        // Skip if it's just a top-level category
-        if (parts.length < 2) return null
-
-        // Get the terminal subcategory (most specific service)
-        return parts[parts.length - 1]
-      })
-      .filter(Boolean) // Remove nulls
-      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-
-    console.log(`Found ${services.length} unique services for business`)
-    return services
-  }
-
   return (
     <CategoryLayout title="Windows and Doors" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {/* Filter Status */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                {selectedFilters
+                  .map((filterId) => {
+                    const option = filterOptions.find((opt) => opt.id === filterId)
+                    return option?.value
+                  })
+                  .join(", ")}
+              </p>
+              <p className="text-sm text-blue-700">
+                Showing {filteredBusinesses.length} of {businesses.length} businesses
+              </p>
+            </div>
+            <button onClick={clearFilters} className="text-sm text-blue-600 hover:text-blue-800 underline">
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -202,7 +266,7 @@ export default function WindowsDoorsPage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : businesses.length === 0 ? (
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,16 +278,24 @@ export default function WindowsDoorsPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Window & Door Services Found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {selectedFilters.length > 0 ? "No Matching Services Found" : "No Window & Door Services Found"}
+            </h3>
             <p className="text-gray-600 mb-4">
-              {userZipCode
-                ? `We're currently building our network of window & door specialists in the ${userZipCode} area.`
-                : "Be the first window and door specialist to join our platform!"}
+              {selectedFilters.length > 0
+                ? "Try adjusting your filters or clearing them to see all available businesses."
+                : userZipCode
+                  ? `We're currently building our network of window & door specialists in the ${userZipCode} area.`
+                  : "Be the first window and door specialist to join our platform!"}
             </p>
-            <Button>Register Your Business</Button>
+            {selectedFilters.length > 0 ? (
+              <Button onClick={clearFilters}>Clear Filters</Button>
+            ) : (
+              <Button>Register Your Business</Button>
+            )}
           </div>
         ) : (
-          businesses.map((business) => (
+          filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -255,14 +327,34 @@ export default function WindowsDoorsPage() {
                         </p>
                         <div className="max-h-32 overflow-y-auto">
                           <div className="flex flex-wrap gap-2 mt-1">
-                            {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                              >
-                                {service}
-                              </span>
-                            ))}
+                            {getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
+                              // Check if this service matches any selected filter
+                              const selectedFilterValues = selectedFilters
+                                .map((filterId) => {
+                                  const option = filterOptions.find((opt) => opt.id === filterId)
+                                  return option?.value
+                                })
+                                .filter(Boolean)
+
+                              const isHighlighted = selectedFilterValues.some(
+                                (filterValue) =>
+                                  service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                  filterValue.toLowerCase().includes(service.toLowerCase()),
+                              )
+
+                              return (
+                                <span
+                                  key={idx}
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                    isHighlighted
+                                      ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                      : "bg-primary/10 text-primary"
+                                  }`}
+                                >
+                                  {service}
+                                </span>
+                              )
+                            })}
                           </div>
                         </div>
                         {getAllTerminalSubcategories(business.subcategories).length > 8 && (

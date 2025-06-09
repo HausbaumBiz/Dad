@@ -24,6 +24,9 @@ export default function TrashCleanupPage() {
     { id: "trash6", label: "Other Trash Cleanup and Removal", value: "Other Trash Cleanup and Removal" },
   ]
 
+  // State for filtering
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -34,18 +37,6 @@ export default function TrashCleanupPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Load user zip code from localStorage
-  useEffect(() => {
-    const savedZipCode = localStorage.getItem("savedZipCode")
-    if (savedZipCode) {
-      setUserZipCode(savedZipCode)
-      console.log(`User zip code loaded: ${savedZipCode}`)
-    } else {
-      console.log("No user zip code found in localStorage")
-      setUserZipCode(null)
-    }
-  }, [])
 
   // Updated function to display ALL terminal subcategories
   const getAllTerminalSubcategories = (subcategories) => {
@@ -71,6 +62,55 @@ export default function TrashCleanupPage() {
     console.log(`Extracted ${allSubcategories.length} unique subcategories for display`)
     return allSubcategories
   }
+
+  // Load user zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+      setUserZipCode(null)
+    }
+  }, [])
+
+  // Filter change handler
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  // Clear filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
+
+  // Get filter values from IDs
+  const getFilterValues = (filterIds: string[]) => {
+    return filterIds.map((id) => {
+      const option = filterOptions.find((opt) => opt.id === id)
+      return option ? option.value : id
+    })
+  }
+
+  // Filter businesses based on selected filters
+  const filteredBusinesses =
+    selectedFilters.length === 0
+      ? providers
+      : providers.filter((provider) => {
+          const businessServices = getAllTerminalSubcategories(provider.businessData.subcategories)
+          const filterValues = getFilterValues(selectedFilters)
+
+          console.log(`Business ${provider.name} services:`, businessServices)
+          console.log("Looking for filter values:", filterValues)
+
+          return businessServices.some((service) => filterValues.some((filterValue) => service === filterValue))
+        })
 
   useEffect(() => {
     async function fetchBusinesses() {
@@ -202,9 +242,32 @@ export default function TrashCleanupPage() {
     setIsProfileDialogOpen(true)
   }
 
+  console.log("Applied filters:", selectedFilters)
+  console.log(`Showing ${filteredBusinesses.length} of ${providers.length} businesses`)
+
   return (
     <CategoryLayout title="Trash Cleanup and Removal" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {/* Filter Status */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                {getFilterValues(selectedFilters).join(", ")}
+              </p>
+              <p className="text-sm text-blue-700">
+                Showing {filteredBusinesses.length} of {providers.length} businesses
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -236,7 +299,7 @@ export default function TrashCleanupPage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -248,17 +311,27 @@ export default function TrashCleanupPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Trash & Cleanup Services Found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {selectedFilters.length > 0 ? "No Matching Services Found" : "No Trash & Cleanup Services Found"}
+            </h3>
             <p className="text-gray-600 mb-6">
-              {userZipCode
-                ? `We're currently building our network of trash cleanup services in the ${userZipCode} area.`
-                : "Be the first cleanup service to join our platform and help local customers with their waste removal needs!"}
+              {selectedFilters.length > 0
+                ? `No businesses match the selected filters: ${getFilterValues(selectedFilters).join(", ")}`
+                : userZipCode
+                  ? `We're currently building our network of trash cleanup services in the ${userZipCode} area.`
+                  : "Be the first cleanup service to join our platform and help local customers with their waste removal needs!"}
             </p>
-            <Button>Register Your Cleanup Business</Button>
+            {selectedFilters.length > 0 ? (
+              <Button onClick={clearFilters}>Clear Filters</Button>
+            ) : (
+              <Button>Register Your Cleanup Business</Button>
+            )}
           </div>
         ) : (
-          providers.map((provider) => {
+          filteredBusinesses.map((provider) => {
             const allServices = getAllTerminalSubcategories(provider.businessData.subcategories)
+            const filterValues = getFilterValues(selectedFilters)
+
             return (
               <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
@@ -292,14 +365,23 @@ export default function TrashCleanupPage() {
                           <p className="text-sm font-medium text-gray-700">Services ({allServices.length}):</p>
                           <div className="max-h-32 overflow-y-auto">
                             <div className="flex flex-wrap gap-2 mt-1">
-                              {allServices.map((service, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                                >
-                                  {service}
-                                </span>
-                              ))}
+                              {allServices.map((service, idx) => {
+                                const isHighlighted =
+                                  selectedFilters.length > 0 &&
+                                  filterValues.some((filterValue) => service === filterValue)
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                      isHighlighted
+                                        ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                        : "bg-primary/10 text-primary"
+                                    }`}
+                                  >
+                                    {service}
+                                  </span>
+                                )
+                              })}
                             </div>
                           </div>
                           {allServices.length > 8 && (

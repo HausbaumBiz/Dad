@@ -10,17 +10,17 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 
-export default function FireplacesChimneysPage() {
-  const filterOptions = [
-    { id: "fireplace1", label: "Chimney Sweep", value: "Chimney Sweep" },
-    { id: "fireplace2", label: "Chimney and Chimney Cap Repair", value: "Chimney and Chimney Cap Repair" },
-    { id: "fireplace3", label: "Gas Fireplace Repair", value: "Gas Fireplace Repair" },
-    { id: "fireplace4", label: "Fireplace Services", value: "Fireplace Services" },
-    { id: "fireplace5", label: "Firewood Suppliers", value: "Firewood Suppliers" },
-    { id: "fireplace6", label: "Heating Oil Suppliers", value: "Heating Oil Suppliers" },
-    { id: "fireplace7", label: "Other Fireplaces and Chimneys", value: "Other Fireplaces and Chimneys" },
-  ]
+const filterOptions = [
+  { id: "fireplace1", label: "Chimney Sweep", value: "Chimney Sweep" },
+  { id: "fireplace2", label: "Chimney and Chimney Cap Repair", value: "Chimney and Chimney Cap Repair" },
+  { id: "fireplace3", label: "Gas Fireplace Repair", value: "Gas Fireplace Repair" },
+  { id: "fireplace4", label: "Fireplace Services", value: "Fireplace Services" },
+  { id: "fireplace5", label: "Firewood Suppliers", value: "Firewood Suppliers" },
+  { id: "fireplace6", label: "Heating Oil Suppliers", value: "Heating Oil Suppliers" },
+  { id: "fireplace7", label: "Other Fireplaces and Chimneys", value: "Other Fireplaces and Chimneys" },
+]
 
+export default function FireplacesChimneysPage() {
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -31,6 +31,40 @@ export default function FireplacesChimneysPage() {
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<any[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<any[]>([])
+
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    return subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        const parts = path.split(" > ")
+        if (parts.length < 2) return null
+
+        return parts[parts.length - 1]
+      })
+      .filter(Boolean)
+      .filter((value, index, self) => self.indexOf(value) === index)
+  }
+
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
 
   // Load user zip code from localStorage
   useEffect(() => {
@@ -134,6 +168,7 @@ export default function FireplacesChimneysPage() {
           })
 
           setProviders(transformedProviders)
+          setAllBusinesses(transformedProviders)
         } else {
           console.log("No user zip code available, showing all businesses")
 
@@ -156,6 +191,7 @@ export default function FireplacesChimneysPage() {
           })
 
           setProviders(transformedProviders)
+          setAllBusinesses(transformedProviders)
         }
       } catch (error) {
         console.error("Error fetching businesses:", error)
@@ -167,6 +203,30 @@ export default function FireplacesChimneysPage() {
 
     fetchBusinesses()
   }, [userZipCode])
+
+  useEffect(() => {
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(allBusinesses)
+      return
+    }
+
+    const filterValues = selectedFilters
+      .map((filterId) => {
+        const option = filterOptions.find((opt) => opt.id === filterId)
+        return option?.value
+      })
+      .filter(Boolean)
+
+    console.log("Looking for filter values:", filterValues)
+
+    const filtered = allBusinesses.filter((business) => {
+      const businessServices = getAllTerminalSubcategories(business.businessData.subcategories)
+
+      return filterValues.some((filterValue) => businessServices.some((service) => service === filterValue))
+    })
+
+    setFilteredBusinesses(filtered)
+  }, [selectedFilters, allBusinesses])
 
   // Replace the getServiceTags function with this improved version that shows all terminal subcategories
 
@@ -188,27 +248,6 @@ export default function FireplacesChimneysPage() {
   }
 
   // With this improved version:
-  const getAllTerminalSubcategories = (subcategories) => {
-    if (!Array.isArray(subcategories)) return []
-
-    return subcategories
-      .map((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        if (!path) return null
-
-        // Extract the specific service name (last part after the last >)
-        const parts = path.split(" > ")
-
-        // Skip if it's just a top-level category
-        if (parts.length < 2) return null
-
-        // Get the terminal subcategory (most specific service)
-        return parts[parts.length - 1]
-      })
-      .filter(Boolean) // Remove nulls
-      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-    // Remove the .slice(0, 4) limit to show all subcategories
-  }
 
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
@@ -224,7 +263,31 @@ export default function FireplacesChimneysPage() {
 
   return (
     <CategoryLayout title="Fireplaces and Chimneys" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                {selectedFilters
+                  .map((filterId) => {
+                    const option = filterOptions.find((opt) => opt.id === filterId)
+                    return option?.label
+                  })
+                  .join(", ")}
+              </p>
+              <p className="text-sm text-green-700">
+                Showing {filteredBusinesses.length} of {allBusinesses.length} businesses
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -256,7 +319,7 @@ export default function FireplacesChimneysPage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -277,7 +340,7 @@ export default function FireplacesChimneysPage() {
             <Button>Register Your Fireplace Business</Button>
           </div>
         ) : (
-          providers.map((provider) => (
+          filteredBusinesses.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -302,26 +365,34 @@ export default function FireplacesChimneysPage() {
                         {provider.rating} ({provider.reviews} reviews)
                       </span>
                     </div>
-                    // Also update the JSX where the services are displayed:
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">
                         Services ({getAllTerminalSubcategories(provider.businessData.subcategories).length}):
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
-                        {provider.services.length > 0 ? (
-                          getAllTerminalSubcategories(provider.businessData.subcategories).map((service, idx) => (
+                        {getAllTerminalSubcategories(provider.businessData.subcategories).map((service, idx) => {
+                          const filterValues = selectedFilters
+                            .map((filterId) => {
+                              const option = filterOptions.find((opt) => opt.id === filterId)
+                              return option?.value
+                            })
+                            .filter(Boolean)
+
+                          const isHighlighted = filterValues.includes(service)
+
+                          return (
                             <span
                               key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                isHighlighted
+                                  ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                  : "bg-primary/10 text-primary"
+                              }`}
                             >
                               {service}
                             </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            Fireplace Services
-                          </span>
-                        )}
+                          )
+                        })}
                       </div>
                       {getAllTerminalSubcategories(provider.businessData.subcategories).length > 8 && (
                         <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>

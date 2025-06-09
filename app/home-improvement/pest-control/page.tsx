@@ -12,7 +12,7 @@ import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-a
 
 export default function PestControlPage() {
   const filterOptions = [
-    { id: "pest1", label: "Rodent/Small Animal Infestations", value: "Rodent/Small Animal Infestations" },
+    { id: "pest1", label: "Rodent/Small Animal Infestations", value: "Rodent/ Small Animal Infestations" },
     { id: "pest2", label: "Wildlife Removal", value: "Wildlife Removal" },
     { id: "pest3", label: "Insect and Bug Control", value: "Insect and Bug Control" },
     { id: "pest4", label: "Other Pest Control/Wildlife Removal", value: "Other Pest Control/Wildlife Removal" },
@@ -24,6 +24,7 @@ export default function PestControlPage() {
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedBusiness, setSelectedBusiness] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +41,19 @@ export default function PestControlPage() {
       setUserZipCode(null)
     }
   }, [])
+
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
 
   // Updated function to display ALL terminal subcategories
   const getAllTerminalSubcategories = (subcategories) => {
@@ -169,9 +183,61 @@ export default function PestControlPage() {
     setIsProfileDialogOpen(true)
   }
 
+  // Filter businesses based on selected filters
+  const filteredBusinesses =
+    selectedFilters.length === 0
+      ? providers
+      : providers.filter((provider) => {
+          const businessServices = getAllTerminalSubcategories(provider.businessData.subcategories)
+
+          // Map filter IDs to their values
+          const selectedFilterValues = selectedFilters.map((filterId) => {
+            const option = filterOptions.find((opt) => opt.id === filterId)
+            return option ? option.value : filterId
+          })
+
+          console.log(`Business ${provider.name} services:`, businessServices)
+          console.log(`Looking for filter values:`, selectedFilterValues)
+
+          // Check if any business service matches any selected filter
+          return selectedFilterValues.some((filterValue) =>
+            businessServices.some((service) => {
+              console.log(`Comparing: "${service}" with "${filterValue}"`)
+              return service === filterValue
+            }),
+          )
+        })
+
+  console.log(`Applied filters: ${JSON.stringify(selectedFilters)}`)
+  console.log(`Showing ${filteredBusinesses.length} of ${providers.length} businesses`)
+
   return (
     <CategoryLayout title="Pest Control/Wildlife Removal" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                {selectedFilters
+                  .map((filterId) => {
+                    const option = filterOptions.find((opt) => opt.id === filterId)
+                    return option ? option.label : filterId
+                  })
+                  .join(", ")}
+              </p>
+              <p className="text-sm text-green-700">
+                Showing {filteredBusinesses.length} of {providers.length} businesses
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -203,28 +269,51 @@ export default function PestControlPage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
-            <div className="mx-auto w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-12 h-12 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Pest Control Services Found</h3>
-            <p className="text-gray-600 mb-6">
-              {userZipCode
-                ? `We're currently building our network of pest control services in the ${userZipCode} area.`
-                : "Be the first pest control service to join our platform and help local customers with their pest problems!"}
-            </p>
-            <Button>Register Your Pest Control Business</Button>
+            {selectedFilters.length > 0 ? (
+              <>
+                <div className="mx-auto w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-12 h-12 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Matching Services Found</h3>
+                <p className="text-gray-600 mb-6">
+                  No pest control businesses match your selected filters. Try selecting different services or clear the
+                  filters to see all businesses.
+                </p>
+                <Button onClick={clearFilters}>Clear Filters</Button>
+              </>
+            ) : (
+              <>
+                <div className="mx-auto w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-12 h-12 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Pest Control Services Found</h3>
+                <p className="text-gray-600 mb-6">
+                  {userZipCode
+                    ? `We're currently building our network of pest control services in the ${userZipCode} area.`
+                    : "Be the first pest control service to join our platform and help local customers with their pest problems!"}
+                </p>
+                <Button>Register Your Pest Control Business</Button>
+              </>
+            )}
           </div>
         ) : (
-          providers.map((provider) => {
+          filteredBusinesses.map((provider) => {
             const allServices = getAllTerminalSubcategories(provider.businessData.subcategories)
             return (
               <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
@@ -243,7 +332,7 @@ export default function PestControlPage() {
                               fill="currentColor"
                               viewBox="0 0 20 20"
                             >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.588h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                             </svg>
                           ))}
                         </div>
@@ -256,14 +345,32 @@ export default function PestControlPage() {
                           <p className="text-sm font-medium text-gray-700">Services ({allServices.length}):</p>
                           <div className="max-h-32 overflow-y-auto">
                             <div className="flex flex-wrap gap-2 mt-1">
-                              {allServices.map((service, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                                >
-                                  {service}
-                                </span>
-                              ))}
+                              {allServices.map((service, idx) => {
+                                // Check if this service matches any selected filter
+                                const selectedFilterValues = selectedFilters.map((filterId) => {
+                                  const option = filterOptions.find((opt) => opt.id === filterId)
+                                  return option ? option.value : filterId
+                                })
+
+                                const isHighlighted = selectedFilterValues.some(
+                                  (filterValue) =>
+                                    service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                    filterValue.toLowerCase().includes(service.toLowerCase()),
+                                )
+
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                      isHighlighted
+                                        ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                        : "bg-primary/10 text-primary"
+                                    }`}
+                                  >
+                                    {service}
+                                  </span>
+                                )
+                              })}
                             </div>
                           </div>
                           {allServices.length > 8 && (

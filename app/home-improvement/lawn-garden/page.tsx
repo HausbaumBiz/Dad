@@ -31,6 +31,9 @@ export default function LawnGardenPage() {
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
+  // State for category filters
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+
   // Get user's zip code from localStorage
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -41,6 +44,17 @@ export default function LawnGardenPage() {
       console.log("No user zip code found in localStorage")
     }
   }, [])
+
+  // Handler for filter changes
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    setSelectedFilters((prev) => {
+      if (checked) {
+        return [...prev, filterId]
+      } else {
+        return prev.filter((id) => id !== filterId)
+      }
+    })
+  }
 
   const fetchProviders = useCallback(async () => {
     try {
@@ -191,7 +205,7 @@ export default function LawnGardenPage() {
 
   return (
     <CategoryLayout title="Lawn, Garden and Snow Removal" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -210,6 +224,45 @@ export default function LawnGardenPage() {
               <p className="text-sm font-medium text-green-800">Showing businesses that service: {userZipCode}</p>
               <p className="text-sm text-green-700">Only businesses available in your area are displayed</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Status Indicator */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-blue-800">
+                  Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}
+                </p>
+                <p className="text-sm text-blue-700">
+                  {selectedFilters
+                    .map((filterId) => {
+                      const option = filterOptions.find((opt) => opt.id === filterId)
+                      return option?.label
+                    })
+                    .join(", ")}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedFilters([])}
+              className="text-blue-600 border-blue-300 hover:bg-blue-100"
+            >
+              Clear Filters
+            </Button>
           </div>
         </div>
       )}
@@ -246,84 +299,132 @@ export default function LawnGardenPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {providers.map((provider) => {
-            const terminalSubcategories = extractAllTerminalSubcategories(provider.subcategories)
+          {providers
+            .filter((provider) => {
+              // If no filters selected, show all providers
+              if (selectedFilters.length === 0) return true
 
-            return (
-              <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row justify-between">
-                    <div>
-                      <h3 className="text-xl font-semibold">{provider.displayName}</h3>
-                      <p className="text-gray-600 text-sm mt-1">{provider.displayLocation}</p>
+              // Get terminal subcategories for this provider
+              const terminalSubcategories = extractAllTerminalSubcategories(provider.subcategories)
 
-                      <div className="flex items-center mt-2">
-                        <div className="flex">
-                          {[...Array(5)].map((_, i) => (
-                            <svg
-                              key={i}
-                              className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.588h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          ))}
-                        </div>
-                        <span className="text-sm text-gray-600 ml-2">
-                          {provider.rating || 0} ({provider.reviews || 0} reviews)
-                        </span>
-                      </div>
+              // Get the filter values that are selected
+              const selectedFilterValues = selectedFilters
+                .map((filterId) => {
+                  const option = filterOptions.find((opt) => opt.id === filterId)
+                  return option?.value
+                })
+                .filter(Boolean)
 
-                      <div className="mt-3">
-                        <p className="text-sm font-medium text-gray-700">Services ({terminalSubcategories.length}):</p>
-                        <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
-                          {terminalSubcategories.length > 0 ? (
-                            terminalSubcategories.map((service, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 whitespace-nowrap"
+              // Check if provider has any of the selected services
+              return selectedFilterValues.some((filterValue) =>
+                terminalSubcategories.some(
+                  (service) =>
+                    service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                    filterValue.toLowerCase().includes(service.toLowerCase()),
+                ),
+              )
+            })
+            .map((provider) => {
+              const terminalSubcategories = extractAllTerminalSubcategories(provider.subcategories)
+
+              return (
+                <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row justify-between">
+                      <div>
+                        <h3 className="text-xl font-semibold">{provider.displayName}</h3>
+                        <p className="text-gray-600 text-sm mt-1">{provider.displayLocation}</p>
+
+                        <div className="flex items-center mt-2">
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <svg
+                                key={i}
+                                className={`w-4 h-4 ${
+                                  i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"
+                                }`}
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
                               >
-                                {service}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                              General Services
-                            </span>
-                          )}
-                          {terminalSubcategories.length > 8 && (
-                            <div className="w-full text-xs text-gray-500 mt-1">Scroll to see more services</div>
-                          )}
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.588h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                            ))}
+                          </div>
+                          <span className="text-sm text-gray-600 ml-2">
+                            {provider.rating || 0} ({provider.reviews || 0} reviews)
+                          </span>
                         </div>
+
+                        <div className="mt-3">
+                          <p className="text-sm font-medium text-gray-700">
+                            Services ({terminalSubcategories.length}):
+                          </p>
+                          <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
+                            {terminalSubcategories.length > 0 ? (
+                              terminalSubcategories.map((service, idx) => {
+                                // Highlight services that match selected filters
+                                const isMatchingFilter =
+                                  selectedFilters.length > 0 &&
+                                  selectedFilters.some((filterId) => {
+                                    const option = filterOptions.find((opt) => opt.id === filterId)
+                                    const filterValue = option?.value
+                                    return (
+                                      filterValue &&
+                                      (service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                        filterValue.toLowerCase().includes(service.toLowerCase()))
+                                    )
+                                  })
+
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${
+                                      isMatchingFilter
+                                        ? "bg-green-100 text-green-800 border-green-200 ring-2 ring-green-300"
+                                        : "bg-blue-100 text-blue-800 border-blue-200"
+                                    }`}
+                                  >
+                                    {service}
+                                  </span>
+                                )
+                              })
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                General Services
+                              </span>
+                            )}
+                            {terminalSubcategories.length > 8 && (
+                              <div className="w-full text-xs text-gray-500 mt-1">Scroll to see more services</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {provider.displayPhone && (
+                          <div className="mt-2">
+                            <p className="text-sm text-gray-600">
+                              <span className="font-medium">Phone:</span> {provider.displayPhone}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
-                      {provider.displayPhone && (
-                        <div className="mt-2">
-                          <p className="text-sm text-gray-600">
-                            <span className="font-medium">Phone:</span> {provider.displayPhone}
-                          </p>
-                        </div>
-                      )}
+                      <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                        <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                          Reviews
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="mt-2 w-full md:w-auto"
+                          onClick={() => handleViewProfile(provider)}
+                        >
+                          View Profile
+                        </Button>
+                      </div>
                     </div>
-
-                    <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                      <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                        Reviews
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="mt-2 w-full md:w-auto"
-                        onClick={() => handleViewProfile(provider)}
-                      >
-                        View Profile
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+                  </CardContent>
+                </Card>
+              )
+            })}
         </div>
       )}
 

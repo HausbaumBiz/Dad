@@ -12,13 +12,13 @@ import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-a
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getZipCode } from "@/lib/zip-code-db"
 
-export default function HandymenPage() {
-  const filterOptions = [
-    { id: "handymen1", label: "Odd Jobs and Repairs", value: "Odd Jobs and Repairs" },
-    { id: "handymen2", label: "Product Assembly", value: "Product Assembly" },
-    { id: "handymen3", label: "Other Handymen", value: "Other Handymen" },
-  ]
+const filterOptions = [
+  { id: "handymen1", label: "Odd Jobs and Repairs", value: "Odd Jobs and Repairs" },
+  { id: "handymen2", label: "Product Assembly", value: "Product Assembly" },
+  { id: "handymen3", label: "Other Handymen", value: "Other Handymen" },
+]
 
+export default function HandymenPage() {
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -28,228 +28,14 @@ export default function HandymenPage() {
   const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<any[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<any[]>([])
+
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
-
-  // Load user zip code from localStorage
-  useEffect(() => {
-    const savedZipCode = localStorage.getItem("savedZipCode")
-    if (savedZipCode) {
-      setUserZipCode(savedZipCode)
-      console.log(`User zip code loaded: ${savedZipCode}`)
-    } else {
-      console.log("No user zip code found in localStorage")
-      setUserZipCode(null)
-    }
-  }, [])
-
-  useEffect(() => {
-    async function fetchBusinesses() {
-      if (userZipCode === undefined) return // Wait until zip code is loaded (even if null)
-
-      try {
-        setLoading(true)
-        setError(null)
-
-        console.log("Fetching businesses for subcategory: Home, Lawn, and Manual Labor > Handymen")
-        const allBusinesses = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Handymen")
-        console.log(`Found ${allBusinesses.length} total handymen businesses`)
-
-        // If we have a zip code, filter by service area
-        if (userZipCode) {
-          console.log(`Filtering businesses that service zip code: ${userZipCode}`)
-          const filteredBusinesses = []
-
-          for (const business of allBusinesses) {
-            try {
-              const response = await fetch(`/api/admin/business/${business.id}/service-area`)
-              if (response.ok) {
-                const serviceAreaData = await response.json()
-                console.log(`Service area data for ${business.displayName || business.businessName}:`, {
-                  zipCount: serviceAreaData.zipCodes?.length || 0,
-                  isNationwide: serviceAreaData.isNationwide,
-                  businessId: serviceAreaData.businessId,
-                })
-
-                // Check if business is nationwide
-                if (serviceAreaData.isNationwide) {
-                  console.log(
-                    `✅ ${business.displayName || business.businessName} services nationwide (including ${userZipCode})`,
-                  )
-                  filteredBusinesses.push(business)
-                  continue
-                }
-
-                // Check if the user's zip code is in the business's service area
-                if (serviceAreaData.zipCodes && Array.isArray(serviceAreaData.zipCodes)) {
-                  const servicesUserZip = serviceAreaData.zipCodes.some((zipData) => {
-                    // Handle both string and object formats
-                    const zipCode = typeof zipData === "string" ? zipData : zipData?.zip
-                    return zipCode === userZipCode
-                  })
-
-                  if (servicesUserZip) {
-                    console.log(`✅ ${business.displayName || business.businessName} services zip code ${userZipCode}`)
-                    filteredBusinesses.push(business)
-                  } else {
-                    console.log(
-                      `❌ ${business.displayName || business.businessName} does not service zip code ${userZipCode}`,
-                    )
-                  }
-                } else {
-                  console.log(
-                    `⚠️ ${business.displayName || business.businessName} has no service area data, including by default`,
-                  )
-                  filteredBusinesses.push(business)
-                }
-              } else {
-                console.log(
-                  `⚠️ Could not fetch service area for ${business.displayName || business.businessName}, including by default`,
-                )
-                filteredBusinesses.push(business)
-              }
-            } catch (error) {
-              console.error(`Error checking service area for ${business.displayName || business.businessName}:`, error)
-              filteredBusinesses.push(business)
-            }
-          }
-
-          console.log(`After zip code filtering: ${filteredBusinesses.length} businesses service ${userZipCode}`)
-
-          // Transform the data for display with city/state lookup
-          const transformedBusinesses = await Promise.all(
-            filteredBusinesses.map(async (business: any) => {
-              // Extract service tags from subcategories
-              // Add this improved function that shows all terminal subcategories
-
-              // Fetch city and state from ZIP code database
-              let location = "Service Area"
-
-              // First try to use ad design location if available
-              if (business.adDesignData?.businessInfo?.city && business.adDesignData?.businessInfo?.state) {
-                location = `${business.adDesignData.businessInfo.city}, ${business.adDesignData.businessInfo.state}`
-              }
-              // Otherwise, look up ZIP code in database
-              else if (business.zipCode) {
-                try {
-                  console.log(`Looking up ZIP code ${business.zipCode} for business ${business.id}`)
-                  const zipData = await getZipCode(business.zipCode)
-                  if (zipData && zipData.city && zipData.state) {
-                    location = `${zipData.city}, ${zipData.state}`
-                    console.log(`Found location for ${business.zipCode}: ${location}`)
-                  } else {
-                    console.log(`No ZIP data found for ${business.zipCode}, using ZIP code as fallback`)
-                    location = `Zip: ${business.zipCode}`
-                  }
-                } catch (zipError) {
-                  console.error(`Error looking up ZIP code ${business.zipCode}:`, zipError)
-                  location = `Zip: ${business.zipCode}`
-                }
-              }
-              // Fallback to display location if available
-              else if (business.displayLocation) {
-                location = business.displayLocation
-              }
-
-              return {
-                id: business.id,
-                name:
-                  business.displayName ||
-                  business.adDesignData?.businessInfo?.businessName ||
-                  business.businessName ||
-                  "Business Name",
-                location: location,
-                rating: business.rating || 4.5,
-                reviews: business.reviewCount || 0,
-                services: business.subcategories,
-                phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
-              }
-            }),
-          )
-
-          setProviders(transformedBusinesses)
-        } else {
-          console.log("No user zip code available, showing all businesses")
-
-          // Transform the data for display with city/state lookup
-          const transformedBusinesses = await Promise.all(
-            allBusinesses.map(async (business: any) => {
-              // Extract service tags from subcategories
-              // Add this improved function that shows all terminal subcategories
-
-              // Fetch city and state from ZIP code database
-              let location = "Service Area"
-
-              // First try to use ad design location if available
-              if (business.adDesignData?.businessInfo?.city && business.adDesignData?.businessInfo?.state) {
-                location = `${business.adDesignData.businessInfo.city}, ${business.adDesignData.businessInfo.state}`
-              }
-              // Otherwise, look up ZIP code in database
-              else if (business.zipCode) {
-                try {
-                  console.log(`Looking up ZIP code ${business.zipCode} for business ${business.id}`)
-                  const zipData = await getZipCode(business.zipCode)
-                  if (zipData && zipData.city && zipData.state) {
-                    location = `${zipData.city}, ${zipData.state}`
-                    console.log(`Found location for ${business.zipCode}: ${location}`)
-                  } else {
-                    console.log(`No ZIP data found for ${business.zipCode}, using ZIP code as fallback`)
-                    location = `Zip: ${business.zipCode}`
-                  }
-                } catch (zipError) {
-                  console.error(`Error looking up ZIP code ${business.zipCode}:`, zipError)
-                  location = `Zip: ${business.zipCode}`
-                }
-              }
-              // Fallback to display location if available
-              else if (business.displayLocation) {
-                location = business.displayLocation
-              }
-
-              return {
-                id: business.id,
-                name:
-                  business.displayName ||
-                  business.adDesignData?.businessInfo?.businessName ||
-                  business.businessName ||
-                  "Business Name",
-                location: location,
-                rating: business.rating || 4.5,
-                reviews: business.reviewCount || 0,
-                services: business.subcategories,
-                phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
-              }
-            }),
-          )
-
-          setProviders(transformedBusinesses)
-        }
-      } catch (err) {
-        console.error("Error fetching businesses:", err)
-        setError("Failed to load businesses")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchBusinesses()
-  }, [userZipCode])
-
-  // Function to handle opening reviews dialog
-  const handleOpenReviews = (provider: any) => {
-    setSelectedProvider(provider)
-    setIsReviewsDialogOpen(true)
-  }
-
-  // Function to handle opening profile dialog
-  const handleViewProfile = (provider: any) => {
-    console.log("Opening profile for business:", provider.id, provider.name)
-    setSelectedBusinessId(provider.id)
-    setSelectedBusinessName(provider.name)
-    setIsProfileDialogOpen(true)
-  }
 
   // Add this function:
   const getAllTerminalSubcategories = (subcategories) => {
@@ -274,9 +60,286 @@ export default function HandymenPage() {
     // Remove the .slice(0, 4) limit to show all subcategories
   }
 
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    setSelectedFilters((prev) => (checked ? [...prev, filterId] : prev.filter((id) => id !== filterId)))
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
+
+  // Load user zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
+      setUserZipCode(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    async function fetchBusinesses() {
+      if (userZipCode === undefined) return // Wait until zip code is loaded (even if null)
+
+      try {
+        setLoading(true)
+        setError(null)
+
+        console.log("Fetching businesses for subcategory: Home, Lawn, and Manual Labor > Handymen")
+        const allBusinessesData = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Handymen")
+        console.log(`Found ${allBusinessesData.length} total handymen businesses`)
+
+        // If we have a zip code, filter by service area
+        if (userZipCode) {
+          console.log(`Filtering businesses that service zip code: ${userZipCode}`)
+          const filteredBusinessesByZip = []
+
+          for (const business of allBusinessesData) {
+            try {
+              const response = await fetch(`/api/admin/business/${business.id}/service-area`)
+              if (response.ok) {
+                const serviceAreaData = await response.json()
+                console.log(`Service area data for ${business.displayName || business.businessName}:`, {
+                  zipCount: serviceAreaData.zipCodes?.length || 0,
+                  isNationwide: serviceAreaData.isNationwide,
+                  businessId: serviceAreaData.businessId,
+                })
+
+                // Check if business is nationwide
+                if (serviceAreaData.isNationwide) {
+                  console.log(
+                    `✅ ${business.displayName || business.businessName} services nationwide (including ${userZipCode})`,
+                  )
+                  filteredBusinessesByZip.push(business)
+                  continue
+                }
+
+                // Check if the user's zip code is in the business's service area
+                if (serviceAreaData.zipCodes && Array.isArray(serviceAreaData.zipCodes)) {
+                  const servicesUserZip = serviceAreaData.zipCodes.some((zipData) => {
+                    // Handle both string and object formats
+                    const zipCode = typeof zipData === "string" ? zipData : zipData?.zip
+                    return zipCode === userZipCode
+                  })
+
+                  if (servicesUserZip) {
+                    console.log(`✅ ${business.displayName || business.businessName} services zip code ${userZipCode}`)
+                    filteredBusinessesByZip.push(business)
+                  } else {
+                    console.log(
+                      `❌ ${business.displayName || business.businessName} does not service zip code ${userZipCode}`,
+                    )
+                  }
+                } else {
+                  console.log(
+                    `⚠️ ${business.displayName || business.businessName} has no service area data, including by default`,
+                  )
+                  filteredBusinessesByZip.push(business)
+                }
+              } else {
+                console.log(
+                  `⚠️ Could not fetch service area for ${business.displayName || business.businessName}, including by default`,
+                )
+                filteredBusinessesByZip.push(business)
+              }
+            } catch (error) {
+              console.error(`Error checking service area for ${business.displayName || business.businessName}:`, error)
+              filteredBusinessesByZip.push(business)
+            }
+          }
+
+          console.log(`After zip code filtering: ${filteredBusinessesByZip.length} businesses service ${userZipCode}`)
+
+          // Transform the data for display with city/state lookup
+          const transformedBusinesses = await Promise.all(
+            filteredBusinessesByZip.map(async (business: any) => {
+              // Extract service tags from subcategories
+              // Add this improved function that shows all terminal subcategories
+
+              // Fetch city and state from ZIP code database
+              let location = "Service Area"
+
+              // First try to use ad design location if available
+              if (business.adDesignData?.businessInfo?.city && business.adDesignData?.businessInfo?.state) {
+                location = `${business.adDesignData.businessInfo.city}, ${business.adDesignData.businessInfo.state}`
+              }
+              // Otherwise, look up ZIP code in database
+              else if (business.zipCode) {
+                try {
+                  console.log(`Looking up ZIP code ${business.zipCode} for business ${business.id}`)
+                  const zipData = await getZipCode(business.zipCode)
+                  if (zipData && zipData.city && zipData.state) {
+                    location = `${zipData.city}, ${zipData.state}`
+                    console.log(`Found location for ${business.zipCode}: ${location}`)
+                  } else {
+                    console.log(`No ZIP data found for ${business.zipCode}, using ZIP code as fallback`)
+                    location = `Zip: ${business.zipCode}`
+                  }
+                } catch (zipError) {
+                  console.error(`Error looking up ZIP code ${business.zipCode}:`, zipError)
+                  location = `Zip: ${business.zipCode}`
+                }
+              }
+              // Fallback to display location if available
+              else if (business.displayLocation) {
+                location = business.displayLocation
+              }
+
+              return {
+                id: business.id,
+                name:
+                  business.displayName ||
+                  business.adDesignData?.businessInfo?.businessName ||
+                  business.businessName ||
+                  "Business Name",
+                location: location,
+                rating: business.rating || 4.5,
+                reviews: business.reviewCount || 0,
+                services: business.subcategories,
+                phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
+              }
+            }),
+          )
+
+          setAllBusinesses(transformedBusinesses)
+        } else {
+          console.log("No user zip code available, showing all businesses")
+
+          // Transform the data for display with city/state lookup
+          const transformedBusinesses = await Promise.all(
+            allBusinessesData.map(async (business: any) => {
+              // Extract service tags from subcategories
+              // Add this improved function that shows all terminal subcategories
+
+              // Fetch city and state from ZIP code database
+              let location = "Service Area"
+
+              // First try to use ad design location if available
+              if (business.adDesignData?.businessInfo?.city && business.adDesignData?.businessInfo?.state) {
+                location = `${business.adDesignData.businessInfo.city}, ${business.adDesignData.businessInfo.state}`
+              }
+              // Otherwise, look up ZIP code in database
+              else if (business.zipCode) {
+                try {
+                  console.log(`Looking up ZIP code ${business.zipCode} for business ${business.id}`)
+                  const zipData = await getZipCode(business.zipCode)
+                  if (zipData && zipData.city && zipData.state) {
+                    location = `${zipData.city}, ${zipData.state}`
+                    console.log(`Found location for ${business.zipCode}: ${location}`)
+                  } else {
+                    console.log(`No ZIP data found for ${business.zipCode}, using ZIP code as fallback`)
+                    location = `Zip: ${business.zipCode}`
+                  }
+                } catch (zipError) {
+                  console.error(`Error looking up ZIP code ${business.zipCode}:`, zipError)
+                  location = `Zip: ${business.zipCode}`
+                }
+              }
+              // Fallback to display location if available
+              else if (business.displayLocation) {
+                location = business.displayLocation
+              }
+
+              return {
+                id: business.id,
+                name:
+                  business.displayName ||
+                  business.adDesignData?.businessInfo?.businessName ||
+                  business.businessName ||
+                  "Business Name",
+                location: location,
+                rating: business.rating || 4.5,
+                reviews: business.reviewCount || 0,
+                services: business.subcategories,
+                phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
+              }
+            }),
+          )
+
+          setAllBusinesses(transformedBusinesses)
+        }
+      } catch (err) {
+        console.error("Error fetching businesses:", err)
+        setError("Failed to load businesses")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBusinesses()
+  }, [userZipCode])
+
+  // Filter businesses based on selected filters
+  useEffect(() => {
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(allBusinesses)
+      return
+    }
+
+    // Convert filter IDs to filter values
+    const filterValues = selectedFilters
+      .map((filterId) => {
+        const option = filterOptions.find((opt) => opt.id === filterId)
+        return option?.value
+      })
+      .filter(Boolean)
+
+    console.log("Looking for filter values:", filterValues)
+
+    const filtered = allBusinesses.filter((business) => {
+      const businessServices = getAllTerminalSubcategories(business.services || [])
+
+      return filterValues.some((filterValue) => businessServices.some((service) => service === filterValue))
+    })
+
+    setFilteredBusinesses(filtered)
+  }, [selectedFilters, allBusinesses])
+
+  // Function to handle opening reviews dialog
+  const handleOpenReviews = (provider: any) => {
+    setSelectedProvider(provider)
+    setIsReviewsDialogOpen(true)
+  }
+
+  // Function to handle opening profile dialog
+  const handleViewProfile = (provider: any) => {
+    console.log("Opening profile for business:", provider.id, provider.name)
+    setSelectedBusinessId(provider.id)
+    setSelectedBusinessName(provider.name)
+    setIsProfileDialogOpen(true)
+  }
+
   return (
     <CategoryLayout title="Handymen" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                {selectedFilters
+                  .map((filterId) => {
+                    const option = filterOptions.find((opt) => opt.id === filterId)
+                    return option?.value
+                  })
+                  .join(", ")}
+              </p>
+              <p className="text-sm text-green-600">
+                Showing {filteredBusinesses.length} of {allBusinesses.length} businesses
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -307,7 +370,7 @@ export default function HandymenPage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -326,7 +389,7 @@ export default function HandymenPage() {
             <Button>Register Your Handyman Business</Button>
           </div>
         ) : (
-          providers.map((provider) => (
+          filteredBusinesses.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -359,14 +422,29 @@ export default function HandymenPage() {
                         Services ({getAllTerminalSubcategories(provider.services || []).length}):
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
-                        {getAllTerminalSubcategories(provider.services || []).map((service, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                          >
-                            {service}
-                          </span>
-                        ))}
+                        {getAllTerminalSubcategories(provider.services || []).map((service, idx) => {
+                          const filterValues = selectedFilters
+                            .map((filterId) => {
+                              const option = filterOptions.find((opt) => opt.id === filterId)
+                              return option?.value
+                            })
+                            .filter(Boolean)
+
+                          const isHighlighted = filterValues.includes(service)
+
+                          return (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                isHighlighted
+                                  ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                  : "bg-primary/10 text-primary"
+                              }`}
+                            >
+                              {service}
+                            </span>
+                          )
+                        })}
                       </div>
                       {getAllTerminalSubcategories(provider.services || []).length > 8 && (
                         <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>

@@ -39,8 +39,77 @@ export default function FlooringPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
   const subcategoryPath = "Home, Lawn, and Manual Labor > Floor/Carpet Care and Installation"
+
+  // Function to extract terminal subcategories
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    const services = subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Always split by " > " and take the last part (terminal subcategory)
+        const parts = path.split(" > ")
+        return parts[parts.length - 1].trim()
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+
+    console.log(`Found ${services.length} unique services for business`)
+    return services
+  }
+
+  // Filter handling functions
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    setSelectedFilters((prev) => {
+      if (checked) {
+        return [...prev, filterId]
+      } else {
+        return prev.filter((id) => id !== filterId)
+      }
+    })
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
+
+  // Filter businesses based on selected filters
+  const filteredBusinesses =
+    selectedFilters.length === 0
+      ? businesses
+      : businesses.filter((business) => {
+          const businessServices = getAllTerminalSubcategories(business.subcategories)
+
+          // Map filter IDs to their values
+          const filterValues = selectedFilters.map((filterId) => {
+            const option = filterOptions.find((opt) => opt.id === filterId)
+            return option?.value || filterId
+          })
+
+          console.log(`Business ${business.displayName} services:`, businessServices)
+          console.log(`Looking for filter values:`, filterValues)
+
+          // Check if any business service matches any selected filter
+          const hasMatch = businessServices.some((service) =>
+            filterValues.some(
+              (filterValue) =>
+                service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                filterValue.toLowerCase().includes(service.toLowerCase()),
+            ),
+          )
+
+          console.log(`Business ${business.displayName} matches filters:`, hasMatch)
+          return hasMatch
+        })
+
+  console.log(`Applied filters:`, selectedFilters)
+  console.log(`Showing ${filteredBusinesses.length} of ${businesses.length} businesses`)
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -151,33 +220,35 @@ export default function FlooringPage() {
   // Replace the getServiceTags function with this improved version that shows all terminal subcategories
 
   // With this improved version:
-  const getAllTerminalSubcategories = (subcategories) => {
-    if (!Array.isArray(subcategories)) return []
-
-    const services = subcategories
-      .map((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        if (!path) return null
-
-        // Extract the specific service name (last part after the last >)
-        const parts = path.split(" > ")
-
-        // Skip if it's just a top-level category
-        if (parts.length < 2) return null
-
-        // Get the terminal subcategory (most specific service)
-        return parts[parts.length - 1]
-      })
-      .filter(Boolean) // Remove nulls
-      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-
-    console.log(`Found ${services.length} unique services for business`)
-    return services
-  }
 
   return (
     <CategoryLayout title="Floor/Carpet Care and Installation" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {/* Filter Status */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                {selectedFilters
+                  .map((filterId) => {
+                    const option = filterOptions.find((opt) => opt.id === filterId)
+                    return option?.value || filterId
+                  })
+                  .join(", ")}
+              </p>
+              <p className="text-sm text-blue-700">
+                Showing {filteredBusinesses.length} of {businesses.length} businesses
+              </p>
+            </div>
+            <button onClick={clearFilters} className="text-sm text-blue-600 hover:text-blue-800 underline">
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -209,7 +280,7 @@ export default function FlooringPage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : businesses.length === 0 ? (
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-amber-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -230,7 +301,7 @@ export default function FlooringPage() {
             <Button>Register Your Business</Button>
           </div>
         ) : (
-          businesses.map((business) => (
+          filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -261,14 +332,34 @@ export default function FlooringPage() {
                           Services ({getAllTerminalSubcategories(business.subcategories).length}):
                         </p>
                         <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
-                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                            >
-                              {service}
-                            </span>
-                          ))}
+                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
+                            // Check if this service matches any selected filter
+                            const filterValues = selectedFilters.map((filterId) => {
+                              const option = filterOptions.find((opt) => opt.id === filterId)
+                              return option?.value || filterId
+                            })
+
+                            const isHighlighted =
+                              selectedFilters.length > 0 &&
+                              filterValues.some(
+                                (filterValue) =>
+                                  service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                  filterValue.toLowerCase().includes(service.toLowerCase()),
+                              )
+
+                            return (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                  isHighlighted
+                                    ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                    : "bg-primary/10 text-primary"
+                                }`}
+                              >
+                                {service}
+                              </span>
+                            )
+                          })}
                         </div>
                         {getAllTerminalSubcategories(business.subcategories).length > 8 && (
                           <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>

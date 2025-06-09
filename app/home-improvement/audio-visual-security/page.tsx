@@ -37,6 +37,7 @@ export default function AudioVisualSecurityPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
   // Load user zip code from localStorage
   useEffect(() => {
@@ -142,7 +143,19 @@ export default function AudioVisualSecurityPage() {
     setIsProfileDialogOpen(true)
   }
 
-  // Updated function to display ALL terminal subcategories
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
+
   const getAllTerminalSubcategories = (subcategories) => {
     if (!Array.isArray(subcategories)) return []
 
@@ -151,25 +164,71 @@ export default function AudioVisualSecurityPage() {
         const path = typeof subcat === "string" ? subcat : subcat?.fullPath
         if (!path) return null
 
-        // Extract the specific service name (last part after the last >)
         const parts = path.split(" > ")
-
-        // Skip if it's just a top-level category
         if (parts.length < 2) return null
 
-        // Get the terminal subcategory (most specific service)
-        return parts[parts.length - 1]
+        return parts[parts.length - 1].trim()
       })
-      .filter(Boolean) // Remove nulls
-      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+      .filter(Boolean)
+      .filter((value, index, self) => self.indexOf(value) === index)
 
-    console.log(`Extracted ${allSubcategories.length} unique subcategories for display`)
+    console.log(`Processing ${subcategories.length} subcategories for service extraction`)
     return allSubcategories
   }
 
+  const filteredBusinesses =
+    selectedFilters.length === 0
+      ? businesses
+      : businesses.filter((business) => {
+          const businessServices = getAllTerminalSubcategories(business.subcategories)
+
+          const filterValues = selectedFilters.map((filterId) => {
+            const option = filterOptions.find((opt) => opt.id === filterId)
+            return option?.value || filterId
+          })
+
+          console.log(`Business ${business.displayName} services:`, businessServices)
+          console.log(`Looking for filter values:`, filterValues)
+
+          return filterValues.some((filterValue) =>
+            businessServices.some(
+              (service) =>
+                service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                filterValue.toLowerCase().includes(service.toLowerCase()),
+            ),
+          )
+        })
+
+  console.log(`Applied filters: ${JSON.stringify(selectedFilters)}`)
+  console.log(`Showing ${filteredBusinesses.length} of ${businesses.length} businesses`)
+
   return (
     <CategoryLayout title="Audio/Visual and Home Security" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                {selectedFilters
+                  .map((filterId) => {
+                    const option = filterOptions.find((opt) => opt.id === filterId)
+                    return option?.label || filterId
+                  })
+                  .join(", ")}
+              </p>
+              <p className="text-sm text-green-700">
+                Showing {filteredBusinesses.length} of {businesses.length} businesses
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -222,7 +281,7 @@ export default function AudioVisualSecurityPage() {
             <Button>Register Your AV/Security Business</Button>
           </div>
         ) : (
-          businesses.map((business) => {
+          filteredBusinesses.map((business) => {
             const allServices = getAllTerminalSubcategories(business.subcategories)
             return (
               <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
@@ -245,7 +304,7 @@ export default function AudioVisualSecurityPage() {
                               fill="currentColor"
                               viewBox="0 0 20 20"
                             >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                             </svg>
                           ))}
                         </div>
@@ -258,14 +317,33 @@ export default function AudioVisualSecurityPage() {
                           <p className="text-sm font-medium text-gray-700">Services ({allServices.length}):</p>
                           <div className="max-h-32 overflow-y-auto">
                             <div className="flex flex-wrap gap-2 mt-1">
-                              {allServices.map((service, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                                >
-                                  {service}
-                                </span>
-                              ))}
+                              {allServices.map((service, idx) => {
+                                const filterValues = selectedFilters.map((filterId) => {
+                                  const option = filterOptions.find((opt) => opt.id === filterId)
+                                  return option?.value || filterId
+                                })
+
+                                const isHighlighted =
+                                  selectedFilters.length > 0 &&
+                                  filterValues.some(
+                                    (filterValue) =>
+                                      service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                      filterValue.toLowerCase().includes(service.toLowerCase()),
+                                  )
+
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                      isHighlighted
+                                        ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                        : "bg-primary/10 text-primary"
+                                    }`}
+                                  >
+                                    {service}
+                                  </span>
+                                )
+                              })}
                             </div>
                           </div>
                           {allServices.length > 8 && (

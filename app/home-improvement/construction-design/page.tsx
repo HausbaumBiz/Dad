@@ -27,11 +27,38 @@ export default function ConstructionDesignPage() {
     },
   ]
 
+  // Helper to extract service names from full paths
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!subcategories || !Array.isArray(subcategories)) return []
+
+    console.log(`Processing ${subcategories.length} subcategories for service extraction`)
+
+    return subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1].trim()
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+  }
+
   // State for businesses
   const [businesses, setBusinesses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined) // Start as undefined
+
+  // State for filtering
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
   // State for dialogs
   const [selectedBusinessId, setSelectedBusinessId] = useState(null)
@@ -41,6 +68,51 @@ export default function ConstructionDesignPage() {
 
   // The subcategory path to search for
   const subcategoryPath = "Home, Lawn, and Manual Labor > Home Construction and Design"
+
+  // Filter handlers
+  const handleFilterChange = (filterId: string, isChecked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${isChecked}`)
+    setSelectedFilters((prev) => {
+      if (isChecked) {
+        return [...prev, filterId]
+      } else {
+        return prev.filter((f) => f !== filterId)
+      }
+    })
+  }
+
+  const clearFilters = () => {
+    console.log("Clearing all filters")
+    setSelectedFilters([])
+  }
+
+  // Filter businesses based on selected filters
+  const filteredBusinesses =
+    selectedFilters.length === 0
+      ? businesses
+      : businesses.filter((business) => {
+          const businessServices = getAllTerminalSubcategories(business.subcategories)
+
+          // Convert filter IDs to filter values for matching
+          const selectedFilterValues = selectedFilters.map((filterId) => {
+            const filterOption = filterOptions.find((option) => option.id === filterId)
+            return filterOption ? filterOption.value : filterId
+          })
+
+          console.log(`Business ${business.displayName} services:`, businessServices)
+          console.log(`Looking for matches with:`, selectedFilterValues)
+
+          return selectedFilterValues.some((filterValue) =>
+            businessServices.some(
+              (service) =>
+                service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                filterValue.toLowerCase().includes(service.toLowerCase()),
+            ),
+          )
+        })
+
+  console.log(`Applied filters: ${JSON.stringify(selectedFilters)}`)
+  console.log(`Showing ${filteredBusinesses.length} of ${businesses.length} businesses`)
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -184,34 +256,34 @@ export default function ConstructionDesignPage() {
     setIsProfileDialogOpen(true)
   }
 
-  // Helper to extract service names from full paths
-  const getAllTerminalSubcategories = (subcategories) => {
-    if (!subcategories || !Array.isArray(subcategories)) return []
-
-    console.log(`Processing ${subcategories.length} subcategories for service extraction`)
-
-    return subcategories
-      .map((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        if (!path) return null
-
-        // Extract the specific service name (last part after the last >)
-        const parts = path.split(" > ")
-
-        // Skip if it's just a top-level category
-        if (parts.length < 2) return null
-
-        // Get the terminal subcategory (most specific service)
-        return parts[parts.length - 1]
-      })
-      .filter(Boolean) // Remove nulls
-      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-    // Remove the .slice(0, 4) limit to show all subcategories
-  }
-
   return (
     <CategoryLayout title="Home Construction and Design" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {/* Filter Status */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length !== 1 ? "s" : ""}:{" "}
+                {selectedFilters
+                  .map((filterId) => {
+                    const filterOption = filterOptions.find((option) => option.id === filterId)
+                    return filterOption ? filterOption.value : filterId
+                  })
+                  .join(", ")}
+              </p>
+              <p className="text-sm text-blue-700">
+                Showing {filteredBusinesses.length} of {businesses.length} businesses
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -242,7 +314,7 @@ export default function ConstructionDesignPage() {
         <div className="text-center py-12">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : businesses.length === 0 ? (
+      ) : filteredBusinesses.length === 0 ? (
         <div className="text-center py-12">
           <div className="mx-auto w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mb-4">
             <svg className="w-12 h-12 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,7 +336,7 @@ export default function ConstructionDesignPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {businesses.map((business) => (
+          {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -289,7 +361,7 @@ export default function ConstructionDesignPage() {
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
@@ -304,14 +376,31 @@ export default function ConstructionDesignPage() {
                       </p>
                       <div className="max-h-32 overflow-y-auto">
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                            >
-                              {service}
-                            </span>
-                          ))}
+                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
+                            // Convert filter IDs to filter values for highlighting
+                            const selectedFilterValues = selectedFilters.map((filterId) => {
+                              const filterOption = filterOptions.find((option) => option.id === filterId)
+                              return filterOption ? filterOption.value : filterId
+                            })
+
+                            const isHighlighted = selectedFilterValues.some(
+                              (filterValue) =>
+                                service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                filterValue.toLowerCase().includes(service.toLowerCase()),
+                            )
+                            return (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                  isHighlighted
+                                    ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                    : "bg-primary/10 text-primary"
+                                }`}
+                              >
+                                {service}
+                              </span>
+                            )
+                          })}
                         </div>
                         {getAllTerminalSubcategories(business.subcategories).length > 8 && (
                           <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>

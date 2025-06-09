@@ -33,6 +33,66 @@ export default function AsphaltConcretePage() {
   const [error, setError] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined) // Start as undefined
 
+  // State for filtering
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+
+  // Helper to extract service names from full paths - moved to top to avoid initialization errors
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!subcategories || !Array.isArray(subcategories)) return []
+
+    const services = subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Always split by " > " and take the last part (terminal subcategory)
+        const parts = path.split(" > ")
+        return parts[parts.length - 1].trim()
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+
+    console.log(`Found ${services.length} unique terminal subcategories`)
+    return services
+  }
+
+  // Filter handlers
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
+
+  // Filter businesses based on selected filters
+  const filteredBusinesses =
+    selectedFilters.length === 0
+      ? businesses
+      : businesses.filter((business) => {
+          const businessServices = getAllTerminalSubcategories(business.subcategories)
+
+          return selectedFilters.some((filterId) => {
+            // Find the filter option that matches this filterId
+            const filterOption = filterOptions.find((option) => option.id === filterId)
+            if (!filterOption) return false
+
+            const filterValue = filterOption.value.toLowerCase()
+
+            // Check if any business service matches this filter
+            return businessServices.some((service) => {
+              const serviceLower = service.toLowerCase()
+              // Fuzzy matching - check if service contains filter or filter contains service
+              return serviceLower.includes(filterValue) || filterValue.includes(serviceLower)
+            })
+          })
+        })
+
   // State for dialogs
   const [selectedBusinessId, setSelectedBusinessId] = useState(null)
   const [selectedBusinessName, setSelectedBusinessName] = useState("")
@@ -199,38 +259,48 @@ export default function AsphaltConcretePage() {
     setIsProfileDialogOpen(true)
   }
 
-  // Helper to extract service names from full paths
-  const getAllTerminalSubcategories = (subcategories) => {
-    if (!subcategories || !Array.isArray(subcategories)) return []
-
-    const services = subcategories
-      .map((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        if (!path) return null
-
-        // Extract the specific service name (last part after the last >)
-        const parts = path.split(" > ")
-
-        // Skip if it's just a top-level category
-        if (parts.length < 2) return null
-
-        // Get the terminal subcategory (most specific service)
-        return parts[parts.length - 1]
-      })
-      .filter(Boolean) // Remove nulls
-      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-
-    console.log(`Found ${services.length} unique terminal subcategories`)
-    return services
-  }
-
   return (
     <CategoryLayout
       title="Asphalt, Concrete, Stone and Gravel"
       backLink="/home-improvement"
       backText="Home Improvement"
     >
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {/* Filter Status Indicator */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-green-800">
+                  Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                  {selectedFilters
+                    .map((filterId) => {
+                      const option = filterOptions.find((opt) => opt.id === filterId)
+                      return option?.label
+                    })
+                    .join(", ")}
+                </p>
+                <p className="text-sm text-green-700">
+                  Showing {filteredBusinesses.length} of {businesses.length} businesses
+                </p>
+              </div>
+            </div>
+            <button onClick={clearFilters} className="text-sm text-green-600 hover:text-green-800 font-medium">
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -261,7 +331,7 @@ export default function AsphaltConcretePage() {
         <div className="text-center py-12">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : businesses.length === 0 ? (
+      ) : filteredBusinesses.length === 0 ? (
         <div className="text-center py-12">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <svg className="w-12 h-12 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,7 +353,7 @@ export default function AsphaltConcretePage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {businesses.map((business) => (
+          {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -330,14 +400,30 @@ export default function AsphaltConcretePage() {
                         <div
                           className={`flex flex-wrap gap-2 ${getAllTerminalSubcategories(business.subcategories).length > 8 ? "max-h-32 overflow-y-auto pr-2" : ""}`}
                         >
-                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                            >
-                              {service}
-                            </span>
-                          ))}
+                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
+                            // Check if this service matches any selected filter
+                            const isHighlighted = selectedFilters.some((filterId) => {
+                              const filterOption = filterOptions.find((option) => option.id === filterId)
+                              if (!filterOption) return false
+
+                              const filterValue = filterOption.value.toLowerCase()
+                              const serviceLower = service.toLowerCase()
+                              return serviceLower.includes(filterValue) || filterValue.includes(serviceLower)
+                            })
+
+                            return (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                  isHighlighted
+                                    ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                    : "bg-primary/10 text-primary"
+                                }`}
+                              >
+                                {service}
+                              </span>
+                            )
+                          })}
                         </div>
 
                         {/* Scroll hint */}

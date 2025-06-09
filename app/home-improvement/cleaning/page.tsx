@@ -11,14 +11,37 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useEffect } from "react"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 
+const filterOptions = [
+  { id: "cleaning1", label: "House Cleaning", value: "House Cleaning" },
+  { id: "cleaning2", label: "Office Cleaning", value: "Office Cleaning" },
+  { id: "cleaning3", label: "Window Cleaning", value: "Window Cleaning" },
+  { id: "cleaning4", label: "Deep Carpet and Floor Cleaning", value: "Deep Carpet and Floor Cleaning" },
+  { id: "cleaning5", label: "Other Home and Office Cleaning", value: "Other Home and Office Cleaning" },
+]
+
 export default function CleaningPage() {
-  const filterOptions = [
-    { id: "cleaning1", label: "House Cleaning", value: "House Cleaning" },
-    { id: "cleaning2", label: "Office Cleaning", value: "Office Cleaning" },
-    { id: "cleaning3", label: "Window Cleaning", value: "Window Cleaning" },
-    { id: "cleaning4", label: "Deep Carpet and Floor Cleaning", value: "Deep Carpet and Floor Cleaning" },
-    { id: "cleaning5", label: "Other Home and Office Cleaning", value: "Other Home and Office Cleaning" },
-  ]
+  // Extract service tags from subcategories
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    return subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1]
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+    // No slice limit to show all subcategories
+  }
 
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState(null)
@@ -26,10 +49,27 @@ export default function CleaningPage() {
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedBusiness, setSelectedBusiness] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [allBusinesses, setAllBusinesses] = useState<any[]>([])
+
+  // Handle filter changes
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
 
   // Load user zip code from localStorage
   useEffect(() => {
@@ -155,6 +195,7 @@ export default function CleaningPage() {
             }
           })
 
+          setAllBusinesses(transformedProviders)
           setProviders(transformedProviders)
         } else {
           console.log("No user zip code available, showing all businesses")
@@ -177,6 +218,7 @@ export default function CleaningPage() {
             }
           })
 
+          setAllBusinesses(transformedProviders)
           setProviders(transformedProviders)
         }
       } catch (error) {
@@ -190,28 +232,39 @@ export default function CleaningPage() {
     fetchBusinesses()
   }, [userZipCode])
 
-  // Extract service tags from subcategories
-  const getAllTerminalSubcategories = (subcategories) => {
-    if (!Array.isArray(subcategories)) return []
+  // Filter businesses based on selected filters
+  useEffect(() => {
+    if (selectedFilters.length === 0) {
+      // If no filters selected, show all businesses
+      setProviders(allBusinesses)
+      return
+    }
 
-    return subcategories
-      .map((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        if (!path) return null
+    // Get the filter values from the filter IDs
+    const filterValues = selectedFilters.map(
+      (filterId) => filterOptions.find((option) => option.id === filterId)?.value || "",
+    )
+    console.log("Looking for filter values:", filterValues)
 
-        // Extract the specific service name (last part after the last >)
-        const parts = path.split(" > ")
+    // Filter businesses that have at least one matching service
+    const filtered = allBusinesses.filter((provider) => {
+      // Get all terminal subcategories for this business
+      const businessServices = getAllTerminalSubcategories(provider.businessData.subcategories || [])
+      console.log(`Business ${provider.name} services:`, businessServices)
 
-        // Skip if it's just a top-level category
-        if (parts.length < 2) return null
-
-        // Get the terminal subcategory (most specific service)
-        return parts[parts.length - 1]
+      // Check if any of the business services match any of the selected filter values
+      return businessServices.some((service) => {
+        return filterValues.some((filterValue) => {
+          console.log(`Comparing: "${service}" with "${filterValue}"`)
+          return service === filterValue
+        })
       })
-      .filter(Boolean) // Remove nulls
-      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-    // Remove the .slice(0, 4) limit to show all subcategories
-  }
+    })
+
+    console.log(`Applied filters: ${JSON.stringify(selectedFilters)}`)
+    console.log(`Showing ${filtered.length} of ${allBusinesses.length} businesses`)
+    setProviders(filtered)
+  }, [selectedFilters, allBusinesses])
 
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
@@ -225,9 +278,42 @@ export default function CleaningPage() {
     setIsProfileDialogOpen(true)
   }
 
+  // Check if a service matches any selected filter
+  const isServiceMatched = (service) => {
+    if (selectedFilters.length === 0) return false
+
+    const filterValues = selectedFilters.map(
+      (filterId) => filterOptions.find((option) => option.id === filterId)?.value || "",
+    )
+
+    return filterValues.some((filterValue) => service === filterValue)
+  }
+
   return (
     <CategoryLayout title="Home and Office Cleaning" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+      {/* Filter Status */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                {selectedFilters
+                  .map((filterId) => filterOptions.find((option) => option.id === filterId)?.label)
+                  .join(", ")}
+              </p>
+              <p className="text-sm text-blue-700">
+                Showing {providers.length} of {allBusinesses.length} businesses
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -271,13 +357,21 @@ export default function CleaningPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Cleaning Services Found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {selectedFilters.length > 0 ? "No Cleaning Services Match Your Filters" : "No Cleaning Services Found"}
+            </h3>
             <p className="text-gray-600 mb-6">
-              {userZipCode
-                ? `We're currently building our network of cleaning services in the ${userZipCode} area.`
-                : "Be the first cleaning service to join our platform and help local customers keep their spaces spotless!"}
+              {selectedFilters.length > 0
+                ? "Try selecting different filters or clear all filters to see all available cleaning services."
+                : userZipCode
+                  ? `We're currently building our network of cleaning services in the ${userZipCode} area.`
+                  : "Be the first cleaning service to join our platform and help local customers keep their spaces spotless!"}
             </p>
-            <Button>Register Your Cleaning Business</Button>
+            {selectedFilters.length > 0 ? (
+              <Button onClick={clearFilters}>Clear All Filters</Button>
+            ) : (
+              <Button>Register Your Cleaning Business</Button>
+            )}
           </div>
         ) : (
           providers.map((provider) => (
@@ -313,11 +407,16 @@ export default function CleaningPage() {
                         Services ({getAllTerminalSubcategories(provider.businessData.subcategories).length}):
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
-                        {provider.services.length > 0 ? (
+                        {getAllTerminalSubcategories(provider.businessData.subcategories).length > 0 ? (
                           getAllTerminalSubcategories(provider.businessData.subcategories).map((service, idx) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
+                                ${
+                                  isServiceMatched(service)
+                                    ? "bg-green-100 text-green-800 ring-1 ring-green-400"
+                                    : "bg-primary/10 text-primary"
+                                }`}
                             >
                               {service}
                             </span>

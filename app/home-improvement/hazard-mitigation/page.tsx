@@ -5,7 +5,7 @@ import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
@@ -35,6 +35,7 @@ export default function HazardMitigationPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
   // Load user zip code from localStorage
   useEffect(() => {
@@ -71,6 +72,21 @@ export default function HazardMitigationPage() {
 
     console.log(`Extracted ${allSubcategories.length} unique subcategories for display`)
     return allSubcategories
+  }
+
+  const handleFilterChange = (filterId: string, isChecked: boolean) => {
+    console.log(`Filter change: ${filterId} = ${isChecked}`)
+    setSelectedFilters((prev) => {
+      if (isChecked) {
+        return [...prev, filterId]
+      } else {
+        return prev.filter((id) => id !== filterId)
+      }
+    })
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
   }
 
   useEffect(() => {
@@ -191,6 +207,39 @@ export default function HazardMitigationPage() {
     fetchBusinesses()
   }, [userZipCode])
 
+  // Filter businesses based on selected filters
+  const filteredBusinesses = useMemo(() => {
+    if (selectedFilters.length === 0) {
+      return providers
+    }
+
+    // Map filter IDs to their values
+    const selectedFilterValues = selectedFilters.map((filterId) => {
+      const option = filterOptions.find((opt) => opt.id === filterId)
+      return option?.value || filterId
+    })
+
+    console.log("Applied filters:", selectedFilterValues)
+
+    const filtered = providers.filter((provider) => {
+      const businessServices = getAllTerminalSubcategories(provider.businessData.subcategories)
+
+      // Check if any of the business services match any of the selected filters
+      const hasMatch = businessServices.some((service) =>
+        selectedFilterValues.some(
+          (filterValue) =>
+            service.toLowerCase().includes(filterValue.toLowerCase()) ||
+            filterValue.toLowerCase().includes(service.toLowerCase()),
+        ),
+      )
+
+      return hasMatch
+    })
+
+    console.log(`Showing ${filtered.length} of ${providers.length} businesses`)
+    return filtered
+  }, [providers, selectedFilters])
+
   // Handle opening reviews dialog
   const handleOpenReviews = (provider) => {
     setSelectedProvider(provider)
@@ -205,7 +254,7 @@ export default function HazardMitigationPage() {
 
   return (
     <CategoryLayout title="Home Hazard Mitigation" backLink="/home-improvement" backText="Home Improvement">
-      <CategoryFilter options={filterOptions} />
+      <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -228,6 +277,41 @@ export default function HazardMitigationPage() {
         </div>
       )}
 
+      {/* Filter Status Indicator */}
+      {selectedFilters.length > 0 && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-green-800">
+                  Filtering by {selectedFilters.length} service{selectedFilters.length > 1 ? "s" : ""}:{" "}
+                  {selectedFilters
+                    .map((filterId) => {
+                      const option = filterOptions.find((opt) => opt.id === filterId)
+                      return option?.label || filterId
+                    })
+                    .join(", ")}
+                </p>
+                <p className="text-sm text-green-700">
+                  Showing {filteredBusinesses.length} of {providers.length} businesses
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         {loading ? (
           <div className="flex justify-center items-center py-12">
@@ -237,7 +321,7 @@ export default function HazardMitigationPage() {
           <div className="text-center py-12">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : filteredBusinesses.length === 0 ? (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -258,7 +342,7 @@ export default function HazardMitigationPage() {
             <Button>Register Your Safety Business</Button>
           </div>
         ) : (
-          providers.map((provider) => {
+          filteredBusinesses.map((provider) => {
             const allServices = getAllTerminalSubcategories(provider.businessData.subcategories)
             return (
               <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
@@ -293,14 +377,32 @@ export default function HazardMitigationPage() {
                           <p className="text-sm font-medium text-gray-700">Services ({allServices.length}):</p>
                           <div className="max-h-32 overflow-y-auto">
                             <div className="flex flex-wrap gap-2 mt-1">
-                              {allServices.map((service, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap"
-                                >
-                                  {service}
-                                </span>
-                              ))}
+                              {allServices.map((service, idx) => {
+                                // Check if this service matches any selected filter
+                                const selectedFilterValues = selectedFilters.map((filterId) => {
+                                  const option = filterOptions.find((opt) => opt.id === filterId)
+                                  return option?.value || filterId
+                                })
+
+                                const isHighlighted = selectedFilterValues.some(
+                                  (filterValue) =>
+                                    service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                    filterValue.toLowerCase().includes(service.toLowerCase()),
+                                )
+
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                      isHighlighted
+                                        ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                        : "bg-primary/10 text-primary"
+                                    }`}
+                                  >
+                                    {service}
+                                  </span>
+                                )
+                              })}
                             </div>
                           </div>
                           {allServices.length > 8 && (

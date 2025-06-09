@@ -11,6 +11,31 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/lib/business-category-service"
 
 export default function OutdoorStructuresPage() {
+  // Define the getAllTerminalSubcategories function first to avoid initialization errors
+  const getAllTerminalSubcategories = (subcategories) => {
+    if (!Array.isArray(subcategories)) return []
+
+    // Log the total number of subcategories
+    console.log(`Processing ${subcategories.length} subcategories for business`)
+
+    return subcategories
+      .map((subcat) => {
+        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
+        if (!path) return null
+
+        // Extract the specific service name (last part after the last >)
+        const parts = path.split(" > ")
+
+        // Skip if it's just a top-level category
+        if (parts.length < 2) return null
+
+        // Get the terminal subcategory (most specific service)
+        return parts[parts.length - 1].trim()
+      })
+      .filter(Boolean) // Remove nulls
+      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+  }
+
   const filterOptions = [
     { id: "structure1", label: "Deck/Patio/Porch Construction", value: "Deck/Patio/Porch Construction" },
     { id: "structure2", label: "Patio and Patio Enclosures", value: "Patio and Patio Enclosures" },
@@ -36,11 +61,51 @@ export default function OutdoorStructuresPage() {
     },
   ]
 
+  // Add state for selected filters
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+
+  // Handler for filter changes
+  const handleFilterChange = (filterId: string, checked: boolean) => {
+    console.log(`Filter changed: ${filterId} = ${checked}`)
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterId])
+    } else {
+      setSelectedFilters((prev) => prev.filter((id) => id !== filterId))
+    }
+  }
+
+  // Handler to clear all filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+  }
+
   // State for businesses
   const [businesses, setBusinesses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Filter businesses based on selected filters
+  const filteredBusinesses = businesses.filter((business) => {
+    // If no filters selected, show all businesses
+    if (selectedFilters.length === 0) return true
+
+    // Get all terminal subcategories for this business
+    const businessServices = getAllTerminalSubcategories(business.subcategories)
+
+    // Check if any of the business services match any of the selected filters
+    return selectedFilters.some((filterId) => {
+      const filterValue = filterOptions.find((option) => option.id === filterId)?.value
+      if (!filterValue) return false
+
+      // Check if any business service contains the filter value or vice versa (case insensitive)
+      return businessServices.some(
+        (service) =>
+          service.toLowerCase().includes(filterValue.toLowerCase()) ||
+          filterValue.toLowerCase().includes(service.toLowerCase()),
+      )
+    })
+  })
 
   // State for dialogs
   const [selectedBusinessId, setSelectedBusinessId] = useState(null)
@@ -160,41 +225,41 @@ export default function OutdoorStructuresPage() {
     setIsProfileDialogOpen(true)
   }
 
-  // Replace the extractSpecificServices function with this improved version that shows all terminal subcategories
-
-  // With this improved version:
-  const getAllTerminalSubcategories = (subcategories) => {
-    if (!Array.isArray(subcategories)) return []
-
-    // Log the total number of subcategories
-    console.log(`Processing ${subcategories.length} subcategories for business`)
-
-    return subcategories
-      .map((subcat) => {
-        const path = typeof subcat === "string" ? subcat : subcat?.fullPath
-        if (!path) return null
-
-        // Extract the specific service name (last part after the last >)
-        const parts = path.split(" > ")
-
-        // Skip if it's just a top-level category
-        if (parts.length < 2) return null
-
-        // Get the terminal subcategory (most specific service)
-        return parts[parts.length - 1]
-      })
-      .filter(Boolean) // Remove nulls
-      .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-    // Removed the .slice(0, 4) to show all subcategories
-  }
-
   return (
     <CategoryLayout
       title="Outdoor Structure Assembly/Construction and Fencing"
       backLink="/home-improvement"
       backText="Home Improvement"
     >
-      <CategoryFilter options={filterOptions} />
+      <div className="mb-6">
+        <CategoryFilter options={filterOptions} onFilterChange={handleFilterChange} selectedFilters={selectedFilters} />
+
+        {/* Filter status indicator */}
+        {selectedFilters.length > 0 && (
+          <div className="flex items-center justify-between bg-blue-50 p-3 rounded-md mb-4">
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Filtering by {selectedFilters.length} {selectedFilters.length === 1 ? "service" : "services"}:
+                {selectedFilters
+                  .map((id) => {
+                    const label = filterOptions.find((opt) => opt.id === id)?.label
+                    return label ? ` ${label}` : ""
+                  })
+                  .join(", ")}
+              </p>
+              <p className="text-xs text-blue-600">
+                Showing {filteredBusinesses.length} of {businesses.length} businesses
+              </p>
+            </div>
+            <button
+              onClick={clearFilters}
+              className="text-sm bg-white px-3 py-1 rounded border border-blue-300 hover:bg-blue-50"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Zip Code Status Indicator */}
       {userZipCode && (
@@ -225,7 +290,7 @@ export default function OutdoorStructuresPage() {
         <div className="text-center py-12">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : businesses.length === 0 ? (
+      ) : filteredBusinesses.length === 0 ? (
         <div className="text-center py-12">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center">
@@ -238,18 +303,25 @@ export default function OutdoorStructuresPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Outdoor Structure Services Found</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Matching Outdoor Structure Services Found</h3>
             <p className="text-gray-600 mb-4">
-              {userZipCode
-                ? `We're currently building our network of outdoor construction and fencing professionals in the ${userZipCode} area.`
-                : "We're currently building our network of outdoor construction and fencing professionals in your area."}
+              {selectedFilters.length > 0
+                ? "No businesses match your selected filters. Try selecting different services or clear the filters."
+                : userZipCode
+                  ? `We're currently building our network of outdoor construction and fencing professionals in the ${userZipCode} area.`
+                  : "We're currently building our network of outdoor construction and fencing professionals in your area."}
             </p>
+            {selectedFilters.length > 0 && (
+              <Button onClick={clearFilters} className="mb-4">
+                Clear Filters
+              </Button>
+            )}
             <Button className="bg-amber-600 hover:bg-amber-700">Register Your Business</Button>
           </div>
         </div>
       ) : (
         <div className="space-y-6">
-          {businesses.map((business) => (
+          {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
@@ -302,14 +374,33 @@ export default function OutdoorStructuresPage() {
                       <div className="mt-1 max-h-32 overflow-y-auto pr-1">
                         <div className="flex flex-wrap gap-2">
                           {getAllTerminalSubcategories(business.subcategories).length > 0 ? (
-                            getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap mb-1"
-                              >
-                                {service}
-                              </span>
-                            ))
+                            getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
+                              // Check if this service matches any selected filter
+                              const isMatched =
+                                selectedFilters.length > 0 &&
+                                selectedFilters.some((filterId) => {
+                                  const filterValue = filterOptions.find((opt) => opt.id === filterId)?.value
+                                  return (
+                                    filterValue &&
+                                    (service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                      filterValue.toLowerCase().includes(service.toLowerCase()))
+                                  )
+                                })
+
+                              return (
+                                <span
+                                  key={idx}
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap mb-1
+                                    ${
+                                      isMatched
+                                        ? "bg-green-100 text-green-800 ring-1 ring-green-400"
+                                        : "bg-primary/10 text-primary"
+                                    }`}
+                                >
+                                  {service}
+                                </span>
+                              )
+                            })
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
                               Outdoor Structure Construction
