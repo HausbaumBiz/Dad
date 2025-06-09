@@ -18,15 +18,35 @@ interface Business {
   businessName: string
   displayLocation: string
   displayPhone: string
-  allSubcategories?: string[]
-  subcategory?: string
+  allSubcategories?: any[] // Changed to any[] to handle both strings and objects
+  subcategory?: string | { category: string; subcategory: string; fullPath: string }
   rating?: number
   reviews?: number
   zipCode?: string
-  // Fix: Match the actual backend data structure
-  serviceArea?: string[] // This should be a direct array of zip codes
-  isNationwide?: boolean // This should be a direct boolean
-  subcategories?: string[]
+  serviceArea?: string[]
+  isNationwide?: boolean
+  subcategories?: any[] // Changed to any[] to handle both strings and objects
+}
+
+// Helper function to extract string value from subcategory (whether it's a string or object)
+function getSubcategoryString(sub: any): string {
+  if (typeof sub === "string") {
+    return sub
+  }
+
+  if (sub && typeof sub === "object") {
+    // If it's an object with subcategory property, use that
+    if (sub.subcategory) {
+      return sub.subcategory
+    }
+    // Otherwise try fullPath
+    if (sub.fullPath) {
+      return sub.fullPath
+    }
+  }
+
+  // Fallback
+  return "Financial Services"
 }
 
 export default function FinancialServicesPage() {
@@ -118,17 +138,14 @@ export default function FinancialServicesPage() {
 
         console.log(`[${new Date().toISOString()}] Retrieved ${result.length} total businesses (request #${fetchId})`)
 
-        // Safely log business information with null/undefined checks
+        // Log subcategory types to help debug
         result.forEach((business) => {
-          // Safely access serviceArea properties with null checks
-          const serviceAreaZips = business.serviceArea || []
-          const isNationwide = business.isNationwide || false
-
-          const serviceAreaInfo = `nationwide=${isNationwide}, serviceZips=[${serviceAreaZips.join(", ")}]`
-
-          console.log(
-            `  - ${business.id}: "${business.displayName}" (primaryZip: ${business.zipCode || "none"}, nationwide=${business.isNationwide || false}, serviceZips=[${business.serviceArea?.join(", ") || business.zipcodes?.join(", ") || ""}])`,
-          )
+          if (business.allSubcategories && business.allSubcategories.length > 0) {
+            console.log(
+              `Business ${business.displayName} subcategory types:`,
+              business.allSubcategories.map((sub) => (typeof sub === "object" ? "object" : typeof sub)),
+            )
+          }
         })
 
         let filteredResult = result
@@ -175,17 +192,24 @@ export default function FinancialServicesPage() {
   const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
     // Check allSubcategories array
     if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-      return business.allSubcategories.some((sub) => sub === filterValue)
+      return business.allSubcategories.some((sub) => {
+        const subString = getSubcategoryString(sub)
+        return subString === filterValue
+      })
     }
 
     // Check subcategories array
     if (business.subcategories && Array.isArray(business.subcategories)) {
-      return business.subcategories.some((sub) => sub === filterValue)
+      return business.subcategories.some((sub) => {
+        const subString = getSubcategoryString(sub)
+        return subString === filterValue
+      })
     }
 
     // Check single subcategory field
     if (business.subcategory) {
-      return business.subcategory === filterValue
+      const subString = getSubcategoryString(business.subcategory)
+      return subString === filterValue
     }
 
     return false
@@ -426,37 +450,47 @@ export default function FinancialServicesPage() {
 
                     <div className="flex items-center mt-2">
                       <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(business.rating || 4.5) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
+                        {[...Array(5)].map((_, i) => {
+                          // Only show yellow stars if business has reviews AND a rating
+                          const hasReviews = business.reviews && business.reviews > 0
+                          const rating = hasReviews ? business.rating || 0 : 0
+
+                          return (
+                            <svg
+                              key={i}
+                              className={`w-4 h-4 ${i < Math.floor(rating) ? "text-yellow-400" : "text-gray-300"}`}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          )
+                        })}
                       </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {business.rating || 4.5} ({business.reviews || 0} reviews)
-                      </span>
+                      {business.reviews && business.reviews > 0 ? (
+                        <span className="text-sm text-gray-600 ml-2">
+                          {business.rating || 0} ({business.reviews} reviews)
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-600 ml-2">No reviews yet</span>
+                      )}
                     </div>
 
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service: string, idx: number) => (
+                          business.allSubcategories.map((service, idx) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {service}
+                              {getSubcategoryString(service)}
                             </span>
                           ))
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {business.subcategory || "Financial Services"}
+                            {getSubcategoryString(business.subcategory) || "Financial Services"}
                           </span>
                         )}
                       </div>
