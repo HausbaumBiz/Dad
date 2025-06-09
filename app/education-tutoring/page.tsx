@@ -13,6 +13,20 @@ import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { Checkbox } from "@/components/ui/checkbox"
 
+// Helper function to extract string from subcategory data
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
+}
+
 // Add fetchIdRef for race condition prevention
 
 // Enhanced Business interface
@@ -28,7 +42,7 @@ interface Business {
   phone?: string
   rating?: number
   reviews?: number
-  allSubcategories?: string[]
+  allSubcategories?: any[] // Changed from string[] to any[]
   subcategory?: string
   serviceArea?: string[]
   isNationwide?: boolean
@@ -167,7 +181,9 @@ export default function EducationTutoringPage() {
   // Function to check if business has exact subcategory match
   const hasExactSubcategoryMatch = (business: Business, subcategory: string): boolean => {
     if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-      return business.allSubcategories.some((sub) => sub.toLowerCase() === subcategory.toLowerCase())
+      return business.allSubcategories.some(
+        (sub) => getSubcategoryString(sub).toLowerCase() === subcategory.toLowerCase(),
+      )
     }
     return false
   }
@@ -370,12 +386,12 @@ export default function EducationTutoringPage() {
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service: string, idx: number) => (
+                          business.allSubcategories.map((service: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {service}
+                              {getSubcategoryString(service)}
                             </span>
                           ))
                         ) : (

@@ -14,6 +14,20 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { Checkbox } from "@/components/ui/checkbox"
 
+// Helper function to extract string from subcategory data
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
+}
+
 // Enhanced Business interface with service area support
 interface Business {
   id: string
@@ -29,7 +43,7 @@ interface Business {
   phone?: string
   rating?: number
   reviews?: number
-  subcategories?: string[]
+  subcategories?: any[] // Changed from string[] to any[]
   businessDescription?: string
   adDesignData?: {
     businessInfo?: {
@@ -126,7 +140,9 @@ export default function MusicLessonsPage() {
 
   // Function to check if business has exact subcategory match
   const hasExactSubcategory = (business: Business, filter: string) => {
-    return business.subcategories?.some((subcategory) => subcategory.toLowerCase() === filter.toLowerCase())
+    return business.subcategories?.some(
+      (subcategory) => getSubcategoryString(subcategory).toLowerCase() === filter.toLowerCase(),
+    )
   }
 
   // Filter handlers
@@ -422,12 +438,12 @@ export default function MusicLessonsPage() {
                         <div className="mt-3">
                           <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
                           <div className="flex flex-wrap gap-2">
-                            {business.subcategories.map((subcategory: string, idx: number) => (
+                            {business.subcategories.map((subcategory: any, idx: number) => (
                               <span
                                 key={idx}
                                 className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                               >
-                                {subcategory}
+                                {getSubcategoryString(subcategory)}
                               </span>
                             ))}
                           </div>

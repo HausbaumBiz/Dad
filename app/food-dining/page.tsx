@@ -338,22 +338,36 @@ export default function FoodDiningPage() {
 
   // Helper function to get subcategories
   const getSubcategories = (business: Business) => {
-    // Prioritize subcategories from Redis
+    // Helper function to extract string from subcategory object
+    const getSubcategoryString = (subcategory: any): string => {
+      if (typeof subcategory === "string") {
+        return subcategory
+      }
+
+      if (subcategory && typeof subcategory === "object") {
+        // Try to get the subcategory field first, then category, then fullPath
+        return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+      }
+
+      return "Unknown Service"
+    }
+
+    // First try to get from subcategories (which should contain the full category objects)
     if (business.subcategories && business.subcategories.length > 0) {
-      return business.subcategories
+      return business.subcategories.map(getSubcategoryString).filter((s) => s !== "Unknown Service")
+    }
+
+    // Then try allSubcategories
+    if (business.allSubcategories && business.allSubcategories.length > 0) {
+      return business.allSubcategories.map(getSubcategoryString).filter((s) => s !== "Unknown Service")
     }
 
     // Fall back to services if available
     if (business.services && business.services.length > 0) {
-      return business.services
+      return business.services.map(getSubcategoryString).filter((s) => s !== "Unknown Service")
     }
 
-    // Fall back to allSubcategories if available
-    if (business.allSubcategories && business.allSubcategories.length > 0) {
-      return business.allSubcategories
-    }
-
-    return []
+    return ["Restaurant"]
   }
 
   const handleReviewsClick = (provider: Business) => {

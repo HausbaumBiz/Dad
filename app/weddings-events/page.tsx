@@ -13,6 +13,20 @@ import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 
+// Helper function to safely extract string from subcategory data
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
+}
+
 export default function WeddingsEventsPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
@@ -53,7 +67,7 @@ export default function WeddingsEventsPage() {
     displayPhone?: string
     rating?: number
     reviewCount?: number
-    subcategories?: string[]
+    subcategories?: any[] // Changed from string[] to any[]
     zipCode?: string
     serviceArea?: string[]
     isNationwide?: boolean
@@ -97,7 +111,9 @@ export default function WeddingsEventsPage() {
 
     // Check subcategories array
     if (business.subcategories && Array.isArray(business.subcategories)) {
-      const hasMatch = filters.some((filter) => business.subcategories!.includes(filter))
+      const hasMatch = filters.some((filter) =>
+        business.subcategories!.some((subcat) => getSubcategoryString(subcat) === filter),
+      )
       if (hasMatch) return true
     }
 
@@ -393,12 +409,12 @@ export default function WeddingsEventsPage() {
                       <div className="mt-3">
                         <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
                         <div className="flex flex-wrap gap-2">
-                          {provider.subcategories.map((subcategory: string, idx: number) => (
+                          {provider.subcategories.map((subcategory: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800"
                             >
-                              {subcategory}
+                              {getSubcategoryString(subcategory)}
                             </span>
                           ))}
                         </div>

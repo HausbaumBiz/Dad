@@ -21,10 +21,24 @@ interface Business {
   displayPhone?: string
   rating?: number
   reviewCount?: number
-  subcategories?: string[]
+  subcategories?: any[]
   zipCode?: string
   serviceArea?: string[]
   isNationwide?: boolean
+}
+
+// Helper function to extract string from subcategory data
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
 }
 
 export default function PetCarePage() {
@@ -114,7 +128,9 @@ export default function PetCarePage() {
 
     // Check subcategories array
     if (business.subcategories && Array.isArray(business.subcategories)) {
-      const hasMatch = filters.some((filter) => business.subcategories!.includes(filter))
+      const hasMatch = filters.some((filter) =>
+        business.subcategories!.some((subcat) => getSubcategoryString(subcat) === filter),
+      )
       if (hasMatch) return true
     }
 
@@ -419,12 +435,12 @@ export default function PetCarePage() {
                     <div>
                       <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
                       <div className="flex flex-wrap gap-2">
-                        {business.subcategories.map((subcategory: string, index: number) => (
+                        {business.subcategories.map((subcategory: any, index: number) => (
                           <span
                             key={index}
                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                           >
-                            {subcategory}
+                            {getSubcategoryString(subcategory)}
                           </span>
                         ))}
                       </div>

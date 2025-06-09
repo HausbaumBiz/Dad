@@ -19,6 +19,20 @@ interface EnhancedBusiness extends Business {
   isNationwide?: boolean // Nationwide flag
 }
 
+// Helper function to extract string from subcategory data
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
+}
+
 export default function TailoringClothingPage() {
   const fetchIdRef = useRef(0)
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
@@ -175,11 +189,22 @@ export default function TailoringClothingPage() {
     const subcategories = business.subcategories || []
     const allSubcategories = business.allSubcategories || []
 
-    return (
-      subcategories.includes(filterValue) ||
-      allSubcategories.includes(filterValue) ||
-      (business as any).subcategory === filterValue
-    )
+    // Check subcategories array
+    const subcategoryMatch = subcategories.some((subcategory: any) => {
+      const subcategoryStr = getSubcategoryString(subcategory)
+      return subcategoryStr === filterValue
+    })
+
+    // Check allSubcategories array
+    const allSubcategoryMatch = allSubcategories.some((subcategory: any) => {
+      const subcategoryStr = getSubcategoryString(subcategory)
+      return subcategoryStr === filterValue
+    })
+
+    // Check direct subcategory property
+    const directMatch = getSubcategoryString((business as any).subcategory) === filterValue
+
+    return subcategoryMatch || allSubcategoryMatch || directMatch
   }
 
   // Handle filter selection
@@ -450,7 +475,7 @@ export default function TailoringClothingPage() {
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {service}
+                              {getSubcategoryString(service)}
                             </span>
                           ))}
                         </div>

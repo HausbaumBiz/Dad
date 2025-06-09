@@ -27,8 +27,8 @@ interface Business {
   phone?: string
   rating?: number
   reviews?: number
-  services?: string[]
-  subcategories?: string[]
+  services?: any[]
+  subcategories?: any[]
   description?: string
   adDesignData?: {
     businessInfo?: {
@@ -39,6 +39,7 @@ interface Business {
   }
   serviceArea?: string[]
   isNationwide?: boolean
+  allSubcategories?: any[]
 }
 
 export default function CareServicesPage() {
@@ -74,6 +75,20 @@ export default function CareServicesPage() {
     { id: "homecare4", label: "Adult Day Services", value: "Adult Day Services" },
     { id: "homecare5", label: "Rehab/Nursing/Respite and Memory Care", value: "Rehab/Nursing/Respite and Memory Care" },
   ]
+
+  // Helper function to safely extract string from subcategory data
+  const getSubcategoryString = (subcategory: any): string => {
+    if (typeof subcategory === "string") {
+      return subcategory
+    }
+
+    if (subcategory && typeof subcategory === "object") {
+      // Try to get the subcategory field first, then category, then fullPath
+      return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+    }
+
+    return "Unknown Service"
+  }
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -128,24 +143,70 @@ export default function CareServicesPage() {
   const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
     if (filters.length === 0) return true
 
-    console.log(`Checking business ${business.displayName || business.businessName} subcategories:`, {
-      subcategories: business.subcategories,
-      services: business.services,
-      filters,
-    })
+    console.log(
+      `[Care Services] Checking if business ${business.displayName || business.businessName} matches filters:`,
+      {
+        filters,
+        businessSubcategories: business.subcategories,
+        businessAllSubcategories: business.allSubcategories,
+        businessServices: business.services,
+      },
+    )
+
+    // Get all subcategories as strings
+    const allSubcategoryStrings: string[] = []
 
     // Check subcategories array
     if (business.subcategories && Array.isArray(business.subcategories)) {
-      const hasMatch = filters.some((filter) => business.subcategories!.includes(filter))
-      if (hasMatch) return true
+      business.subcategories.forEach((sub) => {
+        const subStr = getSubcategoryString(sub)
+        if (subStr !== "Unknown Service") {
+          allSubcategoryStrings.push(subStr)
+        }
+      })
     }
 
-    // Check services array (fallback)
+    // Check allSubcategories array
+    if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+      business.allSubcategories.forEach((sub) => {
+        const subStr = getSubcategoryString(sub)
+        if (subStr !== "Unknown Service") {
+          allSubcategoryStrings.push(subStr)
+        }
+      })
+    }
+
+    // Check services array
     if (business.services && Array.isArray(business.services)) {
-      const hasMatch = filters.some((filter) => business.services!.includes(filter))
-      if (hasMatch) return true
+      business.services.forEach((service) => {
+        const serviceStr = getSubcategoryString(service)
+        if (serviceStr !== "Unknown Service") {
+          allSubcategoryStrings.push(serviceStr)
+        }
+      })
     }
 
+    console.log(
+      `[Care Services] All subcategory strings for ${business.displayName || business.businessName}:`,
+      allSubcategoryStrings,
+    )
+
+    // Check if any filter matches any subcategory string
+    // Use case-insensitive comparison and check for partial matches
+    for (const filter of filters) {
+      const filterLower = filter.toLowerCase()
+      for (const subStr of allSubcategoryStrings) {
+        const subStrLower = subStr.toLowerCase()
+
+        // Check for exact match or if subcategory contains filter or filter contains subcategory
+        if (subStrLower === filterLower || subStrLower.includes(filterLower) || filterLower.includes(subStrLower)) {
+          console.log(`[Care Services] Match found! Filter "${filter}" matches subcategory "${subStr}"`)
+          return true
+        }
+      }
+    }
+
+    console.log(`[Care Services] No match found for business ${business.displayName || business.businessName}`)
     return false
   }
 
@@ -155,15 +216,15 @@ export default function CareServicesPage() {
   }
 
   const applyFilters = () => {
-    console.log("Applying filters:", selectedFilters)
-    console.log("All businesses:", allBusinesses)
+    console.log("[Care Services] Applying filters:", selectedFilters)
+    console.log("[Care Services] All businesses:", allBusinesses)
 
     if (selectedFilters.length === 0) {
       setFilteredBusinesses(allBusinesses)
       setAppliedFilters([])
     } else {
       const filtered = allBusinesses.filter((business) => hasExactSubcategoryMatch(business, selectedFilters))
-      console.log("Filtered results:", filtered)
+      console.log("[Care Services] Filtered results:", filtered)
       setFilteredBusinesses(filtered)
       setAppliedFilters([...selectedFilters])
     }
@@ -314,17 +375,57 @@ export default function CareServicesPage() {
 
   // Helper function to get subcategories
   const getSubcategories = (business: Business) => {
-    // Prioritize subcategories from Redis
-    if (business.subcategories && business.subcategories.length > 0) {
-      return business.subcategories
+    console.log(
+      `[Care Services] Getting subcategories for business ${business.displayName || business.businessName}:`,
+      {
+        subcategories: business.subcategories,
+        allSubcategories: business.allSubcategories,
+        services: business.services,
+      },
+    )
+
+    // Collect all subcategories from different sources
+    const allSubcategoryStrings: string[] = []
+
+    // Check allSubcategories first (this seems to be the main field)
+    if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+      business.allSubcategories.forEach((sub) => {
+        const subStr = getSubcategoryString(sub)
+        if (subStr !== "Unknown Service" && subStr.trim() !== "") {
+          allSubcategoryStrings.push(subStr)
+        }
+      })
     }
 
-    // Fall back to services if available
-    if (business.services && business.services.length > 0) {
-      return business.services
+    // Check subcategories as fallback
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      business.subcategories.forEach((sub) => {
+        const subStr = getSubcategoryString(sub)
+        if (subStr !== "Unknown Service" && subStr.trim() !== "") {
+          allSubcategoryStrings.push(subStr)
+        }
+      })
     }
 
-    return []
+    // Check services as fallback
+    if (business.services && Array.isArray(business.services)) {
+      business.services.forEach((service) => {
+        const serviceStr = getSubcategoryString(service)
+        if (serviceStr !== "Unknown Service" && serviceStr.trim() !== "") {
+          allSubcategoryStrings.push(serviceStr)
+        }
+      })
+    }
+
+    // Remove duplicates
+    const uniqueSubcategories = [...new Set(allSubcategoryStrings)]
+
+    console.log(
+      `[Care Services] Final subcategories for ${business.displayName || business.businessName}:`,
+      uniqueSubcategories,
+    )
+
+    return uniqueSubcategories.length > 0 ? uniqueSubcategories : ["Care Services"]
   }
 
   const handleViewReviews = (business: Business) => {
@@ -526,7 +627,7 @@ export default function CareServicesPage() {
                                   key={index}
                                   className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                                 >
-                                  {typeof subcategory === "string" ? subcategory : subcategory.name || "Unknown"}
+                                  {subcategory}
                                 </span>
                               ))}
                             </div>

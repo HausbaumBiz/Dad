@@ -63,26 +63,118 @@ function formatPhoneNumber(phone: string): string {
   return phone
 }
 
+// Add this helper function after the formatPhoneNumber function and before the component
+function getSubcategoryString(subcategory: any): string {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  // Handle object format with various possible properties
+  if (typeof subcategory === "object" && subcategory !== null) {
+    // Return the most specific value available
+    return (
+      subcategory.subcategory || subcategory.name || subcategory.fullPath || subcategory.category || "Unknown Service"
+    )
+  }
+
+  return "Unknown Service"
+}
+
+// Helper function for exact subcategory matching
+const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
+  if (filters.length === 0) return true
+
+  console.log(`Checking business ${business.displayName || business.businessName} subcategories:`, {
+    subcategories: business.subcategories,
+    allSubcategories: business.allSubcategories,
+    services: business.services,
+    filters,
+  })
+
+  // Collect all subcategory strings from all sources
+  const allSubcategoryStrings: string[] = []
+
+  // Check subcategories array
+  if (business.subcategories && Array.isArray(business.subcategories)) {
+    business.subcategories.forEach((subcategory) => {
+      const subcategoryString = getSubcategoryString(subcategory)
+      if (subcategoryString && subcategoryString !== "Unknown Service") {
+        allSubcategoryStrings.push(subcategoryString)
+      }
+    })
+  }
+
+  // Check allSubcategories array
+  if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+    business.allSubcategories.forEach((subcategory) => {
+      const subcategoryString = getSubcategoryString(subcategory)
+      if (subcategoryString && subcategoryString !== "Unknown Service") {
+        allSubcategoryStrings.push(subcategoryString)
+      }
+    })
+  }
+
+  // Check services array (fallback)
+  if (business.services && Array.isArray(business.services)) {
+    business.services.forEach((service) => {
+      const serviceString = getSubcategoryString(service)
+      if (serviceString && serviceString !== "Unknown Service") {
+        allSubcategoryStrings.push(serviceString)
+      }
+    })
+  }
+
+  // Remove duplicates
+  const uniqueSubcategories = [...new Set(allSubcategoryStrings)]
+
+  console.log(`Business ${business.displayName || business.businessName} subcategory strings:`, uniqueSubcategories)
+
+  // Check for matches using case-insensitive comparison
+  const hasMatch = filters.some((filter) => {
+    const filterLower = filter.toLowerCase().trim()
+    const match = uniqueSubcategories.some((subcategory) => {
+      const subcategoryLower = subcategory.toLowerCase().trim()
+      // Check for exact match or partial match
+      return (
+        subcategoryLower === filterLower ||
+        subcategoryLower.includes(filterLower) ||
+        filterLower.includes(subcategoryLower)
+      )
+    })
+
+    if (match) {
+      console.log(`✅ Found match for filter "${filter}" in business ${business.displayName || business.businessName}`)
+    }
+
+    return match
+  })
+
+  console.log(`Business ${business.displayName || business.businessName} matches filters: ${hasMatch}`)
+  return hasMatch
+}
+
 export default function AutomotiveServicesPage() {
   const { toast } = useToast()
   const fetchIdRef = useRef(0)
 
   const filterOptions = [
-    { id: "auto1", label: "Auto Repair", value: "Auto Repair" },
-    { id: "auto2", label: "Oil Change", value: "Oil Change" },
-    { id: "auto3", label: "Tire Service", value: "Tire Service" },
-    { id: "auto4", label: "Brake Service", value: "Brake Service" },
-    { id: "auto5", label: "Transmission Repair", value: "Transmission Repair" },
-    { id: "auto6", label: "Engine Repair", value: "Engine Repair" },
-    { id: "auto7", label: "Car Wash", value: "Car Wash" },
-    { id: "auto8", label: "Auto Detailing", value: "Auto Detailing" },
-    { id: "auto9", label: "Towing Service", value: "Towing Service" },
-    { id: "auto10", label: "Auto Body Shop", value: "Auto Body Shop" },
-    { id: "auto11", label: "Auto Glass Repair", value: "Auto Glass Repair" },
-    { id: "auto12", label: "Motorcycle Repair", value: "Motorcycle Repair" },
-    { id: "auto13", label: "RV Repair", value: "RV Repair" },
-    { id: "auto14", label: "Auto Parts", value: "Auto Parts" },
-    { id: "auto15", label: "Car Dealership", value: "Car Dealership" },
+    { id: "auto1", label: "General Auto Repair", value: "General Auto Repair" },
+    { id: "auto2", label: "Engine and Transmission", value: "Engine and Transmission" },
+    { id: "auto3", label: "Body Shop", value: "Body Shop" },
+    { id: "auto4", label: "Tire and Brakes", value: "Tire and Brakes" },
+    { id: "auto5", label: "Mufflers", value: "Mufflers" },
+    { id: "auto6", label: "Oil Change", value: "Oil Change" },
+    { id: "auto7", label: "Windshield Repair", value: "Windshield Repair" },
+    { id: "auto8", label: "Custom Paint", value: "Custom Paint" },
+    { id: "auto9", label: "Detailing Services", value: "Detailing Services" },
+    { id: "auto10", label: "Car Wash", value: "Car Wash" },
+    { id: "auto11", label: "Auto Parts", value: "Auto Parts" },
+    { id: "auto12", label: "ATV/Motorcycle Repair", value: "ATV/Motorcycle Repair" },
+    { id: "auto13", label: "Utility Vehicle Repair", value: "Utility Vehicle Repair" },
+    { id: "auto14", label: "RV Maintenance and Repair", value: "RV Maintenance and Repair" },
+    { id: "auto15", label: "Other Automotive/Motorcycle/RV, etc", value: "Other Automotive/Motorcycle/RV, etc" },
+    { id: "auto16", label: "Automotive Sales", value: "Automotive Sales" },
+    { id: "auto17", label: "Motor Sport/Utility Vehicle/RV Sales", value: "Motor Sport/Utility Vehicle/RV Sales" },
   ]
 
   // State for reviews dialog
@@ -112,32 +204,6 @@ export default function AutomotiveServicesPage() {
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
   const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
-
-  // Helper function for exact subcategory matching
-  const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
-    if (filters.length === 0) return true
-
-    console.log(`Checking business ${business.displayName || business.businessName} subcategories:`, {
-      subcategories: business.subcategories,
-      allSubcategories: business.allSubcategories,
-      services: business.services,
-      filters,
-    })
-
-    // Check subcategories array
-    if (business.subcategories && Array.isArray(business.subcategories)) {
-      const hasMatch = filters.some((filter) => business.subcategories!.includes(filter))
-      if (hasMatch) return true
-    }
-
-    // Check services array (fallback)
-    if (business.services && Array.isArray(business.services)) {
-      const hasMatch = filters.some((filter) => business.services!.includes(filter))
-      if (hasMatch) return true
-    }
-
-    return false
-  }
 
   // Filter handlers
   const handleFilterChange = (filterValue: string, checked: boolean) => {
@@ -525,7 +591,7 @@ export default function AutomotiveServicesPage() {
                                 fill="currentColor"
                                 viewBox="0 0 20 20"
                               >
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                               </svg>
                             ))}
                           </div>
@@ -534,7 +600,6 @@ export default function AutomotiveServicesPage() {
                           </span>
                         </div>
 
-                        {/* Display Subcategories */}
                         {(business.subcategories && business.subcategories.length > 0) ||
                         (business.services && business.services.length > 0) ? (
                           <div className="mt-3">
@@ -549,7 +614,7 @@ export default function AutomotiveServicesPage() {
                                   key={idx}
                                   className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
                                 >
-                                  {subcategory}
+                                  {getSubcategoryString(subcategory)}
                                 </span>
                               ))}
                             </div>

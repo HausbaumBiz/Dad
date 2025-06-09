@@ -23,11 +23,25 @@ interface Business {
   zipCode: string
   serviceArea?: string[] // Array of ZIP codes the business serves
   isNationwide?: boolean // Whether the business serves nationwide
-  subcategories?: string[]
-  allSubcategories?: string[]
+  subcategories?: any[] // Changed from string[] to any[] to handle objects
+  allSubcategories?: any[] // Changed from string[] to any[] to handle objects
   rating?: number
   reviews?: number
-  subcategory?: string
+  subcategory?: string | any // Can be string or object
+}
+
+// Helper function to extract string value from subcategory object
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
 }
 
 export default function ArtsEntertainmentPage() {
@@ -195,11 +209,31 @@ export default function ArtsEntertainmentPage() {
     const subcategories = business.subcategories || []
     const allSubcategories = business.allSubcategories || []
 
-    return (
-      subcategories.includes(filterValue) ||
-      allSubcategories.includes(filterValue) ||
-      (business as any).subcategory === filterValue
-    )
+    // Check subcategories array
+    for (const subcategory of subcategories) {
+      const subcategoryStr = getSubcategoryString(subcategory)
+      if (subcategoryStr === filterValue) {
+        return true
+      }
+    }
+
+    // Check allSubcategories array
+    for (const subcategory of allSubcategories) {
+      const subcategoryStr = getSubcategoryString(subcategory)
+      if (subcategoryStr === filterValue) {
+        return true
+      }
+    }
+
+    // Check business.subcategory field
+    if (business.subcategory) {
+      const subcategoryStr = getSubcategoryString(business.subcategory)
+      if (subcategoryStr === filterValue) {
+        return true
+      }
+    }
+
+    return false
   }
 
   // Handle filter selection
@@ -444,12 +478,12 @@ export default function ArtsEntertainmentPage() {
                       <div className="mt-3">
                         <p className="text-sm font-medium text-gray-700">Services:</p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {business.subcategories.map((service: string, idx: number) => (
+                          {business.subcategories.map((service: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {service}
+                              {getSubcategoryString(service)}
                             </span>
                           ))}
                         </div>

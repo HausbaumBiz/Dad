@@ -21,12 +21,26 @@ interface Business {
   zipCode: string
   serviceArea?: string[] // Direct array of ZIP codes
   isNationwide?: boolean // Direct boolean property
-  subcategories?: string[]
-  allSubcategories?: string[]
+  subcategories?: any[] // Changed from string[] to any[]
+  allSubcategories?: any[] // Changed from string[] to any[]
   rating?: number
   reviewCount?: number
   reviewsData?: any[]
   subcategory?: string
+}
+
+// Helper function to safely extract string from subcategory data
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
 }
 
 export default function RetailStoresPage() {
@@ -206,8 +220,8 @@ export default function RetailStoresPage() {
     const allSubcategories = business.allSubcategories || []
 
     return (
-      subcategories.includes(filterValue) ||
-      allSubcategories.includes(filterValue) ||
+      subcategories.some((subcat) => getSubcategoryString(subcat) === filterValue) ||
+      allSubcategories.some((subcat) => getSubcategoryString(subcat) === filterValue) ||
       (business as any).subcategory === filterValue
     )
   }
@@ -474,12 +488,12 @@ export default function RetailStoresPage() {
                       <div className="mt-3">
                         <p className="text-sm font-medium text-gray-700">Store Type:</p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.subcategories.map((subcategory: string, idx: number) => (
+                          {provider.subcategories.map((subcategory: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {subcategory}
+                              {getSubcategoryString(subcategory)}
                             </span>
                           ))}
                         </div>

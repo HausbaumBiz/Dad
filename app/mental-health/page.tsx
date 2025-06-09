@@ -97,6 +97,19 @@ export default function MentalHealthPage() {
     return matches
   }
 
+  // Add this helper function after the businessServesZipCode function and before the useEffect
+
+  // Helper function to extract string value from subcategory object or return the string itself
+  const getSubcategoryString = (subcategory: any): string => {
+    if (typeof subcategory === "string") {
+      return subcategory
+    } else if (subcategory && typeof subcategory === "object") {
+      // If it's an object with subcategory property, return that
+      return subcategory.subcategory || subcategory.category || "Unknown Service"
+    }
+    return "Unknown Service"
+  }
+
   useEffect(() => {
     async function fetchProviders() {
       const currentFetchId = ++fetchIdRef.current
@@ -178,9 +191,8 @@ export default function MentalHealthPage() {
   const hasExactSubcategoryMatch = (provider: any, filterValue: string): boolean => {
     // Check services array (which comes from subcategories)
     if (provider.services && Array.isArray(provider.services)) {
-      return provider.services.some((service) => service === filterValue)
+      return provider.services.some((service) => getSubcategoryString(service) === filterValue)
     }
-
     return false
   }
 
@@ -462,7 +474,7 @@ export default function MentalHealthPage() {
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {service}
+                              {getSubcategoryString(service)}
                             </span>
                           ))}
                         </div>

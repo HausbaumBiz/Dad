@@ -21,6 +21,20 @@ export default function RealEstatePage() {
     { id: "home6", label: "Other Home Buying and Selling", value: "Other Home Buying and Selling" },
   ]
 
+  // Helper function to safely extract string from subcategory data
+  const getSubcategoryString = (subcategory: any): string => {
+    if (typeof subcategory === "string") {
+      return subcategory
+    }
+
+    if (subcategory && typeof subcategory === "object") {
+      // Try to get the subcategory field first, then category, then fullPath
+      return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+    }
+
+    return "Unknown Service"
+  }
+
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
@@ -49,10 +63,10 @@ export default function RealEstatePage() {
     displayPhone?: string
     rating?: number
     reviews?: number
-    subcategories?: string[]
+    subcategories?: any[] // Changed from string[] to any[]
     serviceArea?: string[]
     isNationwide?: boolean
-    allSubcategories?: string[]
+    allSubcategories?: any[] // Changed from string[] to any[]
     subcategory?: string
   }
 
@@ -107,12 +121,12 @@ export default function RealEstatePage() {
   const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
     // Check subcategories array
     if (business.subcategories && Array.isArray(business.subcategories)) {
-      if (business.subcategories.includes(filterValue)) return true
+      if (business.subcategories.some((subcat) => getSubcategoryString(subcat) === filterValue)) return true
     }
 
     // Check allSubcategories array
     if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-      if (business.allSubcategories.includes(filterValue)) return true
+      if (business.allSubcategories.some((subcat) => getSubcategoryString(subcat) === filterValue)) return true
     }
 
     // Check subcategory field
@@ -415,12 +429,12 @@ export default function RealEstatePage() {
                       <div className="mt-3">
                         <p className="text-sm font-medium text-gray-700">Services:</p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.subcategories.map((subcategory: string, idx: number) => (
+                          {provider.subcategories.map((subcategory: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {subcategory}
+                              {getSubcategoryString(subcategory)}
                             </span>
                           ))}
                         </div>

@@ -26,6 +26,17 @@ interface Business {
   adDesignData?: any
 }
 
+// Helper function to extract string from subcategory (handles both string and object formats)
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+  if (typeof subcategory === "object" && subcategory !== null) {
+    return subcategory.subcategory || subcategory.category || "Unknown Service"
+  }
+  return "Unknown Service"
+}
+
 export default function MedicalPractitionersPage() {
   const filterOptions = [
     { id: "medical1", label: "Chiropractors", value: "Chiropractors" },
@@ -191,7 +202,7 @@ export default function MedicalPractitionersPage() {
   const hasExactSubcategoryMatch = (provider: any, filterValue: string): boolean => {
     // Check services array (which comes from subcategories)
     if (provider.services && Array.isArray(provider.services)) {
-      return provider.services.some((service) => service === filterValue)
+      return provider.services.some((service) => getSubcategoryString(service) === filterValue)
     }
 
     return false
@@ -481,7 +492,7 @@ export default function MedicalPractitionersPage() {
                             key={idx}
                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                           >
-                            {service}
+                            {getSubcategoryString(service)}
                           </span>
                         ))}
                       </div>

@@ -14,6 +14,20 @@ import { MapPin, Phone } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
 
+// Helper function to extract string from subcategory data
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
+}
+
 export default function PersonalAssistantsPage() {
   const { toast } = useToast()
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
@@ -177,11 +191,10 @@ export default function PersonalAssistantsPage() {
     })
   }
 
-  // Helper function for strict subcategory matching
-  const hasExactSubcategoryMatch = (businessSubcategories: string[], filter: string): boolean => {
+  const hasExactSubcategoryMatch = (businessSubcategories: any[], filter: string): boolean => {
     return businessSubcategories.some((subcategory) => {
-      // Normalize strings for comparison
-      const subcatNormalized = subcategory.trim().toLowerCase()
+      // Use helper function to get string value
+      const subcatNormalized = getSubcategoryString(subcategory).trim().toLowerCase()
       const filterNormalized = filter.trim().toLowerCase()
 
       // Only exact matches
@@ -278,9 +291,9 @@ export default function PersonalAssistantsPage() {
     phone?: string
     rating?: number
     reviewCount?: number
-    services?: string[]
-    subcategories?: string[]
-    allSubcategories?: string[]
+    services?: any[]
+    subcategories?: any[]
+    allSubcategories?: any[]
     zipCode?: string
     serviceArea?: string[]
     adDesignData?: {
@@ -608,7 +621,7 @@ export default function PersonalAssistantsPage() {
                             key={idx}
                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                           >
-                            {service}
+                            {getSubcategoryString(service)}
                           </span>
                         ))
                       ) : provider.subcategories && provider.subcategories.length > 0 ? (
@@ -617,7 +630,7 @@ export default function PersonalAssistantsPage() {
                             key={idx}
                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                           >
-                            {service}
+                            {getSubcategoryString(service)}
                           </span>
                         ))
                       ) : (

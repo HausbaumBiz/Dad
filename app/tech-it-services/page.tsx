@@ -27,8 +27,8 @@ interface Business {
   phone?: string
   rating?: number
   reviews?: number
-  services?: string[]
-  subcategories?: string[]
+  services?: any[]
+  subcategories?: any[]
   adDesignData?: {
     businessInfo?: {
       phone?: string
@@ -38,7 +38,7 @@ interface Business {
   }
   serviceArea?: string[]
   isNationwide?: boolean
-  allSubcategories?: string[]
+  allSubcategories?: any[]
 }
 
 export default function TechITServicesPage() {
@@ -69,6 +69,20 @@ export default function TechITServicesPage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
   const [showFiltered, setShowFiltered] = useState(false)
+
+  // Helper function to extract string value from subcategory object or string
+  const getSubcategoryString = (subcategory: any): string => {
+    if (typeof subcategory === "string") {
+      return subcategory
+    }
+
+    if (subcategory && typeof subcategory === "object") {
+      // Try to get the subcategory field first, then category, then fullPath
+      return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+    }
+
+    return "Unknown Service"
+  }
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -271,8 +285,11 @@ export default function TechITServicesPage() {
 
         return selectedFilters.some((selectedFilter) => {
           return providerSubcategories.some((subcategory) => {
+            // Get string value from subcategory
+            const subcategoryStr = getSubcategoryString(subcategory)
+
             // Normalize both strings for comparison
-            const normalizedSubcategory = subcategory.toLowerCase().trim()
+            const normalizedSubcategory = subcategoryStr.toLowerCase().trim()
             const normalizedFilter = selectedFilter.toLowerCase().trim()
 
             // Check for exact match or partial match
@@ -504,7 +521,7 @@ export default function TechITServicesPage() {
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {service}
+                              {getSubcategoryString(service)}
                             </span>
                           ))
                         ) : (

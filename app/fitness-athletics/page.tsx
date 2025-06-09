@@ -1,89 +1,52 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
+import { CategoryFilter } from "@/components/category-filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useToast } from "@/components/ui/use-toast"
-import Image from "next/image"
+import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, Phone } from "lucide-react"
-import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
-import { Checkbox } from "@/components/ui/checkbox"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+
+// Enhanced Business interface
+interface Business {
+  id: string
+  displayName?: string
+  businessName: string
+  displayLocation?: string
+  displayPhone?: string
+  rating?: number
+  reviews?: number
+  subcategories?: string[]
+  businessDescription?: string
+  zipCode?: string
+  serviceArea?: string[]
+  isNationwide?: boolean
+  adDesignData?: any
+}
+
+// Add a helper function to extract subcategory strings
+// Add this function before the FitnessAthleticsPage component
+
+function getSubcategoryString(subcategory: any): string {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  // Handle object format with various possible properties
+  if (typeof subcategory === "object" && subcategory !== null) {
+    // Return the most specific value available
+    return (
+      subcategory.subcategory || subcategory.name || subcategory.fullPath || subcategory.category || "Unknown Service"
+    )
+  }
+
+  return "Unknown Service"
+}
 
 export default function FitnessAthleticsPage() {
-  const { toast } = useToast()
-
-  // Add fetchIdRef for race condition prevention
-  const fetchIdRef = useRef(0)
-
-  // Enhanced Business interface
-  interface Business {
-    id: string
-    displayName?: string
-    businessName?: string
-    displayLocation?: string
-    displayCity?: string
-    displayState?: string
-    city?: string
-    state?: string
-    zipCode?: string
-    displayPhone?: string
-    phone?: string
-    rating?: number
-    reviews?: number
-    subcategories?: string[]
-    allSubcategories?: string[]
-    subcategory?: string
-    serviceArea?: string[]
-    isNationwide?: boolean
-  }
-
-  // Helper function to check if business serves the zip code
-  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
-    console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
-      isNationwide: business.isNationwide,
-      serviceArea: business.serviceArea,
-      primaryZip: business.zipCode,
-    })
-
-    // Check if business serves nationwide
-    if (business.isNationwide) {
-      console.log(`✓ Business serves nationwide`)
-      return true
-    }
-
-    // Check if zip code is in service area
-    if (business.serviceArea && Array.isArray(business.serviceArea)) {
-      const serves = business.serviceArea.includes(zipCode)
-      console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
-      return serves
-    }
-
-    // Fallback to primary zip code
-    const matches = business.zipCode === zipCode
-    console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
-    return matches
-  }
-
-  // Add phone number formatting function
-  const formatPhoneNumber = (phone: string | null | undefined): string => {
-    if (!phone) return "No phone provided"
-
-    // Remove all non-numeric characters
-    const cleaned = phone.replace(/\D/g, "")
-
-    // Check if it's a valid 10-digit US phone number
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
-    }
-
-    // Return original if not a standard format
-    return phone
-  }
-
   const filterOptions = [
     { id: "athletics1", label: "Baseball/Softball", value: "Baseball/Softball" },
     { id: "athletics2", label: "Golf", value: "Golf" },
@@ -101,318 +64,201 @@ export default function FitnessAthleticsPage() {
     { id: "athletics14", label: "Other Athletics & Fitness", value: "Other Athletics & Fitness" },
   ]
 
+  // State for reviews dialog
+  const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+
+  // State for business profile dialog
+  const [selectedBusiness, setSelectedBusiness] = useState(null)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-  const [selectedProvider, setSelectedProvider] = useState<any>(null)
-  const [businesses, setBusinesses] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
-  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  const [businesses, setBusinesses] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Filter state management
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
-  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
-  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
-  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
-  // Function to check if business has exact subcategory match
-  const hasExactSubcategoryMatch = (business: Business, subcategory: string): boolean => {
-    if (business.subcategories && Array.isArray(business.subcategories)) {
-      return business.subcategories.some((sub) => sub.toLowerCase() === subcategory.toLowerCase())
-    }
-    return false
-  }
-
-  // Filter handlers
-  const handleFilterChange = (subcategory: string) => {
-    setSelectedFilters((prev) =>
-      prev.includes(subcategory) ? prev.filter((f) => f !== subcategory) : [...prev, subcategory],
-    )
-  }
-
-  const handleApplyFilters = () => {
-    setAppliedFilters([...selectedFilters])
-
-    let filtered = [...allBusinesses]
-    if (selectedFilters.length > 0) {
-      filtered = allBusinesses.filter((business) =>
-        selectedFilters.every((filter) => hasExactSubcategoryMatch(business, filter)),
-      )
-    }
-
-    setFilteredBusinesses(filtered)
-
-    toast({
-      title: "Filters Applied",
-      description: `Showing businesses with ${selectedFilters.length} selected service${selectedFilters.length !== 1 ? "s" : ""}`,
-    })
-  }
-
-  const handleClearFilters = () => {
-    setSelectedFilters([])
-    setAppliedFilters([])
-    setFilteredBusinesses([...allBusinesses])
-
-    toast({
-      title: "Filters Cleared",
-      description: "Showing all fitness & athletics businesses",
-    })
-  }
-
+  // Load user zip code from localStorage
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
       setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
     }
   }, [])
 
   useEffect(() => {
     async function fetchBusinesses() {
-      const currentFetchId = ++fetchIdRef.current
-      console.log(`[Fitness] Starting fetch ${currentFetchId} for zip code:`, userZipCode)
-
-      setIsLoading(true)
+      setLoading(true)
       try {
-        let result = await getBusinessesForCategoryPage("/fitness-athletics")
-
-        // Only update if this is still the current request
-        if (currentFetchId !== fetchIdRef.current) {
-          console.log(`[Fitness] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
-          return
-        }
-
-        console.log(`[Fitness] Fetch ${currentFetchId} got ${result.length} businesses`)
-
-        // Filter by zip code if available
-        if (userZipCode) {
-          const originalCount = result.length
-          result = result.filter((business: Business) => businessServesZipCode(business, userZipCode))
-          console.log(`[Fitness] Filtered from ${originalCount} to ${result.length} businesses for zip ${userZipCode}`)
-        }
-
+        const result = await getBusinessesForCategoryPage("/fitness-athletics")
         setBusinesses(result)
-        setAllBusinesses(result)
-        setFilteredBusinesses(result)
-        setError(null)
-      } catch (err) {
-        // Only update error if this is still the current request
-        if (currentFetchId === fetchIdRef.current) {
-          console.error(`[Fitness] Fetch ${currentFetchId} error:`, err)
-          setError("Failed to load businesses")
-          toast({
-            title: "Error loading businesses",
-            description: "There was a problem loading businesses. Please try again later.",
-            variant: "destructive",
-          })
-        }
+      } catch (error) {
+        console.error("Error fetching businesses:", error)
+        setError("Failed to load businesses")
       } finally {
-        // Only update loading if this is still the current request
-        if (currentFetchId === fetchIdRef.current) {
-          setIsLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     fetchBusinesses()
-  }, [toast, userZipCode])
+  }, [userZipCode])
 
-  const handleOpenReviews = (provider: any) => {
+  // Function to handle opening reviews dialog
+  const handleOpenReviews = (provider) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
   }
 
-  const handleOpenProfile = (provider: any) => {
-    setSelectedProvider(provider)
+  // Function to handle opening business profile dialog
+  const handleViewProfile = (business) => {
+    setSelectedBusiness(business)
     setIsProfileDialogOpen(true)
+  }
+
+  // Also update the isServiceMatched function to use this helper
+  // Replace the current isServiceMatched function with:
+
+  // Function to check if a service matches any selected filter
+  const isServiceMatched = (service) => {
+    if (selectedFilters.length === 0) return false
+
+    const serviceStr = typeof service === "string" ? service : getSubcategoryString(service)
+
+    return selectedFilters.some((filterId) => {
+      const filterOption = filterOptions.find((opt) => opt.id === filterId)
+      if (!filterOption) return false
+
+      return filterOption.value === serviceStr || serviceStr.includes(filterOption.value)
+    })
   }
 
   return (
     <CategoryLayout title="Athletics, Fitness & Dance Instruction" backLink="/" backText="Categories">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        <div className="flex justify-center">
-          <Image
-            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/baseball-WpgfS7MciTxGMJwNZTzlAFewS1DPX0.png"
-            alt="Athletics and Fitness"
-            width={500}
-            height={500}
-            className="rounded-lg shadow-lg max-w-full h-auto"
-          />
-        </div>
+      <CategoryFilter options={filterOptions} />
 
-        <div className="space-y-6">
-          <p className="text-lg text-gray-700">
-            Find qualified coaches, trainers, and fitness professionals in your area. Browse options below or use
-            filters to narrow your search.
-          </p>
-
-          <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
-            <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
-            <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Read reviews from other customers</li>
-              <li>View business videos showcasing work and staff</li>
-              <li>Access exclusive coupons directly on each business listing</li>
-              <li>Discover job openings from businesses you'd trust to hire yourself</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Replace CategoryFilter with checkbox interface */}
-      <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h4 className="text-lg font-semibold text-gray-800">Filter by Service Type</h4>
-          <div className="flex gap-2">
-            <Button onClick={handleApplyFilters} disabled={selectedFilters.length === 0} size="sm">
-              Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
-            </Button>
-            {appliedFilters.length > 0 && (
-              <Button onClick={handleClearFilters} variant="outline" size="sm">
-                Clear Filters
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {filterOptions.map((option) => (
-            <label
-              key={option.id}
-              className="flex items-center space-x-2 bg-gray-50 rounded-md border border-gray-200 px-3 py-2 hover:bg-gray-100 transition-colors cursor-pointer"
-            >
-              <Checkbox
-                id={option.id}
-                checked={selectedFilters.includes(option.value)}
-                onCheckedChange={() => handleFilterChange(option.value)}
-              />
-              <span className="text-sm font-medium text-gray-700">{option.label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {appliedFilters.length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800 font-medium">Active Filters: {appliedFilters.join(", ")}</p>
-        </div>
-      )}
-
+      {/* Zip Code Status Indicator */}
       {userZipCode && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
-          <p className="text-sm text-blue-700">
-            <span className="font-medium">Showing businesses that serve zip code:</span> {userZipCode}
-            <span className="text-xs block mt-1">Includes businesses with {userZipCode} in their service area</span>
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              localStorage.removeItem("savedZipCode")
-              setUserZipCode(null)
-            }}
-            className="text-blue-700 border-blue-300 hover:bg-blue-100"
-          >
-            Clear Filter
-          </Button>
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-blue-800">Showing businesses that service: {userZipCode}</p>
+              <p className="text-sm text-blue-700">Only businesses available in your area are displayed</p>
+            </div>
+          </div>
         </div>
       )}
 
-      {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-          <p>Loading businesses...</p>
-        </div>
-      ) : filteredBusinesses.length > 0 ? (
-        <div className="space-y-6">
-          {filteredBusinesses.map((business) => (
-            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+      <div className="space-y-6">
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-600">{error}</p>
+          </div>
+        ) : businesses.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-12 h-12 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Fitness & Athletics Services Found</h3>
+            <p className="text-gray-600 mb-4">
+              We're currently building our network of fitness professionals and athletic instructors in your area.
+            </p>
+            <Button>Register Your Business</Button>
+          </div>
+        ) : (
+          businesses.map((provider) => (
+            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold">
+                      {provider.displayName || provider.businessName || provider.name || "Business Name"}
+                    </h3>
                     <p className="text-gray-600 text-sm mt-1">
-                      {business.displayLocation ||
-                        (business.displayCity && business.displayState
-                          ? `${business.displayCity}, ${business.displayState}`
-                          : business.city && business.state
-                            ? `${business.city}, ${business.state}`
-                            : business.displayCity ||
-                              business.city ||
-                              business.displayState ||
-                              business.state ||
-                              `Zip: ${business.zipCode}`)}
+                      {provider.displayLocation || provider.location || "Location not specified"}
                     </p>
-
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div className="text-xs text-green-600 mt-1">
-                        {business.isNationwide ? (
-                          <span>✓ Serves nationwide</span>
-                        ) : business.serviceArea?.includes(userZipCode) ? (
-                          <span>✓ Serves {userZipCode} area</span>
-                        ) : business.zipCode === userZipCode ? (
-                          <span>✓ Located in {userZipCode}</span>
-                        ) : null}
-                      </div>
+                    {provider.displayPhone && (
+                      <p className="text-gray-600 text-sm mt-1">
+                        <span className="font-medium">Phone:</span> {provider.displayPhone}
+                      </p>
                     )}
-
-                    {/* Add phone number display */}
-                    {(business.displayPhone || business.phone) && (
-                      <div className="flex items-center mt-1">
-                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
-                        <span className="text-gray-600 text-sm">
-                          {formatPhoneNumber(business.displayPhone || business.phone)}
-                        </span>
-                      </div>
-                    )}
-
                     <div className="flex items-center mt-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(business.rating || 4.5) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${
+                              provider.rating && i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"
+                            }`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.588h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {business.rating || 4.5} ({business.reviews || 0} reviews)
+                        {provider.rating || 0} ({provider.reviews || 0} reviews)
                       </span>
                     </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {business.subcategories && business.subcategories.length > 0 ? (
-                          business.subcategories.map((service: string, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {service}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            Fitness & Athletics
-                          </span>
-                        )}
+                    {/* Display subcategories if available */}
+                    {provider.subcategories && provider.subcategories.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700">Services:</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {provider.subcategories.map((subcategory, idx) => {
+                            const subcategoryText =
+                              typeof subcategory === "string" ? subcategory : getSubcategoryString(subcategory)
+
+                            return (
+                              <span
+                                key={idx}
+                                className={`text-xs px-2 py-1 rounded-full ${
+                                  isServiceMatched(subcategoryText)
+                                    ? "bg-blue-100 text-blue-800 font-medium"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {subcategoryText}
+                              </span>
+                            )
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
+                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
                     <Button
                       variant="outline"
                       className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(business)}
+                      onClick={() => handleViewProfile(provider)}
                     >
                       View Profile
                     </Button>
@@ -420,47 +266,25 @@ export default function FitnessAthleticsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-8 max-w-2xl mx-auto">
-            <h3 className="text-xl font-medium text-orange-800 mb-2">No Fitness & Athletics Providers Found</h3>
-            <p className="text-orange-700 mb-4">
-              {userZipCode
-                ? `We're building our network of certified fitness professionals and athletic instructors that serve the ${userZipCode} area.`
-                : "We're building our network of certified fitness professionals and athletic instructors in your area."}
-            </p>
-            <div className="bg-white rounded border border-orange-100 p-4">
-              <p className="text-gray-700 font-medium">Are you a fitness professional or athletic instructor?</p>
-              <p className="text-gray-600 mt-1">
-                Join Hausbaum to connect with clients who need your fitness expertise and training services.
-              </p>
-              <Button className="mt-3" asChild>
-                <a href="/business-register">Register Your Fitness Business</a>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
-      {selectedProvider && (
-        <ReviewsDialog
-          isOpen={isReviewsDialogOpen}
-          onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.displayName || selectedProvider.businessName || selectedProvider.name}
-          businessId={selectedProvider.id}
-          reviews={[]}
-        />
-      )}
+      {/* Reviews Dialog */}
+      <ReviewsDialog
+        isOpen={isReviewsDialogOpen}
+        onClose={() => setIsReviewsDialogOpen(false)}
+        providerName={selectedProvider?.name}
+        reviews={selectedProvider?.reviews || []}
+      />
 
-      {selectedProvider && (
-        <BusinessProfileDialog
-          isOpen={isProfileDialogOpen}
-          onClose={() => setIsProfileDialogOpen(false)}
-          businessId={selectedProvider.id}
-        />
-      )}
+      {/* Business Profile Dialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusiness?.id}
+        businessName={selectedBusiness?.name}
+      />
 
       <Toaster />
     </CategoryLayout>

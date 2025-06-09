@@ -12,6 +12,20 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { toast } from "@/components/ui/use-toast"
 
+// Helper function to extract string from subcategory (handles both string and object formats)
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
+}
+
 // Enhanced Business interface
 interface Business {
   id: string
@@ -21,7 +35,7 @@ interface Business {
   displayLocation?: string
   rating?: number
   reviews?: number
-  subcategories?: string[]
+  subcategories?: any[] // Changed from string[] to any[]
   businessDescription?: string
   zipCode?: string
   serviceArea?: string[]
@@ -32,7 +46,7 @@ interface Business {
       state?: string
     }
   }
-  allSubcategories?: string[]
+  allSubcategories?: any[] // Changed from string[] to any[]
   subcategory?: string
 }
 
@@ -181,7 +195,7 @@ export default function FuneralServicesPage() {
 
     const allSubs = [...subcategories, ...allSubcategories, subcategory].filter(Boolean)
 
-    return allSubs.some((sub) => sub.toLowerCase().trim() === filterValue.toLowerCase().trim())
+    return allSubs.some((sub) => getSubcategoryString(sub).toLowerCase().trim() === filterValue.toLowerCase().trim())
   }
 
   const handleFilterChange = (filterValue: string, checked: boolean) => {
@@ -431,12 +445,12 @@ export default function FuneralServicesPage() {
                           <span className="text-sm font-medium text-gray-700">Services:</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {provider.subcategories.map((subcategory: string, idx: number) => (
+                          {provider.subcategories.map((subcategory: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
                             >
-                              {subcategory}
+                              {getSubcategoryString(subcategory)}
                             </span>
                           ))}
                         </div>

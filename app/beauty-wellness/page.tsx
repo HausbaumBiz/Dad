@@ -59,6 +59,40 @@ function formatPhoneNumber(phoneNumberString: string) {
   return phoneNumberString
 }
 
+// Add this helper function after the formatPhoneNumber function and before the BeautyWellnessPage component
+
+// Helper function to extract string value from subcategory (which might be an object)
+function getSubcategoryString(subcategory: any): string {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Extract the subcategory name from the object
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
+}
+
+// Now update the hasExactSubcategoryMatch function to use the helper
+const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+  // Check subcategories array
+  if (business.subcategories && Array.isArray(business.subcategories)) {
+    if (business.subcategories.some((sub) => getSubcategoryString(sub) === filterValue)) return true
+  }
+
+  // Check allSubcategories array
+  if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+    if (business.allSubcategories.some((sub) => getSubcategoryString(sub) === filterValue)) return true
+  }
+
+  // Check subcategory field
+  if (getSubcategoryString(business.subcategory) === filterValue) return true
+
+  return false
+}
+
 export default function BeautyWellnessPage() {
   const { toast } = useToast()
   const fetchIdRef = useRef(0)
@@ -206,24 +240,6 @@ export default function BeautyWellnessPage() {
 
     fetchBusinesses()
   }, [userZipCode])
-
-  // Helper function to check if business has exact subcategory match
-  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
-    // Check subcategories array
-    if (business.subcategories && Array.isArray(business.subcategories)) {
-      if (business.subcategories.includes(filterValue)) return true
-    }
-
-    // Check allSubcategories array
-    if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-      if (business.allSubcategories.includes(filterValue)) return true
-    }
-
-    // Check subcategory field
-    if (business.subcategory === filterValue) return true
-
-    return false
-  }
 
   const applyFilters = () => {
     console.log("Applying filters:", selectedFilters)
@@ -454,17 +470,17 @@ export default function BeautyWellnessPage() {
                       <p className="text-sm font-medium text-gray-700">Services:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service: string, idx: number) => (
+                          business.allSubcategories.map((service: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
-                              {service}
+                              {getSubcategoryString(service)}
                             </span>
                           ))
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {business.subcategory || "Beauty & Wellness"}
+                            {getSubcategoryString(business.subcategory) || "Beauty & Wellness"}
                           </span>
                         )}
                       </div>

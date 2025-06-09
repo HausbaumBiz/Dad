@@ -29,8 +29,8 @@ interface Business {
   phone?: string
   city?: string
   state?: string
-  subcategories?: string[]
-  allSubcategories?: string[]
+  subcategories?: any[]
+  allSubcategories?: any[]
   subcategory?: string
 }
 
@@ -47,6 +47,20 @@ function formatPhoneNumber(phone: string): string {
 
   // Return original if not a standard format
   return phone
+}
+
+// Helper function to extract string value from subcategory object or string
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+
+  return "Unknown Service"
 }
 
 export default function TravelVacationPage() {
@@ -209,9 +223,9 @@ export default function TravelVacationPage() {
     const allSubcategories = business.allSubcategories || []
 
     return (
-      subcategories.includes(filterValue) ||
-      allSubcategories.includes(filterValue) ||
-      (business as any).subcategory === filterValue
+      subcategories.some((subcat) => getSubcategoryString(subcat) === filterValue) ||
+      allSubcategories.some((subcat) => getSubcategoryString(subcat) === filterValue) ||
+      getSubcategoryString(business.subcategory) === filterValue
     )
   }
 
@@ -224,7 +238,7 @@ export default function TravelVacationPage() {
     const allCategories = [...new Set([...subcategories, ...allSubcategories])]
 
     // Filter out empty strings and undefined values
-    return allCategories.filter(Boolean)
+    return allCategories.filter(Boolean).map(getSubcategoryString)
   }
 
   // Handle filter selection
