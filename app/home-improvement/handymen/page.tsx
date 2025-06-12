@@ -197,7 +197,7 @@ export default function HandymenPage() {
                   business.businessName ||
                   "Business Name",
                 location: location,
-                rating: business.rating || 4.5,
+                rating: business.rating || 0,
                 reviews: business.reviewCount || 0,
                 services: business.subcategories,
                 phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
@@ -252,7 +252,7 @@ export default function HandymenPage() {
                   business.businessName ||
                   "Business Name",
                 location: location,
-                rating: business.rating || 4.5,
+                rating: business.rating || 0,
                 reviews: business.reviewCount || 0,
                 services: business.subcategories,
                 phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
@@ -402,7 +402,7 @@ export default function HandymenPage() {
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${provider.reviews > 0 && i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -411,7 +411,9 @@ export default function HandymenPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
+                        {provider.reviews > 0
+                          ? `${provider.rating} (${provider.reviews} ${provider.reviews === 1 ? "review" : "reviews"})`
+                          : "No reviews yet"}
                       </span>
                     </div>
 

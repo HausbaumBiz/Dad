@@ -15,6 +15,21 @@ export interface JobBenefit {
   details?: string
 }
 
+export interface ZipCodeData {
+  zip: string
+  city: string
+  state: string
+  latitude: string
+  longitude: string
+}
+
+export interface JobServiceArea {
+  isNationwide: boolean
+  zipCodes: ZipCodeData[]
+  centerZipCode?: string
+  radiusMiles?: number
+}
+
 export interface JobListing {
   id: string
   businessId: string
@@ -51,6 +66,9 @@ export interface JobListing {
 
   // Benefits
   benefits: Record<string, JobBenefit>
+
+  // Service Area (NEW)
+  serviceArea: JobServiceArea
 }
 
 // Then modify the saveJobListing function to use Cloudflare Images
@@ -159,12 +177,32 @@ export async function saveJobListing(
     // Add the job ID to the list and save back to Redis
     await kv.set(jobsKey, [...existingJobs, jobId])
 
+    // NEW: Index job by service area for fast lookups
+    if (jobListing.serviceArea.isNationwide) {
+      // Add to nationwide jobs index
+      await kv.sadd("jobs:nationwide", `${businessId}:${jobId}`)
+      console.log(`Added job to nationwide index`)
+    } else if (jobListing.serviceArea.zipCodes && jobListing.serviceArea.zipCodes.length > 0) {
+      // Index job by each ZIP code it serves
+      for (const zipData of jobListing.serviceArea.zipCodes) {
+        await kv.sadd(`zipcode:${zipData.zip}:jobs`, `${businessId}:${jobId}`)
+        console.log(`Indexed job under ZIP code: ${zipData.zip}`)
+      }
+
+      // Store job's ZIP codes for fast lookup
+      await kv.set(`job:${businessId}:${jobId}:zipcodes`, JSON.stringify(jobListing.serviceArea.zipCodes))
+    }
+
+    // Store job service area metadata
+    await kv.set(`job:${businessId}:${jobId}:servicearea`, JSON.stringify(jobListing.serviceArea))
+
     // Log the full job data for debugging
     console.log(`Job listing saved: `, {
       id: jobId,
       businessId,
       jobsKey,
       jobDataKeys: Object.keys(jobData),
+      serviceArea: jobListing.serviceArea,
     })
 
     // Revalidate paths that might display this job
@@ -261,6 +299,14 @@ export async function getBusinessJobs(businessId: string): Promise<JobListing[]>
             await kv.set(updatedJobKey, JSON.stringify(job))
           }
 
+          // Handle jobs created before service area system was added
+          if (!job.serviceArea) {
+            job.serviceArea = {
+              isNationwide: false,
+              zipCodes: [],
+            }
+          }
+
           // Don't automatically update expiration status here - let the UI calculate it dynamically
 
           jobs.push(job)
@@ -322,6 +368,25 @@ export async function removeJobListing(
       } catch (error) {
         console.error("Error parsing job data:", error)
       }
+    }
+
+    // Clean up service area indexes before deleting the job
+    if (job && job.serviceArea) {
+      if (job.serviceArea.isNationwide) {
+        // Remove from nationwide jobs index
+        await kv.srem("jobs:nationwide", `${businessId}:${jobId}`)
+        console.log(`Removed job from nationwide index`)
+      } else if (job.serviceArea.zipCodes && job.serviceArea.zipCodes.length > 0) {
+        // Remove from ZIP code indexes
+        for (const zipData of job.serviceArea.zipCodes) {
+          await kv.srem(`zipcode:${zipData.zip}:jobs`, `${businessId}:${jobId}`)
+          console.log(`Removed job from ZIP code index: ${zipData.zip}`)
+        }
+      }
+
+      // Clean up service area metadata
+      await kv.del(`job:${businessId}:${jobId}:zipcodes`)
+      await kv.del(`job:${businessId}:${jobId}:servicearea`)
     }
 
     // Delete the job from Redis
@@ -589,6 +654,56 @@ export async function getActiveBusinessJobs(businessId: string): Promise<JobList
     return activeJobs
   } catch (error) {
     console.error("Error getting active business jobs:", error)
+    return []
+  }
+}
+
+// NEW: Function to search jobs by ZIP code
+export async function searchJobsByZipCode(zipCode: string): Promise<JobListing[]> {
+  try {
+    const jobs: JobListing[] = []
+
+    // Get jobs that serve this specific ZIP code
+    const jobIds = await kv.smembers(`zipcode:${zipCode}:jobs`)
+
+    // Get nationwide jobs
+    const nationwideJobIds = await kv.smembers("jobs:nationwide")
+
+    // Combine all job IDs
+    const allJobIds = [...new Set([...jobIds, ...nationwideJobIds])]
+
+    for (const jobRef of allJobIds) {
+      const [businessId, jobId] = jobRef.split(":")
+      const jobKey = `job:${businessId}:${jobId}`
+      const jobData = await kv.get(jobKey)
+
+      if (jobData) {
+        try {
+          let job: JobListing
+          if (typeof jobData === "string") {
+            job = JSON.parse(jobData) as JobListing
+          } else {
+            job = jobData as JobListing
+          }
+
+          // Only include active (non-expired) jobs
+          const expired = await isJobExpired(job)
+          if (!expired) {
+            jobs.push(job)
+          }
+        } catch (error) {
+          console.error(`Error parsing job data for ${jobRef}:`, error)
+        }
+      }
+    }
+
+    return jobs.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return dateB - dateA
+    })
+  } catch (error) {
+    console.error("Error searching jobs by ZIP code:", error)
     return []
   }
 }

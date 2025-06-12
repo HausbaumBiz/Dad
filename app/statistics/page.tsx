@@ -951,6 +951,16 @@ export default function StatisticsPage() {
                           <p className="text-xs text-gray-500">
                             Posted: {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Unknown date"}
                           </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <MapPin className="h-3 w-3 text-gray-400" />
+                            <span className="text-xs text-gray-600">
+                              {job.serviceArea?.isNationwide
+                                ? "Nationwide"
+                                : job.serviceArea?.zipCodes?.length
+                                  ? `${job.serviceArea.zipCodes.length} ZIP code${job.serviceArea.zipCodes.length !== 1 ? "s" : ""}`
+                                  : "No service area set"}
+                            </span>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {renderJobStatus(job)}

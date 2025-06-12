@@ -187,7 +187,7 @@ export default function CleaningPage() {
               name: business.displayName || business.businessName,
               location: business.displayLocation || `${business.city || ""}, ${business.state || ""}`,
               phone: business.displayPhone || business.phone,
-              rating: business.rating || 4.5,
+              rating: business.rating || 0,
               reviews: business.reviewCount || 0,
               services: serviceTags,
               // Keep the original business data for the profile dialog
@@ -210,7 +210,7 @@ export default function CleaningPage() {
               name: business.displayName || business.businessName,
               location: business.displayLocation || `${business.city || ""}, ${business.state || ""}`,
               phone: business.displayPhone || business.phone,
-              rating: business.rating || 4.5,
+              rating: business.rating || 0,
               reviews: business.reviewCount || 0,
               services: serviceTags,
               // Keep the original business data for the profile dialog
@@ -389,7 +389,7 @@ export default function CleaningPage() {
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${provider.reviews > 0 && i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -398,7 +398,9 @@ export default function CleaningPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
+                        {provider.reviews > 0
+                          ? `${provider.rating} (${provider.reviews} ${provider.reviews === 1 ? "review" : "reviews"})`
+                          : "No reviews yet"}
                       </span>
                     </div>
 

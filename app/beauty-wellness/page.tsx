@@ -453,7 +453,7 @@ export default function BeautyWellnessPage() {
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(business.rating || 4.5) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${business.reviews && business.reviews > 0 && i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -462,7 +462,9 @@ export default function BeautyWellnessPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {business.rating || 4.5} ({business.reviews || 0} reviews)
+                        {business.reviews && business.reviews > 0
+                          ? `${business.rating || 0} (${business.reviews} reviews)`
+                          : "No reviews yet"}
                       </span>
                     </div>
 

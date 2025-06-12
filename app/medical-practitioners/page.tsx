@@ -157,8 +157,8 @@ export default function MedicalPractitionersPage() {
               business.displayLocation ||
               `${business.displayCity || ""}, ${business.displayState || ""}`.trim() ||
               `Zip: ${business.zipCode}`,
-            rating: 4.5, // Default rating - you can enhance this later
-            reviews: 12, // Default review count - you can enhance this later
+            rating: 0, // Changed from 4.5 to 0 - no demo rating
+            reviews: 0, // Changed from 12 to 0 - no demo reviews
             services: business.subcategories || ["General Practice"],
             // Get phone from ad design data if available, otherwise use registration phone
             phone: business.adDesignData?.businessInfo?.phone || business.phone || "No phone provided",
@@ -471,7 +471,11 @@ export default function MedicalPractitionersPage() {
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${
+                              provider.reviews > 0 && i < Math.floor(provider.rating)
+                                ? "text-yellow-400"
+                                : "text-gray-300"
+                            }`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -480,7 +484,7 @@ export default function MedicalPractitionersPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
+                        {provider.reviews > 0 ? `${provider.rating} (${provider.reviews} reviews)` : "No reviews yet"}
                       </span>
                     </div>
 

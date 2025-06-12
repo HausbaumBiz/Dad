@@ -249,16 +249,24 @@ export async function getBusinessZipCodes(): Promise<{
 
         if (keyType === "set") {
           const zipCodeStrings = await kv.smembers(`business:${business.id}:zipcodes:set`)
-          if (zipCodeStrings && zipCodeStrings.length > 0) {
+
+          // Ensure zipCodeStrings is an array before calling map
+          if (zipCodeStrings && Array.isArray(zipCodeStrings) && zipCodeStrings.length > 0) {
             // Convert simple strings to ZipCodeData objects
             parsedZipCodes = zipCodeStrings.map((zip) => ({
-              zip,
+              zip: String(zip), // Ensure it's a string
               // These fields will be empty but that's OK for now
               city: "",
               state: "",
               latitude: 0,
               longitude: 0,
             }))
+          } else {
+            console.log(`ZIP code strings is not a valid array:`, {
+              type: typeof zipCodeStrings,
+              isArray: Array.isArray(zipCodeStrings),
+              value: zipCodeStrings,
+            })
           }
         }
       } catch (setError) {
@@ -329,16 +337,24 @@ export async function getBusinessZipCodesById(businessId: string): Promise<{
 
         if (keyType === "set") {
           const zipCodeStrings = await kv.smembers(`business:${businessId}:zipcodes:set`)
-          if (zipCodeStrings && zipCodeStrings.length > 0) {
+
+          // Ensure zipCodeStrings is an array before calling map
+          if (zipCodeStrings && Array.isArray(zipCodeStrings) && zipCodeStrings.length > 0) {
             // Convert simple strings to ZipCodeData objects
             parsedZipCodes = zipCodeStrings.map((zip) => ({
-              zip,
+              zip: String(zip), // Ensure it's a string
               // These fields will be empty but that's OK for now
               city: "",
               state: "",
               latitude: 0,
               longitude: 0,
             }))
+          } else {
+            console.log(`ZIP code strings is not a valid array:`, {
+              type: typeof zipCodeStrings,
+              isArray: Array.isArray(zipCodeStrings),
+              value: zipCodeStrings,
+            })
           }
         }
       } catch (setError) {

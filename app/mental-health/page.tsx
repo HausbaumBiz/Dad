@@ -156,7 +156,7 @@ export default function MentalHealthPage() {
           name: business.displayName || business.businessName,
           location: business.displayLocation || `${business.city}, ${business.state}`,
           phone: business.displayPhone || business.phone,
-          rating: 4.5, // Default rating since we don't have reviews yet
+          rating: 0, // Remove default rating - will be calculated from actual reviews
           reviews: 0, // Default review count
           services: business.subcategories || ["Mental Health Services"],
           adDesignData: business.adDesignData,
@@ -452,7 +452,11 @@ export default function MentalHealthPage() {
                         {[...Array(5)].map((_, i) => (
                           <svg
                             key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-4 h-4 ${
+                              provider.reviews > 0 && i < Math.floor(provider.rating)
+                                ? "text-yellow-400"
+                                : "text-gray-300"
+                            }`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -461,7 +465,7 @@ export default function MentalHealthPage() {
                         ))}
                       </div>
                       <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating} ({provider.reviews} reviews)
+                        {provider.reviews > 0 ? `${provider.rating} (${provider.reviews} reviews)` : "No reviews yet"}
                       </span>
                     </div>
 

@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Check, X, Upload, Eye, Info, Edit } from "lucide-react"
+import { Check, X, Upload, Eye, Info, Edit, MapPin, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -13,6 +13,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { saveJobListing } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
+
+// Define the ZipCodeData type
+interface ZipCodeData {
+  zip: string
+  city: string
+  state: string
+  latitude: string
+  longitude: string
+}
 
 export default function JobListingPage() {
   const [payType, setPayType] = useState<string | null>(null)
@@ -30,6 +39,13 @@ export default function JobListingPage() {
   const [businessId, setBusinessId] = useState<string>("demo-business") // Default business ID
   const [savedJobId, setSavedJobId] = useState<string | null>(null) // To store the saved job ID
   const [showDebugInfo, setShowDebugInfo] = useState(false) // For debugging
+
+  // Add service area state
+  const [isNationwide, setIsNationwide] = useState(false)
+  const [selectedZipCodes, setSelectedZipCodes] = useState<ZipCodeData[]>([])
+  const [zipSearchRadius, setZipSearchRadius] = useState(25)
+  const [centerZipCode, setCenterZipCode] = useState("")
+  const [isLoadingZipCodes, setIsLoadingZipCodes] = useState(false)
 
   const formRef = useRef<HTMLFormElement>(null)
   const router = useRouter()
@@ -148,6 +164,109 @@ export default function JobListingPage() {
     }))
   }
 
+  // Handle ZIP code search
+  const handleZipCodeSearch = async () => {
+    if (!centerZipCode) {
+      toast({
+        title: "ZIP Code Required",
+        description: "Please enter a center ZIP code to search.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsLoadingZipCodes(true)
+    try {
+      const response = await fetch(`/api/zip-codes/radius?zip=${centerZipCode}&radius=${zipSearchRadius}&limit=500`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.zipCodes && data.zipCodes.length > 0) {
+          setSelectedZipCodes(data.zipCodes)
+          toast({
+            title: "ZIP Codes Found",
+            description: `Found ${data.zipCodes.length} ZIP codes within ${zipSearchRadius} miles of ${centerZipCode}`,
+          })
+        } else {
+          toast({
+            title: "No ZIP Codes Found",
+            description: `No ZIP codes found within ${zipSearchRadius} miles of ${centerZipCode}`,
+            variant: "destructive",
+          })
+        }
+      } else {
+        const errorData = await response.json()
+        toast({
+          title: "Error",
+          description: errorData.message || "Failed to find ZIP codes. Please check the ZIP code and try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error searching ZIP codes:", error)
+      toast({
+        title: "Error",
+        description: "Failed to search ZIP codes. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingZipCodes(false)
+    }
+  }
+
+  // Remove a ZIP code from selection
+  const removeZipCode = (zipToRemove: string) => {
+    setSelectedZipCodes((prev) => prev.filter((zip) => zip.zip !== zipToRemove))
+  }
+
+  // Add individual ZIP code
+  const addIndividualZipCode = async () => {
+    const zipInput = prompt("Enter a ZIP code to add:")
+    if (!zipInput) return
+
+    const zip = zipInput.trim()
+    if (selectedZipCodes.some((z) => z.zip === zip)) {
+      toast({
+        title: "ZIP Code Already Added",
+        description: `ZIP code ${zip} is already in your service area.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/zip-codes/search?zip=${zip}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.zipCode) {
+          setSelectedZipCodes((prev) => [...prev, data.zipCode])
+          toast({
+            title: "ZIP Code Added",
+            description: `Added ${zip} - ${data.zipCode.city}, ${data.zipCode.state}`,
+          })
+        } else {
+          toast({
+            title: "ZIP Code Not Found",
+            description: `ZIP code ${zip} was not found in our database.`,
+            variant: "destructive",
+          })
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to validate ZIP code. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding ZIP code:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add ZIP code. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Function to save the business ID
   const saveBusinessId = () => {
     try {
@@ -175,6 +294,16 @@ export default function JobListingPage() {
       toast({
         title: "Categories Required",
         description: "Please select at least one job category before saving.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate service area
+    if (!isNationwide && selectedZipCodes.length === 0) {
+      toast({
+        title: "Service Area Required",
+        description: "Please select either nationwide coverage or specify ZIP codes for your job listing.",
         variant: "destructive",
       })
       return
@@ -240,6 +369,14 @@ export default function JobListingPage() {
 
         // Benefits
         benefits: formattedBenefits,
+
+        // Service Area (NEW)
+        serviceArea: {
+          isNationwide,
+          zipCodes: selectedZipCodes,
+          centerZipCode: centerZipCode || null,
+          radiusMiles: zipSearchRadius,
+        },
       }
 
       formData.append("jobData", JSON.stringify(jobData))
@@ -1199,6 +1336,173 @@ export default function JobListingPage() {
                   />
                 </div>
 
+                {/* Service Area Section */}
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Job Service Area</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Specify where this job is available. You can choose nationwide coverage or select specific ZIP
+                    codes.
+                  </p>
+
+                  <div className="space-y-4">
+                    {/* Nationwide Toggle */}
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="nationwide"
+                        checked={isNationwide}
+                        onChange={(e) => {
+                          setIsNationwide(e.target.checked)
+                          if (e.target.checked) {
+                            setSelectedZipCodes([])
+                            setCenterZipCode("")
+                          }
+                        }}
+                        className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      />
+                      <label htmlFor="nationwide" className="text-sm font-medium text-gray-700">
+                        This job is available nationwide
+                      </label>
+                    </div>
+
+                    {/* Local Service Area */}
+                    {!isNationwide && (
+                      <div className="space-y-4">
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                          <h4 className="font-medium text-blue-800 mb-2">Search ZIP Codes by Radius</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                              <label htmlFor="centerZip" className="block text-sm font-medium text-gray-700 mb-1">
+                                Center ZIP Code:
+                              </label>
+                              <input
+                                type="text"
+                                id="centerZip"
+                                value={centerZipCode}
+                                onChange={(e) => setCenterZipCode(e.target.value)}
+                                placeholder="Enter ZIP code"
+                                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                              />
+                            </div>
+
+                            <div>
+                              <label htmlFor="radius" className="block text-sm font-medium text-gray-700 mb-1">
+                                Radius (miles):
+                              </label>
+                              <select
+                                id="radius"
+                                value={zipSearchRadius}
+                                onChange={(e) => setZipSearchRadius(Number(e.target.value))}
+                                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                              >
+                                <option value={5}>5 miles</option>
+                                <option value={10}>10 miles</option>
+                                <option value={15}>15 miles</option>
+                                <option value={25}>25 miles</option>
+                                <option value={50}>50 miles</option>
+                                <option value={100}>100 miles</option>
+                              </select>
+                            </div>
+
+                            <div className="flex items-end">
+                              <Button
+                                type="button"
+                                onClick={handleZipCodeSearch}
+                                disabled={!centerZipCode || isLoadingZipCodes}
+                                className="w-full flex items-center justify-center"
+                              >
+                                <Search className="h-4 w-4 mr-2" />
+                                {isLoadingZipCodes ? "Searching..." : "Find ZIP Codes"}
+                              </Button>
+                            </div>
+
+                            <div className="flex items-end">
+                              <Button type="button" variant="outline" onClick={addIndividualZipCode} className="w-full">
+                                Add Individual ZIP
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Selected ZIP Codes Display */}
+                        {selectedZipCodes.length > 0 && (
+                          <div className="bg-gray-50 p-4 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-medium text-gray-800">
+                                Selected Service Area ({selectedZipCodes.length} ZIP codes)
+                              </h4>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedZipCodes([])}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                Clear All
+                              </Button>
+                            </div>
+                            <div className="max-h-40 overflow-y-auto">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+                                {selectedZipCodes.map((zip, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center justify-between bg-white p-2 rounded border hover:bg-gray-50"
+                                  >
+                                    <div className="flex items-center">
+                                      <MapPin className="h-3 w-3 text-gray-400 mr-1" />
+                                      <span className="font-medium">{zip.zip}</span>
+                                      <span className="text-gray-500 ml-1">
+                                        - {zip.city}, {zip.state}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeZipCode(zip.zip)}
+                                      className="text-red-500 hover:text-red-700 ml-2 font-bold"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {!isNationwide && selectedZipCodes.length === 0 && (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div className="flex items-center">
+                              <Info className="h-5 w-5 text-yellow-600 mr-2" />
+                              <p className="text-sm text-yellow-800">
+                                Please select ZIP codes for your job's service area, or choose nationwide coverage.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Service Area Summary */}
+                    {(isNationwide || selectedZipCodes.length > 0) && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <Check className="h-5 w-5 text-green-600 mr-2" />
+                          <div>
+                            <p className="text-sm font-medium text-green-800">Service Area Configured</p>
+                            <p className="text-sm text-green-700">
+                              {isNationwide
+                                ? "This job will be available nationwide"
+                                : `This job will be available in ${selectedZipCodes.length} ZIP code${
+                                    selectedZipCodes.length === 1 ? "" : "s"
+                                  }`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex justify-end pt-4 space-x-2">
                   <button
                     type="button"
@@ -1241,6 +1545,10 @@ export default function JobListingPage() {
                 </div>
                 <div>
                   <span className="font-medium">Jobs Index Key:</span> jobs:{businessId}
+                </div>
+                <div>
+                  <span className="font-medium">Service Area:</span>{" "}
+                  {isNationwide ? "Nationwide" : `${selectedZipCodes.length} ZIP codes`}
                 </div>
                 <div className="mt-2">
                   <Button
@@ -1325,13 +1633,24 @@ export default function JobListingPage() {
                 <div className="flex justify-center">
                   <Button
                     type="button"
-                    disabled={selectedCategories.length === 0 || isSaving}
-                    className={`px-6 py-3 ${selectedCategories.length === 0 ? "opacity-50" : ""}`}
+                    disabled={
+                      selectedCategories.length === 0 || isSaving || (!isNationwide && selectedZipCodes.length === 0)
+                    }
+                    className={`px-6 py-3 ${
+                      selectedCategories.length === 0 || (!isNationwide && selectedZipCodes.length === 0)
+                        ? "opacity-50"
+                        : ""
+                    }`}
                     onClick={handleSaveJobListing}
                   >
                     {isSaving ? "Saving..." : "Save and Add to Ad-Box"}
                   </Button>
                 </div>
+                {selectedCategories.length > 0 && !isNationwide && selectedZipCodes.length === 0 && (
+                  <p className="text-center text-sm text-red-600 mt-2">
+                    Please configure your service area before saving
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1391,6 +1710,18 @@ export default function JobListingPage() {
                     <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">
                       {formValues.workHours}
                     </span>
+                    {/* Service Area Badge */}
+                    {isNationwide ? (
+                      <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                        Nationwide
+                      </span>
+                    ) : (
+                      selectedZipCodes.length > 0 && (
+                        <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                          {selectedZipCodes.length} ZIP code{selectedZipCodes.length === 1 ? "" : "s"}
+                        </span>
+                      )
+                    )}
                   </div>
 
                   {/* Add payment information section */}
@@ -1412,6 +1743,33 @@ export default function JobListingPage() {
                       <p className="text-gray-700">
                         <span className="font-medium">Compensation:</span> {paymentValues.otherPay}
                       </p>
+                    )}
+                  </div>
+
+                  {/* Service Area Information */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Service Area</h3>
+                    {isNationwide ? (
+                      <p className="text-gray-700">This position is available nationwide.</p>
+                    ) : selectedZipCodes.length > 0 ? (
+                      <div>
+                        <p className="text-gray-700 mb-2">
+                          This position is available in {selectedZipCodes.length} ZIP code
+                          {selectedZipCodes.length === 1 ? "" : "s"}:
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedZipCodes.slice(0, 10).map((zip, index) => (
+                            <span key={index} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                              {zip.zip}
+                            </span>
+                          ))}
+                          {selectedZipCodes.length > 10 && (
+                            <span className="text-gray-500 text-xs">+{selectedZipCodes.length - 10} more</span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">Service area not specified</p>
                     )}
                   </div>
 
@@ -1486,6 +1844,12 @@ export default function JobListingPage() {
                   <ul className="list-disc pl-5 text-blue-600 space-y-1">
                     <li>In your business profile pop-up under "Job Opportunities"</li>
                     <li>On your Statistics page under "Your Job Listings"</li>
+                    <li>
+                      Available in{" "}
+                      {isNationwide
+                        ? "all ZIP codes nationwide"
+                        : `${selectedZipCodes.length} selected ZIP code${selectedZipCodes.length === 1 ? "" : "s"}`}
+                    </li>
                   </ul>
                   <p className="text-blue-600 mt-2">
                     Business ID: <strong>{businessId}</strong>
