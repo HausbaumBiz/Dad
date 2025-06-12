@@ -97,6 +97,14 @@ export async function saveJobListing(
       "id" | "businessId" | "createdAt" | "updatedAt" | "logoUrl" | "expiresAt" | "isExpired"
     >
 
+    // Ensure categories is always an array
+    if (!jobData.categories || !Array.isArray(jobData.categories)) {
+      console.warn("Categories not provided or not an array, setting to empty array")
+      jobData.categories = []
+    }
+
+    console.log(`Job categories being saved:`, jobData.categories)
+
     // Handle logo upload
     let logoUrl = undefined
     let logoId = undefined
@@ -161,17 +169,43 @@ export async function saveJobListing(
     // Save to Redis - store the full job listing
     const key = `job:${businessId}:${jobId}`
     console.log(`Saving job to Redis key: ${key}`)
+    console.log(`Job listing data being saved:`, {
+      id: jobListing.id,
+      businessId: jobListing.businessId,
+      jobTitle: jobListing.jobTitle,
+      categories: jobListing.categories,
+      serviceArea: jobListing.serviceArea,
+    })
     await kv.set(key, JSON.stringify(jobListing))
 
     // Save to job index for this business - store the job ID in the list for this business
     const jobsKey = `jobs:${businessId}`
     console.log(`Adding job ID to business jobs list at key: ${jobsKey}`)
 
-    let existingJobs = await kv.get<string[]>(jobsKey)
+    const existingJobsData = await kv.get(jobsKey)
+    let existingJobs: string[] = []
 
-    // Handle case where the key doesn't exist yet
-    if (!existingJobs) {
-      existingJobs = []
+    // Handle case where the key doesn't exist yet or has unexpected data
+    if (existingJobsData) {
+      if (Array.isArray(existingJobsData)) {
+        existingJobs = existingJobsData
+      } else if (typeof existingJobsData === "string") {
+        try {
+          const parsed = JSON.parse(existingJobsData)
+          if (Array.isArray(parsed)) {
+            existingJobs = parsed
+          } else {
+            console.error(`Expected array but got: ${typeof parsed}`, parsed)
+            existingJobs = []
+          }
+        } catch (parseError) {
+          console.error("Error parsing existing jobs data:", parseError)
+          existingJobs = []
+        }
+      } else {
+        console.error(`Unexpected data type for existing jobs: ${typeof existingJobsData}`, existingJobsData)
+        existingJobs = []
+      }
     }
 
     // Add the job ID to the list and save back to Redis
@@ -193,6 +227,19 @@ export async function saveJobListing(
       await kv.set(`job:${businessId}:${jobId}:zipcodes`, JSON.stringify(jobListing.serviceArea.zipCodes))
     }
 
+    // NEW: Index job by categories for fast category-based searches
+    if (jobListing.categories && jobListing.categories.length > 0) {
+      for (const category of jobListing.categories) {
+        // Create a normalized category key (lowercase, no spaces)
+        const categoryKey = category.toLowerCase().replace(/\s+/g, "-")
+        await kv.sadd(`category:${categoryKey}:jobs`, `${businessId}:${jobId}`)
+        console.log(`Indexed job under category: ${category} (key: ${categoryKey})`)
+      }
+
+      // Store job's categories for fast lookup
+      await kv.set(`job:${businessId}:${jobId}:categories`, JSON.stringify(jobListing.categories))
+    }
+
     // Store job service area metadata
     await kv.set(`job:${businessId}:${jobId}:servicearea`, JSON.stringify(jobListing.serviceArea))
 
@@ -202,6 +249,7 @@ export async function saveJobListing(
       businessId,
       jobsKey,
       jobDataKeys: Object.keys(jobData),
+      categories: jobListing.categories,
       serviceArea: jobListing.serviceArea,
     })
 
@@ -241,13 +289,32 @@ export async function getBusinessJobs(businessId: string): Promise<JobListing[]>
     const jobsKey = `jobs:${businessId}`
     console.log(`Fetching jobs with key: ${jobsKey}`)
 
-    const jobIds = await kv.get<string[]>(jobsKey)
-    console.log(`Raw jobIds result:`, jobIds)
+    const jobIdsData = await kv.get(jobsKey)
+    let jobIds: string[] = []
 
-    // Ensure we have an array of job IDs
-    if (!jobIds || !Array.isArray(jobIds)) {
-      console.log(`No jobs found at key ${jobsKey} or invalid format`)
-      return []
+    console.log(`Raw jobIds result:`, jobIdsData, `Type: ${typeof jobIdsData}`)
+
+    // Ensure we have a proper array
+    if (jobIdsData) {
+      if (Array.isArray(jobIdsData)) {
+        jobIds = jobIdsData
+      } else if (typeof jobIdsData === "string") {
+        try {
+          const parsed = JSON.parse(jobIdsData)
+          if (Array.isArray(parsed)) {
+            jobIds = parsed
+          } else {
+            console.error(`Expected array but got: ${typeof parsed}`, parsed)
+            jobIds = []
+          }
+        } catch (parseError) {
+          console.error("Error parsing job IDs data:", parseError)
+          jobIds = []
+        }
+      } else {
+        console.error(`Unexpected data type for job IDs: ${typeof jobIdsData}`, jobIdsData)
+        jobIds = []
+      }
     }
 
     console.log(`Found ${jobIds.length} job IDs for business ${businessId}:`, jobIds)
@@ -285,6 +352,11 @@ export async function getBusinessJobs(businessId: string): Promise<JobListing[]>
           // Ensure the job has required fields
           if (!job.id) job.id = jobId
           if (!job.businessId) job.businessId = businessId
+
+          // Ensure categories is always an array
+          if (!job.categories || !Array.isArray(job.categories)) {
+            job.categories = []
+          }
 
           // Handle jobs created before expiration system was added
           if (!job.expiresAt) {
@@ -389,6 +461,18 @@ export async function removeJobListing(
       await kv.del(`job:${businessId}:${jobId}:servicearea`)
     }
 
+    // Clean up category indexes before deleting the job
+    if (job && job.categories && job.categories.length > 0) {
+      for (const category of job.categories) {
+        const categoryKey = category.toLowerCase().replace(/\s+/g, "-")
+        await kv.srem(`category:${categoryKey}:jobs`, `${businessId}:${jobId}`)
+        console.log(`Removed job from category index: ${category} (key: ${categoryKey})`)
+      }
+
+      // Clean up category metadata
+      await kv.del(`job:${businessId}:${jobId}:categories`)
+    }
+
     // Delete the job from Redis
     console.log(`Deleting job from Redis key: ${jobKey}`)
     await kv.del(jobKey)
@@ -397,11 +481,39 @@ export async function removeJobListing(
     const jobsKey = `jobs:${businessId}`
     console.log(`Updating job index at key: ${jobsKey}`)
 
-    const existingJobs = (await kv.get<string[]>(jobsKey)) || []
+    const existingJobsData = await kv.get(jobsKey)
+    let existingJobs: string[] = []
+
+    // Ensure we have a proper array
+    if (existingJobsData) {
+      if (Array.isArray(existingJobsData)) {
+        existingJobs = existingJobsData
+      } else if (typeof existingJobsData === "string") {
+        try {
+          const parsed = JSON.parse(existingJobsData)
+          if (Array.isArray(parsed)) {
+            existingJobs = parsed
+          } else {
+            console.error(`Expected array but got: ${typeof parsed}`, parsed)
+            existingJobs = []
+          }
+        } catch (parseError) {
+          console.error("Error parsing existing jobs data:", parseError)
+          existingJobs = []
+        }
+      } else {
+        console.error(`Unexpected data type for jobs index: ${typeof existingJobsData}`, existingJobsData)
+        existingJobs = []
+      }
+    }
+
+    // Filter out the job ID we want to remove
     const updatedJobs = existingJobs.filter((id) => id !== jobId)
 
     // Log what we're doing for debugging
     console.log(`Before removal: ${existingJobs.length} jobs, After removal: ${updatedJobs.length} jobs`)
+    console.log(`Existing jobs:`, existingJobs)
+    console.log(`Updated jobs:`, updatedJobs)
 
     await kv.set(jobsKey, updatedJobs)
 
@@ -515,7 +627,6 @@ export async function isJobExpired(job: JobListing): Promise<boolean> {
   let expirationDate: Date
 
   if (job.expiresAt) {
-    // Parse the ISO string and convert to local timezone
     expirationDate = new Date(job.expiresAt)
   } else {
     // Calculate expiration from creation date if expiresAt is missing
@@ -527,11 +638,11 @@ export async function isJobExpired(job: JobListing): Promise<boolean> {
   // Set expiration to END of day in local timezone
   expirationDate.setHours(23, 59, 59, 999)
 
-  // Get current time in local timezone
-  const now = new Date()
+  // Get today's date at start of day in local time
+  const today = new Date()
 
   // Only expired if current time is after the end of expiration day
-  return now > expirationDate
+  return today > expirationDate
 }
 
 // Helper function to get days until expiration (using local timezone like coupons)
@@ -661,18 +772,228 @@ export async function getActiveBusinessJobs(businessId: string): Promise<JobList
 // NEW: Function to search jobs by ZIP code
 export async function searchJobsByZipCode(zipCode: string): Promise<JobListing[]> {
   try {
+    console.log(`=== searchJobsByZipCode called for zip: ${zipCode} ===`)
     const jobs: JobListing[] = []
 
     // Get jobs that serve this specific ZIP code
     const jobIds = await kv.smembers(`zipcode:${zipCode}:jobs`)
+    console.log(`Found ${jobIds.length} job IDs for zip code ${zipCode}:`, jobIds)
 
     // Get nationwide jobs
     const nationwideJobIds = await kv.smembers("jobs:nationwide")
+    console.log(`Found ${nationwideJobIds.length} nationwide job IDs:`, nationwideJobIds)
 
     // Combine all job IDs
     const allJobIds = [...new Set([...jobIds, ...nationwideJobIds])]
+    console.log(`Total unique job IDs to process: ${allJobIds.length}`)
 
     for (const jobRef of allJobIds) {
+      const [businessId, jobId] = jobRef.split(":")
+      const jobKey = `job:${businessId}:${jobId}`
+      console.log(`Fetching job data for key: ${jobKey}`)
+
+      const jobData = await kv.get(jobKey)
+
+      if (jobData) {
+        try {
+          let job: JobListing
+          if (typeof jobData === "string") {
+            job = JSON.parse(jobData) as JobListing
+          } else {
+            job = jobData as JobListing
+          }
+
+          // Ensure categories is always an array
+          if (!job.categories || !Array.isArray(job.categories)) {
+            job.categories = []
+          }
+
+          console.log(`Job "${job.jobTitle}" has categories: [${job.categories.join(", ")}]`)
+
+          // Only include active (non-expired) jobs
+          const expired = await isJobExpired(job)
+          if (!expired) {
+            jobs.push(job)
+            console.log(`✅ Added active job: "${job.jobTitle}"`)
+          } else {
+            console.log(`❌ Skipped expired job: "${job.jobTitle}"`)
+          }
+        } catch (error) {
+          console.error(`Error parsing job data for ${jobRef}:`, error)
+        }
+      } else {
+        console.log(`❌ No job data found for key: ${jobKey}`)
+      }
+    }
+
+    console.log(`=== searchJobsByZipCode completed: ${jobs.length} active jobs found ===`)
+    return jobs.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return dateB - dateA
+    })
+  } catch (error) {
+    console.error("Error searching jobs by ZIP code:", error)
+    return []
+  }
+}
+
+// Add this new function at the end of the file
+
+// Function to search jobs by ZIP code and optional category
+export async function searchJobsByZipCodeAndCategory(zipCode: string, category?: string): Promise<JobListing[]> {
+  try {
+    console.log(`=== searchJobsByZipCodeAndCategory called ===`)
+    console.log(`Zip Code: ${zipCode}`)
+    console.log(`Category: ${category}`)
+
+    // First get all jobs for this ZIP code
+    const jobs = await searchJobsByZipCode(zipCode)
+    console.log(`Found ${jobs.length} total jobs in zip code ${zipCode}`)
+
+    // If no category specified, return all jobs
+    if (!category) {
+      console.log("No category specified, returning all jobs")
+      return jobs
+    }
+
+    console.log(`Filtering jobs by category: "${category}"`)
+
+    // Log all job categories for debugging
+    jobs.forEach((job, index) => {
+      console.log(`Job ${index + 1}: "${job.jobTitle}" - Categories: [${job.categories?.join(", ") || "none"}]`)
+    })
+
+    // Filter by category if specified - use more flexible matching
+    const filteredJobs = jobs.filter((job) => {
+      // Check if job has categories and if the specified category is included
+      if (!job.categories || !Array.isArray(job.categories)) {
+        console.log(`Job "${job.jobTitle}" has no categories, skipping`)
+        return false
+      }
+
+      const categoryMatch = job.categories.some((cat) => {
+        const jobCat = cat.toLowerCase().trim()
+        const searchCat = category.toLowerCase().trim()
+
+        console.log(`Comparing job category "${jobCat}" with search category "${searchCat}"`)
+
+        // Exact match
+        if (jobCat === searchCat) {
+          console.log(`✅ Exact match found: "${jobCat}" === "${searchCat}"`)
+          return true
+        }
+
+        // Partial matches
+        if (jobCat.includes(searchCat) || searchCat.includes(jobCat)) {
+          console.log(`✅ Partial match found: "${jobCat}" includes "${searchCat}"`)
+          return true
+        }
+
+        // Handle common category variations
+        const categoryMappings: Record<string, string[]> = {
+          "office work": ["administrative", "clerical", "customer service", "data entry", "receptionist"],
+          "factory work": ["manufacturing", "assembly", "production", "warehouse", "packaging"],
+          "manual labor": ["construction", "landscaping", "moving", "labor", "maintenance"],
+          medical: ["healthcare", "nursing", "medical", "hospital", "clinic"],
+          "non-medical care givers": ["childcare", "elderly care", "companion", "caregiver", "babysitter"],
+          "food service": ["restaurant", "kitchen", "server", "cook", "food prep", "hospitality"],
+          retail: ["sales", "cashier", "store", "customer service", "merchandising"],
+          transportation: ["driver", "delivery", "logistics", "trucking", "courier"],
+          technology: ["it", "software", "computer", "tech", "programming", "developer"],
+          education: ["teacher", "tutor", "instructor", "education", "school"],
+          "professional services": ["legal", "accounting", "consulting", "finance", "business"],
+          "skilled trades": ["electrician", "plumber", "carpenter", "hvac", "mechanic"],
+          "arts & entertainment": ["creative", "design", "music", "art", "media", "entertainment"],
+          "protection services": ["security", "guard", "safety", "law enforcement"],
+          "agriculture & animal care": ["farm", "veterinary", "animal", "agriculture", "livestock"],
+          "charity services": ["nonprofit", "volunteer", "community", "social services"],
+          "part-time & seasonal": ["temporary", "seasonal", "part-time", "contract"],
+        }
+
+        // Check if the search category has mapped keywords
+        const mappedKeywords = categoryMappings[searchCat] || []
+        if (mappedKeywords.some((keyword) => jobCat.includes(keyword))) {
+          console.log(`✅ Keyword match found: "${jobCat}" matches keyword for "${searchCat}"`)
+          return true
+        }
+
+        // Check reverse mapping
+        for (const [key, keywords] of Object.entries(categoryMappings)) {
+          if (keywords.includes(searchCat) && jobCat.includes(key)) {
+            console.log(`✅ Reverse mapping match: "${jobCat}" includes "${key}" for search "${searchCat}"`)
+            return true
+          }
+        }
+
+        console.log(`❌ No match: "${jobCat}" vs "${searchCat}"`)
+        return false
+      })
+
+      if (categoryMatch) {
+        console.log(`✅ Job "${job.jobTitle}" matches category "${category}"`)
+      } else {
+        console.log(`❌ Job "${job.jobTitle}" does not match category "${category}"`)
+      }
+
+      return categoryMatch
+    })
+
+    console.log(`Final result: ${filteredJobs.length} jobs matching category "${category}" in zip ${zipCode}`)
+    return filteredJobs
+  } catch (error) {
+    console.error("Error searching jobs by ZIP code and category:", error)
+    return []
+  }
+}
+
+// Function to get all job categories with counts
+export async function getJobCategories(): Promise<{ category: string; count: number }[]> {
+  try {
+    // Get all business IDs with jobs
+    const businessIds = await listBusinessesWithJobs()
+
+    // Track categories and their counts
+    const categoryMap = new Map<string, number>()
+
+    // Process each business's jobs
+    for (const businessId of businessIds) {
+      const jobs = await getActiveBusinessJobs(businessId)
+
+      // Count each category
+      for (const job of jobs) {
+        if (job.categories && Array.isArray(job.categories)) {
+          for (const category of job.categories) {
+            const currentCount = categoryMap.get(category) || 0
+            categoryMap.set(category, currentCount + 1)
+          }
+        }
+      }
+    }
+
+    // Convert map to array of objects
+    return Array.from(categoryMap.entries())
+      .map(([category, count]) => ({
+        category,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count) // Sort by count descending
+  } catch (error) {
+    console.error("Error getting job categories:", error)
+    return []
+  }
+}
+
+// Function to search jobs by category
+export async function searchJobsByCategory(category: string): Promise<JobListing[]> {
+  try {
+    const jobs: JobListing[] = []
+    const categoryKey = category.toLowerCase().replace(/\s+/g, "-")
+
+    // Get jobs for this category
+    const jobIds = await kv.smembers(`category:${categoryKey}:jobs`)
+
+    for (const jobRef of jobIds) {
       const [businessId, jobId] = jobRef.split(":")
       const jobKey = `job:${businessId}:${jobId}`
       const jobData = await kv.get(jobKey)
@@ -684,6 +1005,11 @@ export async function searchJobsByZipCode(zipCode: string): Promise<JobListing[]
             job = JSON.parse(jobData) as JobListing
           } else {
             job = jobData as JobListing
+          }
+
+          // Ensure categories is always an array
+          if (!job.categories || !Array.isArray(job.categories)) {
+            job.categories = []
           }
 
           // Only include active (non-expired) jobs
@@ -703,7 +1029,7 @@ export async function searchJobsByZipCode(zipCode: string): Promise<JobListing[]
       return dateB - dateA
     })
   } catch (error) {
-    console.error("Error searching jobs by ZIP code:", error)
+    console.error("Error searching jobs by category:", error)
     return []
   }
 }

@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import Link from "next/link"
-import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2, MapPin } from "lucide-react"
+import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2, MapPin, Tag } from "lucide-react"
 import type { CategorySelection } from "@/components/category-selector"
 import { getBusinessCategories, removeBusinessCategory } from "@/app/actions/category-actions"
 import { useToast } from "@/components/ui/use-toast"
@@ -721,6 +721,24 @@ export default function StatisticsPage() {
     )
   }
 
+  // Function to render job categories as badges
+  const renderJobCategories = (categories: string[]) => {
+    if (!categories || categories.length === 0) {
+      return <span className="text-xs text-gray-500 italic">No categories</span>
+    }
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-1">
+        {categories.map((category, index) => (
+          <Badge key={index} variant="secondary" className="text-xs px-2 py-0.5">
+            <Tag className="h-3 w-3 mr-1" />
+            {category}
+          </Badge>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
@@ -945,7 +963,7 @@ export default function StatisticsPage() {
                 ) : jobListings.length > 0 ? (
                   <div className="space-y-4">
                     {jobListings.map((job) => (
-                      <div key={job.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <div key={job.id} className="flex justify-between items-start p-4 bg-gray-50 rounded-lg">
                         <div className="flex-1">
                           <h3 className="font-medium text-gray-800">{job.jobTitle}</h3>
                           <p className="text-xs text-gray-500">
@@ -961,8 +979,10 @@ export default function StatisticsPage() {
                                   : "No service area set"}
                             </span>
                           </div>
+                          {/* Display job categories */}
+                          {renderJobCategories(job.categories)}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 ml-4">
                           {renderJobStatus(job)}
                           <Button
                             variant="outline"

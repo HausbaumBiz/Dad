@@ -1,17 +1,12 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogClose,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { MapPin, X } from "lucide-react"
+import { MapPin, Loader2 } from "lucide-react"
 
 interface ZipCodeDialogProps {
   isOpen: boolean
@@ -21,66 +16,82 @@ interface ZipCodeDialogProps {
 
 export function ZipCodeDialog({ isOpen, onClose, onSubmit }: ZipCodeDialogProps) {
   const [zipCode, setZipCode] = useState("")
+  const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState("")
 
-  const handleSubmit = () => {
-    if (!zipCode.trim()) {
-      setError("Please enter a valid zip code")
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Basic validation
+    if (!zipCode) {
+      setError("Please enter a zip code")
       return
     }
 
-    // Basic US zip code validation (5 digits)
-    if (!/^\d{5}$/.test(zipCode)) {
+    if (!/^\d{5}(-\d{4})?$/.test(zipCode)) {
       setError("Please enter a valid 5-digit zip code")
       return
     }
 
+    setIsValidating(true)
     setError("")
-    onSubmit(zipCode)
-    onClose()
+
+    try {
+      // Here you could validate the zip code against an API if needed
+      // For now, we'll just accept any 5-digit code
+
+      // Submit the valid zip code
+      onSubmit(zipCode)
+
+      // Close the dialog
+      onClose()
+    } catch (error) {
+      console.error("Error validating zip code:", error)
+      setError("An error occurred. Please try again.")
+    } finally {
+      setIsValidating(false)
+    }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md" closeButton={false}>
-        {/* Custom close button */}
-        <div className="absolute right-4 top-4 z-10">
-          <DialogClose className="rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </DialogClose>
-        </div>
-
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Enter Your Zip Code</DialogTitle>
-          <DialogDescription className="text-gray-600">
-            To help you find local services in your area, we need your zip code.
-          </DialogDescription>
+          <DialogTitle>Enter Your Zip Code</DialogTitle>
+          <DialogDescription>We need your zip code to show you relevant job listings in your area.</DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col space-y-4 py-4">
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="flex items-center space-x-2">
-            <MapPin className="h-5 w-5 text-primary" />
-            <span className="text-sm text-gray-600">Your location helps us find the best services near you</span>
-          </div>
-
-          <div className="flex flex-col space-y-2">
+            <MapPin className="h-5 w-5 text-gray-400" />
             <Input
-              placeholder="Enter zip code"
+              type="text"
+              placeholder="Enter 5-digit zip code"
               value={zipCode}
               onChange={(e) => setZipCode(e.target.value)}
-              className={error ? "border-red-500" : ""}
+              className="flex-1"
+              maxLength={5}
             />
-            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
-        </div>
 
-        <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit}>Continue</Button>
-        </div>
+          {error && <p className="text-sm text-red-500">{error}</p>}
+
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isValidating}>
+              {isValidating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                "Continue"
+              )}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   )
