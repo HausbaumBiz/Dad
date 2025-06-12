@@ -42,6 +42,8 @@ export function middleware(request: NextRequest) {
     path === "/child-care" ||
     path === "/penny-saver" ||
     path === "/job-listings" ||
+    // Allow all job-listings category pages to be public
+    path.startsWith("/job-listings/") ||
     // Allow subcategory pages to be public too
     path.startsWith("/home-improvement/") ||
     // More efficient way to handle all category pages
