@@ -332,11 +332,11 @@ export default function HomePage() {
         {/* Hero Section with Rotating Images */}
         <div className="relative overflow-hidden rounded-xl mb-10 bg-gradient-to-r from-primary to-primary/80">
           <div
-            className="absolute inset-0 opacity-40"
+            className="absolute inset-0 opacity-80"
             style={{
-              backgroundImage: "url('/texture0053.png')",
-              backgroundRepeat: "repeat",
-              mixBlendMode: "multiply",
+              backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+              backgroundSize: "12px 12px",
+              mixBlendMode: "overlay",
             }}
           ></div>
 
@@ -627,11 +627,11 @@ export default function HomePage() {
       </main>
       <footer className="bg-primary text-white py-8 relative">
         <div
-          className="absolute inset-0 opacity-30"
+          className="absolute inset-0 opacity-50"
           style={{
-            backgroundImage: "url('/texture0053.png')",
-            backgroundRepeat: "repeat",
-            mixBlendMode: "multiply",
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+            backgroundSize: "12px 12px",
+            mixBlendMode: "overlay",
           }}
         ></div>
         <div className="container mx-auto px-4 relative z-10">
