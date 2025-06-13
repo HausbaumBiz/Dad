@@ -382,8 +382,8 @@ export default function HomePage() {
           {/* Desktop layout (new split layout) - narrower width */}
           <div className="hidden md:block">
             <div className="max-w-5xl mx-auto px-4 py-16 md:py-24">
-              <div className="flex flex-row items-center">
-                <div className="w-1/3 text-white z-10 mb-0">
+              <div className="flex flex-row items-center justify-between">
+                <div className="w-[30%] text-white z-10">
                   <h1 className="text-4xl md:text-5xl font-bold mb-4">Find Local Experts You Can Trust</h1>
                   <p className="text-xl mb-6 text-white/90">
                     Connect with verified professionals in your area for all your service needs
@@ -391,7 +391,7 @@ export default function HomePage() {
                 </div>
 
                 {/* Red square around job section - Desktop - Same size as images and moved to left */}
-                <div className="w-1/3 aspect-square border-4 border-red-600 p-4 flex flex-col justify-center items-center">
+                <div className="w-[30%] aspect-square border-4 border-red-600 p-4 flex flex-col justify-center items-center">
                   <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white text-center">
                     Or Find A Job On Hausbaum
                   </h2>
@@ -402,8 +402,8 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="w-1/3 flex justify-center">
-                  <div className="relative w-full max-w-md aspect-square">
+                <div className="w-[30%] flex justify-center">
+                  <div className="relative w-full aspect-square">
                     <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-2">
                       {heroImages.map((img, i) => (
                         <div key={i} className="relative overflow-hidden rounded-lg">
