@@ -349,13 +349,18 @@ export default function HomePage() {
                 <p className="text-xl mb-6 text-white/90">
                   Connect with verified professionals in your area for all your service needs
                 </p>
-                <p className="text-2xl mb-6 text-white font-semibold">Or Find A Job On Hausbaum</p>
+              </div>
+
+              {/* Red square around job section - Mobile - Same size as images */}
+              <div className="border-4 border-red-600 p-6 w-full max-w-md aspect-square flex flex-col justify-center items-center mb-8">
+                <p className="text-2xl mb-6 text-white font-semibold text-center">Or Find A Job On Hausbaum</p>
                 <div className="flex justify-center">
                   <Button size="lg" className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-xl" asChild>
                     <Link href="/job-listings">Find A Job</Link>
                   </Button>
                 </div>
               </div>
+
               <div className="relative w-full max-w-md aspect-square">
                 <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-2">
                   {heroImages.map((img, i) => (
@@ -385,11 +390,12 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                <div className="w-1/6"></div>
-
-                <div className="w-1/3 text-white z-10 mb-0 flex flex-col items-start">
-                  <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white">Or Find A Job On Hausbaum</h2>
-                  <div className="flex flex-col sm:flex-row gap-4">
+                {/* Red square around job section - Desktop - Same size as images and moved to left */}
+                <div className="w-1/3 aspect-square border-4 border-red-600 p-4 flex flex-col justify-center items-center">
+                  <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white text-center">
+                    Or Find A Job On Hausbaum
+                  </h2>
+                  <div className="flex justify-center">
                     <Button size="lg" className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-xl" asChild>
                       <Link href="/job-listings">Find A Job</Link>
                     </Button>
