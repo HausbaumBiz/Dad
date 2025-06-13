@@ -23,13 +23,12 @@ export default function JobListingsPage() {
   const [searchPerformed, setSearchPerformed] = useState(false)
 
   useEffect(() => {
-    const savedZip = localStorage.getItem("jobSearchZipCode")
-    if (savedZip) {
-      setSavedZipCode(savedZip)
-      setZipCode(savedZip)
-      // Fetch jobs if we have a saved zip code
-      fetchJobs(savedZip)
-    }
+    // Clear zip code and search results on every page visit
+    localStorage.removeItem("jobSearchZipCode")
+    setZipCode("")
+    setSavedZipCode("")
+    setJobs([])
+    setSearchPerformed(false)
   }, [])
 
   const fetchJobs = async (zipCodeToSearch: string) => {
@@ -269,18 +268,20 @@ export default function JobListingsPage() {
         </div>
 
         <div className="relative overflow-hidden rounded-xl mb-10 bg-gradient-to-r from-primary to-primary/80">
+          {/* Noise texture overlay - positioned behind content */}
           <div
-            className="absolute inset-0 opacity-30"
+            className="absolute inset-0 opacity-90 pointer-events-none"
             style={{
-              backgroundImage: "url('/texture0079.png')",
-              backgroundRepeat: "repeat",
-              mixBlendMode: "multiply",
+              backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 2px, transparent 2px)",
+              backgroundSize: "10px 10px",
+              mixBlendMode: "overlay",
+              zIndex: 1,
             }}
           ></div>
           <div className="container mx-auto px-4 py-12 md:py-16 relative z-10">
-            <div className="text-center text-white">
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">Find Your Next Job</h1>
-              <p className="text-xl mb-8 max-w-2xl mx-auto">
+            <div className="text-center text-white relative z-20">
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 drop-shadow-sm">Find Your Next Job</h1>
+              <p className="text-xl mb-8 max-w-2xl mx-auto drop-shadow-sm">
                 Browse job listings from local businesses and employers in your area
               </p>
             </div>
@@ -400,11 +401,11 @@ export default function JobListingsPage() {
 
       <footer className="bg-primary text-white py-8 relative">
         <div
-          className="absolute inset-0 opacity-30"
+          className="absolute inset-0 opacity-60 pointer-events-none"
           style={{
-            backgroundImage: "url('/texture0079.png')",
-            backgroundRepeat: "repeat",
-            mixBlendMode: "multiply",
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 2px, transparent 2px)",
+            backgroundSize: "10px 10px",
+            mixBlendMode: "overlay",
           }}
         ></div>
         <div className="container mx-auto px-4 relative z-10">
