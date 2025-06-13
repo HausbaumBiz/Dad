@@ -332,10 +332,9 @@ export default function HomePage() {
         {/* Hero Section with Rotating Images */}
         <div className="relative overflow-hidden rounded-xl mb-10 bg-gradient-to-r from-primary to-primary/80">
           <div
-            className="absolute inset-0 opacity-30"
+            className="absolute inset-0 opacity-40"
             style={{
-              backgroundImage:
-                "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/texture0079-ofcVFofcVFofcVFofcVFofcVFofcVF.png')",
+              backgroundImage: "url('/texture0053.png')",
               backgroundRepeat: "repeat",
               mixBlendMode: "multiply",
             }}
@@ -630,8 +629,7 @@ export default function HomePage() {
         <div
           className="absolute inset-0 opacity-30"
           style={{
-            backgroundImage:
-              "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/texture0079-ofcVFofcVFofcVFofcVFofcVFofcVF.png')",
+            backgroundImage: "url('/texture0053.png')",
             backgroundRepeat: "repeat",
             mixBlendMode: "multiply",
           }}
