@@ -340,9 +340,10 @@ export default function HomePage() {
               mixBlendMode: "multiply",
             }}
           ></div>
-          <div className="container mx-auto px-4 py-16 md:py-24">
-            {/* Mobile layout (original stacked layout) */}
-            <div className="md:hidden flex flex-col items-center">
+
+          {/* Mobile layout (original stacked layout) - full width */}
+          <div className="md:hidden px-4 py-16">
+            <div className="flex flex-col items-center">
               <div className="text-white z-10 mb-8 text-center">
                 <h1 className="text-4xl font-bold mb-4">Find Local Experts You Can Trust</h1>
                 <p className="text-xl mb-6 text-white/90">
@@ -371,41 +372,45 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Desktop layout (new split layout) */}
-            <div className="hidden md:flex flex-row items-center">
-              <div className="w-1/3 text-white z-10 mb-0">
-                <h1 className="text-4xl md:text-5xl font-bold mb-4">Find Local Experts You Can Trust</h1>
-                <p className="text-xl mb-6 text-white/90">
-                  Connect with verified professionals in your area for all your service needs
-                </p>
-              </div>
-
-              <div className="w-1/6"></div>
-
-              <div className="w-1/3 text-white z-10 mb-0 flex flex-col items-start">
-                <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white">Or Find A Job On Hausbaum</h2>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Button size="lg" className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-xl" asChild>
-                    <Link href="/job-listings">Find A Job</Link>
-                  </Button>
+          {/* Desktop layout (new split layout) - narrower width */}
+          <div className="hidden md:block">
+            <div className="max-w-5xl mx-auto px-4 py-16 md:py-24">
+              <div className="flex flex-row items-center">
+                <div className="w-1/3 text-white z-10 mb-0">
+                  <h1 className="text-4xl md:text-5xl font-bold mb-4">Find Local Experts You Can Trust</h1>
+                  <p className="text-xl mb-6 text-white/90">
+                    Connect with verified professionals in your area for all your service needs
+                  </p>
                 </div>
-              </div>
 
-              <div className="w-1/3 flex justify-center">
-                <div className="relative w-full max-w-md aspect-square">
-                  <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-2">
-                    {heroImages.map((img, i) => (
-                      <div key={i} className="relative overflow-hidden rounded-lg">
-                        <Image
-                          src={img.src || "/placeholder.svg"}
-                          alt={img.alt}
-                          fill
-                          className="object-cover"
-                          unoptimized={true}
-                        />
-                      </div>
-                    ))}
+                <div className="w-1/6"></div>
+
+                <div className="w-1/3 text-white z-10 mb-0 flex flex-col items-start">
+                  <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white">Or Find A Job On Hausbaum</h2>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <Button size="lg" className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-xl" asChild>
+                      <Link href="/job-listings">Find A Job</Link>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="w-1/3 flex justify-center">
+                  <div className="relative w-full max-w-md aspect-square">
+                    <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-2">
+                      {heroImages.map((img, i) => (
+                        <div key={i} className="relative overflow-hidden rounded-lg">
+                          <Image
+                            src={img.src || "/placeholder.svg"}
+                            alt={img.alt}
+                            fill
+                            className="object-cover"
+                            unoptimized={true}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
