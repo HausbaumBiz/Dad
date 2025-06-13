@@ -331,19 +331,21 @@ export default function HomePage() {
       <main className="flex-grow container mx-auto px-4 py-8">
         {/* Hero Section with Rotating Images */}
         <div className="relative overflow-hidden rounded-xl mb-10 bg-gradient-to-r from-primary to-primary/80">
+          {/* Noise texture overlay - moved below content */}
           <div
-            className="absolute inset-0 opacity-80"
+            className="absolute inset-0 opacity-80 pointer-events-none"
             style={{
               backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
               backgroundSize: "12px 12px",
               mixBlendMode: "overlay",
+              zIndex: 1,
             }}
           ></div>
 
           {/* Mobile layout (original stacked layout) - full width */}
-          <div className="md:hidden px-4 py-16">
+          <div className="md:hidden px-4 py-16 relative z-10">
             <div className="flex flex-col items-center">
-              <div className="text-white z-10 mb-8 text-center">
+              <div className="text-white mb-8 text-center">
                 <h1 className="text-4xl font-bold mb-4">Find Local Experts You Can Trust</h1>
                 <p className="text-xl mb-6 text-white/90">
                   Connect with verified professionals in your area for all your service needs
@@ -351,16 +353,20 @@ export default function HomePage() {
               </div>
 
               {/* Red square around job section - Mobile - Same size as images */}
-              <div className="border-4 border-red-600 p-6 w-full max-w-md aspect-square flex flex-col justify-center items-center mb-8">
+              <div className="border-4 border-red-600 p-6 w-full max-w-md aspect-square flex flex-col justify-center items-center mb-8 relative z-10">
                 <p className="text-2xl mb-6 text-white font-semibold text-center">Or Find A Job On Hausbaum</p>
                 <div className="flex justify-center">
-                  <Button size="lg" className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-xl" asChild>
+                  <Button
+                    size="lg"
+                    className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-xl relative z-20"
+                    asChild
+                  >
                     <Link href="/job-listings">Find A Job</Link>
                   </Button>
                 </div>
               </div>
 
-              <div className="relative w-full max-w-md aspect-square">
+              <div className="relative w-full max-w-md aspect-square z-10">
                 <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-2">
                   {heroImages.map((img, i) => (
                     <div key={i} className="relative overflow-hidden rounded-lg">
@@ -379,10 +385,10 @@ export default function HomePage() {
           </div>
 
           {/* Desktop layout (new split layout) - narrower width */}
-          <div className="hidden md:block">
+          <div className="hidden md:block relative z-10">
             <div className="max-w-5xl mx-auto px-4 py-16 md:py-24">
               <div className="flex flex-row items-center justify-between">
-                <div className="w-[30%] text-white z-10">
+                <div className="w-[30%] text-white">
                   <h1 className="text-4xl md:text-5xl font-bold mb-4">Find Local Experts You Can Trust</h1>
                   <p className="text-xl mb-6 text-white/90">
                     Connect with verified professionals in your area for all your service needs
@@ -390,19 +396,23 @@ export default function HomePage() {
                 </div>
 
                 {/* Red square around job section - Desktop - Same size as images and moved to left */}
-                <div className="w-[30%] aspect-square border-4 border-red-600 p-4 flex flex-col justify-center items-center">
+                <div className="w-[30%] aspect-square border-4 border-red-600 p-4 flex flex-col justify-center items-center relative z-10">
                   <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white text-center">
                     Or Find A Job On Hausbaum
                   </h2>
                   <div className="flex justify-center">
-                    <Button size="lg" className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-xl" asChild>
+                    <Button
+                      size="lg"
+                      className="bg-white text-primary hover:bg-white/90 px-8 py-6 text-xl relative z-20"
+                      asChild
+                    >
                       <Link href="/job-listings">Find A Job</Link>
                     </Button>
                   </div>
                 </div>
 
                 <div className="w-[30%] flex justify-center">
-                  <div className="relative w-full aspect-square">
+                  <div className="relative w-full aspect-square z-10">
                     <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-2">
                       {heroImages.map((img, i) => (
                         <div key={i} className="relative overflow-hidden rounded-lg">
@@ -627,7 +637,7 @@ export default function HomePage() {
       </main>
       <footer className="bg-primary text-white py-8 relative">
         <div
-          className="absolute inset-0 opacity-50"
+          className="absolute inset-0 opacity-50 pointer-events-none"
           style={{
             backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
             backgroundSize: "12px 12px",
