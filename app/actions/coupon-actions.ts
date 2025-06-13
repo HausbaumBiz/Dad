@@ -1,6 +1,6 @@
 "use server"
 
-import { redis } from "@/lib/redis"
+import { redis, kv } from "@/lib/redis"
 import { getCurrentBusiness } from "./business-actions"
 
 export interface Coupon {
@@ -14,6 +14,8 @@ export interface Coupon {
   size: "small" | "large"
   businessName: string
   terms: string
+  businessId?: string
+  category?: string
 }
 
 export async function saveBusinessCoupons(businessId: string, coupons: Coupon[]) {
@@ -209,5 +211,180 @@ export async function reinstateCoupon(couponId: string, newExpirationDate: strin
   } catch (error) {
     console.error("Error reinstating coupon:", error)
     return { success: false, error: "Failed to reinstate coupon" }
+  }
+}
+
+// Enhanced getCouponsByZipCode function with better category logging
+export async function getCouponsByZipCode(zipCode: string): Promise<{
+  success: boolean
+  coupons: (Coupon & { businessId: string; category?: string })[]
+  error?: string
+  categoryStats?: { [category: string]: number }
+}> {
+  try {
+    console.log(`Fetching coupons for zip code: ${zipCode}`)
+
+    if (!zipCode) {
+      return { success: false, coupons: [], error: "No zip code provided" }
+    }
+
+    // Step 1: Find businesses that service this zip code
+    const businessesInZip = await kv.smembers(`zipcode:${zipCode}:businesses`)
+    const nationwideBusinesses = await kv.smembers("businesses:nationwide")
+    const allBusinessIds = [...new Set([...businessesInZip, ...nationwideBusinesses])]
+
+    console.log(
+      `Found ${businessesInZip.length} local businesses and ${nationwideBusinesses.length} nationwide businesses for zip code ${zipCode}`,
+    )
+
+    // Step 2: Get coupons for each business
+    const allCoupons: (Coupon & { businessId: string; category?: string })[] = []
+    const categoryStats: { [category: string]: number } = {}
+
+    for (const businessId of allBusinessIds) {
+      try {
+        // Get business details
+        const businessData = await kv.get(`business:${businessId}`)
+        let businessName = "Unknown Business"
+        let businessCategory = undefined
+
+        if (businessData) {
+          if (typeof businessData === "string") {
+            try {
+              const parsedData = JSON.parse(businessData)
+              businessName = parsedData.businessName || "Unknown Business"
+              // Try to get category from the main business data first
+              businessCategory =
+                parsedData.primaryCategory ||
+                parsedData.category ||
+                (parsedData.categories && Array.isArray(parsedData.categories) && parsedData.categories.length > 0
+                  ? parsedData.categories[0]
+                  : undefined)
+            } catch (e) {
+              console.error(`Error parsing business data for ${businessId}:`, e)
+            }
+          } else if (typeof businessData === "object" && businessData !== null) {
+            businessName = businessData.businessName || "Unknown Business"
+            businessCategory =
+              businessData.primaryCategory ||
+              businessData.category ||
+              (businessData.categories && Array.isArray(businessData.categories) && businessData.categories.length > 0
+                ? businessData.categories[0]
+                : undefined)
+          }
+        }
+
+        // If no category found in main business data, check the dedicated category keys
+        if (!businessCategory) {
+          try {
+            // First try to get selected categories
+            const selectedCategoriesData = await kv.get(`business:${businessId}:selectedCategories`)
+            if (selectedCategoriesData) {
+              let selectedCategories = []
+              if (typeof selectedCategoriesData === "string") {
+                try {
+                  selectedCategories = JSON.parse(selectedCategoriesData)
+                } catch (e) {
+                  console.error(`Error parsing selected categories for ${businessId}:`, e)
+                }
+              } else if (Array.isArray(selectedCategoriesData)) {
+                selectedCategories = selectedCategoriesData
+              }
+
+              if (selectedCategories.length > 0) {
+                businessCategory = selectedCategories[0] // Use the first selected category
+                console.log(`Found category from selectedCategories for business ${businessId}: ${businessCategory}`)
+              }
+            }
+
+            // If still no category, try the full categories data
+            if (!businessCategory) {
+              const categoriesData = await kv.get(`business:${businessId}:categories`)
+              if (categoriesData) {
+                let categories = []
+                if (typeof categoriesData === "string") {
+                  try {
+                    categories = JSON.parse(categoriesData)
+                  } catch (e) {
+                    console.error(`Error parsing categories for ${businessId}:`, e)
+                  }
+                } else if (Array.isArray(categoriesData)) {
+                  categories = categoriesData
+                }
+
+                if (categories.length > 0) {
+                  // Extract category name from the first category object
+                  const firstCategory = categories[0]
+                  if (typeof firstCategory === "string") {
+                    businessCategory = firstCategory
+                  } else if (firstCategory && typeof firstCategory === "object") {
+                    businessCategory = firstCategory.category || firstCategory.name || firstCategory.fullPath
+                  }
+                  console.log(`Found category from categories data for business ${businessId}: ${businessCategory}`)
+                }
+              }
+            }
+          } catch (categoryError) {
+            console.error(`Error fetching categories for business ${businessId}:`, categoryError)
+          }
+        }
+
+        console.log(`Business ${businessId} (${businessName}) final category: ${businessCategory || "Uncategorized"}`)
+
+        // Get coupons for this business
+        const couponsResult = await getBusinessCoupons(businessId)
+
+        if (couponsResult.success && couponsResult.coupons && couponsResult.coupons.length > 0) {
+          // Add business ID, business name, and category to each coupon
+          const businessCoupons = couponsResult.coupons.map((coupon) => {
+            const finalCategory = coupon.category || businessCategory || "Uncategorized"
+
+            // Track category statistics
+            categoryStats[finalCategory] = (categoryStats[finalCategory] || 0) + 1
+
+            return {
+              ...coupon,
+              businessId,
+              businessName: coupon.businessName || businessName,
+              category: finalCategory,
+            }
+          })
+
+          allCoupons.push(...businessCoupons)
+          console.log(
+            `Business ${businessId} (${businessName}) contributed ${businessCoupons.length} coupons in category: ${businessCategory || "Uncategorized"}`,
+          )
+        }
+      } catch (businessError) {
+        console.error(`Error processing coupons for business ${businessId}:`, businessError)
+        continue
+      }
+    }
+
+    // Step 3: Filter out expired coupons
+    const now = new Date()
+    const validCoupons = allCoupons.filter((coupon) => {
+      if (!coupon.expirationDate) return true
+
+      const [year, month, day] = coupon.expirationDate.split("-").map(Number)
+      const expDate = new Date(year, month - 1, day, 23, 59, 59, 999)
+      return now <= expDate
+    })
+
+    console.log(`Found ${validCoupons.length} valid coupons for zip code ${zipCode}`)
+    console.log(`Category distribution:`, categoryStats)
+
+    return {
+      success: true,
+      coupons: validCoupons,
+      categoryStats,
+    }
+  } catch (error) {
+    console.error(`Error getting coupons for zip code ${zipCode}:`, error)
+    return {
+      success: false,
+      coupons: [],
+      error: `Failed to retrieve coupons: ${error instanceof Error ? error.message : String(error)}`,
+    }
   }
 }

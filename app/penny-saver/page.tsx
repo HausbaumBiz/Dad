@@ -1,23 +1,42 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, Search, MapPin, Download, Share2, Calendar, Tag, Sparkles } from "lucide-react"
+import { ChevronLeft, Search, MapPin, Download, Share2, Calendar, Tag, Sparkles, Loader2, Check } from "lucide-react"
 import { ZipCodeDialog } from "@/components/zip-code-dialog"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
+import { getCouponsByZipCode, type Coupon } from "@/app/actions/coupon-actions"
+import { getAllBusinessCategories } from "@/app/actions/business-category-actions"
+import { toast } from "@/components/ui/use-toast"
+import html2canvas from "html2canvas"
+
+// Extended coupon type with businessId
+interface ExtendedCoupon extends Coupon {
+  businessId: string
+  category?: string
+}
 
 export default function PennySaverPage() {
   const [zipCode, setZipCode] = useState("")
   const [savedZipCode, setSavedZipCode] = useState("")
   const [isZipDialogOpen, setIsZipDialogOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState("all")
+  const [coupons, setCoupons] = useState<ExtendedCoupon[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savingCouponId, setSavingCouponId] = useState<string | null>(null)
+  const [sharingCouponId, setSharingCouponId] = useState<string | null>(null)
+  const [categories, setCategories] = useState<string[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(false)
+  const couponRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
 
-  const categories = [
+  // Default categories to use if fetching fails
+  const defaultCategories = [
     "Home Improvement",
     "Automotive Services",
     "Elder and Child Care",
@@ -43,17 +62,80 @@ export default function PennySaverPage() {
     "Financial Services",
   ]
 
+  // Fetch categories from Redis
+  const fetchCategories = async () => {
+    setLoadingCategories(true)
+    try {
+      const fetchedCategories = await getAllBusinessCategories()
+      if (fetchedCategories && fetchedCategories.length > 0) {
+        setCategories(fetchedCategories)
+      } else {
+        // Fall back to default categories if none found
+        setCategories(defaultCategories)
+      }
+    } catch (err) {
+      console.error("Error fetching categories:", err)
+      // Fall back to default categories on error
+      setCategories(defaultCategories)
+    } finally {
+      setLoadingCategories(false)
+    }
+  }
+
   useEffect(() => {
+    // Fetch categories when component mounts
+    fetchCategories()
+
+    // Check for saved zip code
     const savedZip = localStorage.getItem("pennySaverZipCode")
     if (savedZip) {
       setSavedZipCode(savedZip)
+      fetchCouponsForZipCode(savedZip)
     }
   }, [])
+
+  const fetchCouponsForZipCode = async (zipCodeValue: string) => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const result = await getCouponsByZipCode(zipCodeValue)
+
+      if (result.success) {
+        setCoupons(result.coupons)
+
+        // Extract unique categories from coupons to ensure dropdown has all relevant options
+        const couponCategories = new Set<string>()
+        result.coupons.forEach((coupon) => {
+          if (coupon.category) couponCategories.add(coupon.category)
+        })
+
+        // If we found categories in coupons that aren't in our list, update the categories
+        const newCategories = Array.from(couponCategories)
+        if (newCategories.length > 0 && newCategories.some((cat) => !categories.includes(cat))) {
+          setCategories((prevCategories) => {
+            const updatedCategories = [...new Set([...prevCategories, ...newCategories])]
+            return updatedCategories.sort()
+          })
+        }
+      } else {
+        setError(result.error || "Failed to fetch coupons")
+        setCoupons([])
+      }
+    } catch (err) {
+      console.error("Error fetching coupons:", err)
+      setError("An unexpected error occurred while fetching coupons")
+      setCoupons([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleZipSubmit = () => {
     if (zipCode) {
       localStorage.setItem("pennySaverZipCode", zipCode)
       setSavedZipCode(zipCode)
+      fetchCouponsForZipCode(zipCode)
     } else {
       alert("Please enter a Zip Code.")
     }
@@ -63,85 +145,144 @@ export default function PennySaverPage() {
     setZipCode(zipCodeValue)
     localStorage.setItem("pennySaverZipCode", zipCodeValue)
     setSavedZipCode(zipCodeValue)
+    fetchCouponsForZipCode(zipCodeValue)
   }
 
   const handleCategoryChange = (value: string) => {
     setSelectedCategory(value)
   }
 
-  // Sample deals for demonstration
-  const sampleDeals = [
-    {
-      id: "1",
-      businessName: "Joe's Pizza",
-      title: "Weekend Special",
-      discount: "20% OFF",
-      description: "Get 20% off on all large pizzas every weekend. Valid for dine-in and takeout orders.",
-      code: "WEEKEND20",
-      expires: "2025-06-30",
-      category: "Food & Dining",
-    },
-    {
-      id: "2",
-      businessName: "Green Thumb Garden Center",
-      title: "Spring Planting Sale",
-      discount: "Buy 2 Get 1 FREE",
-      description: "Buy any two plants and get the third one free of equal or lesser value.",
-      code: "PLANT3",
-      expires: "2025-05-15",
-      category: "Home Improvement",
-    },
-    {
-      id: "3",
-      businessName: "Sparkle Auto Detailing",
-      title: "First-Time Customer",
-      discount: "$25 OFF",
-      description: "First-time customers receive $25 off our premium detailing package.",
-      code: "NEWCUSTOMER",
-      expires: "2025-07-31",
-      category: "Automotive Services",
-    },
-    {
-      id: "4",
-      businessName: "Fitness First Gym",
-      title: "Summer Membership",
-      discount: "50% OFF First Month",
-      description: "Join now and get 50% off your first month of membership. No contracts required.",
-      code: "SUMMER50",
-      expires: "2025-08-15",
-      category: "Fitness & Athletics",
-    },
-    {
-      id: "5",
-      businessName: "Tech Solutions",
-      title: "Computer Repair",
-      discount: "$15 OFF",
-      description: "Get $15 off any computer repair service. Diagnostics included.",
-      code: "FIXMYPC",
-      expires: "2025-09-30",
-      category: "Tech & IT Services",
-    },
-    {
-      id: "6",
-      businessName: "Cozy Corner Bookstore",
-      title: "Book Lover's Deal",
-      discount: "Buy 3 Pay for 2",
-      description: "Purchase any three books and only pay for two. Cheapest book is free.",
-      code: "BOOKWORM",
-      expires: "2025-06-15",
-      category: "Retail Stores",
-    },
-  ]
-
-  // Filter deals based on selected category
-  const filteredDeals =
-    selectedCategory === "all" ? sampleDeals : sampleDeals.filter((deal) => deal.category === selectedCategory)
+  // Filter coupons based on selected category
+  const filteredCoupons =
+    selectedCategory === "all"
+      ? coupons
+      : coupons.filter((coupon) => {
+          // Match by coupon category if available
+          return coupon.category === selectedCategory
+        })
 
   // Format date from YYYY-MM-DD to MM/DD/YYYY
   const formatDate = (dateString: string) => {
     if (!dateString) return ""
-    const [year, month, day] = dateString.split("-")
+    const [year, month, day] = dateString.split("-").map(Number)
     return `${month}/${day}/${year}`
+  }
+
+  // Function to handle saving a coupon
+  const handleSaveCoupon = async (coupon: ExtendedCoupon) => {
+    try {
+      setSavingCouponId(coupon.id)
+
+      // Get the coupon element reference
+      const couponElement = couponRefs.current[coupon.id]
+
+      if (!couponElement) {
+        throw new Error("Could not find coupon element")
+      }
+
+      // Use html2canvas to create an image of the coupon
+      const canvas = await html2canvas(couponElement, {
+        backgroundColor: "#ffffff",
+        scale: 2, // Higher quality
+        logging: false,
+        allowTaint: true,
+        useCORS: true,
+      })
+
+      // Convert canvas to blob
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob)
+            } else {
+              throw new Error("Failed to create image")
+            }
+          },
+          "image/png",
+          0.95,
+        )
+      })
+
+      // Create a download link
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `${coupon.businessName}-${coupon.title.replace(/\s+/g, "-")}.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      // Clean up
+      setTimeout(() => URL.revokeObjectURL(url), 100)
+
+      toast({
+        title: "Coupon Saved",
+        description: "The coupon has been saved to your device.",
+      })
+    } catch (error) {
+      console.error("Error saving coupon:", error)
+      toast({
+        title: "Error Saving Coupon",
+        description: "There was a problem saving the coupon. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingCouponId(null)
+    }
+  }
+
+  // Function to handle sharing a coupon
+  const handleShareCoupon = async (coupon: ExtendedCoupon) => {
+    try {
+      setSharingCouponId(coupon.id)
+
+      // Prepare share data
+      const shareData = {
+        title: `${coupon.businessName} - ${coupon.title}`,
+        text: `${coupon.discount} off at ${coupon.businessName}! ${coupon.description} ${coupon.code ? `Use code: ${coupon.code}` : ""} Valid until: ${formatDate(coupon.expirationDate)}`,
+        url: window.location.href,
+      }
+
+      // Check if Web Share API is available
+      if (navigator.share && navigator.canShare(shareData)) {
+        await navigator.share(shareData)
+        toast({
+          title: "Coupon Shared",
+          description: "The coupon has been shared successfully.",
+        })
+      } else {
+        // Fallback for browsers that don't support Web Share API
+        await navigator.clipboard.writeText(
+          `${coupon.businessName} - ${coupon.title}\n${coupon.discount}\n${coupon.description}\n${coupon.code ? `Code: ${coupon.code}` : ""}\nValid until: ${formatDate(coupon.expirationDate)}`,
+        )
+        toast({
+          title: "Coupon Details Copied",
+          description: "Coupon details have been copied to your clipboard.",
+        })
+      }
+    } catch (error) {
+      console.error("Error sharing coupon:", error)
+
+      // Try clipboard as fallback if sharing fails
+      try {
+        await navigator.clipboard.writeText(
+          `${coupon.businessName} - ${coupon.title}\n${coupon.discount}\n${coupon.description}\n${coupon.code ? `Code: ${coupon.code}` : ""}\nValid until: ${formatDate(coupon.expirationDate)}`,
+        )
+        toast({
+          title: "Coupon Details Copied",
+          description: "Coupon details have been copied to your clipboard.",
+        })
+      } catch (clipboardError) {
+        toast({
+          title: "Error Sharing Coupon",
+          description: "There was a problem sharing the coupon. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setSharingCouponId(null)
+    }
   }
 
   return (
@@ -149,6 +290,7 @@ export default function PennySaverPage() {
       <MainHeader />
 
       <main className="flex-grow container mx-auto px-4 py-8">
+        {/* Back to Home Button */}
         <div className="mb-6">
           <Button variant="ghost" asChild className="pl-0">
             <Link href="/" className="flex items-center text-primary">
@@ -209,9 +351,18 @@ export default function PennySaverPage() {
                   className="w-full"
                 />
               </div>
-              <Button onClick={handleZipSubmit}>
-                <Search className="mr-2 h-4 w-4" />
-                Search
+              <Button onClick={handleZipSubmit} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Search className="mr-2 h-4 w-4" />
+                    Search
+                  </>
+                )}
               </Button>
             </div>
 
@@ -222,8 +373,8 @@ export default function PennySaverPage() {
                   Filter by Category
                 </label>
                 <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a category" />
+                  <SelectTrigger className="w-full" disabled={loadingCategories}>
+                    <SelectValue placeholder={loadingCategories ? "Loading categories..." : "Select a category"} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
@@ -280,54 +431,109 @@ export default function PennySaverPage() {
                 }}
               ></div>
 
-              {/* Coupon Grid */}
-              {filteredDeals.length === 0 ? (
+              {/* Loading State */}
+              {isLoading && (
                 <div className="text-center py-12 relative z-10">
-                  <p className="text-gray-500 text-lg mb-4">No deals available for this category at this time.</p>
-                  <p className="text-gray-400">Check back soon for new savings opportunities!</p>
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-amber-500" />
+                  <p className="text-gray-500 text-lg">Loading coupons for your area...</p>
                 </div>
-              ) : (
+              )}
+
+              {/* Error State */}
+              {error && !isLoading && (
+                <div className="text-center py-12 relative z-10">
+                  <p className="text-red-500 text-lg mb-2">Error: {error}</p>
+                  <p className="text-gray-500">Please try again or try a different zip code.</p>
+                </div>
+              )}
+
+              {/* No Coupons State */}
+              {!isLoading && !error && filteredCoupons.length === 0 && coupons.length === 0 && (
+                <div className="text-center py-12 relative z-10">
+                  <p className="text-gray-500 text-lg mb-4">No coupons are currently available in your area.</p>
+                  <p className="text-gray-400">Please check back soon for new deals from local businesses!</p>
+                </div>
+              )}
+
+              {/* No Coupons in Selected Category */}
+              {!isLoading && !error && filteredCoupons.length === 0 && coupons.length > 0 && (
+                <div className="text-center py-12 relative z-10">
+                  <p className="text-gray-500 text-lg mb-4">No coupons found in the "{selectedCategory}" category.</p>
+                  <p className="text-gray-400">Try selecting a different category or view all coupons.</p>
+                  <Button variant="outline" className="mt-4" onClick={() => setSelectedCategory("all")}>
+                    View All Coupons
+                  </Button>
+                </div>
+              )}
+
+              {/* Coupon Grid */}
+              {!isLoading && !error && filteredCoupons.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
-                  {filteredDeals.map((deal) => (
-                    <div key={deal.id} className="relative">
-                      <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  {filteredCoupons.map((coupon) => (
+                    <div key={coupon.id} className="relative">
+                      <div
+                        ref={(el) => (couponRefs.current[coupon.id] = el)}
+                        className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      >
                         <div className="absolute -top-2 -right-2">
                           <div className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full border border-amber-300 shadow-sm">
-                            {deal.category}
+                            {coupon.category || "General"}
                           </div>
                         </div>
 
                         <div className="text-center mb-2">
-                          <h4 className="font-bold text-lg text-teal-700">{deal.businessName}</h4>
+                          <h4 className="font-bold text-lg text-teal-700">{coupon.businessName}</h4>
                         </div>
 
                         <div className="text-center mb-3">
-                          <div className="font-bold text-xl">{deal.title}</div>
-                          <div className="text-2xl font-extrabold text-red-600">{deal.discount}</div>
+                          <div className="font-bold text-xl">{coupon.title}</div>
+                          <div className="text-2xl font-extrabold text-red-600">{coupon.discount}</div>
                         </div>
 
-                        <div className="text-sm mb-3">{deal.description}</div>
+                        <div className="text-sm mb-3">{coupon.description}</div>
 
-                        {deal.code && (
+                        {coupon.code && (
                           <div className="text-center mb-2">
                             <span className="inline-block bg-gray-100 px-2 py-1 rounded font-mono text-sm">
-                              Code: {deal.code}
+                              Code: {coupon.code}
                             </span>
                           </div>
                         )}
 
                         <div className="text-xs text-gray-600 mt-2 font-semibold flex items-center justify-center">
                           <Calendar className="h-3 w-3 mr-1" />
-                          Expires: {formatDate(deal.expires)}
+                          Expires: {formatDate(coupon.expirationDate)}
                         </div>
 
                         <div className="flex justify-between mt-4">
-                          <Button variant="outline" size="sm" className="flex items-center">
-                            <Download className="mr-1 h-4 w-4" />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center"
+                            onClick={() => handleSaveCoupon(coupon)}
+                            disabled={savingCouponId === coupon.id}
+                          >
+                            {savingCouponId === coupon.id ? (
+                              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="mr-1 h-4 w-4" />
+                            )}
                             Save
                           </Button>
-                          <Button variant="outline" size="sm" className="flex items-center">
-                            <Share2 className="mr-1 h-4 w-4" />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center"
+                            onClick={() => handleShareCoupon(coupon)}
+                            disabled={sharingCouponId === coupon.id}
+                          >
+                            {sharingCouponId === coupon.id ? (
+                              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                            ) : sharingCouponId === `${coupon.id}-done` ? (
+                              <Check className="mr-1 h-4 w-4" />
+                            ) : (
+                              <Share2 className="mr-1 h-4 w-4" />
+                            )}
                             Share
                           </Button>
                         </div>

@@ -16,13 +16,6 @@ export function MainHeader() {
             />
           </div>
         </Link>
-        <Link
-          href="/workbench"
-          className="px-2 py-1 sm:px-3 sm:py-2 md:px-4 md:py-2 rounded-md bg-hausbaum hover:bg-hausbaum-dark transition-colors text-white font-medium text-xs sm:text-sm md:text-base whitespace-nowrap ml-2"
-        >
-          <span className="hidden sm:inline">Back to Workbench</span>
-          <span className="sm:hidden">Back</span>
-        </Link>
       </div>
     </header>
   )

@@ -3,7 +3,7 @@
 import { kv } from "@/lib/redis"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
-import crypto from "crypto"
+// Remove direct crypto import
 import bcrypt from "bcryptjs"
 import type { Business } from "@/lib/definitions"
 import {
@@ -16,6 +16,7 @@ import {
   KEY_PREFIXES,
   type CategoryData,
 } from "@/lib/db-schema"
+import { generateId } from "@/lib/utils"
 
 // Helper function to safely extract error messages
 function getErrorMessage(error: unknown): string {
@@ -350,8 +351,8 @@ export async function registerBusiness(formData: FormData) {
       return { success: false, message: `Email ${email} already registered` }
     }
 
-    // Generate a unique ID for the business
-    const id = crypto.randomUUID()
+    // Generate a unique ID for the business using our browser-compatible function
+    const id = generateId()
 
     // Hash the password
     const salt = await bcrypt.genSalt(10)
