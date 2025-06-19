@@ -11,7 +11,7 @@ import { SuggestCategoryModal } from "@/components/suggest-category-modal"
 import { CategoryChangeWarning } from "@/components/category-change-warning"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Loader2 } from "lucide-react"
+import { Search, Loader2, ArrowLeft } from "lucide-react"
 import { saveBusinessCategories, getBusinessCategories } from "@/app/actions/category-actions"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -138,6 +138,20 @@ export default function BusinessFocusPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
+
+      {/* Back to Workbench Button */}
+      <div className="bg-white border-b border-gray-200 px-4 py-2">
+        <div className="container mx-auto">
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/workbench")}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Workbench
+          </Button>
+        </div>
+      </div>
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">

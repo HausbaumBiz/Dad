@@ -30,7 +30,7 @@ import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
 import { getBusinessCoupons, reinstateCoupon, type Coupon } from "@/app/actions/coupon-actions"
-import { Calendar, Clock, RotateCcw } from "lucide-react"
+import { Calendar, Clock, RotateCcw, ArrowLeft } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -742,6 +742,20 @@ export default function StatisticsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
+
+      {/* Back to Workbench Button */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="container mx-auto">
+          <Button
+            variant="outline"
+            onClick={() => router.push("/workbench")}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Workbench
+          </Button>
+        </div>
+      </div>
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">

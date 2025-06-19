@@ -40,6 +40,8 @@ import {
   type DocumentMetadata,
   type DocumentType,
 } from "@/app/actions/document-actions"
+import { MainHeader } from "@/components/main-header"
+import { MainFooter } from "@/components/main-footer"
 
 export default function CustomButtonWorkbenchPage() {
   const { toast } = useToast()
@@ -398,115 +400,70 @@ export default function CustomButtonWorkbenchPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-8">
-      <div className="container mx-auto px-4 max-w-7xl">
-        <div className="flex justify-between items-center mb-8">
-          <Link
-            href="/workbench"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors text-gray-700"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Workbench
-          </Link>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <MainHeader />
 
-          {!loading && business && <div className="text-sm text-gray-500">{business.businessName}</div>}
-        </div>
+      <div className="container mx-auto px-4 max-w-7xl mt-8">
+        <Link
+          href="/workbench"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors text-gray-700"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Workbench
+        </Link>
+      </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 mb-8">
-          <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">Document Workbench</h1>
-          <p className="text-center text-gray-600 mb-6">Upload, manage, and print your business documents</p>
+      <main className="flex-1 py-8">
+        <div className="container mx-auto px-4 max-w-7xl">
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 mb-8">
+            <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">Document Workbench</h1>
+            <p className="text-center text-gray-600 mb-6">Upload, manage, and print your business documents</p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Document Preview Section */}
-            <div className="lg:col-span-2 order-2 lg:order-1">
-              {selectedDocument ? (
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                      {getDocumentIcon(selectedDocument.fileType)}
-                      {selectedDocument.name}
-                    </h2>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={handlePrint} className="flex items-center gap-1">
-                        <Printer className="h-4 w-4" />
-                        <span className="hidden sm:inline">Print</span>
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={handleDownload} className="flex items-center gap-1">
-                        <Download className="h-4 w-4" />
-                        <span className="hidden sm:inline">Download</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(selectedDocument)}
-                        className="flex items-center gap-1 text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Document Preview Section */}
+              <div className="lg:col-span-2 order-2 lg:order-1">
+                {selectedDocument ? (
+                  <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-xl font-semibold flex items-center gap-2">
+                        {getDocumentIcon(selectedDocument.fileType)}
+                        {selectedDocument.name}
+                      </h2>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handlePrint} className="flex items-center gap-1">
+                          <Printer className="h-4 w-4" />
+                          <span className="hidden sm:inline">Print</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDownload}
+                          className="flex items-center gap-1"
+                        >
+                          <Download className="h-4 w-4" />
+                          <span className="hidden sm:inline">Download</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(selectedDocument)}
+                          className="flex items-center gap-1 text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="bg-white rounded border border-gray-200 p-2 mb-4">
-                    <div className="aspect-[4/3] relative">
-                      {selectedDocument.fileType.includes("pdf") ? (
-                        pdfViewerError ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center">
-                            <div className="text-center mb-4">
-                              <p className="text-gray-600 mb-2">
-                                PDF preview couldn't be loaded in the embedded viewer
-                              </p>
-                              <div className="flex gap-2 justify-center">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={handleOpenInNewWindow}
-                                  className="flex items-center gap-1"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                  Open PDF
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={handlePrint}
-                                  className="flex items-center gap-1"
-                                >
-                                  <Printer className="h-4 w-4" />
-                                  Print
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="bg-gray-100 rounded p-4 w-full max-w-md text-center">
-                              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                              <p className="text-sm text-gray-500">{selectedDocument.name}</p>
-                              <p className="text-xs text-gray-400 mt-1">{formatFileSize(selectedDocument.size)}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-full h-full flex flex-col">
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleOpenInNewWindow}
-                                className="flex items-center gap-1"
-                              >
-                                <Maximize2 className="h-4 w-4" />
-                                <span className="hidden sm:inline">Open Full Screen</span>
-                              </Button>
-                            </div>
-                            <div className="flex-1 relative min-h-[300px]">
-                              <object
-                                ref={pdfObjectRef}
-                                data={`${selectedDocument.url}#toolbar=0`}
-                                type="application/pdf"
-                                className="w-full h-full absolute inset-0"
-                                onError={handlePdfError}
-                              >
-                                <div className="w-full h-full flex flex-col items-center justify-center">
-                                  <p className="text-gray-600 mb-2">
-                                    Your browser doesn't support embedded PDF viewing
-                                  </p>
+                    <div className="bg-white rounded border border-gray-200 p-2 mb-4">
+                      <div className="aspect-[4/3] relative">
+                        {selectedDocument.fileType.includes("pdf") ? (
+                          pdfViewerError ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center">
+                              <div className="text-center mb-4">
+                                <p className="text-gray-600 mb-2">
+                                  PDF preview couldn't be loaded in the embedded viewer
+                                </p>
+                                <div className="flex gap-2 justify-center">
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -516,269 +473,323 @@ export default function CustomButtonWorkbenchPage() {
                                     <ExternalLink className="h-4 w-4" />
                                     Open PDF
                                   </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handlePrint}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <Printer className="h-4 w-4" />
+                                    Print
+                                  </Button>
                                 </div>
-                              </object>
+                              </div>
+                              <div className="bg-gray-100 rounded p-4 w-full max-w-md text-center">
+                                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                                <p className="text-sm text-gray-500">{selectedDocument.name}</p>
+                                <p className="text-xs text-gray-400 mt-1">{formatFileSize(selectedDocument.size)}</p>
+                              </div>
                             </div>
+                          ) : (
+                            <div className="w-full h-full flex flex-col">
+                              <div className="flex justify-end mb-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleOpenInNewWindow}
+                                  className="flex items-center gap-1"
+                                >
+                                  <Maximize2 className="h-4 w-4" />
+                                  <span className="hidden sm:inline">Open Full Screen</span>
+                                </Button>
+                              </div>
+                              <div className="flex-1 relative min-h-[300px]">
+                                <object
+                                  ref={pdfObjectRef}
+                                  data={`${selectedDocument.url}#toolbar=0`}
+                                  type="application/pdf"
+                                  className="w-full h-full absolute inset-0"
+                                  onError={handlePdfError}
+                                >
+                                  <div className="w-full h-full flex flex-col items-center justify-center">
+                                    <p className="text-gray-600 mb-2">
+                                      Your browser doesn't support embedded PDF viewing
+                                    </p>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleOpenInNewWindow}
+                                      className="flex items-center gap-1"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                      Open PDF
+                                    </Button>
+                                  </div>
+                                </object>
+                              </div>
+                            </div>
+                          )
+                        ) : (
+                          <Image
+                            src={selectedDocument.url || "/placeholder.svg"}
+                            alt={selectedDocument.name}
+                            fill
+                            style={{ objectFit: "contain" }}
+                            className="rounded"
+                            unoptimized // Important for blob storage URLs
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                      <div>
+                        <span className="font-medium">Type:</span>{" "}
+                        <span className="capitalize">{selectedDocument.type}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Format:</span>{" "}
+                        {selectedDocument.fileType.split("/")[1].toUpperCase()}
+                      </div>
+                      <div>
+                        <span className="font-medium">Size:</span> {formatFileSize(selectedDocument.size)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Uploaded:</span>{" "}
+                        {new Date(selectedDocument.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-lg border border-gray-200 p-8 flex flex-col items-center justify-center h-full min-h-[400px]">
+                    <FileText className="h-16 w-16 text-gray-300 mb-4" />
+                    <h3 className="text-xl font-medium text-gray-500 mb-2">No Document Selected</h3>
+                    <p className="text-gray-400 text-center max-w-md">
+                      Select a document from the list or upload a new one to preview, print, or download it.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload and Document List Section */}
+              <div className="order-1 lg:order-2">
+                <Card>
+                  <CardContent className="p-4">
+                    <Tabs defaultValue="documents" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2 mb-4">
+                        <TabsTrigger value="documents">My Documents</TabsTrigger>
+                        <TabsTrigger value="upload">Upload New</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="documents" className="mt-0">
+                        {loading ? (
+                          <div className="space-y-3">
+                            {[...Array(5)].map((_, i) => (
+                              <Skeleton key={i} className="h-16 w-full" />
+                            ))}
                           </div>
-                        )
-                      ) : (
-                        <Image
-                          src={selectedDocument.url || "/placeholder.svg"}
-                          alt={selectedDocument.name}
-                          fill
-                          style={{ objectFit: "contain" }}
-                          className="rounded"
-                          unoptimized // Important for blob storage URLs
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                    <div>
-                      <span className="font-medium">Type:</span>{" "}
-                      <span className="capitalize">{selectedDocument.type}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium">Format:</span>{" "}
-                      {selectedDocument.fileType.split("/")[1].toUpperCase()}
-                    </div>
-                    <div>
-                      <span className="font-medium">Size:</span> {formatFileSize(selectedDocument.size)}
-                    </div>
-                    <div>
-                      <span className="font-medium">Uploaded:</span>{" "}
-                      {new Date(selectedDocument.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-8 flex flex-col items-center justify-center h-full min-h-[400px]">
-                  <FileText className="h-16 w-16 text-gray-300 mb-4" />
-                  <h3 className="text-xl font-medium text-gray-500 mb-2">No Document Selected</h3>
-                  <p className="text-gray-400 text-center max-w-md">
-                    Select a document from the list or upload a new one to preview, print, or download it.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Upload and Document List Section */}
-            <div className="order-1 lg:order-2">
-              <Card>
-                <CardContent className="p-4">
-                  <Tabs defaultValue="documents" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 mb-4">
-                      <TabsTrigger value="documents">My Documents</TabsTrigger>
-                      <TabsTrigger value="upload">Upload New</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="documents" className="mt-0">
-                      {loading ? (
-                        <div className="space-y-3">
-                          {[...Array(5)].map((_, i) => (
-                            <Skeleton key={i} className="h-16 w-full" />
-                          ))}
-                        </div>
-                      ) : documents.length > 0 ? (
-                        <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                          {documents.map((doc) => (
-                            <div
-                              key={doc.id}
-                              className={`p-3 rounded-lg border transition-colors ${
-                                selectedDocument?.id === doc.id
-                                  ? "bg-primary/10 border-primary"
-                                  : "bg-white border-gray-200 hover:bg-gray-50"
-                              }`}
-                              onClick={() => editingDocumentId !== doc.id && setSelectedDocument(doc)}
-                            >
-                              <div className="flex items-center gap-3">
-                                {getDocumentIcon(doc.fileType)}
-                                <div className="flex-1 min-w-0">
-                                  {editingDocumentId === doc.id ? (
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        ref={renameInputRef}
-                                        value={newDocumentName}
-                                        onChange={(e) => setNewDocumentName(e.target.value)}
-                                        onKeyDown={(e) => handleRenameKeyDown(doc, e)}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="h-8 py-1"
-                                        autoFocus
-                                      />
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-7 w-7 text-green-600"
-                                        onClick={(e) => handleRename(doc, e)}
-                                      >
-                                        <Check className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-7 w-7 text-gray-500"
-                                        onClick={cancelRenaming}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-center justify-between">
-                                        <h3 className="font-medium text-gray-900 truncate">{doc.name}</h3>
+                        ) : documents.length > 0 ? (
+                          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                            {documents.map((doc) => (
+                              <div
+                                key={doc.id}
+                                className={`p-3 rounded-lg border transition-colors ${
+                                  selectedDocument?.id === doc.id
+                                    ? "bg-primary/10 border-primary"
+                                    : "bg-white border-gray-200 hover:bg-gray-50"
+                                }`}
+                                onClick={() => editingDocumentId !== doc.id && setSelectedDocument(doc)}
+                              >
+                                <div className="flex items-center gap-3">
+                                  {getDocumentIcon(doc.fileType)}
+                                  <div className="flex-1 min-w-0">
+                                    {editingDocumentId === doc.id ? (
+                                      <div className="flex items-center gap-2">
+                                        <Input
+                                          ref={renameInputRef}
+                                          value={newDocumentName}
+                                          onChange={(e) => setNewDocumentName(e.target.value)}
+                                          onKeyDown={(e) => handleRenameKeyDown(doc, e)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="h-8 py-1"
+                                          autoFocus
+                                        />
                                         <Button
                                           size="icon"
                                           variant="ghost"
-                                          className="h-7 w-7 text-gray-400 hover:text-gray-700 ml-2 opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                          onClick={(e) => startRenaming(doc, e)}
-                                          title="Rename document"
+                                          className="h-7 w-7 text-green-600"
+                                          onClick={(e) => handleRename(doc, e)}
                                         >
-                                          <Pencil className="h-3.5 w-3.5" />
+                                          <Check className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-7 w-7 text-gray-500"
+                                          onClick={cancelRenaming}
+                                        >
+                                          <X className="h-4 w-4" />
                                         </Button>
                                       </div>
-                                      <div className="flex items-center text-xs text-gray-500 mt-1">
-                                        <span className="flex items-center">
-                                          {getDocumentTypeIcon(doc.type)}
-                                          <span className="ml-1 capitalize">{doc.type}</span>
-                                        </span>
-                                        <span className="mx-2">•</span>
-                                        <span>{formatFileSize(doc.size)}</span>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                                {editingDocumentId !== doc.id && (
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 text-gray-400 hover:text-gray-700"
-                                    onClick={(e) => startRenaming(doc, e)}
-                                    title="Rename document"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                          <h3 className="text-gray-500 font-medium mb-1">No documents found</h3>
-                          <p className="text-gray-400 text-sm mb-4">Upload your first document to get started</p>
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    <TabsContent value="upload" className="mt-0">
-                      <form ref={uploadFormRef} onSubmit={handleUpload}>
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="documentName">Document Name</Label>
-                            <Input
-                              id="documentName"
-                              value={documentName}
-                              onChange={(e) => setDocumentName(e.target.value)}
-                              placeholder="Enter document name"
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <Label>Upload File</Label>
-                            <div
-                              className={`mt-2 border-2 border-dashed rounded-lg p-6 text-center ${
-                                dragActive
-                                  ? "border-primary bg-primary/5"
-                                  : selectedFile
-                                    ? "border-green-500 bg-green-50"
-                                    : "border-gray-300"
-                              }`}
-                              onDragEnter={handleDrag}
-                              onDragOver={handleDrag}
-                              onDragLeave={handleDrag}
-                              onDrop={handleDrop}
-                            >
-                              {selectedFile ? (
-                                <>
-                                  <div className="flex items-center justify-center mb-2">
-                                    {selectedFile.type.includes("pdf") ? (
-                                      <FileText className="h-8 w-8 text-red-500" />
                                     ) : (
-                                      <FileType className="h-8 w-8 text-blue-500" />
+                                      <>
+                                        <div className="flex items-center justify-between">
+                                          <h3 className="font-medium text-gray-900 truncate">{doc.name}</h3>
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-7 w-7 text-gray-400 hover:text-gray-700 ml-2 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                            onClick={(e) => startRenaming(doc, e)}
+                                            title="Rename document"
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
+                                        <div className="flex items-center text-xs text-gray-500 mt-1">
+                                          <span className="flex items-center">
+                                            {getDocumentTypeIcon(doc.type)}
+                                            <span className="ml-1 capitalize">{doc.type}</span>
+                                          </span>
+                                          <span className="mx-2">•</span>
+                                          <span>{formatFileSize(doc.size)}</span>
+                                        </div>
+                                      </>
                                     )}
                                   </div>
-                                  <p className="text-sm font-medium text-gray-700 mb-1">{selectedFile.name}</p>
-                                  <p className="text-xs text-gray-500 mb-2">{formatFileSize(selectedFile.size)}</p>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedFile(null)
-                                      if (fileInputRef.current) {
-                                        fileInputRef.current.value = ""
-                                      }
-                                    }}
-                                  >
-                                    Change File
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                  <p className="text-sm text-gray-600 mb-1">Drag & drop your file here, or</p>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => fileInputRef.current?.click()}
-                                  >
-                                    Browse Files
-                                  </Button>
-                                </>
-                              )}
-                              <input
-                                ref={fileInputRef}
-                                type="file"
-                                className="hidden"
-                                accept=".pdf,.jpg,.jpeg,.webp"
-                                onChange={handleFileChange}
+                                  {editingDocumentId !== doc.id && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 text-gray-400 hover:text-gray-700"
+                                      onClick={(e) => startRenaming(doc, e)}
+                                      title="Rename document"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                            <h3 className="text-gray-500 font-medium mb-1">No documents found</h3>
+                            <p className="text-gray-400 text-sm mb-4">Upload your first document to get started</p>
+                          </div>
+                        )}
+                      </TabsContent>
+
+                      <TabsContent value="upload" className="mt-0">
+                        <form ref={uploadFormRef} onSubmit={handleUpload}>
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="documentName">Document Name</Label>
+                              <Input
+                                id="documentName"
+                                value={documentName}
+                                onChange={(e) => setDocumentName(e.target.value)}
+                                placeholder="Enter document name"
                                 required
                               />
-                              <p className="text-xs text-gray-400 mt-2">Supported formats: PDF, JPG, WEBP</p>
                             </div>
+
+                            <div>
+                              <Label>Upload File</Label>
+                              <div
+                                className={`mt-2 border-2 border-dashed rounded-lg p-6 text-center ${
+                                  dragActive
+                                    ? "border-primary bg-primary/5"
+                                    : selectedFile
+                                      ? "border-green-500 bg-green-50"
+                                      : "border-gray-300"
+                                }`}
+                                onDragEnter={handleDrag}
+                                onDragOver={handleDrag}
+                                onDragLeave={handleDrag}
+                                onDrop={handleDrop}
+                              >
+                                {selectedFile ? (
+                                  <>
+                                    <div className="flex items-center justify-center mb-2">
+                                      {selectedFile.type.includes("pdf") ? (
+                                        <FileText className="h-8 w-8 text-red-500" />
+                                      ) : (
+                                        <FileType className="h-8 w-8 text-blue-500" />
+                                      )}
+                                    </div>
+                                    <p className="text-sm font-medium text-gray-700 mb-1">{selectedFile.name}</p>
+                                    <p className="text-xs text-gray-500 mb-2">{formatFileSize(selectedFile.size)}</p>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedFile(null)
+                                        if (fileInputRef.current) {
+                                          fileInputRef.current.value = ""
+                                        }
+                                      }}
+                                    >
+                                      Change File
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                    <p className="text-sm text-gray-600 mb-1">Drag & drop your file here, or</p>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => fileInputRef.current?.click()}
+                                    >
+                                      Browse Files
+                                    </Button>
+                                  </>
+                                )}
+                                <input
+                                  ref={fileInputRef}
+                                  type="file"
+                                  className="hidden"
+                                  accept=".pdf,.jpg,.jpeg,.webp"
+                                  onChange={handleFileChange}
+                                  required
+                                />
+                                <p className="text-xs text-gray-400 mt-2">Supported formats: PDF, JPG, WEBP</p>
+                              </div>
+                            </div>
+
+                            {error && (
+                              <div className="flex items-center gap-2 text-red-500 text-sm">
+                                <AlertCircle className="h-4 w-4" />
+                                {error}
+                              </div>
+                            )}
+
+                            {uploadSuccess && (
+                              <div className="flex items-center gap-2 text-green-500 text-sm">
+                                <Check className="h-4 w-4" />
+                                Document uploaded successfully!
+                              </div>
+                            )}
+
+                            <Button type="submit" className="w-full" disabled={uploading || !selectedFile}>
+                              {uploading ? "Uploading..." : "Upload Document"}
+                            </Button>
                           </div>
-
-                          {error && (
-                            <div className="flex items-center gap-2 text-red-500 text-sm">
-                              <AlertCircle className="h-4 w-4" />
-                              {error}
-                            </div>
-                          )}
-
-                          {uploadSuccess && (
-                            <div className="flex items-center gap-2 text-green-500 text-sm">
-                              <Check className="h-4 w-4" />
-                              Document uploaded successfully!
-                            </div>
-                          )}
-
-                          <Button type="submit" className="w-full" disabled={uploading || !selectedFile}>
-                            {uploading ? "Uploading..." : "Upload Document"}
-                          </Button>
-                        </div>
-                      </form>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
+                        </form>
+                      </TabsContent>
+                    </Tabs>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+
+      <MainFooter />
+    </div>
   )
 }

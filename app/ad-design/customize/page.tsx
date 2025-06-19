@@ -397,7 +397,7 @@ export default function CustomizeAdDesignPage() {
 
         // Set the Cloudflare image as our placeholder
         setThumbnailPreview(
-          "https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public",
+          "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/video%20tag-27Lj9Sz5fOFsKQvBZlmD0piiR9U4Of.png",
         )
 
         // Set photo album if available
@@ -420,7 +420,7 @@ export default function CustomizeAdDesignPage() {
       setCloudflareVideo(null)
       // Still set the Cloudflare image as our placeholder even on error
       setThumbnailPreview(
-        "https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public",
+        "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/video%20tag-27Lj9Sz5fOFsKQvBZlmD0piiR9U4Of.png",
       )
       setPhotos([])
 
@@ -1209,8 +1209,8 @@ export default function CustomizeAdDesignPage() {
                         /* Image Placeholder */
                         <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
                           <img
-                            src="https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public"
-                            alt="Business image"
+                            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/video%20tag-27Lj9Sz5fOFsKQvBZlmD0piiR9U4Of.png"
+                            alt="Business video placeholder"
                             className="w-full h-full object-cover"
                           />
                         </div>
@@ -1300,10 +1300,9 @@ export default function CustomizeAdDesignPage() {
               {!hiddenFields.website && (
                 <button
                   onClick={() => window.open(`https://${formData.website}`, "_blank")}
-                  className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                  className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium hover:opacity-90"
                   style={{
-                    backgroundColor:
-                      selectedTexture === "gradient" ? "" : colorValues.textColor ? "#000000" : colorValues.primary,
+                    backgroundColor: selectedTexture === "gradient" ? "" : colorValues.primary,
                     backgroundImage:
                       selectedTexture === "gradient"
                         ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
@@ -1312,6 +1311,7 @@ export default function CustomizeAdDesignPage() {
                       textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundSize || "auto",
                     backgroundRepeat:
                       textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundRepeat || "repeat",
+                    color: colorValues.textColor ? "#000000" : "#ffffff",
                   }}
                 >
                   <svg
@@ -1349,6 +1349,32 @@ export default function CustomizeAdDesignPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
+
+      {/* Add Back to Workbench button */}
+      <div className="bg-white border-b border-gray-200 py-2">
+        <div className="container mx-auto px-4">
+          <button
+            onClick={() => (window.location.href = "/workbench")}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-md transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m12 19-7-7 7-7" />
+              <path d="M19 12H5" />
+            </svg>
+            Back to Workbench
+          </button>
+        </div>
+      </div>
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">

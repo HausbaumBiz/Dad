@@ -11,13 +11,11 @@ import {
   VideoIcon,
   X,
   RefreshCw,
-  Cloud,
   LayoutTemplateIcon as LayoutLandscape,
   LayoutTemplateIcon as LayoutPortrait,
   AlertTriangle,
   Trash2,
 } from "lucide-react"
-import Link from "next/link"
 import { useToast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
 import { formatFileSize, createPreviewUrl } from "@/lib/media-utils"
@@ -34,6 +32,8 @@ import {
 import { getCurrentBusiness } from "@/app/actions/business-actions"
 import { useRouter } from "next/navigation"
 import { CloudflareStreamPlayer } from "@/components/cloudflare-stream-player"
+import { MainHeader } from "@/components/main-header"
+import { MainFooter } from "@/components/main-footer"
 
 // Add these constants
 const MAX_VIDEO_SIZE_MB = 200 // Cloudflare Stream accepts larger videos
@@ -487,288 +487,213 @@ export default function VideoPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="container max-w-6xl py-8">
-        <div className="flex items-center mb-6">
-          <Link href="/workbench" className="mr-4">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold">Video Management</h1>
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500">Loading...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!businessId) {
-    return (
-      <div className="container max-w-6xl py-8">
-        <div className="flex items-center mb-6">
-          <Link href="/workbench" className="mr-4">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold">Video Management</h1>
-        </div>
-        <Alert variant="destructive" className="mb-6">
-          <AlertTriangle className="h-4 w-4 mr-2" />
-          <AlertDescription>
-            You need to be logged in to manage videos. Please{" "}
-            <Link href="/business-login" className="underline">
-              log in
-            </Link>{" "}
-            to continue.
-          </AlertDescription>
-        </Alert>
-      </div>
-    )
-  }
-
   return (
-    <div className="container max-w-6xl py-8">
-      <div className="flex items-center mb-6">
-        <Link href="/workbench" className="mr-4">
-          <Button variant="outline" size="icon">
-            <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <MainHeader />
+
+      {/* Back to Workbench Button */}
+      <div className="bg-white border-b border-gray-200 px-4 py-2">
+        <div className="container mx-auto">
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/workbench")}
+            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Workbench
           </Button>
-        </Link>
-        <h1 className="text-3xl font-bold">Video Management</h1>
+        </div>
       </div>
 
-      <Alert className="mb-6 bg-blue-50 border-blue-200">
-        <AlertDescription className="flex items-center text-blue-700">
-          <Cloud className="h-5 w-5 mr-2" />
-          <span>Videos are stored and streamed using Cloudflare Stream for better performance and reliability.</span>
-        </AlertDescription>
-      </Alert>
-
-      {/* Display existing video if available */}
-      {existingVideo && existingVideo.cloudflareVideoId && (
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">Your Video</h2>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteVideo}
-              disabled={isDeletingVideo || isProcessingVideo}
-              className="flex items-center gap-2"
-            >
-              {isDeletingVideo ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              {isDeletingVideo ? "Deleting..." : "Delete Video"}
-            </Button>
+      <main className="flex-1">
+        <div className="container max-w-6xl py-8">
+          <div className="flex items-center mb-6">
+            <h1 className="text-3xl font-bold">Video Management</h1>
           </div>
 
-          {isProcessingVideo ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Processing Video</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <RefreshCw className="h-5 w-5 animate-spin text-blue-500" />
-                    <p>Your video is being processed by Cloudflare Stream...</p>
-                  </div>
-                  <Progress value={processingProgress} className="h-2" />
-                  <p className="text-sm text-muted-foreground">
-                    This may take a few moments depending on the video size.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <CloudflareStreamPlayer
-              videoId={existingVideo.cloudflareVideoId}
-              aspectRatio={(existingVideo.videoAspectRatio as AspectRatio) || "16:9"}
-              title="Your Business Video"
-            />
-          )}
-
-          <p className="text-sm text-muted-foreground mt-4">
-            {isProcessingVideo
-              ? "Your video will be available for streaming once processing is complete."
-              : "This video is now available for streaming. You can replace it by uploading a new video."}
-          </p>
-        </div>
-      )}
-
-      {/* Aspect Ratio Selector */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Video Orientation</CardTitle>
-          <CardDescription>Select the aspect ratio for your video</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RadioGroup
-            value={aspectRatio}
-            onValueChange={(value) => setAspectRatio(value as AspectRatio)}
-            className="flex flex-col sm:flex-row gap-4"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="16:9" id="landscape" />
-              <Label htmlFor="landscape" className="flex items-center gap-2 cursor-pointer">
-                <LayoutLandscape className="h-5 w-5" />
-                <span>Landscape (16:9)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="9:16" id="portrait" />
-              <Label htmlFor="portrait" className="flex items-center gap-2 cursor-pointer">
-                <LayoutPortrait className="h-5 w-5" />
-                <span>Vertical (9:16)</span>
-              </Label>
-            </div>
-          </RadioGroup>
-        </CardContent>
-      </Card>
-
-      {/* Cloudflare Status */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex justify-between items-center w-full">
-            <div className="flex items-center gap-2">
-              <Cloud className="h-5 w-5" />
-              <div>
-                <CardTitle>Cloudflare Stream</CardTitle>
-                <CardDescription>Streaming service status</CardDescription>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={checkCloudflareConfig}
-              disabled={checkingCloudflareConfig}
-              className="text-xs"
-            >
-              {checkingCloudflareConfig ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Checking...
-                </>
-              ) : (
-                "Check Status"
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <div className={`h-3 w-3 rounded-full ${cloudflareConfigured ? "bg-green-500" : "bg-red-500"}`}></div>
-            <span className="text-sm">
-              {cloudflareConfigured
-                ? "Cloudflare Stream is configured and ready to use"
-                : "Cloudflare Stream is not configured properly"}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Video Upload */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <VideoIcon className="h-5 w-5" />
-            <div>
-              <CardTitle>{existingVideo ? "Replace Video" : "Upload Video"}</CardTitle>
-              <CardDescription>Select a video file to upload to Cloudflare Stream</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {!videoPreview ? (
-            <div className={getUploadAreaClass()} onClick={() => videoInputRef.current?.click()}>
-              <Upload className="h-6 w-6 mb-1 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Select video file</p>
-              <p className="text-xs text-muted-foreground">MP4, MOV, WebM up to {MAX_VIDEO_SIZE_MB}MB</p>
-              <input
-                type="file"
-                ref={videoInputRef}
-                className="hidden"
-                accept="video/mp4,video/quicktime,video/webm,video/x-matroska"
-                onChange={handleVideoSelect}
-              />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="relative">
-                <div className={getVideoPreviewClass()}>
-                  <video src={videoPreview} controls className="w-full h-full object-cover" />
-                </div>
+          {/* Display existing video if available */}
+          {existingVideo && existingVideo.cloudflareVideoId && (
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Your Video</h2>
                 <Button
                   variant="destructive"
-                  size="icon"
-                  className="absolute top-2 right-2 h-8 w-8"
-                  onClick={() => {
-                    setSelectedVideo(null)
-                    setVideoPreview(null)
-                    if (videoInputRef.current) videoInputRef.current.value = ""
-                  }}
+                  size="sm"
+                  onClick={handleDeleteVideo}
+                  disabled={isDeletingVideo || isProcessingVideo}
+                  className="flex items-center gap-2"
                 >
-                  <X className="h-4 w-4" />
+                  {isDeletingVideo ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  {isDeletingVideo ? "Deleting..." : "Delete Video"}
                 </Button>
               </div>
 
-              {selectedVideo && (
-                <div className="flex flex-col gap-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">File:</span>
-                    <span className="font-medium">{selectedVideo.name}</span>
+              {isProcessingVideo ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Processing Video</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className="h-5 w-5 animate-spin text-blue-500" />
+                        <p>Your video is being processed by Cloudflare Stream...</p>
+                      </div>
+                      <Progress value={processingProgress} className="h-2" />
+                      <p className="text-sm text-muted-foreground">
+                        This may take a few moments depending on the video size.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <CloudflareStreamPlayer
+                  videoId={existingVideo.cloudflareVideoId}
+                  aspectRatio={(existingVideo.videoAspectRatio as AspectRatio) || "16:9"}
+                  title="Your Business Video"
+                />
+              )}
+
+              <p className="text-sm text-muted-foreground mt-4">
+                {isProcessingVideo
+                  ? "Your video will be available for streaming once processing is complete."
+                  : "This video is now available for streaming. You can replace it by uploading a new video."}
+              </p>
+            </div>
+          )}
+
+          {/* Aspect Ratio Selector */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Video Orientation</CardTitle>
+              <CardDescription>Select the aspect ratio for your video</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={aspectRatio}
+                onValueChange={(value) => setAspectRatio(value as AspectRatio)}
+                className="flex flex-col sm:flex-row gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="16:9" id="landscape" />
+                  <Label htmlFor="landscape" className="flex items-center gap-2 cursor-pointer">
+                    <LayoutLandscape className="h-5 w-5" />
+                    <span>Landscape (16:9)</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="9:16" id="portrait" />
+                  <Label htmlFor="portrait" className="flex items-center gap-2 cursor-pointer">
+                    <LayoutPortrait className="h-5 w-5" />
+                    <span>Vertical (9:16)</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </CardContent>
+          </Card>
+
+          {/* Video Upload */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <VideoIcon className="h-5 w-5" />
+                <div>
+                  <CardTitle>{existingVideo ? "Replace Video" : "Upload Video"}</CardTitle>
+                  <CardDescription>Select a video file to upload to Cloudflare Stream</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!videoPreview ? (
+                <div className={getUploadAreaClass()} onClick={() => videoInputRef.current?.click()}>
+                  <Upload className="h-6 w-6 mb-1 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Select video file</p>
+                  <p className="text-xs text-muted-foreground">MP4, MOV, WebM up to {MAX_VIDEO_SIZE_MB}MB</p>
+                  <input
+                    type="file"
+                    ref={videoInputRef}
+                    className="hidden"
+                    accept="video/mp4,video/quicktime,video/webm,video/x-matroska"
+                    onChange={handleVideoSelect}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="relative">
+                    <div className={getVideoPreviewClass()}>
+                      <video src={videoPreview} controls className="w-full h-full object-cover" />
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8"
+                      onClick={() => {
+                        setSelectedVideo(null)
+                        setVideoPreview(null)
+                        if (videoInputRef.current) videoInputRef.current.value = ""
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Size:</span>
-                    <span className="font-medium">{formatFileSize(selectedVideo.size)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Type:</span>
-                    <span className="font-medium">{selectedVideo.type}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Aspect Ratio:</span>
-                    <span className="font-medium">{aspectRatio}</span>
-                  </div>
+
+                  {selectedVideo && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">File:</span>
+                        <span className="font-medium">{selectedVideo.name}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Size:</span>
+                        <span className="font-medium">{formatFileSize(selectedVideo.size)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Type:</span>
+                        <span className="font-medium">{selectedVideo.type}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Aspect Ratio:</span>
+                        <span className="font-medium">{aspectRatio}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Display upload error if any */}
-          {uploadError && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              <AlertDescription>
-                <div className="font-medium">Upload failed</div>
-                <div className="text-sm mt-1">{uploadError}</div>
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-end">
-          <>
-            <Button onClick={handleVideoUpload} disabled={isUploading || !selectedVideo || !cloudflareConfigured}>
-              {isUploading ? "Uploading..." : existingVideo ? "Replace Video" : "Upload Video"}
-            </Button>
-          </>
-        </CardFooter>
+              {/* Display upload error if any */}
+              {uploadError && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  <AlertDescription>
+                    <div className="font-medium">Upload failed</div>
+                    <div className="text-sm mt-1">{uploadError}</div>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-end">
+              <>
+                <Button onClick={handleVideoUpload} disabled={isUploading || !selectedVideo || !cloudflareConfigured}>
+                  {isUploading ? "Uploading..." : existingVideo ? "Replace Video" : "Upload Video"}
+                </Button>
+              </>
+            </CardFooter>
 
-        {isUploading && (
-          <div className="px-6 pb-4">
-            <Progress value={uploadProgress} className="h-2" />
-            <div className="flex justify-between items-center mt-1">
-              <p className="text-xs text-muted-foreground">Uploading to Cloudflare... {Math.round(uploadProgress)}%</p>
-            </div>
-          </div>
-        )}
-      </Card>
+            {isUploading && (
+              <div className="px-6 pb-4">
+                <Progress value={uploadProgress} className="h-2" />
+                <div className="flex justify-between items-center mt-1">
+                  <p className="text-xs text-muted-foreground">
+                    Uploading to Cloudflare... {Math.round(uploadProgress)}%
+                  </p>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      </main>
+
+      <MainFooter />
     </div>
   )
 }

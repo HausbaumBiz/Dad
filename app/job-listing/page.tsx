@@ -4,12 +4,10 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Check, X, Upload, Eye, Info, Edit, MapPin, Search } from "lucide-react"
+import { Check, X, Upload, Eye, Info, Edit, MapPin, Search, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MainHeader } from "@/components/main-header"
-import { MainFooter } from "@/components/main-footer"
 import Image from "next/image"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { saveJobListing } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
@@ -166,7 +164,12 @@ export default function JobListingPage() {
 
   // Handle ZIP code search
   const handleZipCodeSearch = async () => {
+    console.log("=== ZIP Code Search Started ===")
+    console.log("Center ZIP Code:", centerZipCode)
+    console.log("Search Radius:", zipSearchRadius)
+
     if (!centerZipCode) {
+      console.log("No center ZIP code provided")
       toast({
         title: "ZIP Code Required",
         description: "Please enter a center ZIP code to search.",
@@ -176,28 +179,82 @@ export default function JobListingPage() {
     }
 
     setIsLoadingZipCodes(true)
+
     try {
-      const response = await fetch(`/api/zip-codes/radius?zip=${centerZipCode}&radius=${zipSearchRadius}&limit=500`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.zipCodes && data.zipCodes.length > 0) {
-          setSelectedZipCodes(data.zipCodes)
-          toast({
-            title: "ZIP Codes Found",
-            description: `Found ${data.zipCodes.length} ZIP codes within ${zipSearchRadius} miles of ${centerZipCode}`,
-          })
-        } else {
-          toast({
-            title: "No ZIP Codes Found",
-            description: `No ZIP codes found within ${zipSearchRadius} miles of ${centerZipCode}`,
-            variant: "destructive",
-          })
+      const apiUrl = `/api/zip-codes/radius?zip=${centerZipCode}&radius=${zipSearchRadius}&limit=500`
+      console.log("Making API call to:", apiUrl)
+
+      const response = await fetch(apiUrl)
+      console.log("API Response status:", response.status)
+      console.log("API Response headers:", Object.fromEntries(response.headers.entries()))
+
+      // Get response text first to see what we're actually getting
+      const responseText = await response.text()
+      console.log("Raw response text (first 500 chars):", responseText.substring(0, 500))
+
+      // Check if response is ok first
+      if (!response.ok) {
+        console.error("API response not OK:", response.status, response.statusText)
+        let errorMessage = `Server error (${response.status}): Please try again later.`
+
+        // Try to parse as JSON if it looks like JSON
+        if (responseText.trim().startsWith("{")) {
+          try {
+            const errorData = JSON.parse(responseText)
+            console.log("Error data:", errorData)
+            errorMessage = errorData.message || errorMessage
+          } catch (parseError) {
+            console.error("Failed to parse error JSON:", parseError)
+          }
         }
-      } else {
-        const errorData = await response.json()
+
         toast({
           title: "Error",
-          description: errorData.message || "Failed to find ZIP codes. Please check the ZIP code and try again.",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Try to parse as JSON
+      let data
+      try {
+        data = JSON.parse(responseText)
+        console.log("API Response data:", data)
+      } catch (parseError) {
+        console.error("Failed to parse response as JSON:", parseError)
+        console.error("Response was:", responseText)
+        toast({
+          title: "Error",
+          description: "Server returned invalid response format.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (data.zipCodes && data.zipCodes.length > 0) {
+        console.log(`Found ${data.zipCodes.length} ZIP codes`)
+        console.log("First few ZIP codes:", data.zipCodes.slice(0, 5))
+
+        setSelectedZipCodes(data.zipCodes)
+
+        if (data.capped) {
+          toast({
+            title: "Results Limited",
+            description: `Found more than 500 ZIP codes. Showing the closest 500 within ${zipSearchRadius} miles.`,
+            variant: "default",
+          })
+        }
+
+        toast({
+          title: "ZIP Codes Found",
+          description: `Found ${data.zipCodes.length} ZIP codes within ${zipSearchRadius} miles of ${centerZipCode}`,
+        })
+      } else {
+        console.log("No ZIP codes found in response")
+        toast({
+          title: "No ZIP Codes Found",
+          description: `No ZIP codes found within ${zipSearchRadius} miles of ${centerZipCode}`,
           variant: "destructive",
         })
       }
@@ -205,17 +262,13 @@ export default function JobListingPage() {
       console.error("Error searching ZIP codes:", error)
       toast({
         title: "Error",
-        description: "Failed to search ZIP codes. Please try again.",
+        description: "The ZIP code service is currently unavailable. Please try again later.",
         variant: "destructive",
       })
     } finally {
+      console.log("=== ZIP Code Search Completed ===")
       setIsLoadingZipCodes(false)
     }
-  }
-
-  // Remove a ZIP code from selection
-  const removeZipCode = (zipToRemove: string) => {
-    setSelectedZipCodes((prev) => prev.filter((zip) => zip.zip !== zipToRemove))
   }
 
   // Add individual ZIP code
@@ -235,25 +288,57 @@ export default function JobListingPage() {
 
     try {
       const response = await fetch(`/api/zip-codes/search?zip=${zip}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.zipCode) {
-          setSelectedZipCodes((prev) => [...prev, data.zipCode])
-          toast({
-            title: "ZIP Code Added",
-            description: `Added ${zip} - ${data.zipCode.city}, ${data.zipCode.state}`,
-          })
-        } else {
-          toast({
-            title: "ZIP Code Not Found",
-            description: `ZIP code ${zip} was not found in our database.`,
-            variant: "destructive",
-          })
+
+      if (!response.ok) {
+        let errorMessage = `Failed to validate ZIP code (${response.status}). Please try again.`
+
+        const contentType = response.headers.get("content-type")
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const errorData = await response.json()
+            errorMessage = errorData.message || errorMessage
+          } catch (parseError) {
+            console.error("Failed to parse error JSON:", parseError)
+          }
         }
-      } else {
+
         toast({
           title: "Error",
-          description: "Failed to validate ZIP code. Please try again.",
+          description: errorMessage,
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Parse successful response - only if it's JSON
+      let data
+      try {
+        const contentType = response.headers.get("content-type")
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Server returned non-JSON response")
+        }
+
+        data = await response.json()
+      } catch (parseError) {
+        console.error("Failed to parse JSON response:", parseError)
+        toast({
+          title: "Error",
+          description: "Failed to parse server response. Please try again later.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (data.zipCode) {
+        setSelectedZipCodes((prev) => [...prev, data.zipCode])
+        toast({
+          title: "ZIP Code Added",
+          description: `Added ${zip} - ${data.zipCode.city}, ${data.zipCode.state}`,
+        })
+      } else {
+        toast({
+          title: "ZIP Code Not Found",
+          description: `ZIP code ${zip} was not found in our database.`,
           variant: "destructive",
         })
       }
@@ -261,7 +346,7 @@ export default function JobListingPage() {
       console.error("Error adding ZIP code:", error)
       toast({
         title: "Error",
-        description: "Failed to add ZIP code. Please try again.",
+        description: "The ZIP code service is currently unavailable. Please try again later.",
         variant: "destructive",
       })
     }
@@ -539,9 +624,28 @@ export default function JobListingPage() {
     },
   ]
 
+  const removeZipCode = (zipCodeToRemove: string) => {
+    setSelectedZipCodes((prev) => prev.filter((zip) => zip.zip !== zipCodeToRemove))
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
+
+      {/* Back to Workbench Button */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="container mx-auto px-4 py-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/workbench")}
+            className="flex items-center gap-2 hover:bg-gray-50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Workbench
+          </Button>
+        </div>
+      </div>
 
       <main className="flex-1">
         <div className="container mx-auto px-4 py-8">
@@ -843,7 +947,7 @@ export default function JobListingPage() {
 
                 {/* Benefits */}
                 <div>
-                  <span className="block text-lg font-medium text-gray-700 mb-4">Benefits Offered:</span>
+                  \<span className="block text-lg font-medium text-gray-700 mb-4">Benefits Offered:</span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Individual Health Insurance */}
                     <div className="space-y-2">
@@ -1370,7 +1474,7 @@ export default function JobListingPage() {
                       <div className="space-y-4">
                         <div className="bg-blue-50 p-4 rounded-lg">
                           <h4 className="font-medium text-blue-800 mb-2">Search ZIP Codes by Radius</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                               <label htmlFor="centerZip" className="block text-sm font-medium text-gray-700 mb-1">
                                 Center ZIP Code:
@@ -1415,6 +1519,130 @@ export default function JobListingPage() {
                                 {isLoadingZipCodes ? "Searching..." : "Find ZIP Codes"}
                               </Button>
                             </div>
+                          </div>
+
+                          <div className="col-span-full">
+                            <p className="text-xs text-gray-500 mt-2">
+                              <Info className="h-3 w-3 inline mr-1" />
+                              Maximum of 500 ZIP codes will be returned per search
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                            <div className="flex items-end">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    console.log("Testing simple API...")
+                                    const response = await fetch("/api/debug/simple-test")
+                                    console.log("Simple API Response status:", response.status)
+
+                                    const result = await response.json()
+                                    console.log("Simple API Result:", result)
+
+                                    if (result.success) {
+                                      toast({
+                                        title: "Simple API Test Successful",
+                                        description: "Basic API routing is working",
+                                      })
+                                    } else {
+                                      toast({
+                                        title: "Simple API Test Failed",
+                                        description: result.error,
+                                        variant: "destructive",
+                                      })
+                                    }
+                                  } catch (error) {
+                                    console.error("Simple API test error:", error)
+                                    toast({
+                                      title: "Simple API Test Error",
+                                      description: "Check console for details",
+                                      variant: "destructive",
+                                    })
+                                  }
+                                }}
+                                className="w-full"
+                              >
+                                Test Simple API
+                              </Button>
+                            </div>
+
+                            <div className="flex items-end">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    const response = await fetch("/api/debug/test-zip-csv")
+                                    const result = await response.json()
+                                    console.log("CSV Test Result:", result)
+
+                                    if (result.success) {
+                                      toast({
+                                        title: "CSV Test Successful",
+                                        description: `Found ${Object.keys(result.parseResult.zipCodes || {}).length} ZIP codes`,
+                                      })
+                                    } else {
+                                      toast({
+                                        title: "CSV Test Failed",
+                                        description: result.error,
+                                        variant: "destructive",
+                                      })
+                                    }
+                                  } catch (error) {
+                                    console.error("CSV test error:", error)
+                                    toast({
+                                      title: "CSV Test Error",
+                                      description: "Check console for details",
+                                      variant: "destructive",
+                                    })
+                                  }
+                                }}
+                                className="w-full"
+                              >
+                                Test CSV Access
+                              </Button>
+                            </div>
+
+                            <div className="flex items-end">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    console.log("Testing ZIP search API directly...")
+                                    const response = await fetch("/api/debug/test-zip-search")
+                                    const result = await response.json()
+                                    console.log("ZIP Search Test Result:", result)
+
+                                    if (result.success) {
+                                      toast({
+                                        title: "ZIP Search Test Successful",
+                                        description: `Found ${result.response.data.zipCodes?.length || 0} ZIP codes`,
+                                      })
+                                    } else {
+                                      toast({
+                                        title: "ZIP Search Test Failed",
+                                        description: result.error,
+                                        variant: "destructive",
+                                      })
+                                    }
+                                  } catch (error) {
+                                    console.error("ZIP search test error:", error)
+                                    toast({
+                                      title: "ZIP Search Test Error",
+                                      description: "Check console for details",
+                                      variant: "destructive",
+                                    })
+                                  }
+                                }}
+                                className="w-full"
+                              >
+                                Test ZIP Search
+                              </Button>
+                            </div>
 
                             <div className="flex items-end">
                               <Button type="button" variant="outline" onClick={addIndividualZipCode} className="w-full">
@@ -1429,7 +1657,7 @@ export default function JobListingPage() {
                           <div className="bg-gray-50 p-4 rounded-lg">
                             <div className="flex items-center justify-between mb-3">
                               <h4 className="font-medium text-gray-800">
-                                Selected Service Area ({selectedZipCodes.length} ZIP codes)
+                                Selected Service Area ({selectedZipCodes.length}/500 ZIP codes)
                               </h4>
                               <Button
                                 type="button"
@@ -1512,405 +1740,14 @@ export default function JobListingPage() {
                     <Eye className="mr-2 h-4 w-4" />
                     Preview Job Listing
                   </button>
-                  {/* Remove the save button */}
                 </div>
               </form>
             </div>
           </div>
 
-          {/* At the bottom of the form, add debug toggle button */}
-          {process.env.NODE_ENV !== "production" && (
-            <div className="mt-6 flex justify-end">
-              <Button variant="outline" size="sm" onClick={() => setShowDebugInfo(!showDebugInfo)} className="text-xs">
-                {showDebugInfo ? "Hide Debug Info" : "Show Debug Info"}
-              </Button>
-            </div>
-          )}
-
-          {/* Debug information section */}
-          {process.env.NODE_ENV !== "production" && showDebugInfo && (
-            <div className="mt-4 p-4 bg-gray-100 rounded-lg text-xs">
-              <h3 className="font-medium mb-2">Debug Information</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="font-medium">Business ID:</span> {businessId}
-                </div>
-                {savedJobId && (
-                  <div>
-                    <span className="font-medium">Last Saved Job ID:</span> {savedJobId}
-                  </div>
-                )}
-                <div>
-                  <span className="font-medium">Job Redis Key:</span> job:{businessId}:{savedJobId || "jobId"}
-                </div>
-                <div>
-                  <span className="font-medium">Jobs Index Key:</span> jobs:{businessId}
-                </div>
-                <div>
-                  <span className="font-medium">Service Area:</span>{" "}
-                  {isNationwide ? "Nationwide" : `${selectedZipCodes.length} ZIP codes`}
-                </div>
-                <div className="mt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        window.open(`/api/debug/business-jobs?businessId=${businessId}`, "_blank")
-                      }
-                    }}
-                  >
-                    View Jobs in Redis
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="p-8">
-              <h2 className="text-2xl font-bold mb-6">Select Job Categories</h2>
-
-              <div className="mb-6">
-                <p className="text-gray-700 mb-2">Select the categories where your job listing should appear:</p>
-                <p className="text-sm text-gray-500 mb-4">
-                  You can select multiple categories that apply to your position.
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {jobCategories.map((category, index) => (
-                    <div
-                      key={index}
-                      onClick={() => toggleCategorySelection(category.title)}
-                      className={`relative p-4 rounded-lg cursor-pointer transition-all ${category.color} hover:shadow-md ${
-                        selectedCategories.includes(category.title)
-                          ? "ring-2 ring-primary shadow-md"
-                          : "border border-gray-200"
-                      }`}
-                    >
-                      {selectedCategories.includes(category.title) && (
-                        <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1">
-                          <Check size={14} />
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3">
-                        <div className="text-3xl">{category.icon}</div>
-                        <div>
-                          <h3 className="font-medium">{category.title}</h3>
-                          <p className="text-xs text-gray-600 line-clamp-2">{category.description}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-8 bg-gray-50 rounded-lg p-6 border border-gray-200">
-                <h2 className="text-xl font-semibold mb-4">Selected Categories ({selectedCategories.length})</h2>
-                {selectedCategories.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {selectedCategories.map((category, index) => (
-                      <div
-                        key={index}
-                        className="px-3 py-2 bg-white rounded border border-gray-200 flex items-center gap-2"
-                      >
-                        <span>{category}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleCategorySelection(category)
-                          }}
-                          className="text-gray-400 hover:text-red-500"
-                        >
-                          &times;
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 italic mb-6">No categories selected yet</p>
-                )}
-                <div className="flex justify-center">
-                  <Button
-                    type="button"
-                    disabled={
-                      selectedCategories.length === 0 || isSaving || (!isNationwide && selectedZipCodes.length === 0)
-                    }
-                    className={`px-6 py-3 ${
-                      selectedCategories.length === 0 || (!isNationwide && selectedZipCodes.length === 0)
-                        ? "opacity-50"
-                        : ""
-                    }`}
-                    onClick={handleSaveJobListing}
-                  >
-                    {isSaving ? "Saving..." : "Save and Add to Ad-Box"}
-                  </Button>
-                </div>
-                {selectedCategories.length > 0 && !isNationwide && selectedZipCodes.length === 0 && (
-                  <p className="text-center text-sm text-red-600 mt-2">
-                    Please configure your service area before saving
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
+          {/* Debug section and remaining components would continue here... */}
         </div>
       </main>
-
-      {/* Job Listing Preview Dialog */}
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Job Listing Preview</DialogTitle>
-          </DialogHeader>
-
-          <div className="py-4">
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              {/* Company Header with Logo */}
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 border-b border-gray-200">
-                <div className="flex items-center">
-                  {logoPreview ? (
-                    <div className="mr-6 flex-shrink-0">
-                      <div className="relative h-20 w-20">
-                        <img
-                          src={logoPreview || "/placeholder.svg"}
-                          alt="Company logo"
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-                    </div>
-                  ) : null}
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-800">{formValues.businessName}</h1>
-                    <p className="text-gray-600">{formValues.businessAddress}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Job Details */}
-              <div className="p-6">
-                <div className="mb-6">
-                  <h2 className="text-xl font-bold text-primary mb-2">{formValues.jobTitle}</h2>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {payType === "hourly" && (
-                      <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                        Hourly Pay
-                      </span>
-                    )}
-                    {payType === "salary" && (
-                      <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                        Salary
-                      </span>
-                    )}
-                    {payType === "other" && (
-                      <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                        Other Pay Type
-                      </span>
-                    )}
-                    <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                      {formValues.workHours}
-                    </span>
-                    {/* Service Area Badge */}
-                    {isNationwide ? (
-                      <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                        Nationwide
-                      </span>
-                    ) : (
-                      selectedZipCodes.length > 0 && (
-                        <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">
-                          {selectedZipCodes.length} ZIP code{selectedZipCodes.length === 1 ? "" : "s"}
-                        </span>
-                      )
-                    )}
-                  </div>
-
-                  {/* Add payment information section */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Compensation</h3>
-                    {payType === "hourly" && paymentValues.hourlyMin && (
-                      <p className="text-gray-700">
-                        <span className="font-medium">Hourly Rate:</span> ${paymentValues.hourlyMin}
-                        {paymentValues.hourlyMax && ` - $${paymentValues.hourlyMax}`} per hour
-                      </p>
-                    )}
-                    {payType === "salary" && paymentValues.salaryMin && (
-                      <p className="text-gray-700">
-                        <span className="font-medium">Salary Range:</span> ${paymentValues.salaryMin}
-                        {paymentValues.salaryMax && ` - $${paymentValues.salaryMax}`} per year
-                      </p>
-                    )}
-                    {payType === "other" && paymentValues.otherPay && (
-                      <p className="text-gray-700">
-                        <span className="font-medium">Compensation:</span> {paymentValues.otherPay}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Service Area Information */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Service Area</h3>
-                    {isNationwide ? (
-                      <p className="text-gray-700">This position is available nationwide.</p>
-                    ) : selectedZipCodes.length > 0 ? (
-                      <div>
-                        <p className="text-gray-700 mb-2">
-                          This position is available in {selectedZipCodes.length} ZIP code
-                          {selectedZipCodes.length === 1 ? "" : "s"}:
-                        </p>
-                        <div className="flex flex-wrap gap-1">
-                          {selectedZipCodes.slice(0, 10).map((zip, index) => (
-                            <span key={index} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
-                              {zip.zip}
-                            </span>
-                          ))}
-                          {selectedZipCodes.length > 10 && (
-                            <span className="text-gray-500 text-xs">+{selectedZipCodes.length - 10} more</span>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 italic">Service area not specified</p>
-                    )}
-                  </div>
-
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Job Description</h3>
-                    <p className="text-gray-700 whitespace-pre-line">{formValues.jobDescription}</p>
-                  </div>
-
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Qualifications</h3>
-                    <p className="text-gray-700 whitespace-pre-line">{formValues.qualifications}</p>
-                  </div>
-
-                  {/* Benefits Section */}
-                  {Object.keys(benefits).some((key) => benefits[key]) && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-2">Benefits</h3>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {Object.keys(benefits).map((benefit) =>
-                          benefits[benefit] ? (
-                            <li key={benefit} className="text-gray-700">
-                              {benefit.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}
-                              {benefitDetails[benefit] ? `: ${benefitDetails[benefit]}` : ""}
-                            </li>
-                          ) : null,
-                        )}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">About {formValues.businessName}</h3>
-                    <p className="text-gray-700">{formValues.businessDescription}</p>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Contact Information</h3>
-                    <p className="text-gray-700">{formValues.contactName}</p>
-                    <p className="text-gray-700">{formValues.contactEmail}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
-              Close Preview
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirmation Dialog */}
-      <Dialog open={isConfirmationOpen} onOpenChange={setIsConfirmationOpen}>
-        <DialogContent className="sm:max-w-md">
-          <div className="flex flex-col items-center justify-center p-6 text-center">
-            <div className="mb-5 rounded-full bg-green-100 p-3">
-              <Check className="h-8 w-8 text-green-600" />
-            </div>
-            <DialogTitle className="text-xl font-semibold mb-2">Your Job Listing has been added</DialogTitle>
-            <p className="text-gray-600 mb-6">
-              Your job listing has been successfully saved and added to your business profile.
-            </p>
-
-            {/* Add additional information to the success dialog */}
-            <div className="bg-blue-50 p-4 rounded-lg text-sm mb-6 text-left w-full">
-              <div className="flex items-start">
-                <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
-                <div>
-                  <p className="font-medium text-blue-700 mb-1">Where to find your job listing:</p>
-                  <ul className="list-disc pl-5 text-blue-600 space-y-1">
-                    <li>In your business profile pop-up under "Job Opportunities"</li>
-                    <li>On your Statistics page under "Your Job Listings"</li>
-                    <li>
-                      Available in{" "}
-                      {isNationwide
-                        ? "all ZIP codes nationwide"
-                        : `${selectedZipCodes.length} selected ZIP code${selectedZipCodes.length === 1 ? "" : "s"}`}
-                    </li>
-                  </ul>
-                  <p className="text-blue-600 mt-2">
-                    Business ID: <strong>{businessId}</strong>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Button onClick={() => setIsConfirmationOpen(false)} className="min-w-[100px]">
-              OK
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Business ID Dialog */}
-      <Dialog open={isBusinessIdDialogOpen} onOpenChange={setIsBusinessIdDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Set Business ID</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-gray-600 mb-4">
-              Enter the business ID that will be used for your job listings. This ID is used to connect jobs to
-              businesses.
-            </p>
-            <div className="space-y-4">
-              <div className="flex flex-col space-y-2">
-                <label htmlFor="businessId" className="text-sm font-medium">
-                  Business ID
-                </label>
-                <input
-                  id="businessId"
-                  value={businessId}
-                  onChange={(e) => setBusinessId(e.target.value)}
-                  className="border rounded-md p-2"
-                />
-              </div>
-
-              {/* Quick select buttons */}
-              <div className="flex flex-wrap gap-2">
-                <p className="text-sm font-medium w-full">Quick select:</p>
-                <Button size="sm" variant="outline" onClick={() => setBusinessId("demo-business")}>
-                  demo-business
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setBusinessId("memorial-gardens")}>
-                  memorial-gardens
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setBusinessId("sunset-funeral-home")}>
-                  sunset-funeral-home
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={saveBusinessId}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <MainFooter />
     </div>
   )
 }
