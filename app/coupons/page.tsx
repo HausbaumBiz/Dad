@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Trash2, CheckCircle, Save, FileText, AlertTriangle, ArrowLeft } from "lucide-react"
+import { Trash2, CheckCircle, Save, FileText, AlertTriangle } from "lucide-react"
 import Image from "next/image"
 import {
   Dialog,
@@ -932,20 +932,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
-
-      {/* Back to Workbench Button */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2">
-        <div className="container mx-auto">
-          <Button
-            variant="ghost"
-            onClick={() => router.push("/workbench")}
-            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Workbench
-          </Button>
-        </div>
-      </div>
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-8">

@@ -50,7 +50,13 @@ import { KEY_PREFIXES } from "@/lib/db-schema"
 
 // Add CSS to hide the default close button
 const hideDefaultCloseButtonStyle = `
-  .business-profile-dialog-content > div[class*="absolute right-4 top-4"] {
+  .business-profile-dialog-content [data-radix-dialog-close] {
+    display: none !important;
+  }
+  .business-profile-dialog-content > button[data-radix-dialog-close] {
+    display: none !important;
+  }
+  .business-profile-dialog-content .absolute.right-4.top-4 {
     display: none !important;
   }
 `

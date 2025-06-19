@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, CheckCircle, CreditCard, Key, Trash2, User, ArrowLeft } from "lucide-react"
+import { AlertCircle, CheckCircle, CreditCard, Key, Trash2, User } from "lucide-react"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
 
 // Business type definition (simplified version from business-actions.ts)
@@ -148,20 +148,6 @@ export default function UserAccountPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <MainHeader />
-
-      {/* Back to Workbench Button */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 py-3">
-          <Button
-            variant="ghost"
-            onClick={() => (window.location.href = "/workbench")}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Workbench
-          </Button>
-        </div>
-      </div>
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">

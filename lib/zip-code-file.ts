@@ -6,6 +6,7 @@
 import fs from "fs/promises"
 import path from "path"
 import type { ZipCodeData, ZipCodeSearchParams, ZipCodeImportStats } from "./zip-code-types"
+import { haversineDistance } from "./zip-code-utils"
 
 // Define the directory where ZIP code data will be stored
 const DATA_DIR = path.join(process.cwd(), "data", "zip-codes")
@@ -342,154 +343,59 @@ export async function importZipCodes(zipCodes: ZipCodeData[]): Promise<ZipCodeIm
 /**
  * Get a ZIP code by its code
  */
-// export async function getZipCode(zip: string): Promise<ZipCodeData | null> {
-//   try {
-//     const zipCodes = await getAllZipCodes()
-//     return zipCodes[zip] || null
-//   } catch (error) {
-//     console.error(`Error getting ZIP code ${zip}:`, error)
-//     return null
-//   }
-// }
+export async function getZipCode(zip: string): Promise<ZipCodeData | null> {
+  try {
+    const zipCodes = await getAllZipCodes()
+    return zipCodes[zip] || null
+  } catch (error) {
+    console.error(`Error getting ZIP code ${zip}:`, error)
+    return null
+  }
+}
 
 /**
  * Find ZIP codes within a radius
  */
-// export async function findZipCodesInRadius(
-//   centralZip: string,
-//   radiusMiles: number,
-//   limit = 100,
-// ): Promise<ZipCodeData[]> {
-//   try {
-//     // Get the central ZIP code data
-//     const centralZipData = await getZipCode(centralZip)
-//     if (!centralZipData) {
-//       throw new Error(`ZIP code ${centralZip} not found`)
-//     }
-
-//     // Get all ZIP codes
-//     const zipCodes = await getAllZipCodes()
-//     const allZipCodes = Object.values(zipCodes)
-
-//     // Calculate distances and filter
-//     const zipCodesWithDistance = allZipCodes.map((zipData) => {
-//       const distance = haversineDistance(
-//         centralZipData.latitude,
-//         centralZipData.longitude,
-//         zipData.latitude,
-//         zipData.longitude,
-//       )
-//       return { zipData, distance }
-//     })
-
-//     // Sort by distance and take the closest ones within the radius
-//     return zipCodesWithDistance
-//       .filter(({ distance }) => distance <= radiusMiles)
-//       .sort((a, b) => a.distance - b.distance)
-//       .slice(0, limit)
-//       .map(({ zipData, distance }) => {
-//         // Add the distance to the ZIP code data
-//         return { ...zipData, distance }
-//       })
-//   } catch (error) {
-//     console.error(`Error finding ZIP codes in radius of ${centralZip}:`, error)
-//     return []
-//   }
-// }
-
-import type { ZipCodeData } from "@/lib/zip-code-types"
-import { haversineDistance } from "@/lib/zip-code-utils"
-
-// This is a fallback implementation when Blob storage is not available
-// In a real implementation, this would read from a local file or database
-
-const sampleZipCodes: Record<string, ZipCodeData> = {
-  "90210": {
-    zip: "90210",
-    city: "Beverly Hills",
-    state: "CA",
-    latitude: 34.0901,
-    longitude: -118.4065,
-    country: "US",
-  },
-  "10001": {
-    zip: "10001",
-    city: "New York",
-    state: "NY",
-    latitude: 40.7505,
-    longitude: -73.9934,
-    country: "US",
-  },
-  "60601": {
-    zip: "60601",
-    city: "Chicago",
-    state: "IL",
-    latitude: 41.8825,
-    longitude: -87.6441,
-    country: "US",
-  },
-  "77001": {
-    zip: "77001",
-    city: "Houston",
-    state: "TX",
-    latitude: 29.7749,
-    longitude: -95.389,
-    country: "US",
-  },
-  "85001": {
-    zip: "85001",
-    city: "Phoenix",
-    state: "AZ",
-    latitude: 33.4484,
-    longitude: -112.074,
-    country: "US",
-  },
-}
-
-/**
- * Find ZIP codes within a radius of a center ZIP code
- * This is a fallback implementation with sample data
- */
 export async function findZipCodesInRadius(
-  centerZip: string,
+  centralZip: string,
   radiusMiles: number,
   limit = 100,
-): Promise<(ZipCodeData & { distance: number })[]> {
-  console.log(`Fallback: Finding ZIP codes within ${radiusMiles} miles of ${centerZip}`)
+): Promise<ZipCodeData[]> {
+  try {
+    // Get the central ZIP code data
+    const centralZipData = await getZipCode(centralZip)
+    if (!centralZipData) {
+      throw new Error(`ZIP code ${centralZip} not found`)
+    }
 
-  const centerZipData = sampleZipCodes[centerZip]
-  if (!centerZipData) {
-    console.log(`Fallback: Center ZIP ${centerZip} not found in sample data`)
+    // Get all ZIP codes
+    const zipCodes = await getAllZipCodes()
+    const allZipCodes = Object.values(zipCodes)
+
+    // Calculate distances and filter
+    const zipCodesWithDistance = allZipCodes.map((zipData) => {
+      const distance = haversineDistance(
+        centralZipData.latitude,
+        centralZipData.longitude,
+        zipData.latitude,
+        zipData.longitude,
+      )
+      return { zipData, distance }
+    })
+
+    // Sort by distance and take the closest ones within the radius
+    return zipCodesWithDistance
+      .filter(({ distance }) => distance <= radiusMiles)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, limit)
+      .map(({ zipData, distance }) => {
+        // Add the distance to the ZIP code data
+        return { ...zipData, distance }
+      })
+  } catch (error) {
+    console.error(`Error finding ZIP codes in radius of ${centralZip}:`, error)
     return []
   }
-
-  const results: (ZipCodeData & { distance: number })[] = []
-
-  // Calculate distances for all sample ZIP codes
-  for (const zipData of Object.values(sampleZipCodes)) {
-    const distance = haversineDistance(
-      centerZipData.latitude,
-      centerZipData.longitude,
-      zipData.latitude,
-      zipData.longitude,
-    )
-
-    if (distance <= radiusMiles) {
-      results.push({ ...zipData, distance })
-    }
-  }
-
-  // Sort by distance and limit results
-  results.sort((a, b) => a.distance - b.distance)
-  return results.slice(0, limit)
-}
-
-/**
- * Find a single ZIP code by ZIP code
- */
-export async function findZipCode(zip: string): Promise<ZipCodeData | null> {
-  console.log(`Fallback: Looking up ZIP code ${zip}`)
-  return sampleZipCodes[zip] || null
 }
 
 /**

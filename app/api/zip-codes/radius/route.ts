@@ -1,111 +1,170 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { ZipCodeData } from "@/lib/zip-code-types"
+import { list } from "@vercel/blob"
+import { haversineDistance } from "@/lib/zip-code-utils"
+import { findZipCodesInRadius } from "@/lib/zip-code-file" // Fallback to file-based storage
 
 export const dynamic = "force-dynamic"
 
-// CSV URL from your blob storage
-const CSV_URL = "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/uszips11-0iYnSKUBgC7Dm6DtxL3bXwFzHgh6Qe.csv"
+// Cache for ZIP code data to avoid fetching from Blob storage on every request
+let zipCodeCache: Record<string, ZipCodeData> | null = null
+let cacheLastUpdated = 0
+const CACHE_TTL = 3600000 // 1 hour in milliseconds
+const CSV_BLOB_URL =
+  "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/uszips11-0iYnSKUBgC7Dm6DtxL3bXwFzHgh6Qe.csv"
 
-/**
- * Parse CSV data into ZipCodeData objects
- */
-function parseCSV(csvText: string): ZipCodeData[] {
-  const lines = csvText.trim().split("\n")
-  const zipCodes: ZipCodeData[] = []
+async function getZipCodeData(): Promise<Record<string, ZipCodeData> | null> {
+  // Return cached data if it's still valid
+  if (zipCodeCache && Date.now() - cacheLastUpdated < CACHE_TTL) {
+    return zipCodeCache
+  }
 
-  // Skip header row
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim()
-    if (!line) continue
+  try {
+    // First try to find the JSON file in Blob storage
+    const { blobs } = await list({ prefix: "data/zip-codes/" })
+    const zipDataBlob = blobs.find((blob) => blob.pathname === "data/zip-codes/zip-data.json")
 
-    // Parse CSV line (handle potential commas in quoted fields)
-    const columns = parseCSVLine(line)
+    if (zipDataBlob) {
+      // Fetch the ZIP code data from the blob URL
+      const response = await fetch(zipDataBlob.url)
 
-    if (columns.length >= 5) {
-      const [zipCode, latitude, longitude, city, state] = columns
+      if (response.ok) {
+        const zipCodes = await response.json()
 
-      // Validate required fields
-      if (zipCode && latitude && longitude && city && state) {
-        const lat = Number.parseFloat(latitude)
-        const lng = Number.parseFloat(longitude)
+        // Update the cache
+        zipCodeCache = zipCodes
+        cacheLastUpdated = Date.now()
 
-        // Only include valid coordinates
-        if (!isNaN(lat) && !isNaN(lng)) {
-          zipCodes.push({
-            zip: zipCode.toString().padStart(5, "0"), // Ensure 5-digit format
-            city: city.trim(),
-            state: state.trim(),
-            latitude: lat,
-            longitude: lng,
-            country: "US",
-          })
-        }
+        return zipCodes
       }
     }
+
+    // If JSON file not found or couldn't be fetched, try the CSV file
+    console.log("JSON file not found in Blob storage, trying CSV file...")
+
+    // Fetch the CSV file
+    const csvResponse = await fetch(CSV_BLOB_URL)
+
+    if (!csvResponse.ok) {
+      console.error(`Failed to fetch CSV file: ${csvResponse.statusText}`)
+      return null
+    }
+
+    const csvText = await csvResponse.text()
+    const zipCodes = parseCSVToZipCodeMap(csvText)
+
+    // Update the cache
+    zipCodeCache = zipCodes
+    cacheLastUpdated = Date.now()
+
+    return zipCodes
+  } catch (error) {
+    console.error("Error fetching ZIP code data from Blob storage:", error)
+    return null
+  }
+}
+
+// Parse CSV to a map of ZIP codes
+function parseCSVToZipCodeMap(csv: string): Record<string, ZipCodeData> {
+  const zipCodes: Record<string, ZipCodeData> = {}
+
+  // Trim the input to remove any leading/trailing whitespace
+  const trimmedCsv = csv.trim()
+
+  if (!trimmedCsv) {
+    return zipCodes
+  }
+
+  // Split by newlines, handling different line endings
+  const lines = trimmedCsv.split(/\r?\n/)
+
+  if (lines.length < 2) {
+    return zipCodes
+  }
+
+  // Parse header row, trimming each header
+  const headers = lines[0].split(",").map((h) => h.trim())
+
+  // Find the indices of required columns
+  const zipIndex = headers.findIndex(
+    (h) =>
+      h.toLowerCase() === "zip" ||
+      h.toLowerCase() === "zipcode" ||
+      h.toLowerCase() === "postal_code" ||
+      h.toLowerCase() === "zip_code",
+  )
+
+  const latIndex = headers.findIndex((h) => h.toLowerCase() === "lat" || h.toLowerCase() === "latitude")
+
+  const lngIndex = headers.findIndex(
+    (h) => h.toLowerCase() === "lng" || h.toLowerCase() === "long" || h.toLowerCase() === "longitude",
+  )
+
+  const cityIndex = headers.findIndex((h) => h.toLowerCase() === "city")
+  const stateIndex = headers.findIndex(
+    (h) => h.toLowerCase() === "state" || h.toLowerCase() === "state_id" || h.toLowerCase() === "state_name",
+  )
+  const countyIndex = headers.findIndex((h) => h.toLowerCase() === "county")
+
+  // Skip if we can't find the required columns
+  if (zipIndex === -1 || latIndex === -1 || lngIndex === -1 || cityIndex === -1 || stateIndex === -1) {
+    console.error("CSV is missing required columns")
+    return zipCodes
+  }
+
+  // Process each data row
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line) continue // Skip empty lines
+
+    // Split the line by comma
+    const values = line.split(",").map((v) => v.trim())
+
+    // Skip if we don't have enough values
+    if (values.length <= Math.max(zipIndex, latIndex, lngIndex, cityIndex, stateIndex)) {
+      continue
+    }
+
+    const zip = values[zipIndex]
+    const latitude = Number.parseFloat(values[latIndex])
+    const longitude = Number.parseFloat(values[lngIndex])
+    const city = values[cityIndex]
+    const state = values[stateIndex]
+
+    // Skip if any required field is missing or invalid
+    if (!zip || isNaN(latitude) || isNaN(longitude) || !city || !state) {
+      continue
+    }
+
+    // Create the ZIP code object
+    const zipCode: ZipCodeData = {
+      zip,
+      latitude,
+      longitude,
+      city,
+      state,
+      country: "US", // Default to US
+    }
+
+    // Add county if available
+    if (countyIndex !== -1 && values[countyIndex]) {
+      zipCode.county = values[countyIndex]
+    }
+
+    // Add to the map
+    zipCodes[zip] = zipCode
   }
 
   return zipCodes
 }
 
-/**
- * Parse a single CSV line, handling quoted fields
- */
-function parseCSVLine(line: string): string[] {
-  const result: string[] = []
-  let current = ""
-  let inQuotes = false
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-
-    if (char === '"') {
-      inQuotes = !inQuotes
-    } else if (char === "," && !inQuotes) {
-      result.push(current.trim())
-      current = ""
-    } else {
-      current += char
-    }
-  }
-
-  // Add the last field
-  result.push(current.trim())
-
-  return result
-}
-
-/**
- * Calculate distance between two points using Haversine formula
- */
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 3959 // Earth's radius in miles
-  const dLat = toRadians(lat2 - lat1)
-  const dLon = toRadians(lon2 - lon1)
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
-}
-
-function toRadians(degrees: number): number {
-  return degrees * (Math.PI / 180)
-}
-
 export async function GET(request: NextRequest) {
   try {
-    console.log("=== ZIP Code Radius Search (Real CSV Data) ===")
-
     const searchParams = request.nextUrl.searchParams
     const zip = searchParams.get("zip")
     const radiusStr = searchParams.get("radius")
     const limitStr = searchParams.get("limit")
 
-    console.log(`Request params: zip=${zip}, radius=${radiusStr}, limit=${limitStr}`)
-
-    // Validate required parameters
     if (!zip) {
       return NextResponse.json({ error: "ZIP code is required" }, { status: 400 })
     }
@@ -120,7 +179,7 @@ export async function GET(request: NextRequest) {
     }
 
     const radius = Number.parseFloat(radiusStr)
-    const limit = limitStr ? Math.min(Number.parseInt(limitStr, 10), 500) : 500
+    const limit = limitStr ? Number.parseInt(limitStr, 10) : 100
 
     if (isNaN(radius) || radius <= 0) {
       return NextResponse.json({ error: "Radius must be a positive number" }, { status: 400 })
@@ -130,104 +189,55 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Limit must be a positive number" }, { status: 400 })
     }
 
-    if (limit > 500) {
-      return NextResponse.json({ error: "Maximum limit is 500 ZIP codes" }, { status: 400 })
-    }
+    // Try to get ZIP code data from Blob storage first
+    const zipCodes = await getZipCodeData()
 
-    console.log(`Searching for ZIP codes within ${radius} miles of ${zip} (max ${limit} results)`)
-    console.log(`Fetching CSV data from: ${CSV_URL}`)
+    if (zipCodes) {
+      // If we have data from Blob storage, use it
+      const centralZipData = zipCodes[zip]
 
-    // Fetch the CSV data
-    const csvResponse = await fetch(CSV_URL)
-    if (!csvResponse.ok) {
-      throw new Error(`Failed to fetch CSV: ${csvResponse.status} ${csvResponse.statusText}`)
-    }
-
-    const csvText = await csvResponse.text()
-    console.log(`CSV data fetched successfully. Size: ${csvText.length} characters`)
-
-    // Parse the CSV data
-    const allZipCodes = parseCSV(csvText)
-    console.log(`Parsed ${allZipCodes.length} ZIP codes from CSV`)
-
-    // Find the center ZIP code
-    const centralZipData = allZipCodes.find((zipData) => zipData.zip === zip.padStart(5, "0"))
-    if (!centralZipData) {
-      console.log(`Central ZIP code ${zip} not found in CSV data`)
-      return NextResponse.json(
-        {
-          error: `ZIP code ${zip} not found in database`,
-          totalZipCodes: allZipCodes.length,
-          suggestion: "Make sure the ZIP code is valid and exists in the US",
-        },
-        { status: 404 },
-      )
-    }
-
-    console.log(`Found central ZIP: ${zip} - ${centralZipData.city}, ${centralZipData.state}`)
-
-    // Calculate distances and filter
-    const results: (ZipCodeData & { distance: number })[] = []
-    let processed = 0
-
-    for (const zipData of allZipCodes) {
-      processed++
-
-      // Log progress for large datasets
-      if (processed % 5000 === 0) {
-        console.log(`Processed ${processed}/${allZipCodes.length} ZIP codes`)
+      if (!centralZipData) {
+        return NextResponse.json({ error: `ZIP code ${zip} not found in Blob storage` }, { status: 404 })
       }
 
-      const distance = haversineDistance(
-        centralZipData.latitude,
-        centralZipData.longitude,
-        zipData.latitude,
-        zipData.longitude,
-      )
+      // Calculate distances and filter
+      const zipCodesWithDistance = Object.values(zipCodes).map((zipData) => {
+        const distance = haversineDistance(
+          centralZipData.latitude,
+          centralZipData.longitude,
+          zipData.latitude,
+          zipData.longitude,
+        )
+        return { zipData, distance }
+      })
 
-      if (distance <= radius) {
-        results.push({
-          ...zipData,
-          distance: Math.round(distance * 100) / 100, // Round to 2 decimal places
+      // Sort by distance and take the closest ones within the radius
+      const results = zipCodesWithDistance
+        .filter(({ distance }) => distance <= radius)
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, limit)
+        .map(({ zipData, distance }) => {
+          // Add the distance to the ZIP code data
+          return { ...zipData, distance }
         })
-      }
+
+      return NextResponse.json({ zipCodes: results, source: "blob" })
     }
 
-    console.log(`Distance calculation completed. Found ${results.length} ZIP codes within ${radius} miles`)
+    // Fallback to file-based storage if Blob storage doesn't have the data
+    const results = await findZipCodesInRadius(zip, radius, limit)
 
-    // Sort by distance and limit results
-    results.sort((a, b) => a.distance - b.distance)
-    const limitedResults = results.slice(0, limit)
+    if (!results || results.length === 0) {
+      return NextResponse.json({ error: `No ZIP codes found within ${radius} miles of ${zip}` }, { status: 404 })
+    }
 
-    console.log(`Returning ${limitedResults.length} results (limited by ${limit})`)
-
-    return NextResponse.json({
-      zipCodes: limitedResults,
-      source: "csv",
-      capped: results.length > limit,
-      debug: {
-        centralZip: centralZipData,
-        totalZipCodesInDatabase: allZipCodes.length,
-        searchRadius: radius,
-        requestedLimit: limit,
-        resultsFound: results.length,
-        resultsReturned: limitedResults.length,
-        csvUrl: CSV_URL,
-      },
-    })
+    return NextResponse.json({ zipCodes: results, source: "file" })
   } catch (error) {
-    console.error("Error in ZIP code radius search:", error)
-
-    // Return a proper JSON error response
+    console.error("Error searching ZIP codes in radius:", error)
     return NextResponse.json(
       {
-        error: "Internal server error in ZIP code search",
+        error: "Failed to search ZIP codes in radius",
         message: error instanceof Error ? error.message : String(error),
-        debug: {
-          stack: error instanceof Error ? error.stack : undefined,
-          timestamp: new Date().toISOString(),
-          csvUrl: CSV_URL,
-        },
       },
       { status: 500 },
     )
