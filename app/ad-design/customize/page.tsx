@@ -14,19 +14,6 @@ import { saveBusinessAdDesign, getBusinessAdDesign } from "@/app/actions/busines
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
 import { getCloudflareBusinessMedia, type CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 
-import { MainHeader } from "@/components/main-header"
-import { MainFooter } from "@/components/main-footer"
-
-// First, add imports for the dialog components at the top of the file, after the existing imports
-import { BusinessPhotoAlbumDialog } from "@/components/business-photo-album-dialog"
-import BusinessJobsDialog from "@/components/business-jobs-dialog"
-import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
-import { DocumentsDialog } from "@/components/documents-dialog"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
-// First, add the import for the new FinalizeBusinessDialog component
-// Add this with the other dialog imports around line 40-50
-import { FinalizeBusinessDialog } from "@/components/finalize-business-dialog"
-
 import {
   Menu,
   List,
@@ -1297,41 +1284,41 @@ export default function CustomizeAdDesignPage() {
               )}
 
               {/* Website button */}
-              {!hiddenFields.website && (
-                <button
-                  onClick={() => window.open(`https://${formData.website}`, "_blank")}
-                  className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-                  style={{
-                    backgroundColor:
-                      selectedTexture === "gradient" ? "" : colorValues.textColor ? "#000000" : colorValues.primary,
-                    backgroundImage:
-                      selectedTexture === "gradient"
-                        ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                        : textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundImage || "none",
-                    backgroundSize:
-                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundSize || "auto",
-                    backgroundRepeat:
-                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundRepeat || "repeat",
-                  }}
+
+              <button
+                onClick={() => window.open(`https://${formData.website}`, "_blank")}
+                className={`flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 ${
+                  colorValues.textColor ? "text-black" : "text-white"
+                }`}
+                style={{
+                  backgroundColor: selectedTexture === "gradient" ? "" : colorValues.primary,
+                  backgroundImage:
+                    selectedTexture === "gradient"
+                      ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                      : textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundImage || "none",
+                  backgroundSize:
+                    textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundSize || "auto",
+                  backgroundRepeat:
+                    textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundRepeat || "repeat",
+                }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-white"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-white"
-                  >
-                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                  </svg>
-                  Visit Website
-                </button>
-              )}
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                Visit Website
+              </button>
             </div>
           </Card>
         </div>
@@ -1347,697 +1334,592 @@ export default function CustomizeAdDesignPage() {
   }, [formData, hiddenFields, photos, cloudflareVideo, businessId])
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <MainHeader />
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">Customize Your AdBox</h1>
 
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Customize Your AdBox</h1>
-            <p className="text-gray-600">Enter your business information.</p>
+              {selectedDesign ? (
+                <>
+                  {renderDesignPreview()}
+
+                  {/* Color Selection Section */}
+                  <Card className="p-6">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Color Theme</h3>
+                      <div className="grid grid-cols-4 gap-3">
+                        {Object.entries(colorMap).map(([colorKey, colorObj]) => (
+                          <button
+                            key={colorKey}
+                            onClick={() => setSelectedColor(colorKey)}
+                            className={`w-12 h-12 rounded-lg border-2 ${
+                              selectedColor === colorKey ? "border-gray-800" : "border-gray-300"
+                            }`}
+                            style={{ backgroundColor: colorObj.primary }}
+                            title={colorKey}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Texture Options Section */}
+                  <Card className="p-6">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Texture Options</h3>
+                      <p className="text-sm text-gray-600">Choose a texture pattern for your header and buttons</p>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        {textureOptions.map((texture) => (
+                          <button
+                            key={texture.value}
+                            onClick={() => setSelectedTexture(texture.value)}
+                            className={`p-3 border rounded-lg text-center ${
+                              selectedTexture === texture.value ? "border-blue-500 bg-blue-50" : "border-gray-300"
+                            }`}
+                          >
+                            <div className="text-sm font-medium">{texture.name}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-2">No design selected</h2>
+                  <p className="text-gray-600 mb-4">Please go back to the design page.</p>
+                  <Button onClick={() => window.history.back()}>Back to Design Page</Button>
+                </div>
+              )}
+            </div>
           </div>
 
-          {selectedDesign ? (
-            <>
-              {renderDesignPreview()}
+          <div className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Business Information Section */}
+              <Card className="p-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold">Business Information</h3>
 
-              {/* Color Selection Section */}
-              <Card>
-                <div className="p-6 space-y-6">
-                  <h2 className="text-xl font-semibold">Color Theme</h2>
-
-                  <div className="grid grid-cols-5 sm:grid-cols-9 gap-2">
-                    {Object.entries(colorMap).map(([colorKey, colorObj]) => (
-                      <button
-                        key={colorKey}
-                        onClick={() => setSelectedColor(colorKey)}
-                        className={`w-10 h-10 rounded-lg border-2 transition-all ${
-                          selectedColor === colorKey ? "ring-2 ring-offset-1" : "hover:scale-105"
-                        }`}
-                        style={{
-                          background: `linear-gradient(to right, ${colorObj.primary}, ${colorObj.secondary})`,
-                          borderColor:
-                            colorKey === "white"
-                              ? "#000000"
-                              : selectedColor === colorKey
-                                ? colorObj.primary
-                                : "transparent",
-                          ringColor: colorObj.primary,
-                        }}
-                        aria-label={`Select ${colorKey} theme`}
-                      >
-                        <span className="sr-only">{colorKey}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-
-              {/* Add this after the Color Selection Section Card: */}
-              <Card>
-                <div className="p-6 space-y-6">
-                  <h2 className="text-xl font-semibold">Texture Options</h2>
-                  <p className="text-sm text-gray-600">Choose a texture pattern for your header and buttons</p>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {textureOptions.map((texture) => (
-                      <button
-                        key={texture.value}
-                        type="button"
-                        onClick={() => setSelectedTexture(texture.value)}
-                        className={`relative h-16 rounded-lg border-2 transition-all overflow-hidden ${
-                          selectedTexture === texture.value ? "ring-2 ring-offset-1 ring-blue-500" : "hover:scale-105"
-                        }`}
-                        style={{
-                          backgroundColor: texture.value === "gradient" ? "" : colorValues.primary,
-                          backgroundImage:
-                            texture.value === "gradient"
-                              ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                              : texture.style.backgroundImage,
-                          backgroundSize: texture.style.backgroundSize,
-                          backgroundRepeat: texture.style.backgroundRepeat,
-                          borderColor: selectedTexture === texture.value ? colorValues.primary : "#e5e7eb",
-                        }}
-                        aria-label={`Select ${texture.name} texture`}
-                      >
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span
-                            className={`text-xs font-medium ${colorValues.textColor ? "text-black" : "text-white"}`}
-                          >
-                            {texture.name}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {/* Business Information Section */}
-                <Card>
-                  <div className="p-6 space-y-6">
-                    <h2 className="text-xl font-semibold">Business Information</h2>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label htmlFor="businessName">Business Name</label>
-                        <input
-                          id="businessName"
-                          name="businessName"
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          value={formData.businessName}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label htmlFor="streetAddress">Address</label>
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              id="hideAddress"
-                              checked={hiddenFields.address}
-                              onChange={() => toggleFieldVisibility("address")}
-                              className="mr-2"
-                            />
-                            <label htmlFor="hideAddress" className="text-sm text-gray-500">
-                              Hide from AdBox
-                            </label>
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <input
-                            id="streetAddress"
-                            name="streetAddress"
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                            value={formData.streetAddress}
-                            onChange={handleInputChange}
-                            placeholder="Street Address"
-                            required
-                          />
-                          <div className="grid grid-cols-12 gap-2">
-                            <div className="col-span-6">
-                              <input
-                                id="city"
-                                name="city"
-                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                value={formData.city}
-                                onChange={handleInputChange}
-                                placeholder="City"
-                                required
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <input
-                                id="state"
-                                name="state"
-                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                value={formData.state}
-                                onChange={handleInputChange}
-                                placeholder="State"
-                                maxLength={2}
-                                required
-                              />
-                            </div>
-                            <div className="col-span-4">
-                              <input
-                                id="zipCode"
-                                name="zipCode"
-                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                value={formData.zipCode}
-                                onChange={handleInputChange}
-                                placeholder="ZIP Code"
-                                maxLength={10}
-                                required
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label htmlFor="phone">Phone Number</label>
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              id="hidePhone"
-                              checked={hiddenFields.phone}
-                              onChange={() => toggleFieldVisibility("phone")}
-                              className="mr-2"
-                            />
-                            <label htmlFor="hidePhone" className="text-sm text-gray-500">
-                              Hide from AdBox
-                            </label>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <div className="w-24">
-                            <input
-                              id="phoneArea"
-                              name="phoneArea"
-                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-center"
-                              value={formData.phoneArea}
-                              onChange={(e) => handlePhoneChange(e, "phoneArea")}
-                              placeholder="Area"
-                              maxLength={3}
-                              required
-                            />
-                          </div>
-                          <div className="w-24">
-                            <input
-                              id="phonePrefix"
-                              name="phonePrefix"
-                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-center"
-                              value={formData.phonePrefix}
-                              onChange={(e) => handlePhoneChange(e, "phonePrefix")}
-                              placeholder="Prefix"
-                              maxLength={3}
-                              required
-                            />
-                          </div>
-                          <div className="w-28">
-                            <input
-                              id="phoneLine"
-                              name="phoneLine"
-                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-center"
-                              value={formData.phoneLine}
-                              onChange={(e) => handlePhoneChange(e, "phoneLine")}
-                              placeholder="Line"
-                              maxLength={4}
-                              required
-                            />
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">Format: (123) 456-7890</p>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label htmlFor="hours">Business Hours</label>
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              id="hideHours"
-                              checked={hiddenFields.hours}
-                              onChange={() => toggleFieldVisibility("hours")}
-                              className="mr-2"
-                            />
-                            <label htmlFor="hideHours" className="text-sm text-gray-500">
-                              Hide from AdBox
-                            </label>
-                          </div>
-                        </div>
-                        <textarea
-                          id="hours"
-                          name="hours"
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          value={formData.hours}
-                          onChange={handleInputChange}
-                          rows={3}
-                          required
-                        />
-                        <p className="text-sm text-gray-500 mt-1">Enter each day on a new line</p>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label htmlFor="website">Website</label>
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              id="hideWebsite"
-                              checked={hiddenFields.website}
-                              onChange={() => toggleFieldVisibility("website")}
-                              className="mr-2"
-                            />
-                            <label htmlFor="hideWebsite" className="text-sm text-gray-500">
-                              Hide from AdBox
-                            </label>
-                          </div>
-                        </div>
-                        <input
-                          id="website"
-                          name="website"
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          value={formData.website}
-                          onChange={handleInputChange}
-                          required={!hiddenFields.website}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Free Text Section */}
-                <Card>
-                  <div className="p-6 space-y-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-xl font-semibold">Custom Message</h2>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="hideFreeText"
-                          checked={hiddenFields.freeText}
-                          onChange={() => toggleFieldVisibility("freeText")}
-                          className="mr-2"
-                        />
-                        <label htmlFor="hideFreeText" className="text-sm text-gray-500">
-                          Hide from AdBox
-                        </label>
-                      </div>
-                    </div>
+                  <div className="space-y-4">
                     <div>
-                      <label htmlFor="freeText">Custom Message Text</label>
-                      <textarea
-                        id="freeText"
-                        name="freeText"
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        value={formData.freeText}
+                      <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-1">
+                        Business Name
+                      </label>
+                      <input
+                        type="text"
+                        id="businessName"
+                        name="businessName"
+                        value={formData.businessName}
                         onChange={handleInputChange}
-                        placeholder="Enter a custom message or slogan to display in your AdBox"
-                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      <p className="text-sm text-gray-500 mt-1">
-                        This text will be displayed prominently in your AdBox
-                      </p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">Address</label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={hiddenFields.address}
+                            onChange={() => toggleFieldVisibility("address")}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-600">Hide from AdBox</span>
+                        </label>
+                      </div>
+
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          name="streetAddress"
+                          placeholder="Street Address"
+                          value={formData.streetAddress}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <div className="grid grid-cols-3 gap-3">
+                          <input
+                            type="text"
+                            name="city"
+                            placeholder="City"
+                            value={formData.city}
+                            onChange={handleInputChange}
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <input
+                            type="text"
+                            name="state"
+                            placeholder="State"
+                            value={formData.state}
+                            onChange={handleInputChange}
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <input
+                            type="text"
+                            name="zipCode"
+                            placeholder="ZIP Code"
+                            value={formData.zipCode}
+                            onChange={handleInputChange}
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={hiddenFields.phone}
+                            onChange={() => toggleFieldVisibility("phone")}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-600">Hide from AdBox</span>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <input
+                          type="text"
+                          name="phoneArea"
+                          placeholder="Area"
+                          value={formData.phoneArea}
+                          onChange={(e) => handlePhoneChange(e, "phoneArea")}
+                          maxLength={3}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                          type="text"
+                          name="phonePrefix"
+                          placeholder="Prefix"
+                          value={formData.phonePrefix}
+                          onChange={(e) => handlePhoneChange(e, "phonePrefix")}
+                          maxLength={3}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <input
+                          type="text"
+                          name="phoneLine"
+                          placeholder="Line"
+                          value={formData.phoneLine}
+                          onChange={(e) => handlePhoneChange(e, "phoneLine")}
+                          maxLength={4}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500">Format: (123) 456-7890</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">Business Hours</label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={hiddenFields.hours}
+                            onChange={() => toggleFieldVisibility("hours")}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-600">Hide from AdBox</span>
+                        </label>
+                      </div>
+
+                      <textarea
+                        name="hours"
+                        value={formData.hours}
+                        onChange={handleInputChange}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter each day on a new line"
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">Website</label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={hiddenFields.website}
+                            onChange={() => toggleFieldVisibility("website")}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-600">Hide from AdBox</span>
+                        </label>
+                      </div>
+
+                      <input
+                        type="text"
+                        name="website"
+                        value={formData.website}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
                   </div>
-                </Card>
+                </div>
+              </Card>
 
-                {/* Feature Buttons Section */}
-                <Card>
-                  <div className="p-6 space-y-6">
-                    <h2 className="text-xl font-semibold">Feature Buttons</h2>
-                    <div className="space-y-4">
-                      <div className="flex items-center">
+              {/* Free Text Section */}
+              <Card className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">Custom Message</label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={hiddenFields.freeText}
+                        onChange={() => toggleFieldVisibility("freeText")}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-600">Hide from AdBox</span>
+                    </label>
+                  </div>
+
+                  <textarea
+                    name="freeText"
+                    value={formData.freeText}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter a custom message or slogan to display in your AdBox"
+                  />
+                  <p className="text-xs text-gray-500">This text will be displayed prominently in your AdBox</p>
+                </div>
+              </Card>
+
+              {/* Feature Buttons Section */}
+              <Card className="p-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold">Feature Buttons</h3>
+
+                  <div className="space-y-3">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={hiddenFields.savingsButton}
+                        onChange={() => toggleFieldVisibility("savingsButton")}
+                        className="mr-3"
+                      />
+                      <span className="text-sm">Hide Savings Button</span>
+                    </label>
+
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={hiddenFields.jobsButton}
+                        onChange={() => toggleFieldVisibility("jobsButton")}
+                        className="mr-3"
+                      />
+                      <span className="text-sm">Hide Job Opportunities Button</span>
+                    </label>
+
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={hiddenFields.website}
+                        onChange={() => toggleFieldVisibility("website")}
+                        className="mr-3"
+                      />
+                      <span className="text-sm">Hide Website Button/Link</span>
+                    </label>
+
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={hiddenFields.photoAlbum}
+                        onChange={() => toggleFieldVisibility("photoAlbum")}
+                        className="mr-3"
+                      />
+                      <span className="text-sm">Hide Photo Album Button/Link</span>
+                    </label>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-medium text-gray-700">Custom Button</label>
+                      <label className="flex items-center">
                         <input
                           type="checkbox"
-                          id="hideSavingsButton"
-                          checked={hiddenFields.savingsButton}
-                          onChange={() => toggleFieldVisibility("savingsButton")}
-                          className="mr-2"
-                        />
-                        <label htmlFor="hideSavingsButton" className="text-gray-700">
-                          Hide Savings Button
-                        </label>
-                      </div>
-
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="hideJobsButton"
-                          checked={hiddenFields.jobsButton}
-                          onChange={() => toggleFieldVisibility("jobsButton")}
-                          className="mr-2"
-                        />
-                        <label htmlFor="hideJobsButton" className="text-gray-700">
-                          Hide Job Opportunities Button
-                        </label>
-                      </div>
-
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="hideWebsiteButton"
-                          checked={hiddenFields.website}
-                          onChange={() => toggleFieldVisibility("website")}
-                          className="mr-2"
-                        />
-                        <label htmlFor="hideWebsiteButton" className="text-gray-700">
-                          Hide Website Button/Link
-                        </label>
-                      </div>
-
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="hidePhotoAlbumButton"
-                          checked={hiddenFields.photoAlbum}
-                          onChange={() => toggleFieldVisibility("photoAlbum")}
-                          className="mr-2"
-                        />
-                        <label htmlFor="hidePhotoAlbumButton" className="text-gray-700">
-                          Hide Photo Album Button/Link
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 border-t pt-6">
-                      <h3 className="text-lg font-medium mb-4">Custom Button</h3>
-
-                      <div className="flex items-center mb-4">
-                        <input
-                          type="checkbox"
-                          id="hideCustomButton"
                           checked={hiddenFields.customButton}
                           onChange={() => toggleFieldVisibility("customButton")}
                           className="mr-2"
                         />
-                        <label htmlFor="hideCustomButton" className="text-gray-700">
-                          Hide Custom Button
+                        <span className="text-sm text-gray-600">Hide Custom Button</span>
+                      </label>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label htmlFor="customButtonType" className="block text-sm font-medium text-gray-700 mb-1">
+                          Button Type
                         </label>
+                        <select
+                          id="customButtonType"
+                          value={customButtonType}
+                          onChange={handleCustomButtonTypeChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="Menu">Menu</option>
+                          <option value="Forms">Forms</option>
+                          <option value="Product List">Product List</option>
+                          <option value="Other">Other (Custom Name)</option>
+                        </select>
                       </div>
 
-                      <div className="space-y-4">
+                      {showCustomNameInput && (
                         <div>
-                          <label htmlFor="customButtonType" className="block text-sm font-medium text-gray-700 mb-1">
-                            Button Type
+                          <label htmlFor="customButtonName" className="block text-sm font-medium text-gray-700 mb-1">
+                            Custom Button Name
                           </label>
-                          <select
-                            id="customButtonType"
-                            value={customButtonType}
-                            onChange={handleCustomButtonTypeChange}
-                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                          >
-                            <option value="Menu">Menu</option>
-                            <option value="Forms">Forms</option>
-                            <option value="Product List">Product List</option>
-                            <option value="Other">Other (Custom Name)</option>
-                          </select>
+                          <input
+                            type="text"
+                            id="customButtonName"
+                            value={customButtonName}
+                            onChange={handleCustomButtonNameChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
                         </div>
-
-                        {showCustomNameInput && (
-                          <div>
-                            <label htmlFor="customButtonName" className="block text-sm font-medium text-gray-700 mb-1">
-                              Custom Button Name
-                            </label>
-                            <input
-                              type="text"
-                              id="customButtonName"
-                              value={customButtonName}
-                              onChange={handleCustomButtonNameChange}
-                              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                              placeholder="Enter custom button name"
-                              maxLength={20}
-                            />
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
-                </Card>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Button Icon</label>
-                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                    {availableIcons.map((icon) => {
-                      const IconComponent = icon.component
-                      return (
-                        <button
-                          key={icon.name}
-                          type="button"
-                          onClick={() => setCustomButtonIcon(icon.name)}
-                          className={`p-2 border rounded-md flex items-center justify-center ${
-                            customButtonIcon === icon.name
-                              ? "border-blue-500 bg-blue-50"
-                              : "border-gray-200 hover:bg-gray-50"
-                          }`}
-                          title={icon.name}
-                        >
-                          <IconComponent className="h-5 w-5" />
-                        </button>
-                      )
-                    })}
-                  </div>
                 </div>
+              </Card>
 
-                <div className="flex justify-center gap-4 pt-4">
-                  <button
-                    type="submit"
-                    className={`px-8 py-2 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 ${colorValues.textColor ? "text-black" : "text-white"}`}
-                    style={{
-                      backgroundColor: colorValues.primary,
-                      borderColor: colorValues.textColor ? "#ddd" : "transparent",
-                      borderWidth: colorValues.textColor ? "1px" : "0",
-                    }}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Saving..." : "Save"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleFinalizeAndSubmit}
-                    className={`px-8 py-2 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-opacity ${
-                      isAllComplete ? (colorValues.textColor ? "text-black" : "text-white") : "text-gray-400"
-                    }`}
-                    style={{
-                      backgroundColor: isAllComplete ? colorValues.secondary : "#e5e7eb",
-                      borderColor: isAllComplete ? (colorValues.textColor ? "#ddd" : "transparent") : "#d1d5db",
-                      borderWidth: "1px",
-                      opacity: isAllComplete ? 1 : 0.6,
-                      cursor: isAllComplete ? "pointer" : "not-allowed",
-                    }}
-                    disabled={!isAllComplete || isLoading}
-                  >
-                    Finalize and Submit
-                  </button>
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Button Icon</h3>
+                <div className="grid grid-cols-4 gap-3">
+                  {availableIcons.map((icon) => {
+                    const IconComponent = icon.component
+                    return (
+                      <button
+                        key={icon.name}
+                        type="button"
+                        onClick={() => setCustomButtonIcon(icon.name)}
+                        className={`p-3 border rounded-lg flex flex-col items-center gap-2 ${
+                          customButtonIcon === icon.name ? "border-blue-500 bg-blue-50" : "border-gray-300"
+                        }`}
+                      >
+                        <IconComponent className="h-5 w-5" />
+                        <span className="text-xs">{icon.name}</span>
+                      </button>
+                    )
+                  })}
                 </div>
-              </form>
-            </>
-          ) : (
-            <div className="text-center p-12 bg-white rounded-lg shadow">
-              <h2 className="text-xl font-semibold text-red-500">No design selected</h2>
-              <p className="mt-2 text-gray-600">Please go back to the design page.</p>
-              <button
-                className="mt-4 px-4 py-2 bg-blue-600 text-white font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                onClick={() => {
-                  window.location.href = "/ad-design"
-                }}
-              >
-                Back to Design Page
-              </button>
-            </div>
-          )}
+              </Card>
+
+              <div className="flex gap-4">
+                <Button type="submit" className="flex-1" disabled={isLoading}>
+                  {isLoading ? "Saving..." : "Save"}
+                </Button>
+
+                <Button type="button" onClick={handleFinalizeAndSubmit} variant="outline" className="flex-1">
+                  Finalize and Submit
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
-      </main>
+      </div>
 
-      <MainFooter />
+      {/* Placeholder dialogs - these would need to be implemented */}
+      {isSavingsDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Coupons & Savings</h3>
+            <p className="text-gray-600 mb-4">Coupons dialog would go here</p>
+            <Button onClick={() => setIsSavingsDialogOpen(false)}>Close</Button>
+          </div>
+        </div>
+      )}
 
-      {/* Coupons Dialog */}
-      <BusinessCouponsDialog
-        businessId={businessId}
-        isOpen={isSavingsDialogOpen}
-        onOpenChange={setIsSavingsDialogOpen}
-        businessName={formData.businessName}
-      />
+      {isPhotoAlbumDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Photo Album</h3>
+            <p className="text-gray-600 mb-4">Photo album dialog would go here</p>
+            <Button onClick={() => setIsPhotoAlbumDialogOpen(false)}>Close</Button>
+          </div>
+        </div>
+      )}
 
-      {/* Now let's add the Jobs Dialog component */}
+      {isJobsDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Job Listings</h3>
+            <p className="text-gray-600 mb-4">Job listings dialog would go here</p>
+            <Button onClick={() => setIsJobsDialogOpen(false)}>Close</Button>
+          </div>
+        </div>
+      )}
 
-      {/* Using BusinessJobsDialog component instead of a custom Jobs dialog */}
+      {isDocumentsOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Documents</h3>
+            <p className="text-gray-600 mb-4">Documents dialog would go here</p>
+            <Button onClick={() => setIsDocumentsOpen(false)}>Close</Button>
+          </div>
+        </div>
+      )}
 
-      {/* Photo Album Dialog */}
-      <BusinessPhotoAlbumDialog
-        isOpen={isPhotoAlbumDialogOpen}
-        onClose={() => setIsPhotoAlbumDialogOpen(false)}
-        businessId={businessId}
-        businessName={formData.businessName}
-      />
+      {isCompletionDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-lg w-full mx-4">
+            <div className="space-y-4">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold mb-2">AdBox Completion Status</h3>
+                <p className="text-gray-600">Review which sections of your AdBox are complete before saving.</p>
+              </div>
 
-      {/* Jobs Dialog */}
-      <BusinessJobsDialog
-        isOpen={isJobsDialogOpen}
-        onClose={() => setIsJobsDialogOpen(false)}
-        businessId={businessId}
-        businessName={formData.businessName}
-      />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <span className="font-medium">Business Information</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      completionStatus.businessInfo ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {completionStatus.businessInfo ? "Complete" : "Needs Content"}
+                  </span>
+                </div>
 
-      {/* Documents Dialog */}
-      <DocumentsDialog
-        isOpen={isDocumentsOpen}
-        onClose={() => setIsDocumentsOpen(false)}
-        businessId={businessId}
-        businessName={formData.businessName}
-      />
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <span className="font-medium">Business Video</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      hiddenFields.video
+                        ? "bg-gray-100 text-gray-600"
+                        : completionStatus.video
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {hiddenFields.video ? "Hidden" : completionStatus.video ? "Complete" : "Needs Content"}
+                  </span>
+                </div>
 
-      {/* Completion Status Dialog */}
-      <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
-        <DialogContent className="max-w-md">
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-xl font-semibold mb-2">AdBox Completion Status</h2>
-              <p className="text-gray-600 text-sm">Review which sections of your AdBox are complete before saving.</p>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <span className="font-medium">Photo Album</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      hiddenFields.photoAlbum
+                        ? "bg-gray-100 text-gray-600"
+                        : completionStatus.photos
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {hiddenFields.photoAlbum ? "Hidden" : completionStatus.photos ? "Complete" : "Needs Content"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <span className="font-medium">Coupons & Savings</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      hiddenFields.savingsButton
+                        ? "bg-gray-100 text-gray-600"
+                        : completionStatus.coupons
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {hiddenFields.savingsButton ? "Hidden" : completionStatus.coupons ? "Complete" : "Needs Content"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <span className="font-medium">Job Listings</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      hiddenFields.jobsButton
+                        ? "bg-gray-100 text-gray-600"
+                        : completionStatus.jobs
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {hiddenFields.jobsButton ? "Hidden" : completionStatus.jobs ? "Complete" : "Needs Content"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <span className="font-medium">Custom Button</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      hiddenFields.customButton
+                        ? "bg-gray-100 text-gray-600"
+                        : completionStatus.customButton
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {hiddenFields.customButton ? "Hidden" : completionStatus.customButton ? "Complete" : "Needs Setup"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <span className="font-medium">Website Link</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      hiddenFields.website
+                        ? "bg-gray-100 text-gray-600"
+                        : completionStatus.website
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {hiddenFields.website ? "Hidden" : completionStatus.website ? "Complete" : "Needs Content"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Tip:</strong> If you don't want to add photos, coupons, job listings, or a custom button, you
+                  can hide them using the checkboxes in the form above.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setIsCompletionDialogOpen(false)} className="flex-1">
+                  Continue Editing
+                </Button>
+                <Button onClick={handleActualSave} disabled={isLoading} className="flex-1">
+                  {isLoading ? "Saving..." : "Save"}
+                </Button>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="space-y-3">
-              {/* Business Information */}
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${completionStatus.businessInfo ? "bg-green-500" : "bg-yellow-500"}`}
-                />
-                <span className="text-sm font-medium">Business Information</span>
-                {completionStatus.businessInfo && <span className="text-xs text-green-600 ml-auto">Complete</span>}
-              </div>
-
-              {/* Video */}
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${completionStatus.video || hiddenFields.video ? "bg-green-500" : "bg-yellow-500"}`}
-                />
-                <span className="text-sm font-medium">Business Video</span>
-                {hiddenFields.video ? (
-                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
-                ) : completionStatus.video ? (
-                  <span className="text-xs text-green-600 ml-auto">Complete</span>
-                ) : (
-                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
-                )}
-              </div>
-
-              {/* Photos */}
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${completionStatus.photos || hiddenFields.photoAlbum ? "bg-green-500" : "bg-yellow-500"}`}
-                />
-                <span className="text-sm font-medium">Photo Album</span>
-                {hiddenFields.photoAlbum ? (
-                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
-                ) : completionStatus.photos ? (
-                  <span className="text-xs text-green-600 ml-auto">Complete</span>
-                ) : (
-                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
-                )}
-              </div>
-
-              {/* Coupons */}
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${completionStatus.coupons || hiddenFields.savingsButton ? "bg-green-500" : "bg-yellow-500"}`}
-                />
-                <span className="text-sm font-medium">Coupons & Savings</span>
-                {hiddenFields.savingsButton ? (
-                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
-                ) : completionStatus.coupons ? (
-                  <span className="text-xs text-green-600 ml-auto">Complete</span>
-                ) : (
-                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
-                )}
-              </div>
-
-              {/* Job Listings */}
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${completionStatus.jobs || hiddenFields.jobsButton ? "bg-green-500" : "bg-yellow-500"}`}
-                />
-                <span className="text-sm font-medium">Job Listings</span>
-                {hiddenFields.jobsButton ? (
-                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
-                ) : completionStatus.jobs ? (
-                  <span className="text-xs text-green-600 ml-auto">Complete</span>
-                ) : (
-                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
-                )}
-              </div>
-
-              {/* Custom Button */}
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${completionStatus.customButton || hiddenFields.customButton ? "bg-green-500" : "bg-yellow-500"}`}
-                />
-                <span className="text-sm font-medium">Custom Button</span>
-                {hiddenFields.customButton ? (
-                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
-                ) : completionStatus.customButton ? (
-                  <span className="text-xs text-green-600 ml-auto">Complete</span>
-                ) : (
-                  <span className="text-xs text-yellow-600 ml-auto">Needs Setup</span>
-                )}
-              </div>
-
-              {/* Website Link */}
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${completionStatus.website || hiddenFields.website ? "bg-green-500" : "bg-yellow-500"}`}
-                />
-                <span className="text-sm font-medium">Website Link</span>
-                {hiddenFields.website ? (
-                  <span className="text-xs text-gray-500 ml-auto">Hidden</span>
-                ) : completionStatus.website ? (
-                  <span className="text-xs text-green-600 ml-auto">Complete</span>
-                ) : (
-                  <span className="text-xs text-yellow-600 ml-auto">Needs Content</span>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Tip:</strong> If you don't want to add photos, coupons, job listings, or a custom button, you
-                can hide them using the checkboxes in the form above.
-              </p>
-            </div>
-
+      {isFinalizeDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Finalize Business Profile</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to finalize and submit your business profile? This action cannot be undone.
+            </p>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setIsCompletionDialogOpen(false)} className="flex-1">
-                Continue Editing
+              <Button variant="outline" onClick={() => setIsFinalizeDialogOpen(false)} className="flex-1">
+                Cancel
               </Button>
-              <Button
-                onClick={handleActualSave}
-                disabled={isLoading}
-                className="flex-1"
-                style={{
-                  backgroundColor: colorValues.primary,
-                  color: colorValues.textColor ? "#000000" : "#ffffff",
-                }}
-              >
-                {isLoading ? "Saving..." : "Save"}
+              <Button onClick={handleActualFinalization} className="flex-1">
+                Finalize and Submit
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-      {/* Finalize Business Dialog */}
-      <FinalizeBusinessDialog
-        isOpen={isFinalizeDialogOpen}
-        onClose={() => setIsFinalizeDialogOpen(false)}
-        businessId={businessId}
-        onFinalize={handleActualFinalization}
-        colorValues={colorValues}
-      />
+        </div>
+      )}
     </div>
   )
 }
