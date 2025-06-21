@@ -368,7 +368,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       </style>
 
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="business-profile-dialog-content w-full p-0 m-0 max-w-6xl">
+        <DialogContent className="business-profile-dialog-content w-full p-0 m-0 max-w-4xl">
           <DialogHeader className="sr-only">
             <DialogTitle>{businessName}</DialogTitle>
             <DialogDescription>
@@ -656,7 +656,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                 </Card>
               </div>
 
-              {/* Desktop Layout (new design) */}
+              {/* Desktop Layout (updated with custom button logic) */}
               <div className="hidden md:block">
                 <div className="max-w-6xl mx-auto">
                   {/* Header with Business Name */}
@@ -824,7 +824,10 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                               </button>
                             )}
 
-                            {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
+                            {/* Conditionally render either the website button or the custom button */}
+                            {adDesign.hiddenFields?.customButton &&
+                            !adDesign.hiddenFields?.website &&
+                            adDesign.businessInfo?.website ? (
                               <button
                                 onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
                                 className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
@@ -849,6 +852,26 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                                 </svg>
                                 <span className="text-sm font-medium">Website</span>
                               </button>
+                            ) : (
+                              !adDesign.hiddenFields?.customButton && (
+                                <button
+                                  onClick={() => setIsDocumentsOpen(true)}
+                                  className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors col-span-2"
+                                >
+                                  {(() => {
+                                    const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
+                                    return (
+                                      <IconComponent
+                                        className="h-5 w-5"
+                                        style={{
+                                          color: colorValues.primary,
+                                        }}
+                                      />
+                                    )
+                                  })()}
+                                  <span className="text-sm font-medium">{adDesign.customButton?.name || "Menu"}</span>
+                                </button>
+                              )
                             )}
 
                             {!adDesign.hiddenFields?.savingsButton && (
@@ -878,26 +901,6 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                                   }}
                                 />
                                 <span className="text-sm font-medium">Jobs</span>
-                              </button>
-                            )}
-
-                            {!adDesign.hiddenFields?.customButton && (
-                              <button
-                                onClick={() => setIsDocumentsOpen(true)}
-                                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors col-span-2"
-                              >
-                                {(() => {
-                                  const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
-                                  return (
-                                    <IconComponent
-                                      className="h-5 w-5"
-                                      style={{
-                                        color: colorValues.primary,
-                                      }}
-                                    />
-                                  )
-                                })()}
-                                <span className="text-sm font-medium">{adDesign.customButton?.name || "Menu"}</span>
                               </button>
                             )}
                           </div>
@@ -940,7 +943,10 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                                 })()}
                               </div>
 
-                              {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
+                              {/* Conditionally render either the website button or the custom button */}
+                              {adDesign.hiddenFields?.customButton &&
+                              !adDesign.hiddenFields?.website &&
+                              adDesign.businessInfo?.website ? (
                                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                                   <button
                                     onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
@@ -984,6 +990,40 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                                     <span>Visit Our Full Website</span>
                                   </button>
                                 </div>
+                              ) : (
+                                !adDesign.hiddenFields?.customButton && (
+                                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                    <button
+                                      onClick={() => setIsDocumentsOpen(true)}
+                                      className="flex items-center justify-center gap-2 w-full text-white p-3 rounded-md transition-colors hover:opacity-90"
+                                      style={{
+                                        backgroundColor:
+                                          adDesign.texture === "gradient"
+                                            ? ""
+                                            : colorValues.textColor
+                                              ? "#000000"
+                                              : colorValues.primary,
+                                        backgroundImage:
+                                          adDesign.texture === "gradient"
+                                            ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                                            : textureOptions.find((t) => t.value === adDesign.texture)?.style
+                                                .backgroundImage || "none",
+                                        backgroundSize:
+                                          textureOptions.find((t) => t.value === adDesign.texture)?.style
+                                            .backgroundSize || "auto",
+                                        backgroundRepeat:
+                                          textureOptions.find((t) => t.value === adDesign.texture)?.style
+                                            .backgroundRepeat || "repeat",
+                                      }}
+                                    >
+                                      {(() => {
+                                        const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
+                                        return <IconComponent className="h-5 w-5 text-white" />
+                                      })()}
+                                      <span>{adDesign.customButton?.name || "Menu"}</span>
+                                    </button>
+                                  </div>
+                                )
                               )}
                             </div>
                           </CardContent>
