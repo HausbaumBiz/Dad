@@ -400,9 +400,9 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
             <div className="overflow-hidden">
               {/* Mobile Layout (unchanged) */}
               <div className="block md:hidden">
-                <Card className="w-full">
+                <Card className="w-full animate-in fade-in duration-1000">
                   <div
-                    className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500`}
+                    className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
                     style={{
                       backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
                       backgroundImage:
@@ -421,7 +421,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     )}
                   </div>
 
-                  <div className="pt-6 px-6 space-y-4 animate-in slide-in-from-bottom duration-600 delay-200">
+                  <div className="pt-6 px-6 space-y-4">
                     {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
                       <div className="flex items-start gap-3">
                         <div
@@ -505,7 +505,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
                   {/* Mobile Video Section */}
                   {!adDesign.hiddenFields?.video && (
-                    <div className="border-t pt-4 mt-4 px-4 animate-in fade-in duration-700 delay-400">
+                    <div className="border-t pt-4 mt-4 px-4">
                       <div className="relative w-full pb-[56.25%]">
                         {(() => {
                           if (businessVideo && businessVideo.cloudflareVideoId) {
@@ -539,7 +539,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                   )}
 
                   {/* Mobile Footer with buttons */}
-                  <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4 animate-in slide-in-from-bottom duration-600 delay-500">
+                  <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
                     <div className="grid grid-cols-3 gap-2">
                       {!adDesign.hiddenFields?.photoAlbum && (
                         <Button
