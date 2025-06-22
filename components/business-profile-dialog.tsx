@@ -505,7 +505,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
                   {/* Mobile Video Section */}
                   {!adDesign.hiddenFields?.video && (
-                    <div className="border-t pt-4 mt-4 px-4">
+                    <div className="border-t pt-4 mt-4 px-4 animate-in fade-in duration-2000 delay-500">
                       <div className="relative w-full pb-[56.25%]">
                         {(() => {
                           if (businessVideo && businessVideo.cloudflareVideoId) {
