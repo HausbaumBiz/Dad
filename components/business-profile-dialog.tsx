@@ -376,9 +376,9 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
             </DialogDescription>
           </DialogHeader>
 
-          {/* Custom close button - centered above content */}
-          <div className="flex justify-center w-full py-1 border-b">
-            <DialogClose className="rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+          {/* Custom close button - mobile: absolute top, desktop: centered above content */}
+          <div className="md:flex md:justify-center md:w-full md:py-1 md:border-b">
+            <DialogClose className="absolute top-2 right-2 z-50 rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none md:relative md:top-auto md:right-auto md:z-auto">
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
             </DialogClose>
