@@ -1156,54 +1156,20 @@ export default function CustomizeAdDesignPage() {
               )}
             </div>
 
-            {/* Video Section - Using Cloudflare Video or Image Placeholder */}
-            {!hiddenFields.video && (
+            {/* Video Section - Only show if video exists */}
+            {!hiddenFields.video && cloudflareVideo && cloudflareVideo.cloudflareVideoId && (
               <div className="border-t pt-4 mt-4 px-4">
                 <div className="relative w-full pb-[56.25%]">
-                  {(() => {
-                    console.log("Video render check:", {
-                      cloudflareVideo,
-                      hasVideoId: cloudflareVideo?.cloudflareVideoId,
-                      isReady: cloudflareVideo?.cloudflareVideoReadyToStream,
-                      fullCondition:
-                        cloudflareVideo &&
-                        cloudflareVideo.cloudflareVideoId &&
-                        cloudflareVideo.cloudflareVideoReadyToStream,
-                    })
-
-                    if (cloudflareVideo && cloudflareVideo.cloudflareVideoId) {
-                      // Use Cloudflare Stream iframe embed for better compatibility
-                      const embedUrl = `https://customer-5093uhykxo17njhi.cloudflarestream.com/${cloudflareVideo.cloudflareVideoId}/iframe`
-
-                      console.log("Rendering video with embed URL:", embedUrl)
-
-                      return (
-                        /* Cloudflare Video using iframe embed */
-                        <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
-                          <iframe
-                            src={embedUrl}
-                            className="w-full h-full"
-                            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-                            allowFullScreen
-                            style={{ border: "none" }}
-                            title="Business Video"
-                          />
-                        </div>
-                      )
-                    } else {
-                      console.log("Rendering placeholder image instead of video")
-                      return (
-                        /* Image Placeholder */
-                        <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
-                          <img
-                            src="https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public"
-                            alt="Business image"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )
-                    }
-                  })()}
+                  <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                    <iframe
+                      src={`https://customer-5093uhykxo17njhi.cloudflarestream.com/${cloudflareVideo.cloudflareVideoId}/iframe`}
+                      className="w-full h-full"
+                      allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                      allowFullScreen
+                      style={{ border: "none" }}
+                      title="Business Video"
+                    />
+                  </div>
                 </div>
               </div>
             )}
