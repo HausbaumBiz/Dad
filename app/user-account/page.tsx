@@ -329,7 +329,8 @@ export default function UserAccountPage() {
                             </div>
                             <Button onClick={handleUpgrade} className="bg-amber-400 hover:bg-amber-500 text-black">
                               <CreditCard className="mr-2 h-4 w-4" />
-                              Upgrade Now
+                              <span className="sm:hidden">Upgrade</span>
+                              <span className="hidden sm:inline">Upgrade Now</span>
                             </Button>
                           </CardFooter>
                         </Card>

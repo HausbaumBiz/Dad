@@ -1380,7 +1380,16 @@ export default function CustomizeAdDesignPage() {
                               selectedTexture === texture.value ? "border-blue-500 bg-blue-50" : "border-gray-300"
                             }`}
                           >
-                            <div className="text-sm font-medium">{texture.name}</div>
+                            <div className="text-sm font-medium">
+                              <span className="hidden sm:inline">{texture.name}</span>
+                              <span className="sm:hidden">
+                                {texture.name === "Diagonal"
+                                  ? "Diag"
+                                  : texture.name === "Gradient"
+                                    ? "Grad"
+                                    : texture.name}
+                              </span>
+                            </div>
                           </button>
                         ))}
                       </div>
@@ -1708,7 +1717,12 @@ export default function CustomizeAdDesignPage() {
                         }`}
                       >
                         <IconComponent className="h-5 w-5" />
-                        <span className="text-xs">{icon.name}</span>
+                        <span className="text-xs">
+                          <span className="hidden sm:inline">{icon.name}</span>
+                          <span className="sm:hidden">
+                            {icon.name === "MessageSquare" ? "Msg" : icon.name === "ShoppingCart" ? "Cart" : icon.name}
+                          </span>
+                        </span>
                       </button>
                     )
                   })}
