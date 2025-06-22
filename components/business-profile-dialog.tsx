@@ -402,7 +402,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
               <div className="block md:hidden">
                 <Card className="w-full">
                   <div
-                    className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
+                    className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500`}
                     style={{
                       backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
                       backgroundImage:
@@ -421,7 +421,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     )}
                   </div>
 
-                  <div className="pt-6 px-6 space-y-4">
+                  <div className="pt-6 px-6 space-y-4 animate-in slide-in-from-bottom duration-600 delay-200">
                     {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
                       <div className="flex items-start gap-3">
                         <div
@@ -505,7 +505,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
                   {/* Mobile Video Section */}
                   {!adDesign.hiddenFields?.video && (
-                    <div className="border-t pt-4 mt-4 px-4">
+                    <div className="border-t pt-4 mt-4 px-4 animate-in fade-in duration-700 delay-400">
                       <div className="relative w-full pb-[56.25%]">
                         {(() => {
                           if (businessVideo && businessVideo.cloudflareVideoId) {
@@ -539,7 +539,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                   )}
 
                   {/* Mobile Footer with buttons */}
-                  <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
+                  <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4 animate-in slide-in-from-bottom duration-600 delay-500">
                     <div className="grid grid-cols-3 gap-2">
                       {!adDesign.hiddenFields?.photoAlbum && (
                         <Button
@@ -661,7 +661,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                 <div className="max-w-6xl mx-auto">
                   {/* Header with Business Name */}
                   <div
-                    className={`text-white rounded-t-lg p-8 ${colorValues.textColor ? "text-black" : "text-white"}`}
+                    className={`text-white rounded-t-lg p-8 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500`}
                     style={{
                       backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
                       backgroundImage:
@@ -686,7 +686,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     {/* Left Column - Business Info */}
                     <div className="space-y-6">
                       {/* Contact Information */}
-                      <Card className="overflow-hidden border-none shadow-md">
+                      <Card className="overflow-hidden border-none shadow-md animate-in slide-in-from-left duration-700 delay-200">
                         <CardContent className="p-0">
                           <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
                             <h2 className="font-semibold text-lg">Contact Information</h2>
@@ -751,7 +751,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
                       {/* Hours of Operation */}
                       {!adDesign.hiddenFields?.hours && (
-                        <Card className="overflow-hidden border-none shadow-md">
+                        <Card className="overflow-hidden border-none shadow-md animate-in slide-in-from-left duration-700 delay-400">
                           <CardContent className="p-0">
                             <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
                               <h2 className="font-semibold text-lg">Hours of Operation</h2>
@@ -803,7 +803,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                       )}
 
                       {/* Quick Links */}
-                      <Card className="overflow-hidden border-none shadow-md">
+                      <Card className="overflow-hidden border-none shadow-md animate-in slide-in-from-left duration-700 delay-600">
                         <CardContent className="p-0">
                           <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
                             <h2 className="font-semibold text-lg">Quick Links</h2>
@@ -911,7 +911,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     {/* Right Column - Video */}
                     <div className="space-y-6">
                       {!adDesign.hiddenFields?.video && (
-                        <Card className="overflow-hidden border-none shadow-md h-full">
+                        <Card className="overflow-hidden border-none shadow-md h-full animate-in slide-in-from-right duration-700 delay-300">
                           <CardContent className="p-0 h-full flex flex-col">
                             <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
                               <h2 className="font-semibold text-lg">Featured Video</h2>
