@@ -13,6 +13,7 @@ import { getBusinessMedia, saveMediaSettings, type MediaItem } from "@/app/actio
 import { saveBusinessAdDesign, getBusinessAdDesign } from "@/app/actions/business-actions"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
 import { getCloudflareBusinessMedia, type CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
+import { getBusinessDocuments } from "@/app/actions/document-actions"
 
 import {
   Menu,
@@ -54,7 +55,6 @@ export default function CustomizeAdDesignPage() {
   // Add state for the dialogs
   const [isSavingsDialogOpen, setIsSavingsDialogOpen] = useState(false)
   // Add state variables for the photo album and jobs dialogs
-  // Add these after the existing state variables (around line 45-50)
   const [isPhotoAlbumDialogOpen, setIsPhotoAlbumDialogOpen] = useState(false)
   const [isJobsDialogOpen, setIsJobsDialogOpen] = useState(false)
 
@@ -104,7 +104,6 @@ export default function CustomizeAdDesignPage() {
   const [isAllComplete, setIsAllComplete] = useState(false)
 
   // Add a new state variable for the finalize dialog
-  // Add this with the other dialog state variables around line 60-70
   const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false)
 
   // Color mapping
@@ -788,7 +787,28 @@ export default function CustomizeAdDesignPage() {
 
     // Check custom button completion (if not hidden)
     if (!hiddenFields.customButton) {
-      status.customButton = !!(customButtonName && customButtonName !== "Menu")
+      // Check if custom button has been configured (any name, including default "Menu")
+      const hasCustomButtonName = !!(customButtonName && customButtonName.trim() !== "")
+
+      // Check if documents have been uploaded
+      let hasDocuments = false
+      try {
+        const documents = await getBusinessDocuments(businessId)
+        hasDocuments = documents && documents.length > 0
+      } catch (error) {
+        console.error("Error checking documents for completion status:", error)
+        hasDocuments = false
+      }
+
+      // Custom button is complete if it has a name (including default "Menu") AND documents uploaded
+      status.customButton = hasCustomButtonName && hasDocuments
+
+      console.log(
+        `Custom button completion: name="${customButtonName}", hasName=${hasCustomButtonName}, documents=${hasDocuments}, complete=${status.customButton}`,
+      )
+    } else {
+      // If custom button is hidden, mark as complete
+      status.customButton = true
     }
 
     // Check website completion - must not be default/sample data
@@ -900,15 +920,12 @@ export default function CustomizeAdDesignPage() {
   }
 
   // Add new function to handle finalize and submit
-  // Replace the handleFinalizeAndSubmit function with this new implementation
-  // This should be around line 600-610
   const handleFinalizeAndSubmit = async () => {
     // Open the finalize dialog instead of showing a toast
     setIsFinalizeDialogOpen(true)
   }
 
   // Add a new function to handle the actual finalization
-  // Add this after the handleFinalizeAndSubmit function
   const handleActualFinalization = async () => {
     try {
       toast({
