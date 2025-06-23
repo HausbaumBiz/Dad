@@ -235,6 +235,7 @@ export default function CustomizeAdDesignPage() {
     phoneArea: "555",
     phonePrefix: "123",
     phoneLine: "4567",
+    email: "business@example.com", // Add this line
     hours: "Mon-Fri: 9AM-5PM\nSat: 10AM-3PM",
     website: "www.businessname.com",
     freeText: "We offer professional services with 10+ years of experience in the industry.",
@@ -246,6 +247,7 @@ export default function CustomizeAdDesignPage() {
   const [hiddenFields, setHiddenFields] = useState<{
     address: boolean
     phone: boolean
+    email: boolean // Add this line
     hours: boolean
     website: boolean
     video: boolean
@@ -258,6 +260,7 @@ export default function CustomizeAdDesignPage() {
   }>({
     address: false,
     phone: false,
+    email: false, // Add this line
     hours: false,
     website: false,
     video: false,
@@ -496,6 +499,7 @@ export default function CustomizeAdDesignPage() {
           phoneArea: phoneArea || "555",
           phonePrefix: phonePrefix || "123",
           phoneLine: phoneLine || "4567",
+          email: businessInfo.email || "business@example.com", // Add this line
           hours: businessInfo.hours || "Mon-Fri: 9AM-5PM\nSat: 10AM-3PM",
           website: businessInfo.website || "www.businessname.com",
           freeText:
@@ -532,6 +536,7 @@ export default function CustomizeAdDesignPage() {
           phoneArea: "555",
           phonePrefix: "123",
           phoneLine: "4567",
+          email: "your-business@example.com", // Add this line
           hours: "Your Business Hours",
           website: "Your Business Website",
           freeText: "Your Business Description",
@@ -552,6 +557,7 @@ export default function CustomizeAdDesignPage() {
         phoneArea: "555",
         phonePrefix: "123",
         phoneLine: "4567",
+        email: "your-business@example.com", // Add this line
         hours: "Your Business Hours",
         website: "Your Business Website",
         freeText: "Your Business Description",
@@ -749,11 +755,14 @@ export default function CustomizeAdDesignPage() {
 
     const hasRealPhone = formData.phoneArea !== "555" || formData.phonePrefix !== "123" || formData.phoneLine !== "4567"
 
+    const hasRealEmail = formData.email && formData.email !== "business@example.com" // Add this line
+
     const hasRealHours =
       formData.hours && formData.hours !== "Mon-Fri: 9AM-5PM\nSat: 10AM-3PM" && formData.hours !== "Your Business Hours"
 
     // Business info is complete only if all fields have real data
-    status.businessInfo = hasRealBusinessName && hasRealAddress && hasRealCity && hasRealPhone && hasRealHours
+    status.businessInfo =
+      hasRealBusinessName && hasRealAddress && hasRealCity && hasRealPhone && hasRealEmail && hasRealHours // Add hasRealEmail
 
     // Check video completion
     if (cloudflareVideo && cloudflareVideo.cloudflareVideoId) {
@@ -1003,11 +1012,21 @@ export default function CustomizeAdDesignPage() {
   const fetchJobListings = async () => {
     setIsJobsLoading(true)
     try {
-      // For now, use a hardcoded business ID - in a real application,
-      // this would come from the authenticated user's session
-      const businessId = "demo-business"
+      // Use the actual business ID from component state, not hardcoded
+      if (!businessId) {
+        console.warn("No business ID available for fetching job listings")
+        setJobListings([])
+        return
+      }
 
       const jobs = await getBusinessJobs(businessId)
+
+      // Ensure jobs is an array before processing
+      if (!Array.isArray(jobs)) {
+        console.error("getBusinessJobs did not return an array:", jobs)
+        setJobListings([])
+        return
+      }
 
       // Add some validation to ensure we have valid job objects
       const validJobs = jobs.filter((job) => {
@@ -1102,6 +1121,36 @@ export default function CustomizeAdDesignPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-500">Phone</p>
                     <p>{getFormattedPhone()}</p>
+                  </div>
+                </div>
+              )}
+
+              {!hiddenFields.email && (
+                <div className="flex items-start gap-3">
+                  <div
+                    className="h-5 w-5 mt-0.5 flex-shrink-0"
+                    style={{
+                      color: colorValues.textColor ? "#000000" : colorValues.primary,
+                    }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                      <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Email</p>
+                    <p>{formData.email}</p>
                   </div>
                 </div>
               )}
@@ -1507,6 +1556,30 @@ export default function CustomizeAdDesignPage() {
                         />
                       </div>
                       <p className="text-xs text-gray-500">Format: (123) 456-7890</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">Business Email</label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={hiddenFields.email}
+                            onChange={() => toggleFieldVisibility("email")}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-600">Hide from AdBox</span>
+                        </label>
+                      </div>
+
+                      <input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="business@example.com"
+                      />
                     </div>
 
                     <div className="space-y-4">

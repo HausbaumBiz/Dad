@@ -323,6 +323,12 @@ export async function getBusinessJobs(businessId: string): Promise<JobListing[]>
       return []
     }
 
+    // Ensure jobIds is an array before proceeding
+    if (!Array.isArray(jobIds)) {
+      console.error("jobIds is not an array after processing:", jobIds)
+      return []
+    }
+
     // Fetch each job
     const jobs: JobListing[] = []
 
@@ -391,6 +397,12 @@ export async function getBusinessJobs(businessId: string): Promise<JobListing[]>
     }
 
     console.log(`Returning ${jobs.length} jobs for business ${businessId}`)
+
+    // Ensure jobs is an array before sorting
+    if (!Array.isArray(jobs)) {
+      console.error("jobs is not an array before sorting:", jobs)
+      return []
+    }
 
     // Sort by creation date (newest first)
     return jobs.sort((a, b) => {
