@@ -563,7 +563,12 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
       return { success: false, error: "Missing business ID" }
     }
 
-    console.log("Saving business ad design:", designData)
+    console.log("Saving business ad design with color data:", {
+      designId: designData.designId,
+      colorScheme: designData.colorScheme,
+      colorValues: designData.colorValues,
+      texture: designData.texture,
+    })
 
     // Define the keys we'll be using
     const mainKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign`
@@ -589,23 +594,23 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
       }),
     )
 
-    // Store the color values
-    let colorValues = null
-    try {
-      const colorValuesStr = await kv.get(colorsKey)
-      console.log(`Color values (${colorsKey}):`, colorValuesStr)
+    // Store the color values separately AND include them in the main data
+    if (designData.colorValues) {
+      console.log("Saving color values:", designData.colorValues)
+      await kv.set(colorsKey, JSON.stringify(designData.colorValues))
 
-      if (colorValuesStr) {
-        colorValues = safeJsonParse(colorValuesStr, {})
-        // Ensure colorValues is an object, not an array
-        if (Array.isArray(colorValues)) {
-          console.warn("Color values is unexpectedly an array, converting to object")
-          colorValues = {}
-        }
-      }
-    } catch (error) {
-      console.error("Error getting color values:", getErrorMessage(error))
-      colorValues = {} // Ensure we have a fallback object
+      // ALSO save color values in the main design data for easier retrieval
+      await kv.set(
+        mainKey,
+        JSON.stringify({
+          designId: designData.designId,
+          colorScheme: designData.colorScheme,
+          colorValues: designData.colorValues, // Include color values here too
+          texture: designData.texture || "gradient",
+          customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
+          updatedAt: new Date().toISOString(),
+        }),
+      )
     }
 
     // Store the business information
@@ -660,6 +665,7 @@ export async function getBusinessAdDesign(businessId: string) {
           texture: "gradient",
           customButton: { type: "Menu", name: "Menu", icon: "Menu" },
         })
+        console.log("Parsed design data:", designData)
       }
     } catch (error) {
       console.error("Error getting main design data:", getErrorMessage(error))
@@ -770,7 +776,11 @@ export async function getBusinessAdDesign(businessId: string) {
       texture: designData.texture || "gradient", // Ensure texture is included with default
     }
 
-    console.log("Final combined ad design data:", result)
+    console.log("Final combined ad design data with colors:", {
+      ...result,
+      colorValues: result.colorValues,
+      colorScheme: result.colorScheme,
+    })
     return result
   } catch (error) {
     console.error("Error getting business ad design:", getErrorMessage(error))

@@ -1,5 +1,7 @@
 "use client"
 
+import { Button } from "@/components/ui/button"
+
 import type React from "react"
 
 import { useState, useEffect } from "react"
@@ -12,7 +14,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
 import {
   Loader2,
@@ -135,9 +136,18 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
       const design = await getBusinessAdDesign(businessId)
 
       if (design) {
-        console.log("Loaded ad design:", design)
+        console.log("Loaded ad design with full data:", {
+          designId: design.designId,
+          colorScheme: design.colorScheme,
+          colorValues: design.colorValues,
+          texture: design.texture,
+          businessInfo: design.businessInfo,
+          hiddenFields: design.hiddenFields,
+          customButton: design.customButton,
+        })
         setAdDesign(design)
       } else {
+        console.log("No ad design found for business:", businessId)
         setError("No ad design found for this business")
       }
     } catch (err) {
@@ -192,17 +202,49 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     }
   }
 
-  // Get the color values from the design
+  // Replace the getColorValues function with this improved version:
   const getColorValues = () => {
-    if (!adDesign || !adDesign.colorValues) {
-      return { primary: "#007BFF", secondary: "#0056b3" }
+    console.log("Getting color values from adDesign:", adDesign)
+
+    // First, try to get the saved color values directly
+    if (adDesign?.colorValues && adDesign.colorValues.primary) {
+      console.log("Using saved colorValues:", adDesign.colorValues)
+      return {
+        primary: adDesign.colorValues.primary,
+        secondary: adDesign.colorValues.secondary || adDesign.colorValues.primary,
+        textColor: adDesign.colorValues.textColor,
+      }
     }
 
-    return {
-      primary: adDesign.colorValues.primary || "#007BFF",
-      secondary: adDesign.colorValues.secondary || "#0056b3",
-      textColor: adDesign.colorValues.textColor,
+    // If no direct color values, try to derive from colorScheme
+    if (adDesign?.colorScheme) {
+      console.log("Deriving colors from colorScheme:", adDesign.colorScheme)
+
+      // Color mapping - same as in customize page
+      const colorMap: Record<string, { primary: string; secondary: string; textColor?: string }> = {
+        blue: { primary: "#007BFF", secondary: "#0056b3" },
+        purple: { primary: "#6f42c1", secondary: "#5e37a6" },
+        green: { primary: "#28a745", secondary: "#218838" },
+        teal: { primary: "#20c997", secondary: "#17a2b8" },
+        orange: { primary: "#fd7e14", secondary: "#e65f02" },
+        red: { primary: "#dc3545", secondary: "#c82333" },
+        black: { primary: "#000000", secondary: "#333333" },
+        white: { primary: "#ffffff", secondary: "#f8f9fa", textColor: "#000000" },
+        yellow: { primary: "#ffc107", secondary: "#ffdb58", textColor: "#000000" },
+        slategrey: { primary: "#708090", secondary: "#4E5964" },
+        brown: { primary: "#8B4513", secondary: "#6B3610" },
+        darkpink: { primary: "#FF1493", secondary: "#C71585" },
+        lightpink: { primary: "#FFC0CB", secondary: "#FFB6C1", textColor: "#000000" },
+      }
+
+      const colors = colorMap[adDesign.colorScheme] || colorMap.blue
+      console.log("Mapped colors:", colors)
+      return colors
     }
+
+    // Default fallback
+    console.log("Using default blue colors")
+    return { primary: "#007BFF", secondary: "#0056b3" }
   }
 
   const colorValues = getColorValues()
@@ -515,10 +557,10 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                                 <iframe
                                   src={embedUrl}
                                   className="w-full h-full"
-                                  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                                  allow="accelerometer; gyroscope; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                   allowFullScreen
+                                  title={`${businessName} video`}
                                   style={{ border: "none" }}
-                                  title="Business Video"
                                 />
                               </div>
                             )
@@ -860,14 +902,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                                 >
                                   {(() => {
                                     const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
-                                    return (
-                                      <IconComponent
-                                        className="h-5 w-5"
-                                        style={{
-                                          color: colorValues.primary,
-                                        }}
-                                      />
-                                    )
+                                    return <IconComponent className="h-5 w-5 text-white" />
                                   })()}
                                   <span className="text-sm font-medium">{adDesign.customButton?.name || "Menu"}</span>
                                 </button>
