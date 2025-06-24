@@ -425,7 +425,7 @@ export default function LegalServicesPage() {
                     {(provider.isNationwide || (provider.serviceArea && provider.serviceArea.length > 0)) && (
                       <div className="flex items-center text-gray-600 text-xs mt-1 mb-3">
                         <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800">
-                          {provider.isNationwide ? "Serves nationwide" : `Serves ${userZipCode} area`}
+                          {provider.isNationwide ? "Serves nationwide" : `Serves ${userZipCode} and surrounding areas`}
                         </span>
                       </div>
                     )}

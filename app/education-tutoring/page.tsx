@@ -357,7 +357,7 @@ export default function EducationTutoringPage() {
                         {business.isNationwide ? (
                           <span>✓ Serves nationwide</span>
                         ) : business.serviceArea?.includes(userZipCode) ? (
-                          <span>✓ Serves {userZipCode} area</span>
+                          <span>✓ Serves {userZipCode} and surrounding areas</span>
                         ) : business.zipCode === userZipCode ? (
                           <span>✓ Located in {userZipCode}</span>
                         ) : null}

@@ -400,7 +400,7 @@ export default function RealEstatePage() {
                         {provider.isNationwide ? (
                           <span>✓ Serves nationwide</span>
                         ) : provider.serviceArea?.includes(userZipCode) ? (
-                          <span>✓ Serves {userZipCode} area</span>
+                          <span>✓ Serves {userZipCode} and surrounding areas</span>
                         ) : provider.zipCode === userZipCode ? (
                           <span>✓ Located in {userZipCode}</span>
                         ) : null}

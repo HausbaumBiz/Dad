@@ -578,7 +578,9 @@ export default function CareServicesPage() {
                         {business.isNationwide ? (
                           <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
                         ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
-                          <div className="text-xs text-green-600 font-medium mb-1">✓ Serves {userZipCode} area</div>
+                          <div className="text-xs text-green-600 font-medium mb-1">
+                            ✓ Serves {userZipCode} and surrounding areas
+                          </div>
                         ) : null}
 
                         {business.description && <p className="text-gray-600 mb-3">{business.description}</p>}

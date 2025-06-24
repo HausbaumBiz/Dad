@@ -442,7 +442,7 @@ export default function FinancialServicesPage() {
                           {business.isNationwide
                             ? "Serves nationwide"
                             : business.serviceArea?.includes(userZipCode)
-                              ? `Serves ${userZipCode} area`
+                              ? `Serves ${userZipCode} and surrounding areas`
                               : `Primary location: ${business.zipCode}`}
                         </span>
                       </div>

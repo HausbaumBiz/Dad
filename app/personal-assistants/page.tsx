@@ -591,7 +591,7 @@ export default function PersonalAssistantsPage() {
                         <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800">
                           {provider.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))
                             ? "Serves nationwide"
-                            : `Serves ${userZipCode} area`}
+                            : `Serves ${userZipCode} and surrounding areas`}
                         </span>
                       </div>
                     )}

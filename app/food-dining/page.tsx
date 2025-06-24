@@ -513,7 +513,7 @@ export default function FoodDiningPage() {
                     {(business.isNationwide || (business.serviceArea && business.serviceArea.length > 0)) && (
                       <div className="flex items-center mt-1">
                         <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
-                          {business.isNationwide ? "Serves nationwide" : `Serves ${userZipCode} area`}
+                          {business.isNationwide ? "Serves nationwide" : `Serves ${userZipCode} and surrounding areas`}
                         </span>
                       </div>
                     )}
