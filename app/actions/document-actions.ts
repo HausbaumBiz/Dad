@@ -97,32 +97,41 @@ export async function getBusinessDocuments(businessId: string, type?: DocumentTy
 
     if (!documentIds.length) return []
 
-    // Get document metadata
-    const documents = await Promise.all(
-      documentIds.map(async (id) => {
-        try {
-          const data = await kv.hget(`business:${businessId}:documents`, id)
+    // Get document metadata with better error handling
+    const documents: DocumentMetadata[] = []
 
-          // Check if data exists
-          if (!data) return null
+    for (const id of documentIds) {
+      try {
+        const data = await kv.hget(`business:${businessId}:documents`, id)
 
-          // Handle different data types
-          if (typeof data === "string") {
-            return JSON.parse(data) as DocumentMetadata
-          } else if (typeof data === "object") {
-            return data as DocumentMetadata
+        // Check if data exists
+        if (!data) continue
+
+        let document: DocumentMetadata | null = null
+
+        // Handle different data types
+        if (typeof data === "string") {
+          try {
+            document = JSON.parse(data) as DocumentMetadata
+          } catch (parseError) {
+            console.error(`Error parsing document JSON for ${id}:`, parseError)
+            continue
           }
-
-          return null
-        } catch (err) {
-          console.error(`Error parsing document ${id}:`, err)
-          return null
+        } else if (typeof data === "object" && data !== null) {
+          document = data as DocumentMetadata
         }
-      }),
-    )
 
-    // Filter out null values and sort by creation date (newest first)
-    return documents.filter((doc): doc is DocumentMetadata => doc !== null).sort((a, b) => b.createdAt - a.createdAt)
+        if (document && document.id && document.businessId) {
+          documents.push(document)
+        }
+      } catch (err) {
+        console.error(`Error processing document ${id}:`, err)
+        continue
+      }
+    }
+
+    // Sort by creation date (newest first)
+    return documents.sort((a, b) => b.createdAt - a.createdAt)
   } catch (error) {
     console.error("Error getting business documents:", error)
     return []

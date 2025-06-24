@@ -39,6 +39,7 @@ import {
   Coffee,
   Gift,
   Music,
+  Mail,
 } from "lucide-react"
 import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
 import { BusinessCouponsDialog } from "./business-coupons-dialog"
@@ -341,9 +342,29 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     return null
   }
 
+  // Helper function to get email from ad design data first, then Redis business data
+  const getEmail = () => {
+    // First try to get email from ad design business info (customize page)
+    if (adDesign?.businessInfo?.email) {
+      return adDesign.businessInfo.email
+    }
+
+    // Fall back to Redis business data (registration email)
+    if (businessData && typeof businessData === "object" && businessData.email) {
+      return businessData.email
+    }
+
+    return null
+  }
+
   // Helper function to format phone number
   const formatPhone = (phone: string) => {
     return phone || "Not provided"
+  }
+
+  // Helper function to format email
+  const formatEmail = (email: string) => {
+    return email || "Not provided"
   }
 
   // Helper function to format address
@@ -396,6 +417,12 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
     window.open(`tel:${phoneNumber}`)
   }
 
+  // Function to handle email
+  const handleEmail = (email: string) => {
+    if (!email) return
+    window.open(`mailto:${email}`)
+  }
+
   // Function to handle map directions
   const handleGetDirections = (address: string) => {
     if (!address) return
@@ -440,7 +467,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
             </div>
           ) : adDesign ? (
             <div className="overflow-hidden">
-              {/* Mobile Layout (unchanged) */}
+              {/* Mobile Layout */}
               <div className="block md:hidden">
                 <Card className="w-full animate-in fade-in duration-1000">
                   <div
@@ -481,6 +508,28 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                             className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
                           >
                             {formatPhone(getPhoneNumber())}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!adDesign.hiddenFields?.email && getEmail() && (
+                      <div className="flex items-start gap-3">
+                        <div
+                          className="h-5 w-5 mt-0.5 flex-shrink-0"
+                          style={{
+                            color: colorValues.textColor ? "#000000" : colorValues.primary,
+                          }}
+                        >
+                          <Mail className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Email</p>
+                          <button
+                            onClick={() => handleEmail(getEmail())}
+                            className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
+                          >
+                            {formatEmail(getEmail())}
                           </button>
                         </div>
                       </div>
@@ -698,7 +747,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                 </Card>
               </div>
 
-              {/* Desktop Layout (updated with custom button logic) */}
+              {/* Desktop Layout */}
               <div className="hidden md:block">
                 <div className="max-w-6xl mx-auto">
                   {/* Header with Business Name */}
@@ -756,6 +805,33 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                                     className="font-medium text-blue-600 hover:underline cursor-pointer"
                                   >
                                     {formatPhone(getPhoneNumber())}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {!adDesign.hiddenFields?.email && getEmail() && (
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="p-2 rounded-full"
+                                  style={{
+                                    backgroundColor: `${colorValues.primary}20`,
+                                  }}
+                                >
+                                  <Mail
+                                    className="h-5 w-5"
+                                    style={{
+                                      color: colorValues.primary,
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <p className="text-sm text-slate-500 dark:text-slate-400">Email</p>
+                                  <button
+                                    onClick={() => handleEmail(getEmail())}
+                                    className="font-medium text-blue-600 hover:underline cursor-pointer"
+                                  >
+                                    {formatEmail(getEmail())}
                                   </button>
                                 </div>
                               </div>
