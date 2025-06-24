@@ -41,14 +41,14 @@ import {
   Music,
   Mail,
 } from "lucide-react"
-import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
-import { BusinessCouponsDialog } from "./business-coupons-dialog"
-import { BusinessJobsDialog } from "./business-jobs-dialog"
-import { DocumentsDialog } from "./documents-dialog"
 import { getCloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import type { CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import { kv } from "@/lib/redis"
 import { KEY_PREFIXES } from "@/lib/db-schema"
+import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
+import { BusinessCouponsDialog } from "./business-coupons-dialog"
+import { BusinessJobsDialog } from "./business-jobs-dialog"
+import { DocumentsDialog } from "./documents-dialog"
 
 // Add CSS to hide the default close button
 const hideDefaultCloseButtonStyle = `
@@ -940,49 +940,6 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                                 />
                                 <span className="text-sm font-medium">Photo Album</span>
                               </button>
-                            )}
-
-                            {/* Conditionally render either the website button or the custom button */}
-                            {adDesign.hiddenFields?.customButton &&
-                            !adDesign.hiddenFields?.website &&
-                            adDesign.businessInfo?.website ? (
-                              <button
-                                onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
-                                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="20"
-                                  height="20"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  style={{
-                                    color: colorValues.primary,
-                                  }}
-                                >
-                                  <circle cx="12" cy="12" r="10"></circle>
-                                  <path d="M2 12h20"></path>
-                                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                                </svg>
-                                <span className="text-sm font-medium">Website</span>
-                              </button>
-                            ) : (
-                              !adDesign.hiddenFields?.customButton && (
-                                <button
-                                  onClick={() => setIsDocumentsOpen(true)}
-                                  className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors col-span-2"
-                                >
-                                  {(() => {
-                                    const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
-                                    return <IconComponent className="h-5 w-5 text-white" />
-                                  })()}
-                                  <span className="text-sm font-medium">{adDesign.customButton?.name || "Menu"}</span>
-                                </button>
-                              )
                             )}
 
                             {!adDesign.hiddenFields?.savingsButton && (
