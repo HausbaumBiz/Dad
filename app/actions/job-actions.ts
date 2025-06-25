@@ -454,90 +454,108 @@ export async function removeJobListing(
       }
     }
 
-    // Clean up service area indexes before deleting the job
+    // Clean up service area indexes (but preserve all ZIP code data)
     if (job && job.serviceArea) {
       if (job.serviceArea.isNationwide) {
-        // Remove from nationwide jobs index
-        await kv.srem("jobs:nationwide", `${businessId}:${jobId}`)
-        console.log(`Removed job from nationwide index`)
-      } else if (job.serviceArea.zipCodes && job.serviceArea.zipCodes.length > 0) {
-        // Remove from ZIP code indexes
-        for (const zipData of job.serviceArea.zipCodes) {
-          await kv.srem(`zipcode:${zipData.zip}:jobs`, `${businessId}:${jobId}`)
-          console.log(`Removed job from ZIP code index: ${zipData.zip}`)
+        // Remove from nationwide jobs index only
+        try {
+          await kv.srem("jobs:nationwide", `${businessId}:${jobId}`)
+          console.log(`Removed job from nationwide index`)
+        } catch (error) {
+          console.error("Error removing from nationwide index:", error)
         }
       }
+      // COMPLETELY SKIP ZIP code operations - preserve shared ZIP code database
 
-      // Clean up service area metadata
-      await kv.del(`job:${businessId}:${jobId}:zipcodes`)
-      await kv.del(`job:${businessId}:${jobId}:servicearea`)
+      // Clean up only job-specific service area metadata (not shared ZIP code data)
+      try {
+        await kv.del(`job:${businessId}:${jobId}:zipcodes`)
+        await kv.del(`job:${businessId}:${jobId}:servicearea`)
+        console.log("Cleaned up job-specific service area metadata only")
+      } catch (error) {
+        console.error("Error cleaning up job service area metadata:", error)
+      }
     }
 
-    // Clean up category indexes before deleting the job
+    // Clean up category indexes
     if (job && job.categories && job.categories.length > 0) {
       for (const category of job.categories) {
-        const categoryKey = category.toLowerCase().replace(/\s+/g, "-")
-        await kv.srem(`category:${categoryKey}:jobs`, `${businessId}:${jobId}`)
-        console.log(`Removed job from category index: ${category} (key: ${categoryKey})`)
+        try {
+          const categoryKey = category.toLowerCase().replace(/\s+/g, "-")
+          await kv.srem(`category:${categoryKey}:jobs`, `${businessId}:${jobId}`)
+          console.log(`Removed job from category index: ${category} (key: ${categoryKey})`)
+        } catch (error) {
+          console.error(`Error removing job from category ${category} index:`, error)
+        }
       }
 
-      // Clean up category metadata
-      await kv.del(`job:${businessId}:${jobId}:categories`)
+      // Clean up job-specific category metadata
+      try {
+        await kv.del(`job:${businessId}:${jobId}:categories`)
+        console.log("Cleaned up job-specific category metadata")
+      } catch (error) {
+        console.error("Error cleaning up job category metadata:", error)
+      }
     }
 
-    // Delete the job from Redis
-    console.log(`Deleting job from Redis key: ${jobKey}`)
-    await kv.del(jobKey)
+    // Delete the main job record
+    try {
+      console.log(`Deleting job from Redis key: ${jobKey}`)
+      await kv.del(jobKey)
+      console.log("Successfully deleted main job record")
+    } catch (error) {
+      console.error("Error deleting main job record:", error)
+    }
 
-    // Update the job index for this business
+    // Update the business job index
     const jobsKey = `jobs:${businessId}`
-    console.log(`Updating job index at key: ${jobsKey}`)
+    console.log(`Updating business job index at key: ${jobsKey}`)
 
-    const existingJobsData = await kv.get(jobsKey)
-    let existingJobs: string[] = []
+    try {
+      const existingJobsData = await kv.get(jobsKey)
+      let existingJobs: string[] = []
 
-    // Ensure we have a proper array
-    if (existingJobsData) {
-      if (Array.isArray(existingJobsData)) {
-        existingJobs = existingJobsData
-      } else if (typeof existingJobsData === "string") {
-        try {
-          const parsed = JSON.parse(existingJobsData)
-          if (Array.isArray(parsed)) {
-            existingJobs = parsed
-          } else {
-            console.error(`Expected array but got: ${typeof parsed}`, parsed)
-            existingJobs = []
+      // Handle different data types for the jobs list
+      if (existingJobsData) {
+        if (Array.isArray(existingJobsData)) {
+          existingJobs = existingJobsData.filter((id) => typeof id === "string")
+        } else if (typeof existingJobsData === "string") {
+          try {
+            const parsed = JSON.parse(existingJobsData)
+            if (Array.isArray(parsed)) {
+              existingJobs = parsed.filter((id) => typeof id === "string")
+            } else {
+              existingJobs = [existingJobsData]
+            }
+          } catch (parseError) {
+            existingJobs = [existingJobsData]
           }
-        } catch (parseError) {
-          console.error("Error parsing existing jobs data:", parseError)
+        } else {
+          console.error(`Unexpected data type for jobs index: ${typeof existingJobsData}`)
           existingJobs = []
         }
-      } else {
-        console.error(`Unexpected data type for jobs index: ${typeof existingJobsData}`, existingJobsData)
-        existingJobs = []
       }
+
+      // Remove the job ID from the business jobs list
+      const updatedJobs = existingJobs.filter((id) => id !== jobId)
+
+      console.log(`Business jobs before removal: ${existingJobs.length}`)
+      console.log(`Business jobs after removal: ${updatedJobs.length}`)
+
+      // Save the updated jobs list
+      await kv.set(jobsKey, updatedJobs)
+      console.log(`Successfully updated business job index`)
+    } catch (indexError) {
+      console.error("Error updating business job index:", indexError)
     }
 
-    // Filter out the job ID we want to remove
-    const updatedJobs = existingJobs.filter((id) => id !== jobId)
-
-    // Log what we're doing for debugging
-    console.log(`Before removal: ${existingJobs.length} jobs, After removal: ${updatedJobs.length} jobs`)
-    console.log(`Existing jobs:`, existingJobs)
-    console.log(`Updated jobs:`, updatedJobs)
-
-    await kv.set(jobsKey, updatedJobs)
-
-    // Clean up any Cloudflare image resources if they exist
+    // Clean up Cloudflare image resources if they exist
     if (job && job.logoId) {
       try {
-        // Clean up logo image if needed
-        console.log(`Job had a logo with ID: ${job.logoId} - cleanup would happen here`)
+        console.log(`Job had a logo with ID: ${job.logoId} - cleanup would happen here if needed`)
         // Note: Actual Cloudflare image deletion would be implemented here if required
       } catch (cleanupError) {
         console.error("Error cleaning up job logo:", cleanupError)
-        // Continue with job deletion even if image cleanup fails
       }
     }
 
@@ -548,17 +566,13 @@ export async function removeJobListing(
     revalidatePath("/statistics")
     revalidatePath(`/business/${businessId}`)
     revalidatePath("/funeral-services")
-
-    // Also revalidate any pop-up dialog paths
-    revalidatePath("/") // Homepage where popups might appear
-
-    // If there are specific paths where the business-jobs-dialog component appears, add them here
+    revalidatePath("/")
     revalidatePath(`/business/${businessId}/jobs`)
     revalidatePath(`/business-portal`)
 
     return {
       success: true,
-      message: "Job listing completely removed from all locations!",
+      message: "Job listing removed successfully! All ZIP code data preserved for future job listings.",
     }
   } catch (error) {
     console.error("Error removing job listing:", error)
