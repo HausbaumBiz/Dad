@@ -6,6 +6,7 @@ import type React from "react"
 import { useSearchParams } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { type Coupon, getBusinessCoupons } from "@/app/actions/coupon-actions"
 import { type JobListing, getBusinessJobs } from "@/app/actions/job-actions"
 import { toast } from "@/components/ui/use-toast"
@@ -35,7 +36,15 @@ import {
   ImageIcon,
   Ticket,
   Briefcase,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
 } from "lucide-react"
+
+import { BusinessPhotoAlbumDialog } from "@/components/business-photo-album-dialog"
+import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
+import { BusinessJobsDialog } from "@/components/business-jobs-dialog"
+import { DocumentsDialog } from "@/components/documents-dialog"
 
 interface PhotoItem {
   id: string
@@ -106,6 +115,13 @@ export default function CustomizeAdDesignPage() {
   // Add a new state variable for the finalize dialog
   const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false)
 
+  // Add custom color state
+  const [useCustomColors, setUseCustomColors] = useState(false)
+  const [customColors, setCustomColors] = useState({
+    primary: "#007BFF",
+    secondary: "#0056b3",
+  })
+
   // Color mapping
   const colorMap: Record<string, { primary: string; secondary: string; textColor?: string }> = {
     blue: { primary: "#007BFF", secondary: "#0056b3" },
@@ -121,6 +137,16 @@ export default function CustomizeAdDesignPage() {
     brown: { primary: "#8B4513", secondary: "#6B3610" },
     darkpink: { primary: "#FF1493", secondary: "#C71585" },
     lightpink: { primary: "#FFC0CB", secondary: "#FFB6C1", textColor: "#000000" },
+  }
+
+  // Helper function to detect if a color is light
+  const isLightColor = (hexColor: string): boolean => {
+    const hex = hexColor.replace("#", "")
+    const r = Number.parseInt(hex.substr(0, 2), 16)
+    const g = Number.parseInt(hex.substr(2, 2), 16)
+    const b = Number.parseInt(hex.substr(4, 2), 16)
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000
+    return brightness > 128
   }
 
   // Add texture options after colorMap
@@ -223,8 +249,14 @@ export default function CustomizeAdDesignPage() {
     { name: "Music", component: Music },
   ]
 
-  // Get the selected color values
-  const colorValues = colorMap[selectedColor] || colorMap.blue
+  // Get the selected color values - use custom colors if enabled
+  const colorValues = useCustomColors
+    ? {
+        primary: customColors.primary,
+        secondary: customColors.secondary,
+        textColor: isLightColor(customColors.primary) ? "#000000" : undefined,
+      }
+    : colorMap[selectedColor] || colorMap.blue
 
   const [formData, setFormData] = useState({
     businessName: "Business Name",
@@ -297,6 +329,25 @@ export default function CustomizeAdDesignPage() {
   // Add handler for custom button name change
   const handleCustomButtonNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCustomButtonName(e.target.value)
+  }
+
+  // Custom color handlers
+  const handleCustomColorChange = (colorType: "primary" | "secondary", value: string) => {
+    setCustomColors((prev) => ({
+      ...prev,
+      [colorType]: value,
+    }))
+  }
+
+  const handleHexInputChange = (colorType: "primary" | "secondary", value: string) => {
+    // Validate hex color format
+    const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
+    if (hexRegex.test(value) || value === "") {
+      setCustomColors((prev) => ({
+        ...prev,
+        [colorType]: value.startsWith("#") ? value : `#${value}`,
+      }))
+    }
   }
 
   // Photo album state
@@ -508,8 +559,18 @@ export default function CustomizeAdDesignPage() {
           thumbnailFile: null,
         })
 
+        // If we have saved custom colors, use them
+        if (savedDesign.customColors) {
+          setUseCustomColors(true)
+          setCustomColors(savedDesign.customColors)
+        } else if (savedDesign.colorScheme === "custom") {
+          setUseCustomColors(true)
+        } else {
+          setUseCustomColors(false)
+        }
+
         // If we have a saved color scheme, use it
-        if (savedDesign.colorScheme) {
+        if (savedDesign.colorScheme && savedDesign.colorScheme !== "custom") {
           setSelectedColor(savedDesign.colorScheme)
         }
 
@@ -603,101 +664,6 @@ export default function CustomizeAdDesignPage() {
       [field]: truncatedValue || "", // Ensure we never set undefined
     }))
   }
-
-  // Video control functions
-  // const handlePlayVideo = () => {
-  //   console.log("Play video triggered")
-
-  //   // Hide thumbnail when play is triggered
-  //   setShowThumbnail(false)
-
-  //   // Set isPlaying to true immediately to update UI
-  //   setIsPlaying(true)
-
-  //   // Get video element
-  //   const videoElement = videoRef.current
-
-  //   // Reset video to beginning to ensure consistent playback
-  //   if (videoElement) {
-  //     videoElement.currentTime = 0
-  //   }
-
-  //   // Play video
-  //   if (videoElement) {
-  //     // Make sure audio is enabled
-  //     videoElement.muted = false
-
-  //     const playPromise = videoElement.play()
-
-  //     if (playPromise !== undefined) {
-  //       playPromise
-  //         .then(() => {
-  //           console.log("Video playback started successfully")
-  //         })
-  //         .catch((error) => {
-  //           console.error("Error playing video:", error)
-  //           // If video fails to play, show thumbnail again
-  //           setShowThumbnail(true)
-  //           setIsPlaying(false)
-  //         })
-  //     }
-  //   }
-  // }
-
-  // const handlePauseVideo = () => {
-  //   if (videoRef.current) {
-  //     videoRef.current.pause()
-  //   }
-
-  //   setIsPlaying(false)
-  //   // Don't show thumbnail on pause, only when video ends or before it starts
-  // }
-
-  // Update the video end handler useEffect
-  // useEffect(() => {
-  //   // Get video element that currently exists in the DOM
-  //   const videoElement = videoRef.current
-  //   let timeUpdateHandler: (() => void) | null = null
-
-  //   const handleVideoEnd = () => {
-  //     console.log("Video ended, showing thumbnail")
-  //     setIsPlaying(false)
-  //     setShowThumbnail(true) // Show thumbnail when video ends
-  //   }
-
-  //   // Add event listeners to video element
-  //   if (videoElement) {
-  //     // Remove any existing event listeners first to avoid duplicates
-  //     videoElement.removeEventListener("ended", handleVideoEnd)
-
-  //     // Add the event listener for video end
-  //     videoElement.addEventListener("ended", handleVideoEnd)
-
-  //     // Also monitor the currentTime to detect when video is near the end
-  //     // This is a backup in case the ended event doesn't fire properly
-  //     timeUpdateHandler = () => {
-  //       if (videoElement.currentTime >= videoElement.duration - 0.2 && videoElement.duration > 0) {
-  //         console.log(`Video near end: ${videoElement.currentTime}/${videoElement.duration}`)
-  //         handleVideoEnd()
-  //       }
-  //     }
-
-  //     videoElement.removeEventListener("timeupdate", timeUpdateHandler)
-  //     videoElement.addEventListener("timeupdate", timeUpdateHandler)
-  //   }
-
-  //   return () => {
-  //     // Clean up all event listeners safely
-  //     if (videoElement) {
-  //       videoElement.removeEventListener("ended", handleVideoEnd)
-
-  //       // Remove timeupdate listener
-  //       if (timeUpdateHandler) {
-  //         videoElement.removeEventListener("timeupdate", timeUpdateHandler)
-  //       }
-  //     }
-  //   }
-  // }, [videoRef.current])
 
   // Replace the handleOpenPhotoAlbum function with this new version that opens the dialog
   // Around line 375
@@ -852,6 +818,7 @@ export default function CustomizeAdDesignPage() {
         title: "Error",
         description: "Business ID is missing. Please try again.",
         variant: "destructive",
+        variant: "destructive",
       })
       return
     }
@@ -889,7 +856,8 @@ export default function CustomizeAdDesignPage() {
       // Save business ad design data with all the necessary information
       const result = await saveBusinessAdDesign(businessId, {
         designId: selectedDesign,
-        colorScheme: selectedColor,
+        colorScheme: useCustomColors ? "custom" : selectedColor,
+        customColors: useCustomColors ? customColors : null,
         colorValues: colorValues, // Save the actual color values
         texture: selectedTexture, // Add this line
         businessInfo: formattedData,
@@ -937,10 +905,16 @@ export default function CustomizeAdDesignPage() {
   // Add a new function to handle the actual finalization
   const handleActualFinalization = async () => {
     try {
+      // First save the current changes
+      await handleActualSave()
+
       toast({
         title: "Success",
         description: "Your business profile has been finalized and submitted!",
       })
+
+      // Close the finalize dialog
+      setIsFinalizeDialogOpen(false)
 
       // Redirect to the workbench page after successful finalization
       window.location.href = "/workbench"
@@ -953,30 +927,6 @@ export default function CustomizeAdDesignPage() {
       })
     }
   }
-
-  // Modify the handleSubmit function to save the formatted phone number
-
-  // Custom video control buttons component
-  // const VideoControls = () => (
-  //   <div className="flex justify-center mt-2 space-x-4">
-  //     <button
-  //       onClick={handlePlayVideo}
-  //       className={`p-2 rounded-full ${isPlaying ? "opacity-50" : "opacity-100"}`}
-  //       style={{ backgroundColor: colorValues.primary }}
-  //       disabled={isPlaying}
-  //     >
-  //       <Play size={20} className="text-white" />
-  //     </button>
-  //     <button
-  //       onClick={handlePauseVideo}
-  //       className={`p-2 rounded-full ${!isPlaying ? "opacity-50" : "opacity-100"}`}
-  //       style={{ backgroundColor: colorValues.primary }}
-  //       disabled={!isPlaying}
-  //     >
-  //       <Pause size={20} className="text-white" />
-  //     </button>
-  //   </div>
-  // )
 
   // Update the fetchSavedCoupons function to properly fetch coupons
 
@@ -1315,42 +1265,62 @@ export default function CustomizeAdDesignPage() {
                 </Button>
               )}
 
-              {/* Website button */}
-
-              <button
-                onClick={() => window.open(`https://${formData.website}`, "_blank")}
-                className={`flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 ${
-                  colorValues.textColor ? "text-black" : "text-white"
-                }`}
-                style={{
-                  backgroundColor: selectedTexture === "gradient" ? "" : colorValues.primary,
-                  backgroundImage:
-                    selectedTexture === "gradient"
-                      ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                      : textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundImage || "none",
-                  backgroundSize:
-                    textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundSize || "auto",
-                  backgroundRepeat:
-                    textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundRepeat || "repeat",
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-white"
+              {/* Website button/footer */}
+              {!hiddenFields.website ? (
+                <button
+                  onClick={() => window.open(`https://${formData.website}`, "_blank")}
+                  className={`flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 ${
+                    colorValues.textColor ? "text-black" : "text-white"
+                  }`}
+                  style={{
+                    backgroundColor: selectedTexture === "gradient" ? "" : colorValues.primary,
+                    backgroundImage:
+                      selectedTexture === "gradient"
+                        ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                        : textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundImage || "none",
+                    backgroundSize:
+                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundSize || "auto",
+                    backgroundRepeat:
+                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundRepeat || "repeat",
+                  }}
                 >
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                </svg>
-                Visit Website
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-white"
+                  >
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                  </svg>
+                  Visit Website
+                </button>
+              ) : (
+                <div
+                  className={`flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium ${
+                    colorValues.textColor ? "text-black" : "text-white"
+                  }`}
+                  style={{
+                    backgroundColor: selectedTexture === "gradient" ? "" : colorValues.primary,
+                    backgroundImage:
+                      selectedTexture === "gradient"
+                        ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                        : textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundImage || "none",
+                    backgroundSize:
+                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundSize || "auto",
+                    backgroundRepeat:
+                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundRepeat || "repeat",
+                  }}
+                >
+                  {/* Empty div to maintain the colored footer bar */}
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -1379,21 +1349,155 @@ export default function CustomizeAdDesignPage() {
 
                   {/* Color Selection Section */}
                   <Card className="p-6">
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                       <h3 className="text-lg font-semibold">Color Theme</h3>
-                      <div className="grid grid-cols-4 gap-3">
-                        {Object.entries(colorMap).map(([colorKey, colorObj]) => (
-                          <button
-                            key={colorKey}
-                            onClick={() => setSelectedColor(colorKey)}
-                            className={`w-12 h-12 rounded-lg border-2 ${
-                              selectedColor === colorKey ? "border-gray-800" : "border-gray-300"
-                            }`}
-                            style={{ backgroundColor: colorObj.primary }}
-                            title={colorKey}
+
+                      {/* Toggle between preset and custom colors */}
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="colorMode"
+                            checked={!useCustomColors}
+                            onChange={() => setUseCustomColors(false)}
+                            className="mr-2"
                           />
-                        ))}
+                          <span className="text-sm font-medium">Preset Colors</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="colorMode"
+                            checked={useCustomColors}
+                            onChange={() => setUseCustomColors(true)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm font-medium">Custom Colors</span>
+                        </label>
                       </div>
+
+                      {/* Preset Colors */}
+                      {!useCustomColors && (
+                        <div className="space-y-3">
+                          <p className="text-sm text-gray-600">Choose from our preset color combinations</p>
+                          <div className="grid grid-cols-4 gap-3">
+                            {Object.entries(colorMap).map(([colorKey, colorObj]) => (
+                              <button
+                                key={colorKey}
+                                onClick={() => setSelectedColor(colorKey)}
+                                className={`w-12 h-12 rounded-lg border-2 ${
+                                  selectedColor === colorKey ? "border-gray-800" : "border-gray-300"
+                                }`}
+                                style={{ backgroundColor: colorObj.primary }}
+                                title={colorKey}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Custom Colors */}
+                      {useCustomColors && (
+                        <div className="space-y-6">
+                          <p className="text-sm text-gray-600">Create your own custom color combination</p>
+
+                          {/* Primary Color */}
+                          <div className="space-y-3">
+                            <label className="block text-sm font-medium text-gray-700">Primary Color</label>
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={customColors.primary}
+                                  onChange={(e) => handleCustomColorChange("primary", e.target.value)}
+                                  className="w-12 h-12 rounded-lg border border-gray-300 cursor-pointer"
+                                  title="Pick primary color"
+                                />
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-gray-500">Color Picker</span>
+                                  <span className="text-xs font-mono">{customColors.primary}</span>
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-xs text-gray-500 mb-1">Hex Code</label>
+                                <input
+                                  type="text"
+                                  value={customColors.primary}
+                                  onChange={(e) => handleHexInputChange("primary", e.target.value)}
+                                  placeholder="#007BFF"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  maxLength={7}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Secondary Color */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <label className="block text-sm font-medium text-gray-700">Secondary Color</label>
+                              <span className="text-xs text-gray-500 italic">
+                                Secondary colors appear only if Gradient is selected in the Texture Options
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={customColors.secondary}
+                                  onChange={(e) => handleCustomColorChange("secondary", e.target.value)}
+                                  className="w-12 h-12 rounded-lg border border-gray-300 cursor-pointer"
+                                  title="Pick secondary color"
+                                />
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-gray-500">Color Picker</span>
+                                  <span className="text-xs font-mono">{customColors.secondary}</span>
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-xs text-gray-500 mb-1">Hex Code</label>
+                                <input
+                                  type="text"
+                                  value={customColors.secondary}
+                                  onChange={(e) => handleHexInputChange("secondary", e.target.value)}
+                                  placeholder="#0056b3"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                  maxLength={7}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Color Preview */}
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700">Preview</label>
+                            <div className="flex gap-2">
+                              <div
+                                className="w-16 h-8 rounded border border-gray-300 flex items-center justify-center"
+                                style={{ backgroundColor: customColors.primary }}
+                              >
+                                <span
+                                  className="text-xs font-medium"
+                                  style={{ color: isLightColor(customColors.primary) ? "#000" : "#fff" }}
+                                >
+                                  Primary
+                                </span>
+                              </div>
+                              <div
+                                className="w-16 h-8 rounded border border-gray-300 flex items-center justify-center"
+                                style={{ backgroundColor: customColors.secondary }}
+                              >
+                                <span
+                                  className="text-xs font-medium"
+                                  style={{ color: isLightColor(customColors.secondary) ? "#000" : "#fff" }}
+                                >
+                                  Secondary
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </Card>
 
@@ -1526,41 +1630,42 @@ export default function CustomizeAdDesignPage() {
                         </label>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-3">
-                        <input
-                          type="text"
-                          name="phoneArea"
-                          placeholder="Area"
-                          value={formData.phoneArea}
-                          onChange={(e) => handlePhoneChange(e, "phoneArea")}
-                          maxLength={3}
-                          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                          type="text"
-                          name="phonePrefix"
-                          placeholder="Prefix"
-                          value={formData.phonePrefix}
-                          onChange={(e) => handlePhoneChange(e, "phonePrefix")}
-                          maxLength={3}
-                          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <input
-                          type="text"
-                          name="phoneLine"
-                          placeholder="Line"
-                          value={formData.phoneLine}
-                          onChange={(e) => handlePhoneChange(e, "phoneLine")}
-                          maxLength={4}
-                          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-3 gap-3">
+                          <input
+                            type="text"
+                            name="phoneArea"
+                            placeholder="Area Code"
+                            value={formData.phoneArea}
+                            onChange={(e) => handlePhoneChange(e, "phoneArea")}
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            maxLength={3}
+                          />
+                          <input
+                            type="text"
+                            name="phonePrefix"
+                            placeholder="Prefix"
+                            value={formData.phonePrefix}
+                            onChange={(e) => handlePhoneChange(e, "phonePrefix")}
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            maxLength={3}
+                          />
+                          <input
+                            type="text"
+                            name="phoneLine"
+                            placeholder="Line"
+                            value={formData.phoneLine}
+                            onChange={(e) => handlePhoneChange(e, "phoneLine")}
+                            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            maxLength={4}
+                          />
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-500">Format: (123) 456-7890</p>
                     </div>
 
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">Business Email</label>
+                        <label className="block text-sm font-medium text-gray-700">Email</label>
                         <label className="flex items-center">
                           <input
                             type="checkbox"
@@ -1571,20 +1676,21 @@ export default function CustomizeAdDesignPage() {
                           <span className="text-sm text-gray-600">Hide from AdBox</span>
                         </label>
                       </div>
-
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="business@example.com"
-                      />
+                      <div>
+                        <input
+                          type="email"
+                          id="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-gray-700">Business Hours</label>
+                        <label className="block text-sm font-medium text-gray-700">Hours of Operation</label>
                         <label className="flex items-center">
                           <input
                             type="checkbox"
@@ -1595,15 +1701,16 @@ export default function CustomizeAdDesignPage() {
                           <span className="text-sm text-gray-600">Hide from AdBox</span>
                         </label>
                       </div>
-
-                      <textarea
-                        name="hours"
-                        value={formData.hours}
-                        onChange={handleInputChange}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter each day on a new line"
-                      />
+                      <div>
+                        <textarea
+                          id="hours"
+                          name="hours"
+                          value={formData.hours}
+                          onChange={handleInputChange}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        ></textarea>
+                      </div>
                     </div>
 
                     <div className="space-y-4">
@@ -1619,179 +1726,198 @@ export default function CustomizeAdDesignPage() {
                           <span className="text-sm text-gray-600">Hide from AdBox</span>
                         </label>
                       </div>
+                      <div>
+                        <input
+                          type="text"
+                          id="website"
+                          name="website"
+                          value={formData.website}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
 
-                      <input
-                        type="text"
-                        name="website"
-                        value={formData.website}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-medium text-gray-700">Free Text</label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={hiddenFields.freeText}
+                            onChange={() => toggleFieldVisibility("freeText")}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-600">Hide from AdBox</span>
+                        </label>
+                      </div>
+                      <div>
+                        <textarea
+                          id="freeText"
+                          name="freeText"
+                          value={formData.freeText}
+                          onChange={handleInputChange}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        ></textarea>
+                      </div>
                     </div>
                   </div>
                 </div>
               </Card>
 
-              {/* Free Text Section */}
+              {/* Custom Button Section */}
               <Card className="p-6">
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div className="flex items-center justify-between">
-                    <label className="block text-sm font-medium text-gray-700">Custom Message</label>
+                    <h3 className="text-lg font-semibold">Custom Button</h3>
                     <label className="flex items-center">
                       <input
                         type="checkbox"
-                        checked={hiddenFields.freeText}
-                        onChange={() => toggleFieldVisibility("freeText")}
+                        checked={hiddenFields.customButton}
+                        onChange={() => toggleFieldVisibility("customButton")}
                         className="mr-2"
                       />
                       <span className="text-sm text-gray-600">Hide from AdBox</span>
                     </label>
                   </div>
 
-                  <textarea
-                    name="freeText"
-                    value={formData.freeText}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter a custom message or slogan to display in your AdBox"
-                  />
-                  <p className="text-xs text-gray-500">This text will be displayed prominently in your AdBox</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="customButtonType" className="block text-sm font-medium text-gray-700 mb-1">
+                        Button Type
+                      </label>
+                      <select
+                        id="customButtonType"
+                        name="customButtonType"
+                        value={customButtonType}
+                        onChange={handleCustomButtonTypeChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option>Menu</option>
+                        <option>List</option>
+                        <option>FileText</option>
+                        <option>ShoppingCart</option>
+                        <option>Clipboard</option>
+                        <option>Calendar</option>
+                        <option>MessageSquare</option>
+                        <option>Map</option>
+                        <option>Settings</option>
+                        <option>BookOpen</option>
+                        <option>PenTool</option>
+                        <option>Truck</option>
+                        <option>Heart</option>
+                        <option>Coffee</option>
+                        <option>Gift</option>
+                        <option>Music</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
+
+                    {showCustomNameInput && (
+                      <div>
+                        <label htmlFor="customButtonName" className="block text-sm font-medium text-gray-700 mb-1">
+                          Button Name
+                        </label>
+                        <input
+                          type="text"
+                          id="customButtonName"
+                          name="customButtonName"
+                          value={customButtonName}
+                          onChange={handleCustomButtonNameChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label htmlFor="customButtonIcon" className="block text-sm font-medium text-gray-700 mb-1">
+                        Button Icon
+                      </label>
+                      <select
+                        id="customButtonIcon"
+                        name="customButtonIcon"
+                        value={customButtonIcon}
+                        onChange={(e) => setCustomButtonIcon(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {availableIcons.map((icon) => (
+                          <option key={icon.name} value={icon.name}>
+                            {icon.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </Card>
 
-              {/* Feature Buttons Section */}
+              {/* Button Visibility Section */}
               <Card className="p-6">
-                <div className="space-y-6">
-                  <h3 className="text-lg font-semibold">Feature Buttons</h3>
+                <h3 className="text-lg font-semibold mb-4">Button Visibility</h3>
+                <p className="text-sm text-gray-600">Control which elements are visible in the AdBox.</p>
 
-                  <div className="space-y-3">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">Video</label>
                     <label className="flex items-center">
                       <input
                         type="checkbox"
-                        checked={hiddenFields.savingsButton}
-                        onChange={() => toggleFieldVisibility("savingsButton")}
-                        className="mr-3"
+                        checked={hiddenFields.video}
+                        onChange={() => toggleFieldVisibility("video")}
+                        className="mr-2"
                       />
-                      <span className="text-sm">Hide Savings Button</span>
+                      <span className="text-sm text-gray-600">Hide from AdBox</span>
                     </label>
+                  </div>
 
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={hiddenFields.jobsButton}
-                        onChange={() => toggleFieldVisibility("jobsButton")}
-                        className="mr-3"
-                      />
-                      <span className="text-sm">Hide Job Opportunities Button</span>
-                    </label>
-
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={hiddenFields.website}
-                        onChange={() => toggleFieldVisibility("website")}
-                        className="mr-3"
-                      />
-                      <span className="text-sm">Hide Website Button/Link</span>
-                    </label>
-
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">Photo Album</label>
                     <label className="flex items-center">
                       <input
                         type="checkbox"
                         checked={hiddenFields.photoAlbum}
                         onChange={() => toggleFieldVisibility("photoAlbum")}
-                        className="mr-3"
+                        className="mr-2"
                       />
-                      <span className="text-sm">Hide Photo Album Button/Link</span>
+                      <span className="text-sm text-gray-600">Hide from AdBox</span>
                     </label>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-sm font-medium text-gray-700">Custom Button</label>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={hiddenFields.customButton}
-                          onChange={() => toggleFieldVisibility("customButton")}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-600">Hide Custom Button</span>
-                      </label>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">Savings Button</label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={hiddenFields.savingsButton}
+                        onChange={() => toggleFieldVisibility("savingsButton")}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-600">Hide from AdBox</span>
+                    </label>
+                  </div>
 
-                    <div className="space-y-3">
-                      <div>
-                        <label htmlFor="customButtonType" className="block text-sm font-medium text-gray-700 mb-1">
-                          Button Type
-                        </label>
-                        <select
-                          id="customButtonType"
-                          value={customButtonType}
-                          onChange={handleCustomButtonTypeChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="Menu">Menu</option>
-                          <option value="Forms">Forms</option>
-                          <option value="Product List">Product List</option>
-                          <option value="Other">Other (Custom Name)</option>
-                        </select>
-                      </div>
-
-                      {showCustomNameInput && (
-                        <div>
-                          <label htmlFor="customButtonName" className="block text-sm font-medium text-gray-700 mb-1">
-                            Custom Button Name
-                          </label>
-                          <input
-                            type="text"
-                            id="customButtonName"
-                            value={customButtonName}
-                            onChange={handleCustomButtonNameChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      )}
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700">Jobs Button</label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={hiddenFields.jobsButton}
+                        onChange={() => toggleFieldVisibility("jobsButton")}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-600">Hide from AdBox</span>
+                    </label>
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Button Icon</h3>
-                <div className="grid grid-cols-4 gap-3">
-                  {availableIcons.map((icon) => {
-                    const IconComponent = icon.component
-                    return (
-                      <button
-                        key={icon.name}
-                        type="button"
-                        onClick={() => setCustomButtonIcon(icon.name)}
-                        className={`p-3 border rounded-lg flex flex-col items-center gap-2 ${
-                          customButtonIcon === icon.name ? "border-blue-500 bg-blue-50" : "border-gray-300"
-                        }`}
-                      >
-                        <IconComponent className="h-5 w-5" />
-                        <span className="text-xs">
-                          <span className="hidden sm:inline">{icon.name}</span>
-                          <span className="sm:hidden">
-                            {icon.name === "MessageSquare" ? "Msg" : icon.name === "ShoppingCart" ? "Cart" : icon.name}
-                          </span>
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </Card>
-
-              <div className="flex gap-4">
-                <Button type="submit" className="flex-1" disabled={isLoading}>
-                  {isLoading ? "Saving..." : "Save"}
+              <div className="flex justify-end">
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Saving..." : "Save Changes"}
                 </Button>
-
-                <Button type="button" onClick={handleFinalizeAndSubmit} variant="outline" className="flex-1">
-                  Finalize and Submit
+                <Button type="button" variant="secondary" onClick={handleFinalizeAndSubmit} className="ml-4">
+                  Finalize & Submit
                 </Button>
               </div>
             </form>
@@ -1799,206 +1925,120 @@ export default function CustomizeAdDesignPage() {
         </div>
       </div>
 
-      {/* Placeholder dialogs - these would need to be implemented */}
-      {isSavingsDialogOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Coupons & Savings</h3>
-            <p className="text-gray-600 mb-4">Coupons dialog would go here</p>
-            <Button onClick={() => setIsSavingsDialogOpen(false)}>Close</Button>
-          </div>
-        </div>
-      )}
+      {/* Completion Status Dialog */}
+      <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save Progress</DialogTitle>
+            <DialogDescription>Review your completion status before saving your ad design.</DialogDescription>
+          </DialogHeader>
 
-      {isPhotoAlbumDialogOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Photo Album</h3>
-            <p className="text-gray-600 mb-4">Photo album dialog would go here</p>
-            <Button onClick={() => setIsPhotoAlbumDialogOpen(false)}>Close</Button>
-          </div>
-        </div>
-      )}
+          <div className="space-y-4">
+            <div className="space-y-3">
+              {Object.entries(completionStatus).map(([key, isComplete]) => {
+                const labels = {
+                  businessInfo: "Business Information",
+                  video: "Video",
+                  photos: "Photos",
+                  coupons: "Coupons",
+                  jobs: "Job Listings",
+                  customButton: "Custom Button",
+                  website: "Website",
+                }
 
-      {isJobsDialogOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Job Listings</h3>
-            <p className="text-gray-600 mb-4">Job listings dialog would go here</p>
-            <Button onClick={() => setIsJobsDialogOpen(false)}>Close</Button>
-          </div>
-        </div>
-      )}
+                return (
+                  <div key={key} className="flex items-center gap-3">
+                    {isComplete ? (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    )}
+                    <span className={`text-sm ${isComplete ? "text-green-700" : "text-red-700"}`}>
+                      {labels[key as keyof typeof labels]}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
 
-      {isDocumentsOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Documents</h3>
-            <p className="text-gray-600 mb-4">Documents dialog would go here</p>
-            <Button onClick={() => setIsDocumentsOpen(false)}>Close</Button>
-          </div>
-        </div>
-      )}
-
-      {isCompletionDialogOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-lg w-full mx-4">
-            <div className="space-y-4">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold mb-2">AdBox Completion Status</h3>
-                <p className="text-gray-600">Review which sections of your AdBox are complete before saving.</p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <span className="font-medium">Business Information</span>
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      completionStatus.businessInfo ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {completionStatus.businessInfo ? "Complete" : "Needs Content"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <span className="font-medium">Business Video</span>
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      hiddenFields.video
-                        ? "bg-gray-100 text-gray-600"
-                        : completionStatus.video
-                          ? "bg-green-100 text-green-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {hiddenFields.video ? "Hidden" : completionStatus.video ? "Complete" : "Needs Content"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <span className="font-medium">Photo Album</span>
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      hiddenFields.photoAlbum
-                        ? "bg-gray-100 text-gray-600"
-                        : completionStatus.photos
-                          ? "bg-green-100 text-green-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {hiddenFields.photoAlbum ? "Hidden" : completionStatus.photos ? "Complete" : "Needs Content"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <span className="font-medium">Coupons & Savings</span>
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      hiddenFields.savingsButton
-                        ? "bg-gray-100 text-gray-600"
-                        : completionStatus.coupons
-                          ? "bg-green-100 text-green-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {hiddenFields.savingsButton ? "Hidden" : completionStatus.coupons ? "Complete" : "Needs Content"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <span className="font-medium">Job Listings</span>
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      hiddenFields.jobsButton
-                        ? "bg-gray-100 text-gray-600"
-                        : completionStatus.jobs
-                          ? "bg-green-100 text-green-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {hiddenFields.jobsButton ? "Hidden" : completionStatus.jobs ? "Complete" : "Needs Content"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <span className="font-medium">Custom Button</span>
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      hiddenFields.customButton
-                        ? "bg-gray-100 text-gray-600"
-                        : completionStatus.customButton
-                          ? "bg-green-100 text-green-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {hiddenFields.customButton ? "Hidden" : completionStatus.customButton ? "Complete" : "Needs Setup"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                  <span className="font-medium">Website Link</span>
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      hiddenFields.website
-                        ? "bg-gray-100 text-gray-600"
-                        : completionStatus.website
-                          ? "bg-green-100 text-green-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {hiddenFields.website ? "Hidden" : completionStatus.website ? "Complete" : "Needs Content"}
-                  </span>
+            {!isAllComplete && (
+              <div className="flex items-start gap-2 p-3 bg-yellow-50 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
+                <div className="text-sm text-yellow-700">
+                  Some sections are incomplete. You can still save your progress and complete them later.
                 </div>
               </div>
+            )}
+          </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Tip:</strong> If you don't want to add photos, coupons, job listings, or a custom button, you
-                  can hide them using the checkboxes in the form above.
-                </p>
-              </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="outline" onClick={() => setIsCompletionDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleActualSave} disabled={isLoading}>
+              {isLoading ? "Saving..." : "Save Progress"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setIsCompletionDialogOpen(false)} className="flex-1">
-                  Continue Editing
-                </Button>
-                <Button onClick={handleActualSave} disabled={isLoading} className="flex-1">
-                  {isLoading ? "Saving..." : "Save"}
-                </Button>
-              </div>
+      {/* Finalize Dialog */}
+      <Dialog open={isFinalizeDialogOpen} onOpenChange={setIsFinalizeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Finalize & Submit</DialogTitle>
+            <DialogDescription>
+              Are you ready to finalize and submit your business profile? This will save all your changes and mark your
+              profile as complete.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg">
+            <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+            <div className="text-sm text-blue-700">
+              Once finalized, you can still make changes later, but your profile will be marked as ready for review.
             </div>
           </div>
-        </div>
-      )}
 
-      {isFinalizeDialogOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Finalize Business Profile</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to finalize and submit your business profile? This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setIsFinalizeDialogOpen(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button onClick={handleActualFinalization} className="flex-1">
-                Finalize and Submit
-              </Button>
-            </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="outline" onClick={() => setIsFinalizeDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleActualFinalization} disabled={isLoading}>
+              {isLoading ? "Finalizing..." : "Finalize & Submit"}
+            </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo Album Dialog */}
+      <BusinessPhotoAlbumDialog
+        open={isPhotoAlbumDialogOpen}
+        onOpenChange={setIsPhotoAlbumDialogOpen}
+        photos={photos}
+        businessId={businessId}
+      />
+
+      {/* Coupons Dialog */}
+      <BusinessCouponsDialog
+        open={isSavingsDialogOpen}
+        onOpenChange={setIsSavingsDialogOpen}
+        coupons={savedCoupons}
+        isLoading={isCouponsLoading}
+        businessId={businessId}
+      />
+
+      {/* Jobs Dialog */}
+      <BusinessJobsDialog
+        open={isJobsDialogOpen}
+        onOpenChange={setIsJobsDialogOpen}
+        jobs={jobListings}
+        isLoading={isJobsLoading}
+        businessId={businessId}
+      />
+
+      {/* Documents Dialog */}
+      <DocumentsDialog open={isDocumentsOpen} onOpenChange={setIsDocumentsOpen} businessId={businessId} />
     </div>
   )
-}
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString)
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
 }

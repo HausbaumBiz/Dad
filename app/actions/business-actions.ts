@@ -55,6 +55,12 @@ function sanitizeBusinessData(business: any): Business {
     throw new Error("Invalid business data")
   }
 
+  // Check if business is an array (which would cause the .map error)
+  if (Array.isArray(business)) {
+    console.error("Business data is unexpectedly an array:", business)
+    throw new Error("Business data is an array instead of an object")
+  }
+
   // Ensure all required fields exist and are of correct type
   const sanitized: Business = {
     id: business.id || "",
@@ -499,21 +505,99 @@ export async function getCurrentBusiness() {
     }
 
     console.log(`Fetching business with ID: ${businessId}`)
-    const businessData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
 
-    if (!businessData) {
-      console.log(`No business found with ID: ${businessId}`)
-      // Don't delete the cookie here, let the client handle redirection
+    let businessData: any = null
+    try {
+      businessData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
+    } catch (redisError) {
+      console.error("Redis error when fetching business:", getErrorMessage(redisError))
       return null
     }
 
-    // Sanitize and return the business data
-    const business = sanitizeBusinessData({ ...businessData, id: businessId })
-    console.log("Successfully retrieved and sanitized business data")
+    if (!businessData) {
+      console.log(`No business found with ID: ${businessId}`)
+      return null
+    }
+
+    console.log("Raw business data type:", typeof businessData)
+    console.log("Is array:", Array.isArray(businessData))
+    console.log(
+      "Raw business data keys:",
+      businessData && typeof businessData === "object" ? Object.keys(businessData) : "N/A",
+    )
+
+    // Handle different data types that might come from Redis
+    let processedData: any = null
+
+    if (typeof businessData === "string") {
+      try {
+        processedData = JSON.parse(businessData)
+        console.log("Parsed string data successfully")
+      } catch (parseError) {
+        console.error("Failed to parse business data string:", getErrorMessage(parseError))
+        return null
+      }
+    } else if (Array.isArray(businessData)) {
+      console.error("Business data is unexpectedly an array:", businessData)
+      return null
+    } else if (businessData && typeof businessData === "object") {
+      processedData = businessData
+      console.log("Using object data directly")
+    } else {
+      console.error("Business data is unexpected type:", typeof businessData, businessData)
+      return null
+    }
+
+    // Validate that processedData is a proper object
+    if (!processedData || typeof processedData !== "object" || Array.isArray(processedData)) {
+      console.error("Processed data is not a valid object:", typeof processedData, Array.isArray(processedData))
+      return null
+    }
+
+    // Safely construct the business object with explicit property access
+    const business = {
+      id: businessId,
+      firstName: processedData.firstName && typeof processedData.firstName === "string" ? processedData.firstName : "",
+      lastName: processedData.lastName && typeof processedData.lastName === "string" ? processedData.lastName : "",
+      businessName:
+        processedData.businessName && typeof processedData.businessName === "string" ? processedData.businessName : "",
+      zipCode: processedData.zipCode && typeof processedData.zipCode === "string" ? processedData.zipCode : "",
+      email: processedData.email && typeof processedData.email === "string" ? processedData.email : "",
+      isEmailVerified: Boolean(processedData.isEmailVerified),
+      createdAt:
+        processedData.createdAt && typeof processedData.createdAt === "string"
+          ? processedData.createdAt
+          : new Date().toISOString(),
+      updatedAt:
+        processedData.updatedAt && typeof processedData.updatedAt === "string"
+          ? processedData.updatedAt
+          : new Date().toISOString(),
+    }
+
+    // Add optional fields with type checking
+    if (processedData.passwordHash && typeof processedData.passwordHash === "string") {
+      business.passwordHash = processedData.passwordHash
+    }
+    if (processedData.category && typeof processedData.category === "string") {
+      business.category = processedData.category
+    }
+    if (processedData.phone && typeof processedData.phone === "string") {
+      business.phone = processedData.phone
+    }
+    if (processedData.address && typeof processedData.address === "string") {
+      business.address = processedData.address
+    }
+
+    console.log("Successfully constructed business object:", {
+      id: business.id,
+      businessName: business.businessName,
+      email: business.email,
+    })
+
     return business
   } catch (error) {
     console.error("Error getting current business:", getErrorMessage(error))
-    // In case of error, return null instead of mock data to trigger proper error handling
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
     return null
   }
 }
@@ -608,6 +692,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
           colorValues: designData.colorValues, // Include color values here too
           texture: designData.texture || "gradient",
           customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
+          customColors: designData.customColors || null, // Add custom colors
           updatedAt: new Date().toISOString(),
         }),
       )
@@ -733,6 +818,7 @@ export async function getBusinessAdDesign(businessId: string) {
               colorScheme: parsedData.colorScheme || "blue",
               texture: parsedData.texture || "gradient",
               customButton: parsedData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
+              customColors: parsedData.customColors || null,
               updatedAt: parsedData.updatedAt || new Date().toISOString(),
             }
 
@@ -774,6 +860,7 @@ export async function getBusinessAdDesign(businessId: string) {
       hiddenFields: hiddenFields || {},
       customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
       texture: designData.texture || "gradient", // Ensure texture is included with default
+      customColors: designData.customColors || null, // Include custom colors
     }
 
     console.log("Final combined ad design data with colors:", {

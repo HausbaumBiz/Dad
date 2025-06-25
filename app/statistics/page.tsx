@@ -25,7 +25,13 @@ import { getBusinessCategories, removeBusinessCategory } from "@/app/actions/cat
 import { useToast } from "@/components/ui/use-toast"
 import { getBusinessKeywords } from "@/app/actions/keyword-actions"
 import { Badge } from "@/components/ui/badge"
-import { type JobListing, getBusinessJobs, removeJobListing, renewJobListing } from "@/app/actions/job-actions"
+import {
+  type JobListing,
+  getBusinessJobs,
+  removeJobListing,
+  renewJobListing,
+  saveJobListing,
+} from "@/app/actions/job-actions"
 import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
@@ -101,6 +107,17 @@ export default function StatisticsPage() {
   const [couponToReinstate, setCouponToReinstate] = useState<Coupon | null>(null)
   const [newExpirationDate, setNewExpirationDate] = useState("")
   const [renewingJob, setRenewingJob] = useState<string | null>(null)
+
+  // Add these new state variables after the existing state declarations
+  const [removingJobs, setRemovingJobs] = useState<Set<string>>(new Set())
+  const [removedJobs, setRemovedJobs] = useState<Map<string, JobListing>>(new Map())
+  const [showJobRemovalDetails, setShowJobRemovalDetails] = useState(false)
+  const [jobRemovalDetails, setJobRemovalDetails] = useState<{
+    job: JobListing
+    zipCodes: number
+    categories: number
+    willRemoveFrom: string[]
+  } | null>(null)
 
   // Load selected categories from server on component mount
   useEffect(() => {
@@ -328,51 +345,247 @@ export default function StatisticsPage() {
     }
   }
 
+  // Replace the handleRemoveJob function
   const handleRemoveJob = async (jobId: string) => {
-    setJobToRemove(jobId)
-    setShowRemoveJobDialog(true)
+    const job = jobListings.find((j) => j.id === jobId)
+    if (!job) return
+
+    // Calculate what will be removed
+    const zipCodes = job.serviceArea?.zipCodes?.length || 0
+    const categories = job.categories?.length || 0
+    const willRemoveFrom = [
+      "Your business profile",
+      "Job listings page",
+      "AdBox popup",
+      ...(job.serviceArea?.isNationwide ? ["Nationwide job index"] : []),
+      ...(zipCodes > 0 ? [`${zipCodes} ZIP code indexes`] : []),
+      ...(categories > 0 ? [`${categories} category indexes`] : []),
+    ]
+
+    setJobRemovalDetails({
+      job,
+      zipCodes,
+      categories,
+      willRemoveFrom,
+    })
+    setShowJobRemovalDetails(true)
   }
 
-  // Add this function to confirm job removal
+  // Replace the confirmRemoveJob function
   const confirmRemoveJob = async () => {
-    if (!jobToRemove) return
+    if (!jobRemovalDetails) return
 
-    setIsRemovingJob(true)
+    const jobId = jobRemovalDetails.job.id
+    setRemovingJobs((prev) => new Set([...prev, jobId]))
+    setShowJobRemovalDetails(false)
+
     try {
-      // Find the job in the current job listings to get its business ID
-      const jobToDelete = jobListings.find((job) => job.id === jobToRemove)
-
-      if (!jobToDelete) {
-        throw new Error("Job listing not found")
+      // Optimistic update - remove from UI immediately
+      const jobToRemove = jobListings.find((job) => job.id === jobId)
+      if (jobToRemove) {
+        setRemovedJobs((prev) => new Map([...prev, [jobId, jobToRemove]]))
+        setJobListings((prev) => prev.filter((job) => job.id !== jobId))
       }
 
-      // Use the business ID from the job itself instead of a hardcoded value
-      const result = await removeJobListing(jobToDelete.businessId, jobToRemove)
+      // Attempt actual removal
+      const result = await removeJobListing(jobRemovalDetails.job.businessId, jobId)
 
       if (result.success) {
-        // Update local state
-        const updatedJobs = jobListings.filter((job) => job.id !== jobToRemove)
-        setJobListings(updatedJobs)
-
         toast({
-          title: "Success",
-          description: "Job listing removed successfully from all locations",
+          title: "✅ Job Removed Successfully",
+          description: (
+            <div className="space-y-2">
+              <p>{result.message}</p>
+              <button onClick={() => handleUndoJobRemoval(jobId)} className="text-sm underline hover:no-underline">
+                Undo removal
+              </button>
+            </div>
+          ),
+          duration: 10000, // Longer duration for undo option
         })
       } else {
-        throw new Error(result.message || "Failed to remove job listing")
+        throw new Error(result.message)
       }
     } catch (error) {
       console.error("Error removing job listing:", error)
+
+      // Rollback optimistic update
+      const removedJob = removedJobs.get(jobId)
+      if (removedJob) {
+        setJobListings((prev) =>
+          [...prev, removedJob].sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return dateB - dateA
+          }),
+        )
+        setRemovedJobs((prev) => {
+          const newMap = new Map(prev)
+          newMap.delete(jobId)
+          return newMap
+        })
+      }
+
       toast({
-        title: "Error",
-        description: "Failed to remove the job listing",
+        title: "❌ Removal Failed",
+        description: (
+          <div className="space-y-2">
+            <p>Failed to remove job listing: {error instanceof Error ? error.message : "Unknown error"}</p>
+            <button onClick={() => handleRetryJobRemoval(jobId)} className="text-sm underline hover:no-underline">
+              Try again
+            </button>
+          </div>
+        ),
         variant: "destructive",
+        duration: 8000,
       })
     } finally {
-      setIsRemovingJob(false)
-      setShowRemoveJobDialog(false)
-      setJobToRemove(null)
+      setRemovingJobs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(jobId)
+        return newSet
+      })
+      setJobRemovalDetails(null)
     }
+  }
+
+  // Add these new helper functions
+  const handleUndoJobRemoval = async (jobId: string) => {
+    const removedJob = removedJobs.get(jobId)
+    if (!removedJob) return
+
+    try {
+      // Re-add the job by calling saveJobListing with the existing data
+      const formData = new FormData()
+      formData.append(
+        "jobData",
+        JSON.stringify({
+          jobTitle: removedJob.jobTitle,
+          jobDescription: removedJob.jobDescription,
+          qualifications: removedJob.qualifications,
+          businessName: removedJob.businessName,
+          businessDescription: removedJob.businessDescription,
+          businessAddress: removedJob.businessAddress,
+          workHours: removedJob.workHours,
+          contactEmail: removedJob.contactEmail,
+          contactName: removedJob.contactName,
+          payType: removedJob.payType,
+          hourlyMin: removedJob.hourlyMin,
+          hourlyMax: removedJob.hourlyMax,
+          salaryMin: removedJob.salaryMin,
+          salaryMax: removedJob.salaryMax,
+          otherPay: removedJob.otherPay,
+          categories: removedJob.categories,
+          benefits: removedJob.benefits,
+          serviceArea: removedJob.serviceArea,
+        }),
+      )
+
+      const result = await saveJobListing(formData, removedJob.businessId)
+
+      if (result.success) {
+        // Reload job listings to get the restored job
+        const updatedJobs = await getBusinessJobs(removedJob.businessId)
+        setJobListings(updatedJobs)
+
+        setRemovedJobs((prev) => {
+          const newMap = new Map(prev)
+          newMap.delete(jobId)
+          return newMap
+        })
+
+        toast({
+          title: "✅ Job Restored",
+          description: "Job listing has been restored successfully",
+        })
+      } else {
+        throw new Error(result.message)
+      }
+    } catch (error) {
+      toast({
+        title: "❌ Restore Failed",
+        description: "Failed to restore job listing. You may need to recreate it manually.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRetryJobRemoval = (jobId: string) => {
+    const job = jobListings.find((j) => j.id === jobId)
+    if (job) {
+      handleRemoveJob(jobId)
+    }
+  }
+
+  // Update the job listing render section to show better loading states
+  const renderJobListingCard = (job: JobListing) => {
+    const isRemoving = removingJobs.has(job.id)
+
+    return (
+      <div
+        key={job.id}
+        className={`flex justify-between items-start p-4 bg-gray-50 rounded-lg transition-all ${isRemoving ? "opacity-50 pointer-events-none" : ""}`}
+      >
+        <div className="flex-1">
+          <h3 className="font-medium text-gray-800">{job.jobTitle}</h3>
+          <p className="text-xs text-gray-500">
+            Posted: {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Unknown date"}
+          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <MapPin className="h-3 w-3 text-gray-400" />
+            <span className="text-xs text-gray-600">
+              {job.serviceArea?.isNationwide
+                ? "Nationwide"
+                : job.serviceArea?.zipCodes?.length
+                  ? `${job.serviceArea.zipCodes.length} ZIP code${job.serviceArea.zipCodes.length !== 1 ? "s" : ""}`
+                  : "No service area set"}
+            </span>
+          </div>
+          {renderJobCategories(job.categories)}
+        </div>
+        <div className="flex items-center gap-2 ml-4">
+          {renderJobStatus(job)}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleRenewJob(job.id)}
+            disabled={renewingJob === job.id || isRemoving}
+            className="text-xs px-2 py-1 h-auto text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          >
+            {renewingJob === job.id ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Renewing...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Renew Listing
+              </>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleRemoveJob(job.id)}
+            disabled={isRemoving}
+            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+          >
+            {isRemoving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Removing...
+              </>
+            ) : (
+              <>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Remove
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   const handleReinstateCoupon = async (coupon: Coupon) => {
@@ -961,61 +1174,8 @@ export default function StatisticsPage() {
                     <span className="ml-2">Loading your job listings...</span>
                   </div>
                 ) : jobListings.length > 0 ? (
-                  <div className="space-y-4">
-                    {jobListings.map((job) => (
-                      <div key={job.id} className="flex justify-between items-start p-4 bg-gray-50 rounded-lg">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-800">{job.jobTitle}</h3>
-                          <p className="text-xs text-gray-500">
-                            Posted: {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Unknown date"}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <MapPin className="h-3 w-3 text-gray-400" />
-                            <span className="text-xs text-gray-600">
-                              {job.serviceArea?.isNationwide
-                                ? "Nationwide"
-                                : job.serviceArea?.zipCodes?.length
-                                  ? `${job.serviceArea.zipCodes.length} ZIP code${job.serviceArea.zipCodes.length !== 1 ? "s" : ""}`
-                                  : "No service area set"}
-                            </span>
-                          </div>
-                          {/* Display job categories */}
-                          {renderJobCategories(job.categories)}
-                        </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          {renderJobStatus(job)}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRenewJob(job.id)}
-                            disabled={renewingJob === job.id}
-                            className="text-xs px-2 py-1 h-auto text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          >
-                            {renewingJob === job.id ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Renewing...
-                              </>
-                            ) : (
-                              <>
-                                <RotateCcw className="h-3 w-3 mr-1" />
-                                Renew Listing
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveJob(job.id)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Remove
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  // In the job listings card content, replace the map with:
+                  <div className="space-y-4">{jobListings.map(renderJobListingCard)}</div>
                 ) : (
                   <div className="text-center py-8">
                     <div className="flex justify-center mb-4">
@@ -1230,41 +1390,59 @@ export default function StatisticsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Confirmation Dialog for Job Removal */}
-      <AlertDialog open={showRemoveJobDialog} onOpenChange={setShowRemoveJobDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Job Listing</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure you want to remove this job listing?</AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="mb-5">
-            <p className="text-sm text-muted-foreground mb-2">This will:</p>
-            <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-              <li>Delete the job from your business profile</li>
-              <li>Remove it from the job listings page</li>
-              <li>Remove it from the ad-box popup</li>
-            </ul>
-            <p className="text-sm text-muted-foreground mt-2 font-medium">This action cannot be undone.</p>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRemovingJob}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmRemoveJob}
-              disabled={isRemovingJob}
-              className="bg-red-500 hover:bg-red-600"
-            >
-              {isRemovingJob ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Removing...
-                </>
-              ) : (
-                "Remove"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Enhanced Job Removal Dialog */}
+      <Dialog open={showJobRemovalDetails} onOpenChange={setShowJobRemovalDetails}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-6 w-6" />
+              Remove Job Listing
+            </DialogTitle>
+            <DialogDescription>This will permanently remove the job listing from all locations.</DialogDescription>
+          </DialogHeader>
+
+          {jobRemovalDetails && (
+            <div className="py-4 space-y-4">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <h4 className="font-medium">{jobRemovalDetails.job.jobTitle}</h4>
+                <p className="text-sm text-gray-600">{jobRemovalDetails.job.businessName}</p>
+                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                  <span>{jobRemovalDetails.zipCodes} ZIP codes</span>
+                  <span>{jobRemovalDetails.categories} categories</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h5 className="font-medium text-sm">This will remove the job from:</h5>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {jobRemovalDetails.willRemoveFrom.map((location, index) => (
+                    <li key={index} className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 bg-red-400 rounded-full" />
+                      {location}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> You can undo this action for a short time after removal.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="sm:justify-end">
+            <Button variant="outline" onClick={() => setShowJobRemovalDetails(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmRemoveJob} className="bg-red-600 hover:bg-red-700">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Remove Job Listing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reinstate Coupon Dialog */}
       <Dialog open={showReinstateDialog} onOpenChange={setShowReinstateDialog}>

@@ -109,20 +109,46 @@ export async function getBusinessDocuments(businessId: string, type?: DocumentTy
 
         let document: DocumentMetadata | null = null
 
-        // Handle different data types
+        // Enhanced type checking and validation
         if (typeof data === "string") {
           try {
-            document = JSON.parse(data) as DocumentMetadata
+            const parsed = JSON.parse(data)
+            // Validate that parsed data is an object and not an array
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              document = parsed as DocumentMetadata
+            } else {
+              console.error(
+                `Document ${id} has invalid structure - expected object, got:`,
+                typeof parsed,
+                Array.isArray(parsed) ? "array" : parsed,
+              )
+              continue
+            }
           } catch (parseError) {
             console.error(`Error parsing document JSON for ${id}:`, parseError)
             continue
           }
-        } else if (typeof data === "object" && data !== null) {
+        } else if (typeof data === "object" && data !== null && !Array.isArray(data)) {
+          // Ensure it's an object and not an array
           document = data as DocumentMetadata
+        } else {
+          console.error(`Document ${id} has unexpected data type:`, typeof data, Array.isArray(data) ? "array" : data)
+          continue
         }
 
-        if (document && document.id && document.businessId) {
+        // Validate required fields exist and are of correct type
+        if (
+          document &&
+          typeof document === "object" &&
+          !Array.isArray(document) &&
+          document.id &&
+          document.businessId &&
+          typeof document.id === "string" &&
+          typeof document.businessId === "string"
+        ) {
           documents.push(document)
+        } else {
+          console.error(`Document ${id} failed validation:`, document)
         }
       } catch (err) {
         console.error(`Error processing document ${id}:`, err)
@@ -130,8 +156,12 @@ export async function getBusinessDocuments(businessId: string, type?: DocumentTy
       }
     }
 
-    // Sort by creation date (newest first)
-    return documents.sort((a, b) => b.createdAt - a.createdAt)
+    // Sort by creation date (newest first) with safe fallback
+    return documents.sort((a, b) => {
+      const aTime = typeof a.createdAt === "number" ? a.createdAt : 0
+      const bTime = typeof b.createdAt === "number" ? b.createdAt : 0
+      return bTime - aTime
+    })
   } catch (error) {
     console.error("Error getting business documents:", error)
     return []
@@ -147,14 +177,34 @@ export async function deleteDocument(businessId: string, documentId: string): Pr
       throw new Error("Document not found")
     }
 
-    // Parse document data safely
+    // Parse document data safely with enhanced validation
     let document: DocumentMetadata
     if (typeof documentData === "string") {
-      document = JSON.parse(documentData) as DocumentMetadata
-    } else if (typeof documentData === "object") {
+      try {
+        const parsed = JSON.parse(documentData)
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          document = parsed as DocumentMetadata
+        } else {
+          throw new Error(
+            "Invalid document data structure - expected object, got " +
+              (Array.isArray(parsed) ? "array" : typeof parsed),
+          )
+        }
+      } catch (parseError) {
+        throw new Error("Failed to parse document data: " + parseError)
+      }
+    } else if (typeof documentData === "object" && documentData !== null && !Array.isArray(documentData)) {
       document = documentData as DocumentMetadata
     } else {
-      throw new Error("Invalid document data format")
+      throw new Error(
+        "Invalid document data format - expected object, got " +
+          (Array.isArray(documentData) ? "array" : typeof documentData),
+      )
+    }
+
+    // Validate required fields
+    if (!document.type || typeof document.type !== "string") {
+      throw new Error("Document missing required type field")
     }
 
     // Remove from document list by type
@@ -187,14 +237,29 @@ export async function renameDocument(businessId: string, documentId: string, new
       throw new Error("Document not found")
     }
 
-    // Parse document data safely
+    // Parse document data safely with enhanced validation
     let document: DocumentMetadata
     if (typeof documentData === "string") {
-      document = JSON.parse(documentData) as DocumentMetadata
-    } else if (typeof documentData === "object") {
+      try {
+        const parsed = JSON.parse(documentData)
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          document = parsed as DocumentMetadata
+        } else {
+          throw new Error(
+            "Invalid document data structure - expected object, got " +
+              (Array.isArray(parsed) ? "array" : typeof parsed),
+          )
+        }
+      } catch (parseError) {
+        throw new Error("Failed to parse document data: " + parseError)
+      }
+    } else if (typeof documentData === "object" && documentData !== null && !Array.isArray(documentData)) {
       document = documentData as DocumentMetadata
     } else {
-      throw new Error("Invalid document data format")
+      throw new Error(
+        "Invalid document data format - expected object, got " +
+          (Array.isArray(documentData) ? "array" : typeof documentData),
+      )
     }
 
     // Update the document name

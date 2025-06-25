@@ -454,76 +454,182 @@ export async function removeJobListing(
       }
     }
 
-    // Clean up service area indexes (but preserve all ZIP code data)
+    // Helper function to safely remove from Redis key (simplified approach)
+    const safeKeyRemoval = async (keyName: string, value: string, description: string) => {
+      try {
+        // Validate inputs
+        if (!keyName || typeof keyName !== "string") {
+          console.log(`Invalid key name for ${description}, skipping`)
+          return
+        }
+
+        if (!value || typeof value !== "string") {
+          console.log(`Invalid value for ${description}, skipping`)
+          return
+        }
+
+        console.log(`Processing ${description}: key="${keyName}", value="${value}"`)
+
+        // First check if the key exists
+        let keyExists = false
+        try {
+          keyExists = await kv.exists(keyName)
+        } catch (existsError) {
+          console.log(`Could not check if key ${keyName} exists, assuming it doesn't`)
+          return
+        }
+
+        if (!keyExists) {
+          console.log(`Key ${keyName} does not exist, skipping removal`)
+          return
+        }
+
+        // Try to remove from set (most common case)
+        try {
+          const isMember = await kv.sismember(keyName, value)
+          if (isMember) {
+            const removed = await kv.srem(keyName, value)
+            console.log(`✅ Successfully removed ${value} from ${description} set (${removed} items removed)`)
+            return
+          } else {
+            console.log(`Value ${value} not found in ${description} set`)
+          }
+        } catch (setError) {
+          console.log(`Key ${keyName} is not a set or set operations failed`)
+        }
+
+        // Try other data types without using kv.type()
+        let operationSucceeded = false
+
+        // Try as string
+        if (!operationSucceeded) {
+          try {
+            const stringValue = await kv.get(keyName)
+            if (typeof stringValue === "string" && stringValue === value) {
+              // Don't delete the key, just log that we found it
+              console.log(`Found matching string value for ${keyName}, but not deleting (might be used elsewhere)`)
+              operationSucceeded = true
+            }
+          } catch (stringError) {
+            // Ignore string operation errors
+          }
+        }
+
+        // Try as list
+        if (!operationSucceeded) {
+          try {
+            const removedFromList = await kv.lrem(keyName, 0, value)
+            if (removedFromList > 0) {
+              console.log(`✅ Removed ${removedFromList} occurrences of ${value} from ${description} list`)
+              operationSucceeded = true
+            }
+          } catch (listError) {
+            // Ignore list operation errors
+          }
+        }
+
+        // Try as hash
+        if (!operationSucceeded) {
+          try {
+            const hashExists = await kv.hexists(keyName, value)
+            if (hashExists) {
+              await kv.hdel(keyName, value)
+              console.log(`✅ Removed field ${value} from ${description} hash`)
+              operationSucceeded = true
+            }
+          } catch (hashError) {
+            // Ignore hash operation errors
+          }
+        }
+
+        // Try as sorted set
+        if (!operationSucceeded) {
+          try {
+            const removedFromZset = await kv.zrem(keyName, value)
+            if (removedFromZset > 0) {
+              console.log(`✅ Removed ${value} from ${description} sorted set`)
+              operationSucceeded = true
+            }
+          } catch (zsetError) {
+            // Ignore sorted set operation errors
+          }
+        }
+
+        if (!operationSucceeded) {
+          console.log(`⚠️ Could not remove ${value} from ${keyName} using any known data type operations`)
+          console.log(`This key may be corrupted or contain unexpected data, but we'll continue with other cleanup`)
+          // DO NOT attempt to delete the key - just log and continue
+        }
+      } catch (error) {
+        console.error(`Error in safeKeyRemoval for ${description} (${keyName}):`, error)
+        // Log the error but don't throw - continue with other cleanup operations
+      }
+    }
+
+    // Clean up service area indexes before deleting the job
     if (job && job.serviceArea) {
       if (job.serviceArea.isNationwide) {
-        // Remove from nationwide jobs index only
-        try {
-          await kv.srem("jobs:nationwide", `${businessId}:${jobId}`)
-          console.log(`Removed job from nationwide index`)
-        } catch (error) {
-          console.error("Error removing from nationwide index:", error)
+        // Remove from nationwide jobs index
+        await safeKeyRemoval("jobs:nationwide", `${businessId}:${jobId}`, "nationwide index")
+      } else if (job.serviceArea.zipCodes && job.serviceArea.zipCodes.length > 0) {
+        // Remove from ZIP code indexes
+        for (const zipData of job.serviceArea.zipCodes) {
+          await safeKeyRemoval(`zipcode:${zipData.zip}:jobs`, `${businessId}:${jobId}`, `ZIP code index ${zipData.zip}`)
         }
       }
-      // COMPLETELY SKIP ZIP code operations - preserve shared ZIP code database
 
-      // Clean up only job-specific service area metadata (not shared ZIP code data)
+      // Clean up service area metadata
       try {
         await kv.del(`job:${businessId}:${jobId}:zipcodes`)
         await kv.del(`job:${businessId}:${jobId}:servicearea`)
-        console.log("Cleaned up job-specific service area metadata only")
+        console.log("Cleaned up service area metadata")
       } catch (error) {
-        console.error("Error cleaning up job service area metadata:", error)
+        console.error("Error cleaning up service area metadata:", error)
       }
     }
 
-    // Clean up category indexes
+    // Clean up category indexes before deleting the job
     if (job && job.categories && job.categories.length > 0) {
       for (const category of job.categories) {
-        try {
-          const categoryKey = category.toLowerCase().replace(/\s+/g, "-")
-          await kv.srem(`category:${categoryKey}:jobs`, `${businessId}:${jobId}`)
-          console.log(`Removed job from category index: ${category} (key: ${categoryKey})`)
-        } catch (error) {
-          console.error(`Error removing job from category ${category} index:`, error)
-        }
+        const categoryKey = category.toLowerCase().replace(/\s+/g, "-")
+        await safeKeyRemoval(`category:${categoryKey}:jobs`, `${businessId}:${jobId}`, `category index ${category}`)
       }
 
-      // Clean up job-specific category metadata
+      // Clean up category metadata
       try {
         await kv.del(`job:${businessId}:${jobId}:categories`)
-        console.log("Cleaned up job-specific category metadata")
+        console.log("Cleaned up category metadata")
       } catch (error) {
-        console.error("Error cleaning up job category metadata:", error)
+        console.error("Error cleaning up category metadata:", error)
       }
     }
 
-    // Delete the main job record
+    // Delete the job from Redis
     try {
       console.log(`Deleting job from Redis key: ${jobKey}`)
       await kv.del(jobKey)
-      console.log("Successfully deleted main job record")
+      console.log("Successfully deleted job data")
     } catch (error) {
-      console.error("Error deleting main job record:", error)
+      console.error("Error deleting job from Redis:", error)
     }
 
-    // Update the business job index
+    // Update the job index for this business
     const jobsKey = `jobs:${businessId}`
-    console.log(`Updating business job index at key: ${jobsKey}`)
+    console.log(`Updating job index at key: ${jobsKey}`)
 
     try {
       const existingJobsData = await kv.get(jobsKey)
       let existingJobs: string[] = []
 
-      // Handle different data types for the jobs list
-      if (existingJobsData) {
+      // More robust handling of different data types
+      if (existingJobsData !== null && existingJobsData !== undefined) {
         if (Array.isArray(existingJobsData)) {
-          existingJobs = existingJobsData.filter((id) => typeof id === "string")
+          existingJobs = existingJobsData.filter((item) => typeof item === "string")
         } else if (typeof existingJobsData === "string") {
           try {
             const parsed = JSON.parse(existingJobsData)
             if (Array.isArray(parsed)) {
-              existingJobs = parsed.filter((id) => typeof id === "string")
+              existingJobs = parsed.filter((item) => typeof item === "string")
             } else {
               existingJobs = [existingJobsData]
             }
@@ -531,32 +637,22 @@ export async function removeJobListing(
             existingJobs = [existingJobsData]
           }
         } else {
-          console.error(`Unexpected data type for jobs index: ${typeof existingJobsData}`)
+          console.error(`Unexpected data type: ${typeof existingJobsData}, resetting to empty array`)
           existingJobs = []
         }
       }
 
-      // Remove the job ID from the business jobs list
+      // Filter out the job ID we want to remove
       const updatedJobs = existingJobs.filter((id) => id !== jobId)
 
-      console.log(`Business jobs before removal: ${existingJobs.length}`)
-      console.log(`Business jobs after removal: ${updatedJobs.length}`)
+      console.log(`Before removal: ${existingJobs.length} jobs`)
+      console.log(`After removal: ${updatedJobs.length} jobs`)
 
       // Save the updated jobs list
       await kv.set(jobsKey, updatedJobs)
-      console.log(`Successfully updated business job index`)
-    } catch (indexError) {
-      console.error("Error updating business job index:", indexError)
-    }
-
-    // Clean up Cloudflare image resources if they exist
-    if (job && job.logoId) {
-      try {
-        console.log(`Job had a logo with ID: ${job.logoId} - cleanup would happen here if needed`)
-        // Note: Actual Cloudflare image deletion would be implemented here if required
-      } catch (cleanupError) {
-        console.error("Error cleaning up job logo:", cleanupError)
-      }
+      console.log(`Successfully updated jobs index`)
+    } catch (indexUpdateError) {
+      console.error("Error updating job index:", indexUpdateError)
     }
 
     // Revalidate all paths that might display this job
@@ -572,7 +668,8 @@ export async function removeJobListing(
 
     return {
       success: true,
-      message: "Job listing removed successfully! All ZIP code data preserved for future job listings.",
+      message:
+        "Job listing removed successfully! Some corrupted index entries may remain but won't affect functionality.",
     }
   } catch (error) {
     console.error("Error removing job listing:", error)
