@@ -49,18 +49,26 @@ import { BusinessPhotoAlbumDialog } from "./business-photo-album-dialog"
 import { BusinessCouponsDialog } from "./business-coupons-dialog"
 import { BusinessJobsDialog } from "./business-jobs-dialog"
 import { DocumentsDialog } from "./documents-dialog"
+import {
+  trackProfileView,
+  trackPhotoAlbumClick,
+  trackCouponClick,
+  trackJobClick,
+  trackPhoneClick,
+  trackWebsiteClick,
+} from "@/lib/analytics-utils"
 
 // Add CSS to hide the default close button
 const hideDefaultCloseButtonStyle = `
-  .business-profile-dialog-content [data-radix-dialog-close] {
-    display: none !important;
-  }
-  .business-profile-dialog-content > button[data-radix-dialog-close] {
-    display: none !important;
-  }
-  .business-profile-dialog-content .absolute.right-4.top-4 {
-    display: none !important;
-  }
+ .business-profile-dialog-content [data-radix-dialog-close] {
+   display: none !important;
+ }
+ .business-profile-dialog-content > button[data-radix-dialog-close] {
+   display: none !important;
+ }
+ .business-profile-dialog-content .absolute.right-4.top-4 {
+   display: none !important;
+ }
 `
 
 interface BusinessProfileDialogProps {
@@ -87,6 +95,8 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   useEffect(() => {
     if (isOpen && businessId) {
       console.log(`BusinessProfileDialog opened for business ID: ${businessId}`)
+      // Track profile view
+      trackProfileView(businessId)
       loadBusinessData()
       loadBusinessAdDesign()
       loadBusinessVideo()
@@ -413,6 +423,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   // Function to handle phone call
   const handlePhoneCall = (phone: string) => {
     if (!phone) return
+    trackPhoneClick(businessId)
     const phoneNumber = phone.replace(/\D/g, "")
     window.open(`tel:${phoneNumber}`)
   }
@@ -427,6 +438,31 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
   const handleGetDirections = (address: string) => {
     if (!address) return
     window.open(`https://maps.google.com/?q=${encodeURIComponent(address)}`, "_blank")
+  }
+
+  // Function to handle website click
+  const handleWebsiteClick = (website: string) => {
+    if (!website) return
+    trackWebsiteClick(businessId)
+    window.open(`https://${website}`, "_blank")
+  }
+
+  // Function to handle photo album click
+  const handlePhotoAlbumClick = () => {
+    trackPhotoAlbumClick(businessId)
+    setIsPhotoAlbumOpen(true)
+  }
+
+  // Function to handle coupons click
+  const handleCouponsClick = () => {
+    trackCouponClick(businessId)
+    setIsCouponsOpen(true)
+  }
+
+  // Function to handle jobs click
+  const handleJobsClick = () => {
+    trackJobClick(businessId)
+    setIsJobsOpen(true)
   }
 
   return (
@@ -461,7 +497,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
           ) : error ? (
             <div className="text-center py-8 text-red-500">
               <p>{error}</p>
-              <Button variant="outline" className="mt-4" onClick={onClose}>
+              <Button variant="outline" className="mt-4 bg-transparent" onClick={onClose}>
                 Close
               </Button>
             </div>
@@ -635,8 +671,8 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                       {!adDesign.hiddenFields?.photoAlbum && (
                         <Button
                           variant="outline"
-                          className="flex flex-col items-center justify-center gap-1 h-auto py-3"
-                          onClick={() => setIsPhotoAlbumOpen(true)}
+                          className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
+                          onClick={handlePhotoAlbumClick}
                         >
                           <ImageIcon
                             className="h-5 w-5"
@@ -651,8 +687,8 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                       {!adDesign.hiddenFields?.savingsButton && (
                         <Button
                           variant="outline"
-                          className="flex flex-col items-center justify-center gap-1 h-auto py-3"
-                          onClick={() => setIsCouponsOpen(true)}
+                          className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
+                          onClick={handleCouponsClick}
                         >
                           <Ticket
                             className="h-5 w-5"
@@ -667,8 +703,8 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                       {!adDesign.hiddenFields?.jobsButton && (
                         <Button
                           variant="outline"
-                          className="flex flex-col items-center justify-center gap-1 h-auto py-3"
-                          onClick={() => setIsJobsOpen(true)}
+                          className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
+                          onClick={handleJobsClick}
                         >
                           <Briefcase
                             className="h-5 w-5"
@@ -684,7 +720,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                     {!adDesign.hiddenFields?.customButton && (
                       <Button
                         variant="outline"
-                        className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2"
+                        className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2 bg-transparent"
                         onClick={() => setIsDocumentsOpen(true)}
                       >
                         {(() => {
@@ -704,7 +740,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
                     {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
                       <button
-                        onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
+                        onClick={() => handleWebsiteClick(adDesign.businessInfo.website)}
                         className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
                         style={{
                           backgroundColor:
@@ -929,7 +965,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                           <div className="p-4 grid grid-cols-2 gap-3">
                             {!adDesign.hiddenFields?.photoAlbum && (
                               <button
-                                onClick={() => setIsPhotoAlbumOpen(true)}
+                                onClick={handlePhotoAlbumClick}
                                 className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                               >
                                 <ImageIcon
@@ -944,7 +980,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
                             {!adDesign.hiddenFields?.savingsButton && (
                               <button
-                                onClick={() => setIsCouponsOpen(true)}
+                                onClick={handleCouponsClick}
                                 className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                               >
                                 <Ticket
@@ -959,7 +995,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
                             {!adDesign.hiddenFields?.jobsButton && (
                               <button
-                                onClick={() => setIsJobsOpen(true)}
+                                onClick={handleJobsClick}
                                 className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                               >
                                 <Briefcase
@@ -1017,7 +1053,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
                               adDesign.businessInfo?.website ? (
                                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                                   <button
-                                    onClick={() => window.open(`https://${adDesign.businessInfo.website}`, "_blank")}
+                                    onClick={() => handleWebsiteClick(adDesign.businessInfo.website)}
                                     className="flex items-center justify-center gap-2 w-full text-white p-3 rounded-md transition-colors hover:opacity-90"
                                     style={{
                                       backgroundColor:
@@ -1105,7 +1141,7 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
           ) : (
             <div className="text-center py-8 text-gray-500">
               <p>No profile information available for this business.</p>
-              <Button variant="outline" className="mt-4" onClick={onClose}>
+              <Button variant="outline" className="mt-4 bg-transparent" onClick={onClose}>
                 Close
               </Button>
             </div>

@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import Link from "next/link"
-import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2, MapPin, Tag } from "lucide-react"
+import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2, MapPin, Tag, RefreshCw } from "lucide-react"
 import type { CategorySelection } from "@/components/category-selector"
 import { getBusinessCategories, removeBusinessCategory } from "@/app/actions/category-actions"
 import { useToast } from "@/components/ui/use-toast"
@@ -36,6 +36,7 @@ import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
 import { getBusinessCoupons, reinstateCoupon, type Coupon } from "@/app/actions/coupon-actions"
+import { getBusinessAnalytics, resetAllAnalytics, type AnalyticsData } from "@/app/actions/analytics-actions"
 import { Calendar, Clock, RotateCcw } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,6 +48,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D"]
 
 // Client-side expiration functions (using user's local timezone) - same as coupons page
 const isCouponExpiredClient = (expirationDate: string): boolean => {
@@ -108,6 +111,11 @@ export default function StatisticsPage() {
   const [newExpirationDate, setNewExpirationDate] = useState("")
   const [renewingJob, setRenewingJob] = useState<string | null>(null)
 
+  // Analytics state
+  const [clickAnalytics, setClickAnalytics] = useState<AnalyticsData | null>(null)
+  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(true)
+  const [isResettingAnalytics, setIsResettingAnalytics] = useState(false)
+
   // Add these new state variables after the existing state declarations
   const [removingJobs, setRemovingJobs] = useState<Set<string>>(new Set())
   const [removedJobs, setRemovedJobs] = useState<Map<string, JobListing>>(new Map())
@@ -118,6 +126,76 @@ export default function StatisticsPage() {
     categories: number
     willRemoveFrom: string[]
   } | null>(null)
+
+  // Load analytics data
+  useEffect(() => {
+    async function loadAnalytics() {
+      setIsAnalyticsLoading(true)
+      try {
+        // Use the current business ID or a default
+        let currentBusinessId = businessId
+        try {
+          const loggedInBusiness = await getCurrentBusiness()
+          if (loggedInBusiness && loggedInBusiness.id) {
+            currentBusinessId = loggedInBusiness.id
+            setBusinessId(currentBusinessId)
+          }
+        } catch (error) {
+          console.error("Error getting logged-in business:", error)
+        }
+
+        if (!currentBusinessId) {
+          currentBusinessId = "demo-business"
+        }
+
+        const result = await getBusinessAnalytics(currentBusinessId)
+        setClickAnalytics(result)
+      } catch (error) {
+        console.error("Error loading analytics:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load analytics data",
+          variant: "destructive",
+        })
+      } finally {
+        setIsAnalyticsLoading(false)
+      }
+    }
+
+    loadAnalytics()
+  }, [businessId])
+
+  // Handle analytics reset
+  const handleResetAnalytics = async () => {
+    if (!businessId) return
+
+    setIsResettingAnalytics(true)
+    try {
+      await resetAllAnalytics()
+      // Reset local state
+      setClickAnalytics({
+        profileViews: 0,
+        photoAlbumClicks: 0,
+        couponClicks: 0,
+        jobClicks: 0,
+        phoneClicks: 0,
+        websiteClicks: 0,
+      })
+      toast({
+        title: "Success",
+        description: "Analytics data has been reset",
+      })
+    } catch (error) {
+      console.error("Error resetting analytics:", error)
+      toast({
+        title: "Error",
+        description: "Failed to reset analytics",
+        variant: "destructive",
+      })
+    } finally {
+      setIsResettingAnalytics(false)
+    }
+  }
 
   // Load selected categories from server on component mount
   useEffect(() => {
@@ -237,6 +315,7 @@ export default function StatisticsPage() {
           const loggedInBusiness = await getCurrentBusiness()
           if (loggedInBusiness && loggedInBusiness.id) {
             currentBusinessId = loggedInBusiness.id
+            setBusinessId(currentBusinessId) // Update state with actual business ID
             console.log(`Using logged-in business ID for job listings: ${currentBusinessId}`)
           }
         } catch (error) {
@@ -791,11 +870,11 @@ export default function StatisticsPage() {
     },
   ]
 
-  // Sample data for clicks statistics
+  // Updated clicks statistics with real data
   const clicksStats = [
     {
       title: "Profile Views",
-      yourStats: "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.profileViews?.toString() || "0",
       competitorStats: "145",
     },
     {
@@ -805,27 +884,27 @@ export default function StatisticsPage() {
     },
     {
       title: "Coupons Clipped",
-      yourStats: "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.couponClicks?.toString() || "0",
       competitorStats: "37",
     },
     {
       title: "Job Opportunity Views",
-      yourStats: "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.jobClicks?.toString() || "0",
       competitorStats: "43",
     },
     {
       title: "Photo Album Views",
-      yourStats: "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.photoAlbumClicks?.toString() || "0",
       competitorStats: "89",
     },
     {
       title: "Phone Number Clicks",
-      yourStats: "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.phoneClicks?.toString() || "0",
       competitorStats: "56",
     },
     {
       title: "Website Clicks",
-      yourStats: "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.websiteClicks?.toString() || "0",
       competitorStats: "72",
     },
   ]
@@ -1174,7 +1253,6 @@ export default function StatisticsPage() {
                     <span className="ml-2">Loading your job listings...</span>
                   </div>
                 ) : jobListings.length > 0 ? (
-                  // In the job listings card content, replace the map with:
                   <div className="space-y-4">{jobListings.map(renderJobListingCard)}</div>
                 ) : (
                   <div className="text-center py-8">
@@ -1294,6 +1372,29 @@ export default function StatisticsPage() {
           {/* Clicks Tab */}
           <TabsContent value="clicks" className="space-y-6">
             <div className="max-w-4xl mx-auto">
+              {/* Analytics Reset Button */}
+              <div className="flex justify-end mb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetAnalytics}
+                  disabled={isResettingAnalytics}
+                  className="flex items-center gap-2 bg-transparent"
+                >
+                  {isResettingAnalytics ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4" />
+                      Reset Analytics
+                    </>
+                  )}
+                </Button>
+              </div>
+
               {clicksStats.map((stat, index) => (
                 <Card key={index} className="mb-4">
                   <CardHeader
