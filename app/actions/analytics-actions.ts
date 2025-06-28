@@ -4,149 +4,294 @@ import { kv } from "@/lib/redis"
 
 export interface AnalyticsEvent {
   businessId: string
-  eventType: "profile_view" | "photo_album_click" | "coupon_click" | "job_click" | "phone_click" | "website_click"
+  eventType: "profile_view" | "contact_click" | "website_click" | "phone_click"
+  zipCode?: string
   timestamp: number
-  userAgent?: string
-  ipAddress?: string
+  metadata?: Record<string, any>
 }
 
-export interface AnalyticsData {
-  profileViews: number
-  photoAlbumClicks: number
-  couponClicks: number
-  jobClicks: number
-  phoneClicks: number
-  websiteClicks: number
+export interface ZipCodeAnalytics {
+  zipCode: string
+  count: number
+  city?: string
+  state?: string
+  lastViewed?: number
 }
 
-const ANALYTICS_PREFIX = "analytics:"
-const COUNTER_PREFIX = "analytics:counter:"
-
-export async function trackAnalyticsEvent(event: AnalyticsEvent): Promise<void> {
+export async function trackAnalyticsEvent(event: AnalyticsEvent) {
   try {
-    // Store individual event with expiration (30 days)
-    const eventKey = `${ANALYTICS_PREFIX}${event.businessId}:${event.eventType}:${event.timestamp}`
-    await kv.setex(eventKey, 30 * 24 * 60 * 60, JSON.stringify(event))
+    console.log("📊 Tracking analytics event:", event)
 
-    // Increment counter for this business and event type
-    const counterKey = `${COUNTER_PREFIX}${event.businessId}:${event.eventType}`
-    await kv.incr(counterKey)
+    const { businessId, eventType, zipCode, timestamp, metadata } = event
 
-    console.log(`Analytics tracked: ${event.eventType} for business ${event.businessId}`)
+    // Create unique keys for this business
+    const eventsKey = `analytics:${businessId}:events`
+    const zipCodesKey = `analytics:${businessId}:zipcodes`
+
+    // Check and fix key types if needed
+    await ensureHashKey(eventsKey)
+    await ensureHashKey(zipCodesKey)
+
+    // Track general event
+    await kv.hincrby(eventsKey, eventType, 1)
+    await kv.hincrby(eventsKey, "total_events", 1)
+
+    // Track ZIP code specific data if provided
+    if (zipCode && zipCode.length === 5) {
+      console.log(`📍 Tracking ZIP code: ${zipCode}`)
+
+      // Increment view count for this ZIP code
+      await kv.hincrby(zipCodesKey, zipCode, 1)
+
+      // Store additional ZIP code metadata
+      const zipMetaKey = `analytics:${businessId}:zipmeta:${zipCode}`
+      const zipMeta = {
+        zipCode,
+        lastViewed: timestamp,
+        city: metadata?.city || "",
+        state: metadata?.state || "",
+      }
+
+      await kv.set(zipMetaKey, JSON.stringify(zipMeta), { ex: 86400 * 30 }) // 30 days
+    }
+
+    // Store recent event for debugging
+    const recentEventsKey = `analytics:${businessId}:recent`
+    const recentEvent = {
+      eventType,
+      zipCode,
+      timestamp,
+      metadata,
+    }
+
+    await kv.lpush(recentEventsKey, JSON.stringify(recentEvent))
+    await kv.ltrim(recentEventsKey, 0, 99) // Keep last 100 events
+    await kv.expire(recentEventsKey, 86400 * 7) // 7 days
+
+    console.log("✅ Analytics event tracked successfully")
+
+    return { success: true, message: "Event tracked successfully" }
   } catch (error) {
-    console.error("Error tracking analytics event:", error)
-    throw error
+    console.error("❌ Error tracking analytics event:", error)
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error occurred",
+    }
   }
 }
 
-export async function getBusinessAnalytics(businessId: string): Promise<AnalyticsData> {
+export async function getBusinessZipCodeAnalytics(businessId: string): Promise<ZipCodeAnalytics[]> {
   try {
-    const [profileViews, photoAlbumClicks, couponClicks, jobClicks, phoneClicks, websiteClicks] = await Promise.all([
-      kv.get(`${COUNTER_PREFIX}${businessId}:profile_view`),
-      kv.get(`${COUNTER_PREFIX}${businessId}:photo_album_click`),
-      kv.get(`${COUNTER_PREFIX}${businessId}:coupon_click`),
-      kv.get(`${COUNTER_PREFIX}${businessId}:job_click`),
-      kv.get(`${COUNTER_PREFIX}${businessId}:phone_click`),
-      kv.get(`${COUNTER_PREFIX}${businessId}:website_click`),
-    ])
+    console.log(`📈 Getting ZIP code analytics for business: ${businessId}`)
 
-    return {
-      profileViews: Number(profileViews) || 0,
-      photoAlbumClicks: Number(photoAlbumClicks) || 0,
-      couponClicks: Number(couponClicks) || 0,
-      jobClicks: Number(jobClicks) || 0,
-      phoneClicks: Number(phoneClicks) || 0,
-      websiteClicks: Number(websiteClicks) || 0,
+    const zipCodesKey = `analytics:${businessId}:zipcodes`
+
+    // Check if key exists and is the right type
+    const keyType = await kv.type(zipCodesKey)
+    if (!keyType || keyType === "none") {
+      console.log("No zip code data found - key doesn't exist")
+      return []
     }
+
+    if (keyType !== "hash") {
+      console.warn(`Zip code key ${zipCodesKey} is of type ${keyType}, expected hash`)
+      return []
+    }
+
+    // Get ZIP codes data
+    const zipCodesData = await kv.hgetall(zipCodesKey)
+    console.log("ZIP codes data:", zipCodesData)
+
+    if (!zipCodesData || Object.keys(zipCodesData).length === 0) {
+      console.log("No zip code data found - empty hash")
+      return []
+    }
+
+    // Process ZIP codes with metadata
+    const zipCodeAnalytics: ZipCodeAnalytics[] = []
+
+    for (const [zipCode, count] of Object.entries(zipCodesData)) {
+      if (zipCode && count) {
+        const zipMetaKey = `analytics:${businessId}:zipmeta:${zipCode}`
+        const zipMetaStr = await kv.get(zipMetaKey)
+
+        let zipMeta = { city: "", state: "", lastViewed: Date.now() }
+        if (zipMetaStr) {
+          try {
+            zipMeta = JSON.parse(zipMetaStr as string)
+          } catch (e) {
+            console.warn(`Failed to parse ZIP meta for ${zipCode}:`, e)
+          }
+        }
+
+        zipCodeAnalytics.push({
+          zipCode,
+          count: Number.parseInt(count.toString()) || 0,
+          city: zipMeta.city,
+          state: zipMeta.state,
+          lastViewed: zipMeta.lastViewed,
+        })
+      }
+    }
+
+    // Sort by count descending
+    zipCodeAnalytics.sort((a, b) => b.count - a.count)
+
+    console.log("📊 ZIP code analytics retrieved:", zipCodeAnalytics)
+    return zipCodeAnalytics
   } catch (error) {
-    console.error("Error getting business analytics:", error)
+    console.error("❌ Error getting ZIP code analytics:", error)
+    return []
+  }
+}
+
+export async function getBusinessAnalytics(businessId: string) {
+  try {
+    console.log(`📈 Getting analytics for business: ${businessId}`)
+
+    const eventsKey = `analytics:${businessId}:events`
+
+    // Get general events data
+    const eventsData = await kv.hgetall(eventsKey)
+    console.log("Events data:", eventsData)
+
+    // Get ZIP code analytics
+    const zipCodeAnalytics = await getBusinessZipCodeAnalytics(businessId)
+
+    const analytics = {
+      businessId,
+      totalEvents: Number.parseInt(eventsData?.total_events?.toString() || "0"),
+      profileViews: Number.parseInt(eventsData?.profile_view?.toString() || "0"),
+      contactClicks: Number.parseInt(eventsData?.contact_click?.toString() || "0"),
+      websiteClicks: Number.parseInt(eventsData?.website_click?.toString() || "0"),
+      phoneClicks: Number.parseInt(eventsData?.phone_click?.toString() || "0"),
+      zipCodeAnalytics,
+      lastUpdated: Date.now(),
+    }
+
+    console.log("📊 Analytics retrieved:", analytics)
+    return analytics
+  } catch (error) {
+    console.error("❌ Error getting business analytics:", error)
     return {
+      businessId,
+      totalEvents: 0,
       profileViews: 0,
-      photoAlbumClicks: 0,
-      couponClicks: 0,
-      jobClicks: 0,
-      phoneClicks: 0,
+      contactClicks: 0,
       websiteClicks: 0,
+      phoneClicks: 0,
+      zipCodeAnalytics: [],
+      lastUpdated: Date.now(),
     }
   }
 }
 
-export async function getAllBusinessAnalytics(): Promise<Record<string, AnalyticsData>> {
+export async function resetBusinessAnalytics(businessId: string) {
   try {
-    // Get all counter keys
-    const keys = await kv.keys(`${COUNTER_PREFIX}*`)
+    console.log(`🗑️ Resetting analytics for business: ${businessId}`)
 
-    if (!keys || keys.length === 0) {
-      return {}
+    const eventsKey = `analytics:${businessId}:events`
+    const zipCodesKey = `analytics:${businessId}:zipcodes`
+    const recentEventsKey = `analytics:${businessId}:recent`
+
+    // Delete main analytics keys
+    await kv.del(eventsKey)
+    await kv.del(zipCodesKey)
+    await kv.del(recentEventsKey)
+
+    // Find and delete ZIP metadata keys
+    const zipMetaPattern = `analytics:${businessId}:zipmeta:*`
+    const zipMetaKeys = await kv.keys(zipMetaPattern)
+
+    if (zipMetaKeys.length > 0) {
+      await kv.del(...zipMetaKeys)
     }
 
-    // Group keys by business ID
-    const businessIds = new Set<string>()
-    keys.forEach((key) => {
-      const parts = key.replace(COUNTER_PREFIX, "").split(":")
-      if (parts.length >= 2) {
-        businessIds.add(parts[0])
+    console.log("✅ Analytics reset successfully")
+    return { success: true, message: "Analytics reset successfully" }
+  } catch (error) {
+    console.error("❌ Error resetting analytics:", error)
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to reset analytics",
+    }
+  }
+}
+
+export async function cleanupAnalyticsKeys(businessId: string) {
+  try {
+    console.log(`🧹 Cleaning up analytics keys for business: ${businessId}`)
+
+    const eventsKey = `analytics:${businessId}:events`
+    const zipCodesKey = `analytics:${businessId}:zipcodes`
+
+    // Check key types and delete if wrong type
+    const eventsType = await kv.type(eventsKey)
+    const zipCodesType = await kv.type(zipCodesKey)
+
+    console.log(`Key types - events: ${eventsType}, zipcodes: ${zipCodesType}`)
+
+    if (eventsType !== "hash" && eventsType !== "none") {
+      console.log(`Deleting wrong type key: ${eventsKey} (${eventsType})`)
+      await kv.del(eventsKey)
+    }
+
+    if (zipCodesType !== "hash" && zipCodesType !== "none") {
+      console.log(`Deleting wrong type key: ${zipCodesKey} (${zipCodesType})`)
+      await kv.del(zipCodesKey)
+    }
+
+    console.log("✅ Analytics keys cleaned up successfully")
+    return { success: true, message: "Analytics keys cleaned up successfully" }
+  } catch (error) {
+    console.error("❌ Error cleaning up analytics keys:", error)
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to cleanup keys",
+    }
+  }
+}
+
+// Helper function to ensure a key is a hash type
+async function ensureHashKey(key: string) {
+  try {
+    const keyType = await kv.type(key)
+
+    if (keyType !== "hash" && keyType !== "none") {
+      console.log(`Converting key ${key} from ${keyType} to hash`)
+      await kv.del(key)
+    }
+
+    // Initialize as hash if it doesn't exist
+    if (keyType === "none") {
+      await kv.hset(key, "initialized", "1")
+      await kv.hdel(key, "initialized")
+    }
+  } catch (error) {
+    console.error(`Error ensuring hash key ${key}:`, error)
+    // If we can't check/fix the key, delete it to start fresh
+    try {
+      await kv.del(key)
+    } catch (deleteError) {
+      console.error(`Failed to delete problematic key ${key}:`, deleteError)
+    }
+  }
+}
+
+export async function getRecentEvents(businessId: string, limit = 10) {
+  try {
+    const recentEventsKey = `analytics:${businessId}:recent`
+    const events = await kv.lrange(recentEventsKey, 0, limit - 1)
+
+    return events.map((eventStr) => {
+      try {
+        return JSON.parse(eventStr as string)
+      } catch (e) {
+        return { error: "Failed to parse event", raw: eventStr }
       }
     })
-
-    // Get analytics for each business
-    const result: Record<string, AnalyticsData> = {}
-    for (const businessId of businessIds) {
-      result[businessId] = await getBusinessAnalytics(businessId)
-    }
-
-    return result
   } catch (error) {
-    console.error("Error getting all business analytics:", error)
-    return {}
-  }
-}
-
-export async function resetBusinessAnalytics(businessId: string): Promise<void> {
-  try {
-    const eventTypes = [
-      "profile_view",
-      "photo_album_click",
-      "coupon_click",
-      "job_click",
-      "phone_click",
-      "website_click",
-    ]
-
-    // Delete all counters for this business
-    const counterKeys = eventTypes.map((type) => `${COUNTER_PREFIX}${businessId}:${type}`)
-    await Promise.all(counterKeys.map((key) => kv.del(key)))
-
-    // Delete all individual events for this business
-    const eventKeys = await kv.keys(`${ANALYTICS_PREFIX}${businessId}:*`)
-    if (eventKeys && eventKeys.length > 0) {
-      await Promise.all(eventKeys.map((key) => kv.del(key)))
-    }
-
-    console.log(`Analytics reset for business ${businessId}`)
-  } catch (error) {
-    console.error("Error resetting business analytics:", error)
-    throw error
-  }
-}
-
-export async function resetAllAnalytics(): Promise<void> {
-  try {
-    // Delete all counter keys
-    const counterKeys = await kv.keys(`${COUNTER_PREFIX}*`)
-    if (counterKeys && counterKeys.length > 0) {
-      await Promise.all(counterKeys.map((key) => kv.del(key)))
-    }
-
-    // Delete all event keys
-    const eventKeys = await kv.keys(`${ANALYTICS_PREFIX}*`)
-    if (eventKeys && eventKeys.length > 0) {
-      await Promise.all(eventKeys.map((key) => kv.del(key)))
-    }
-
-    console.log("All analytics data reset")
-  } catch (error) {
-    console.error("Error resetting all analytics:", error)
-    throw error
+    console.error("Error getting recent events:", error)
+    return []
   }
 }

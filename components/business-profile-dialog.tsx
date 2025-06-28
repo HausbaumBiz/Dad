@@ -1,9 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import {
   Dialog,
@@ -56,19 +54,20 @@ import {
   trackJobClick,
   trackPhoneClick,
   trackWebsiteClick,
+  getCurrentZipCode,
 } from "@/lib/analytics-utils"
 
 // Add CSS to hide the default close button
 const hideDefaultCloseButtonStyle = `
- .business-profile-dialog-content [data-radix-dialog-close] {
-   display: none !important;
- }
- .business-profile-dialog-content > button[data-radix-dialog-close] {
-   display: none !important;
- }
- .business-profile-dialog-content .absolute.right-4.top-4 {
-   display: none !important;
- }
+.business-profile-dialog-content [data-radix-dialog-close] {
+  display: none !important;
+}
+.business-profile-dialog-content > button[data-radix-dialog-close] {
+  display: none !important;
+}
+.business-profile-dialog-content .absolute.right-4.top-4 {
+  display: none !important;
+}
 `
 
 interface BusinessProfileDialogProps {
@@ -76,9 +75,16 @@ interface BusinessProfileDialogProps {
   onClose: () => void
   businessId: string
   businessName: string
+  searchZipCode?: string | null
 }
 
-export function BusinessProfileDialog({ isOpen, onClose, businessId, businessName }: BusinessProfileDialogProps) {
+export function BusinessProfileDialog({
+  isOpen,
+  onClose,
+  businessId,
+  businessName,
+  searchZipCode,
+}: BusinessProfileDialogProps) {
   const [loading, setLoading] = useState(true)
   const [adDesign, setAdDesign] = useState<any>(null)
   const [businessData, setBusinessData] = useState<any>(null)
@@ -94,14 +100,21 @@ export function BusinessProfileDialog({ isOpen, onClose, businessId, businessNam
 
   useEffect(() => {
     if (isOpen && businessId) {
-      console.log(`BusinessProfileDialog opened for business ID: ${businessId}`)
-      // Track profile view
-      trackProfileView(businessId)
+      console.log(`🎬 BusinessProfileDialog opened for business ID: ${businessId}`)
+      console.log(`📍 Search zip code: ${searchZipCode}`)
+
+      // Get zip code from multiple sources
+      const zipCode = searchZipCode || getCurrentZipCode()
+      console.log(`📍 Final zip code for tracking: ${zipCode}`)
+
+      // Track profile view with zip code
+      trackProfileView(businessId, zipCode)
+
       loadBusinessData()
       loadBusinessAdDesign()
       loadBusinessVideo()
     }
-  }, [isOpen, businessId])
+  }, [isOpen, businessId, searchZipCode])
 
   useEffect(() => {
     // Close child dialogs when main dialog is closed

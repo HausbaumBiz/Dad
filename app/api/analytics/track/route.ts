@@ -1,33 +1,36 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { trackAnalyticsEvent, type AnalyticsEvent } from "@/app/actions/analytics-actions"
+import { trackAnalyticsEvent } from "@/app/actions/analytics-actions"
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { businessId, eventType } = body
+
+    const { businessId, eventType, zipCode, metadata } = body
 
     if (!businessId || !eventType) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+      return NextResponse.json(
+        { success: false, message: "Missing required fields: businessId, eventType" },
+        { status: 400 },
+      )
     }
 
-    // Get user agent and IP for tracking
-    const userAgent = request.headers.get("user-agent") || undefined
-    const forwarded = request.headers.get("x-forwarded-for")
-    const ipAddress = forwarded ? forwarded.split(",")[0] : request.ip || undefined
-
-    const event: AnalyticsEvent = {
+    const result = await trackAnalyticsEvent({
       businessId,
       eventType,
+      zipCode,
       timestamp: Date.now(),
-      userAgent,
-      ipAddress,
-    }
+      metadata,
+    })
 
-    await trackAnalyticsEvent(event)
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json(result)
   } catch (error) {
-    console.error("Error tracking analytics event:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Error in analytics track route:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 },
+    )
   }
 }

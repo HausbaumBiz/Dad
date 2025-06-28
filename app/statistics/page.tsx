@@ -1,13 +1,43 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Image from "next/image"
-import { useRouter } from "next/navigation"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { MapPin, RefreshCw } from "lucide-react"
+import { getBusinessAnalytics, resetBusinessAnalytics, type ZipCodeAnalytics } from "@/app/actions/analytics-actions"
+import { useToast } from "@/components/ui/use-toast"
+import Link from "next/link"
+
+// Mock business data - in real app this would come from auth/session
+const CURRENT_BUSINESS = {
+  id: "test-business-1",
+  name: "Elite Home Services",
+  category: "Home Improvement",
+}
+
+interface BusinessAnalytics {
+  businessId: string
+  totalEvents: number
+  profileViews: number
+  contactClicks: number
+  websiteClicks: number
+  phoneClicks: number
+  zipCodeAnalytics: ZipCodeAnalytics[]
+  lastUpdated: number
+}
+
+// import { useState, useEffect } from "react"
+import Image from "next/image"
+import { useRouter } from "next/navigation"
+// import { MainHeader } from "@/components/main-header"
+// import { MainFooter } from "@/components/main-footer"
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+// import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,13 +48,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import Link from "next/link"
-import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2, MapPin, Tag, RefreshCw } from "lucide-react"
+// import Link from "next/link"
+import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2, RotateCcwIcon } from "lucide-react"
 import type { CategorySelection } from "@/components/category-selector"
 import { getBusinessCategories, removeBusinessCategory } from "@/app/actions/category-actions"
-import { useToast } from "@/components/ui/use-toast"
+// import { useToast } from "@/components/ui/use-toast"
 import { getBusinessKeywords } from "@/app/actions/keyword-actions"
-import { Badge } from "@/components/ui/badge"
+// import { Badge } from "@/components/ui/badge"
 import {
   type JobListing,
   getBusinessJobs,
@@ -36,8 +66,14 @@ import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
 import { getBusinessCoupons, reinstateCoupon, type Coupon } from "@/app/actions/coupon-actions"
-import { getBusinessAnalytics, resetAllAnalytics, type AnalyticsData } from "@/app/actions/analytics-actions"
-import { Calendar, Clock, RotateCcw } from "lucide-react"
+// import {
+//   getBusinessAnalytics,
+//   resetAllAnalytics,
+//   type AnalyticsData,
+//   getBusinessZipCodeAnalytics,
+//   type ZipCodeAnalytics,
+// } from "@/app/actions/analytics-actions"
+import { Calendar, Clock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -48,6 +84,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { renderJobCategories } from "@/components/job-categories"
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D"]
 
@@ -112,9 +149,13 @@ export default function StatisticsPage() {
   const [renewingJob, setRenewingJob] = useState<string | null>(null)
 
   // Analytics state
-  const [clickAnalytics, setClickAnalytics] = useState<AnalyticsData | null>(null)
+  const [clickAnalytics, setClickAnalytics] = useState<BusinessAnalytics | null>(null)
   const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(true)
   const [isResettingAnalytics, setIsResettingAnalytics] = useState(false)
+
+  // Zip code analytics state
+  const [zipCodeAnalytics, setZipCodeAnalytics] = useState<ZipCodeAnalytics[]>([])
+  const [isZipCodeAnalyticsLoading, setIsZipCodeAnalyticsLoading] = useState(true)
 
   // Add these new state variables after the existing state declarations
   const [removingJobs, setRemovingJobs] = useState<Set<string>>(new Set())
@@ -131,6 +172,7 @@ export default function StatisticsPage() {
   useEffect(() => {
     async function loadAnalytics() {
       setIsAnalyticsLoading(true)
+      setIsZipCodeAnalyticsLoading(true)
       try {
         // Use the current business ID or a default
         let currentBusinessId = businessId
@@ -148,8 +190,13 @@ export default function StatisticsPage() {
           currentBusinessId = "demo-business"
         }
 
-        const result = await getBusinessAnalytics(currentBusinessId)
-        setClickAnalytics(result)
+        const [analyticsResult, zipCodeResult] = await Promise.all([
+          getBusinessAnalytics(currentBusinessId),
+          // getBusinessZipCodeAnalytics(currentBusinessId),
+        ])
+
+        setClickAnalytics(analyticsResult)
+        // setZipCodeAnalytics(zipCodeResult)
       } catch (error) {
         console.error("Error loading analytics:", error)
         toast({
@@ -159,11 +206,12 @@ export default function StatisticsPage() {
         })
       } finally {
         setIsAnalyticsLoading(false)
+        setIsZipCodeAnalyticsLoading(false)
       }
     }
 
     loadAnalytics()
-  }, [businessId])
+  }, [businessId, toast])
 
   // Handle analytics reset
   const handleResetAnalytics = async () => {
@@ -171,16 +219,19 @@ export default function StatisticsPage() {
 
     setIsResettingAnalytics(true)
     try {
-      await resetAllAnalytics()
+      await resetBusinessAnalytics(businessId)
       // Reset local state
       setClickAnalytics({
+        businessId: businessId,
+        totalEvents: 0,
         profileViews: 0,
-        photoAlbumClicks: 0,
-        couponClicks: 0,
-        jobClicks: 0,
-        phoneClicks: 0,
+        contactClicks: 0,
         websiteClicks: 0,
+        phoneClicks: 0,
+        zipCodeAnalytics: [],
+        lastUpdated: 0,
       })
+      setZipCodeAnalytics([])
       toast({
         title: "Success",
         description: "Analytics data has been reset",
@@ -253,7 +304,7 @@ export default function StatisticsPage() {
     }
 
     loadCategories()
-  }, [])
+  }, [toast])
 
   // Load keywords from server on component mount
   useEffect(() => {
@@ -277,7 +328,7 @@ export default function StatisticsPage() {
     }
 
     loadKeywords()
-  }, [])
+  }, [toast])
 
   // Load ZIP codes from server on component mount
   useEffect(() => {
@@ -302,7 +353,7 @@ export default function StatisticsPage() {
     }
 
     loadZipCodes()
-  }, [])
+  }, [toast])
 
   // Load job listings from server on component mount
   useEffect(() => {
@@ -343,7 +394,7 @@ export default function StatisticsPage() {
     }
 
     loadJobListings()
-  }, [])
+  }, [businessId, toast])
 
   // Load coupons from server on component mount
   useEffect(() => {
@@ -367,7 +418,7 @@ export default function StatisticsPage() {
     }
 
     loadCoupons()
-  }, [])
+  }, [toast])
 
   // Group categories by main category
   const groupedCategories = selectedCategories.reduce(
@@ -638,7 +689,7 @@ export default function StatisticsPage() {
               </>
             ) : (
               <>
-                <RotateCcw className="h-3 w-3 mr-1" />
+                <RotateCcwIcon className="h-3 w-3 mr-1" />
                 Renew Listing
               </>
             )}
@@ -732,7 +783,7 @@ export default function StatisticsPage() {
             onClick={() => handleReinstateCoupon(coupon)}
             className="text-xs px-2 py-1 h-auto"
           >
-            <RotateCcw className="h-3 w-3 mr-1" />
+            <RotateCcwIcon className="h-3 w-3 mr-1" />
             Reinstate
           </Button>
         </div>
@@ -884,17 +935,17 @@ export default function StatisticsPage() {
     },
     {
       title: "Coupons Clipped",
-      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.couponClicks?.toString() || "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.contactClicks?.toString() || "0",
       competitorStats: "37",
     },
     {
       title: "Job Opportunity Views",
-      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.jobClicks?.toString() || "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.contactClicks?.toString() || "0",
       competitorStats: "43",
     },
     {
       title: "Photo Album Views",
-      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.photoAlbumClicks?.toString() || "0",
+      yourStats: "Loading...",
       competitorStats: "89",
     },
     {
@@ -1010,24 +1061,6 @@ export default function StatisticsPage() {
         <Calendar className="h-3 w-3 mr-1" />
         {daysUntilExpiration} days left
       </span>
-    )
-  }
-
-  // Function to render job categories as badges
-  const renderJobCategories = (categories: string[]) => {
-    if (!categories || categories.length === 0) {
-      return <span className="text-xs text-gray-500 italic">No categories</span>
-    }
-
-    return (
-      <div className="flex flex-wrap gap-1 mt-1">
-        {categories.map((category, index) => (
-          <Badge key={index} variant="secondary" className="text-xs px-2 py-0.5">
-            <Tag className="h-3 w-3 mr-1" />
-            {category}
-          </Badge>
-        ))}
-      </div>
     )
   }
 
@@ -1421,20 +1454,103 @@ export default function StatisticsPage() {
 
           {/* Details Tab */}
           <TabsContent value="details">
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                <CardTitle className="text-teal-700">Detailed Analytics</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                <p>
-                  Add real-time updated pie chart of top 5 zip codes searches that lead to their page. Make suggestions
-                  of surrounding zip codes to add for more traffic.
-                </p>
-                <p>Add a line graph of interactions with the ad over time.</p>
-                <p>Bar graph of "Your Services" mostly searched.</p>
-                <p>Outside links that lead to the ad. Suggestions on where competitors are getting links.</p>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
+                  <CardTitle className="text-teal-700">Top ZIP Codes Leading to Profile Views</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {isZipCodeAnalyticsLoading ? (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <span className="ml-2">Loading ZIP code analytics...</span>
+                    </div>
+                  ) : zipCodeAnalytics.length > 0 ? (
+                    <div className="space-y-4">
+                      <p className="text-gray-600 mb-4">
+                        See which ZIP codes your customers are searching from when they view your business profile:
+                      </p>
+                      <div className="grid gap-3">
+                        {zipCodeAnalytics.slice(0, 10).map((zipData, index) => (
+                          <div
+                            key={zipData.zipCode}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center justify-center w-8 h-8 bg-teal-100 text-teal-700 rounded-full text-sm font-bold">
+                                {index + 1}
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-800">{zipData.zipCode}</span>
+                                {zipData.city && zipData.state && (
+                                  <span className="text-sm text-gray-500 ml-2">
+                                    {zipData.city}, {zipData.state}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600">
+                                {zipData.count} view{zipData.count !== 1 ? "s" : ""}
+                              </span>
+                              <div className="w-16 bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-teal-600 h-2 rounded-full"
+                                  style={{
+                                    width: `${Math.min((zipData.count / Math.max(...zipCodeAnalytics.map((z) => z.count))) * 100, 100)}%`,
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {zipCodeAnalytics.length > 10 && (
+                        <p className="text-sm text-gray-500 text-center mt-4">
+                          Showing top 10 of {zipCodeAnalytics.length} ZIP codes
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="flex justify-center mb-4">
+                        <MapPin className="h-12 w-12 text-gray-400" />
+                      </div>
+                      <p className="text-gray-500 mb-2">No ZIP code data available yet.</p>
+                      <p className="text-sm text-gray-400">
+                        ZIP code tracking will appear here once users start viewing your business profile.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
+                  <CardTitle className="text-blue-700">Test Zip Code Tracking</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <p className="text-gray-600">
+                      Test the zip code tracking functionality by simulating profile views from different locations:
+                    </p>
+                    <Button onClick={() => router.push("/test-zip-tracking")} className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Open Zip Code Tracking Test
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
+                  <CardTitle className="text-teal-700">Detailed Analytics</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <p className="text-gray-600">More detailed analytics features coming soon...</p>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Outreach Tab */}
@@ -1444,16 +1560,7 @@ export default function StatisticsPage() {
                 <CardTitle className="text-teal-700">Outreach Tools</CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <p className="mb-4">
-                  This section will provide tools to reach out to potential customers who have interacted with your
-                  content.
-                </p>
-                <ul className="list-disc pl-5 space-y-2">
-                  <li>Masked email of registered users that have interacted with your site</li>
-                  <li>Email output that sends messages to those email addresses</li>
-                  <li>Change/add/delete zip codes and services</li>
-                  <li>Directions on how to add links from other sites</li>
-                </ul>
+                <p className="text-gray-600">Outreach tools and features coming soon...</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1462,25 +1569,22 @@ export default function StatisticsPage() {
 
       <MainFooter />
 
-      {/* Confirmation Dialog for Category Removal */}
+      {/* Remove Category Dialog */}
       <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Category</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this category? This action cannot be undone.
+              Are you sure you want to remove this category? This action cannot be undone and will remove your business
+              from this category's search results.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmRemoveCategory}
-              disabled={isRemoving}
-              className="bg-red-500 hover:bg-red-600"
-            >
+            <AlertDialogAction onClick={confirmRemoveCategory} disabled={isRemoving}>
               {isRemoving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Removing...
                 </>
               ) : (
@@ -1491,78 +1595,56 @@ export default function StatisticsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Enhanced Job Removal Dialog */}
-      <Dialog open={showJobRemovalDetails} onOpenChange={setShowJobRemovalDetails}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-700">
-              <AlertCircle className="h-6 w-6" />
+      {/* Job Removal Details Dialog */}
+      <AlertDialog open={showJobRemovalDetails} onOpenChange={setShowJobRemovalDetails}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
               Remove Job Listing
-            </DialogTitle>
-            <DialogDescription>This will permanently remove the job listing from all locations.</DialogDescription>
-          </DialogHeader>
-
-          {jobRemovalDetails && (
-            <div className="py-4 space-y-4">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <h4 className="font-medium">{jobRemovalDetails.job.jobTitle}</h4>
-                <p className="text-sm text-gray-600">{jobRemovalDetails.job.businessName}</p>
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                  <span>{jobRemovalDetails.zipCodes} ZIP codes</span>
-                  <span>{jobRemovalDetails.categories} categories</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h5 className="font-medium text-sm">This will remove the job from:</h5>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  {jobRemovalDetails.willRemoveFrom.map((location, index) => (
-                    <li key={index} className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-red-400 rounded-full" />
-                      {location}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-sm text-amber-800">
-                  <strong>Note:</strong> You can undo this action for a short time after removal.
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>
+                  Are you sure you want to remove <strong>"{jobRemovalDetails?.job.jobTitle}"</strong>?
                 </p>
-              </div>
-            </div>
-          )}
 
-          <DialogFooter className="sm:justify-end">
-            <Button variant="outline" onClick={() => setShowJobRemovalDetails(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmRemoveJob} className="bg-red-600 hover:bg-red-700">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Remove Job Listing
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <h4 className="font-medium text-amber-800 mb-2">This will remove the job from:</h4>
+                  <ul className="text-sm text-amber-700 space-y-1">
+                    {jobRemovalDetails?.willRemoveFrom.map((location, index) => (
+                      <li key={index} className="flex items-center gap-2">
+                        <span className="w-1 h-1 bg-amber-600 rounded-full"></span>
+                        {location}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <p className="text-sm text-gray-600">This action cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemoveJob} className="bg-red-600 hover:bg-red-700">
+              Remove Job
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Reinstate Coupon Dialog */}
       <Dialog open={showReinstateDialog} onOpenChange={setShowReinstateDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-teal-700">
-              <RotateCcw className="h-6 w-6" />
-              Reinstate Coupon
-            </DialogTitle>
-            <DialogDescription>Set a new expiration date for this coupon to make it active again.</DialogDescription>
+            <DialogTitle>Reinstate Coupon</DialogTitle>
+            <DialogDescription>
+              Set a new expiration date for "{couponToReinstate?.title}" to make it active again.
+            </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            {couponToReinstate && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <h4 className="font-medium">{couponToReinstate.title}</h4>
-                <p className="text-sm text-gray-600">{couponToReinstate.discount}</p>
-              </div>
-            )}
-            <div className="space-y-2">
+          <div className="space-y-4">
+            <div>
               <Label htmlFor="newExpirationDate">New Expiration Date</Label>
               <Input
                 id="newExpirationDate"
@@ -1570,36 +1652,24 @@ export default function StatisticsPage() {
                 value={newExpirationDate}
                 onChange={(e) => setNewExpirationDate(e.target.value)}
                 min={new Date().toISOString().split("T")[0]}
-                required
               />
             </div>
           </div>
-          <DialogFooter className="sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowReinstateDialog(false)
-                setCouponToReinstate(null)
-                setNewExpirationDate("")
-              }}
-            >
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReinstateDialog(false)}>
               Cancel
             </Button>
             <Button
               onClick={confirmReinstateCoupon}
-              disabled={reinstatingCoupon === couponToReinstate?.id || !newExpirationDate}
-              className="bg-teal-600 hover:bg-teal-700"
+              disabled={!newExpirationDate || reinstatingCoupon === couponToReinstate?.id}
             >
               {reinstatingCoupon === couponToReinstate?.id ? (
                 <>
-                  <span className="mr-2">Reinstating...</span>
-                  <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Reinstating...
                 </>
               ) : (
-                <>
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Reinstate Coupon
-                </>
+                "Reinstate Coupon"
               )}
             </Button>
           </DialogFooter>

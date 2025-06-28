@@ -15,6 +15,14 @@ export const KEY_PREFIXES = {
   CATEGORY: "category:",
   ZIPCODE: "zipcode:",
   SERVICE: "service:",
+  ANALYTICS: "analytics:",
+  USER: "user:",
+  JOB: "job:",
+  COUPON: "coupon:",
+  MEDIA: "media:",
+  KEYWORD: "keyword:",
+  REVIEW: "review:",
+  SESSION: "session:",
 }
 
 // Category name mappings for consistent lookup
@@ -62,6 +70,125 @@ export interface ServiceAreaData {
   isNationwide: boolean
   radius?: number
   centralZip?: string
+}
+
+// Business data structure
+export interface BusinessData {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  address?: string
+  description?: string
+  categories?: CategoryData[]
+  keywords?: string[]
+  serviceArea?: ServiceAreaData
+  createdAt: string
+  updatedAt: string
+}
+
+// User data structure
+export interface UserData {
+  id: string
+  email: string
+  name?: string
+  phone?: string
+  createdAt: string
+  lastLogin?: string
+}
+
+// Analytics data structure
+export interface AnalyticsData {
+  businessId: string
+  eventType: string
+  timestamp: number
+  userAgent?: string
+  ipAddress?: string
+  zipCode?: string
+  metadata?: Record<string, any>
+}
+
+// Job listing data structure
+export interface JobData {
+  id: string
+  businessId: string
+  title: string
+  description: string
+  location: string
+  type: string
+  salary?: string
+  requirements?: string[]
+  benefits?: string[]
+  categories?: string[]
+  serviceArea?: ServiceAreaData
+  createdAt: string
+  expiresAt: string
+  isActive: boolean
+}
+
+// Coupon data structure
+export interface CouponData {
+  id: string
+  businessId: string
+  title: string
+  description: string
+  discount: string
+  startDate: string
+  expirationDate: string
+  isActive: boolean
+  usageCount: number
+  maxUsage?: number
+  createdAt: string
+}
+
+// Media data structure
+export interface MediaData {
+  id: string
+  businessId: string
+  type: "image" | "video"
+  url: string
+  cloudflareId?: string
+  filename: string
+  size: number
+  mimeType: string
+  tags?: string[]
+  folder?: string
+  createdAt: string
+}
+
+// ZIP code data structure
+export interface ZipCodeData {
+  zip: string
+  city?: string
+  state?: string
+  county?: string
+  latitude?: number
+  longitude?: number
+  population?: number
+}
+
+// Review data structure
+export interface ReviewData {
+  id: string
+  businessId: string
+  userId?: string
+  rating: number
+  title?: string
+  comment?: string
+  isVerified: boolean
+  createdAt: string
+  updatedAt?: string
+}
+
+// Session data structure
+export interface SessionData {
+  id: string
+  userId?: string
+  businessId?: string
+  type: "user" | "business"
+  createdAt: string
+  expiresAt: string
+  metadata?: Record<string, any>
 }
 
 /**
