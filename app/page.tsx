@@ -13,6 +13,7 @@ import { ZipCodeDialog } from "@/components/zip-code-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { UserMenu } from "@/components/user-menu"
 import { CategorySubcategories } from "@/components/category-subcategories"
+import { setCurrentZipCode } from "@/lib/analytics-utils"
 
 export default function HomePage() {
   const { toast } = useToast()
@@ -29,6 +30,8 @@ export default function HomePage() {
     if (savedZip) {
       setSavedZipCode(savedZip)
       setCategoriesActive(true)
+      // Also set this as the current ZIP code for analytics
+      setCurrentZipCode(savedZip)
     }
 
     // Check for registration success cookie
@@ -73,9 +76,34 @@ export default function HomePage() {
 
   const handleZipSubmit = () => {
     if (zipCode) {
+      // Validate ZIP code format
+      if (!/^\d{5}$/.test(zipCode)) {
+        toast({
+          title: "Invalid ZIP Code",
+          description: "Please enter a valid 5-digit ZIP code.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log(`🏠 User entered ZIP code: ${zipCode}`)
+
+      // Store in localStorage for persistence
       localStorage.setItem("savedZipCode", zipCode)
       setSavedZipCode(zipCode)
+
+      // Set as current ZIP code for analytics tracking
+      setCurrentZipCode(zipCode)
+
+      // Enable categories
       setCategoriesActive(true)
+
+      toast({
+        title: "ZIP Code Set",
+        description: `Now showing businesses in area ${zipCode}`,
+      })
+
+      console.log(`✅ ZIP code ${zipCode} saved and set for analytics tracking`)
     } else {
       alert("Please enter a Zip Code.")
     }
@@ -90,15 +118,26 @@ export default function HomePage() {
   }
 
   const handleZipDialogSubmit = (zipCodeValue: string) => {
+    console.log(`🏠 User entered ZIP code via dialog: ${zipCodeValue}`)
+
     setZipCode(zipCodeValue)
     localStorage.setItem("savedZipCode", zipCodeValue)
     setSavedZipCode(zipCodeValue)
+
+    // Set as current ZIP code for analytics tracking
+    setCurrentZipCode(zipCodeValue)
+
     setCategoriesActive(true)
 
     // If there was a selected category, navigate to it after setting the zip code
     if (selectedCategoryHref) {
-      window.location.href = selectedCategoryHref
+      // Add ZIP code as URL parameter for category pages
+      const url = new URL(selectedCategoryHref, window.location.origin)
+      url.searchParams.set("zip", zipCodeValue)
+      window.location.href = url.toString()
     }
+
+    console.log(`✅ ZIP code ${zipCodeValue} saved and set for analytics tracking`)
   }
 
   const handleSubcategorySelection = (categoryTitle: string, selected: string[]) => {
@@ -318,7 +357,7 @@ export default function HomePage() {
             <UserMenu userName={userName || undefined} />
 
             <div className="text-sm text-gray-600 mt-2">
-              <Button variant="outline" asChild className="text-sm">
+              <Button variant="outline" asChild className="text-sm bg-transparent">
                 <Link href="/business-portal" className="flex items-center">
                   Business Owner? Register or Login
                   <ChevronRight className="ml-1 h-4 w-4" />
@@ -454,6 +493,8 @@ export default function HomePage() {
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
                   className="w-full"
+                  maxLength={5}
+                  pattern="\d{5}"
                 />
               </div>
               <Button onClick={handleZipSubmit}>
@@ -473,7 +514,10 @@ export default function HomePage() {
                   key={index}
                   className="relative overflow-hidden rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105"
                 >
-                  <a href={category.href} onClick={(e) => handleCategoryClick(category.href, e)}>
+                  <a
+                    href={`${category.href}${savedZipCode ? `?zip=${savedZipCode}` : ""}`}
+                    onClick={(e) => handleCategoryClick(category.href, e)}
+                  >
                     <div className="aspect-[4/3] relative">
                       <Image
                         src={category.image || "/placeholder.svg"}
@@ -507,7 +551,11 @@ export default function HomePage() {
                 />
               </div>
               <CardContent className="p-4">
-                <a href={category.href} onClick={(e) => handleCategoryClick(category.href, e)} className="block">
+                <a
+                  href={`${category.href}${savedZipCode ? `?zip=${savedZipCode}` : ""}`}
+                  onClick={(e) => handleCategoryClick(category.href, e)}
+                  className="block"
+                >
                   <h3 className="text-lg font-medium text-center mb-2">{category.title}</h3>
                 </a>
 

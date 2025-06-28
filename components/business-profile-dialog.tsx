@@ -101,20 +101,46 @@ export function BusinessProfileDialog({
   useEffect(() => {
     if (isOpen && businessId) {
       console.log(`🎬 BusinessProfileDialog opened for business ID: ${businessId}`)
-      console.log(`📍 Search zip code: ${searchZipCode}`)
+      console.log(`📍 Search zip code prop: ${searchZipCode}`)
 
-      // Get zip code from multiple sources
-      const zipCode = searchZipCode || getCurrentZipCode()
+      // Get zip code from multiple sources, prioritizing the search ZIP code
+      let zipCode = searchZipCode || getCurrentZipCode()
+
+      // Also try to get from URL parameters if available
+      if (!zipCode && typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search)
+        zipCode = urlParams.get("zip") || urlParams.get("zipcode")
+      }
+
+      // Also try localStorage as fallback
+      if (!zipCode && typeof window !== "undefined") {
+        zipCode = localStorage.getItem("savedZipCode") || localStorage.getItem("currentSearchZip")
+      }
+
       console.log(`📍 Final zip code for tracking: ${zipCode}`)
 
-      // Track profile view with zip code
-      trackProfileView(businessId, zipCode)
+      // Track profile view with the determined zip code
+      if (zipCode) {
+        console.log(`📊 Tracking profile view for business ${businessId} from ZIP ${zipCode}`)
+        trackProfileView(businessId, zipCode, {
+          businessName,
+          timestamp: Date.now(),
+          source: searchZipCode ? "search_prop" : "detected",
+        })
+      } else {
+        console.log(`📊 Tracking profile view for business ${businessId} without ZIP code`)
+        trackProfileView(businessId, undefined, {
+          businessName,
+          timestamp: Date.now(),
+          source: "no_zip",
+        })
+      }
 
       loadBusinessData()
       loadBusinessAdDesign()
       loadBusinessVideo()
     }
-  }, [isOpen, businessId, searchZipCode])
+  }, [isOpen, businessId, searchZipCode, businessName])
 
   useEffect(() => {
     // Close child dialogs when main dialog is closed

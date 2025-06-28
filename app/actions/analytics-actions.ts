@@ -50,9 +50,14 @@ export async function trackAnalyticsEvent(event: AnalyticsEvent) {
         lastViewed: timestamp,
         city: metadata?.city || "",
         state: metadata?.state || "",
+        source: metadata?.source || "unknown",
+        testMode: metadata?.testMode || false,
       }
 
       await kv.set(zipMetaKey, JSON.stringify(zipMeta), { ex: 86400 * 30 }) // 30 days
+      console.log(`💾 Stored ZIP metadata for ${zipCode}:`, zipMeta)
+    } else if (zipCode) {
+      console.warn(`⚠️ Invalid ZIP code format: ${zipCode} (length: ${zipCode.length})`)
     }
 
     // Store recent event for debugging
@@ -62,6 +67,7 @@ export async function trackAnalyticsEvent(event: AnalyticsEvent) {
       zipCode,
       timestamp,
       metadata,
+      formattedTime: new Date(timestamp).toISOString(),
     }
 
     await kv.lpush(recentEventsKey, JSON.stringify(recentEvent))
@@ -293,5 +299,29 @@ export async function getRecentEvents(businessId: string, limit = 10) {
   } catch (error) {
     console.error("Error getting recent events:", error)
     return []
+  }
+}
+
+// Debug function to get all analytics data for a business
+export async function getDebugAnalytics(businessId: string) {
+  try {
+    const [analytics, recentEvents] = await Promise.all([
+      getBusinessAnalytics(businessId),
+      getRecentEvents(businessId, 20),
+    ])
+
+    return {
+      analytics,
+      recentEvents,
+      timestamp: new Date().toISOString(),
+    }
+  } catch (error) {
+    console.error("Error getting debug analytics:", error)
+    return {
+      analytics: null,
+      recentEvents: [],
+      error: error instanceof Error ? error.message : "Unknown error",
+      timestamp: new Date().toISOString(),
+    }
   }
 }

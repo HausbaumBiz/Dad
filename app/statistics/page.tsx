@@ -190,13 +190,11 @@ export default function StatisticsPage() {
           currentBusinessId = "demo-business"
         }
 
-        const [analyticsResult, zipCodeResult] = await Promise.all([
-          getBusinessAnalytics(currentBusinessId),
-          // getBusinessZipCodeAnalytics(currentBusinessId),
-        ])
+        const [analyticsResult] = await Promise.all([getBusinessAnalytics(currentBusinessId)])
 
         setClickAnalytics(analyticsResult)
-        // setZipCodeAnalytics(zipCodeResult)
+        // Set ZIP code analytics from the analytics result
+        setZipCodeAnalytics(analyticsResult.zipCodeAnalytics || [])
       } catch (error) {
         console.error("Error loading analytics:", error)
         toast({
