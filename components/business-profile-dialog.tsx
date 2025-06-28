@@ -97,6 +97,7 @@ export function BusinessProfileDialog({
   const [videoLoading, setVideoLoading] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [currentZipCode, setCurrentZipCode] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -118,6 +119,7 @@ export function BusinessProfileDialog({
       }
 
       console.log(`📍 Final zip code for tracking: ${zipCode}`)
+      setCurrentZipCode(zipCode)
 
       // Track profile view with the determined zip code
       if (zipCode) {
@@ -462,7 +464,11 @@ export function BusinessProfileDialog({
   // Function to handle phone call
   const handlePhoneCall = (phone: string) => {
     if (!phone) return
-    trackPhoneClick(businessId)
+    console.log(`📞 Tracking phone click for business ${businessId} from ZIP ${currentZipCode}`)
+    trackPhoneClick(businessId, currentZipCode, {
+      businessName,
+      timestamp: Date.now(),
+    })
     const phoneNumber = phone.replace(/\D/g, "")
     window.open(`tel:${phoneNumber}`)
   }
@@ -482,25 +488,45 @@ export function BusinessProfileDialog({
   // Function to handle website click
   const handleWebsiteClick = (website: string) => {
     if (!website) return
-    trackWebsiteClick(businessId)
+    console.log(`🌐 Tracking website click for business ${businessId} from ZIP ${currentZipCode}`)
+    trackWebsiteClick(businessId, currentZipCode, {
+      businessName,
+      website,
+      timestamp: Date.now(),
+    })
     window.open(`https://${website}`, "_blank")
   }
 
   // Function to handle photo album click
   const handlePhotoAlbumClick = () => {
-    trackPhotoAlbumClick(businessId)
+    console.log(`📸 Tracking photo album click for business ${businessId} from ZIP ${currentZipCode}`)
+    trackPhotoAlbumClick(businessId, currentZipCode, {
+      businessName,
+      timestamp: Date.now(),
+      source: "profile_dialog",
+    })
     setIsPhotoAlbumOpen(true)
   }
 
   // Function to handle coupons click
   const handleCouponsClick = () => {
-    trackCouponClick(businessId)
+    console.log(`🎫 Tracking coupon click for business ${businessId} from ZIP ${currentZipCode}`)
+    trackCouponClick(businessId, currentZipCode, {
+      businessName,
+      timestamp: Date.now(),
+      source: "profile_dialog",
+    })
     setIsCouponsOpen(true)
   }
 
   // Function to handle jobs click
   const handleJobsClick = () => {
-    trackJobClick(businessId)
+    console.log(`💼 Tracking job click for business ${businessId} from ZIP ${currentZipCode}`)
+    trackJobClick(businessId, currentZipCode, {
+      businessName,
+      timestamp: Date.now(),
+      source: "profile_dialog",
+    })
     setIsJobsOpen(true)
   }
 

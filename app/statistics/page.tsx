@@ -26,6 +26,9 @@ interface BusinessAnalytics {
   contactClicks: number
   websiteClicks: number
   phoneClicks: number
+  photoAlbumClicks: number
+  couponClicks: number
+  jobClicks: number
   zipCodeAnalytics: ZipCodeAnalytics[]
   lastUpdated: number
 }
@@ -226,6 +229,9 @@ export default function StatisticsPage() {
         contactClicks: 0,
         websiteClicks: 0,
         phoneClicks: 0,
+        photoAlbumClicks: 0,
+        couponClicks: 0,
+        jobClicks: 0,
         zipCodeAnalytics: [],
         lastUpdated: 0,
       })
@@ -919,7 +925,7 @@ export default function StatisticsPage() {
     },
   ]
 
-  // Updated clicks statistics with real data
+  // Updated clicks statistics with real data including photo album views
   const clicksStats = [
     {
       title: "Profile Views",
@@ -932,19 +938,19 @@ export default function StatisticsPage() {
       competitorStats: "124",
     },
     {
+      title: "Photo Album Views",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.photoAlbumClicks?.toString() || "0",
+      competitorStats: "89",
+    },
+    {
       title: "Coupons Clipped",
-      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.contactClicks?.toString() || "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.couponClicks?.toString() || "0",
       competitorStats: "37",
     },
     {
       title: "Job Opportunity Views",
-      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.contactClicks?.toString() || "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.jobClicks?.toString() || "0",
       competitorStats: "43",
-    },
-    {
-      title: "Photo Album Views",
-      yourStats: "Loading...",
-      competitorStats: "89",
     },
     {
       title: "Phone Number Clicks",
@@ -1221,31 +1227,28 @@ export default function StatisticsPage() {
                     <span className="ml-2">Loading your service area...</span>
                   </div>
                 ) : isNationwide ? (
-                  <div className="text-center py-4">
-                    <Badge className="px-3 py-1.5 text-sm bg-green-100 text-green-800 hover:bg-green-100">
-                      Nationwide Service
-                    </Badge>
-                    <p className="mt-2 text-gray-600">Your business serves customers nationwide</p>
+                  <div className="text-center py-8">
+                    <div className="flex justify-center mb-4">
+                      <MapPin className="h-12 w-12 text-green-500" />
+                    </div>
+                    <p className="text-lg font-medium text-green-700">Nationwide Service</p>
+                    <p className="text-gray-500">You serve customers across the entire United States</p>
                   </div>
                 ) : zipCodes.length > 0 ? (
-                  <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <MapPin className="h-5 w-5 text-teal-600" />
-                      <h3 className="font-medium">Your service covers {zipCodes.length} ZIP codes</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-600">
+                        You serve <span className="font-medium">{zipCodes.length}</span> ZIP code
+                        {zipCodes.length !== 1 ? "s" : ""}
+                      </p>
                     </div>
-                    <div className="max-h-60 overflow-y-auto p-2 border rounded-lg">
-                      <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                        {zipCodes.map((zip) => (
-                          <li key={zip.zip} className="px-3 py-2 bg-gray-50 rounded text-sm">
-                            <span className="font-medium">{zip.zip}</span>
-                            {zip.city && zip.state && (
-                              <span className="text-xs text-gray-500 block truncate">
-                                {zip.city}, {zip.state}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                      {zipCodes.map((zipCode, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+                          <span className="font-mono">{zipCode.zipCode}</span>
+                          <span className="text-xs text-gray-500">0 views</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ) : (
@@ -1256,7 +1259,7 @@ export default function StatisticsPage() {
                     <p className="text-gray-500 mb-4">No service area defined yet.</p>
                     <Button onClick={() => router.push("/business-focus")} className="flex items-center gap-2">
                       <PlusCircle className="h-4 w-4" />
-                      Define Service Area
+                      Set Service Area
                     </Button>
                   </div>
                 )}
@@ -1274,7 +1277,7 @@ export default function StatisticsPage() {
                 >
                   <PlusCircle className="h-4 w-4" />
                   <span className="hidden sm:inline">Add Job Listing</span>
-                  <span className="sm:hidden">Add</span>
+                  <span className="sm:hidden">Add Job</span>
                 </Button>
               </CardHeader>
               <CardContent className="pt-6">
@@ -1284,7 +1287,7 @@ export default function StatisticsPage() {
                     <span className="ml-2">Loading your job listings...</span>
                   </div>
                 ) : jobListings.length > 0 ? (
-                  <div className="space-y-4">{jobListings.map(renderJobListingCard)}</div>
+                  <div className="space-y-3">{jobListings.map((job) => renderJobListingCard(job))}</div>
                 ) : (
                   <div className="text-center py-8">
                     <div className="flex justify-center mb-4">
@@ -1310,8 +1313,8 @@ export default function StatisticsPage() {
                   className="flex items-center gap-1"
                 >
                   <PlusCircle className="h-4 w-4" />
-                  <span className="hidden sm:inline">Manage Coupons</span>
-                  <span className="sm:hidden">Manage</span>
+                  <span className="hidden sm:inline">Create Coupon</span>
+                  <span className="sm:hidden">Create</span>
                 </Button>
               </CardHeader>
               <CardContent className="pt-6">
@@ -1321,15 +1324,13 @@ export default function StatisticsPage() {
                     <span className="ml-2">Loading your coupons...</span>
                   </div>
                 ) : coupons.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {coupons.map((coupon) => (
-                      <div key={coupon.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <div key={coupon.id} className="flex justify-between items-start p-4 bg-gray-50 rounded-lg">
                         <div className="flex-1">
                           <h3 className="font-medium text-gray-800">{coupon.title}</h3>
-                          <p className="text-sm text-gray-600">{coupon.discount}</p>
-                          <p className="text-xs text-gray-500">
-                            Valid: {formatDate(coupon.startDate)} - {formatDate(coupon.expirationDate)}
-                          </p>
+                          <p className="text-sm text-gray-600 mt-1">{coupon.description}</p>
+                          <p className="text-xs text-gray-500 mt-1">Expires: {formatDate(coupon.expirationDate)}</p>
                         </div>
                         <div className="ml-4">{renderCouponStatus(coupon)}</div>
                       </div>
@@ -1349,216 +1350,195 @@ export default function StatisticsPage() {
                 )}
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                <CardTitle className="text-teal-700">Awards</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <h3 className="text-lg font-medium mb-4 text-center">Unlocked Awards Appear in Gold</h3>
-                <div className="flex flex-wrap justify-center gap-6 mb-8">
-                  {awards.map((award) => (
-                    <div key={award.id} className="flex flex-col items-center">
-                      <div
-                        className={`relative w-24 h-24 md:w-32 md:h-32 ${award.unlocked ? "" : "filter grayscale opacity-60"} transition-all hover:scale-105`}
-                      >
-                        <Image
-                          src={award.image || "/placeholder.svg"}
-                          alt={award.name}
-                          fill
-                          className="object-contain"
-                        />
-                      </div>
-                      <span className="text-xs mt-2 text-center text-gray-600 max-w-[100px]">{award.name}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-center mt-6">
-                  <Link href="/awards-explained">
-                    <Button className="bg-amber-400 hover:bg-amber-500 text-black font-medium">Awards Explained</Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                <CardTitle className="text-teal-700">Your Customer Ratings</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-6">
-                  {ratings.map((item, index) => (
-                    <div key={index} className="border-b pb-4 last:border-0 last:pb-0">
-                      <h3 className="text-lg font-medium mb-2">{item.question}</h3>
-                      <p>
-                        Your average rating is: <span className="text-red-500 font-medium">{item.rating}</span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Clicks Tab */}
           <TabsContent value="clicks" className="space-y-6">
-            <div className="max-w-4xl mx-auto">
-              {/* Analytics Reset Button */}
-              <div className="flex justify-end mb-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleResetAnalytics}
-                  disabled={isResettingAnalytics}
-                  className="flex items-center gap-2 bg-transparent"
-                >
-                  {isResettingAnalytics ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Resetting...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4" />
-                      Reset Analytics
-                    </>
-                  )}
-                </Button>
-              </div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Click Analytics</h2>
+              <Button
+                variant="outline"
+                onClick={handleResetAnalytics}
+                disabled={isResettingAnalytics}
+                className="flex items-center gap-2 bg-transparent"
+              >
+                {isResettingAnalytics ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Reset Analytics
+              </Button>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {clicksStats.map((stat, index) => (
-                <Card key={index} className="mb-4">
-                  <CardHeader
-                    className={`${index % 2 === 0 ? "bg-gradient-to-r from-teal-50 to-teal-100" : "bg-white"} border-b`}
-                  >
-                    <CardTitle className="text-teal-700">{stat.title}</CardTitle>
+                <Card key={index}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">{stat.title}</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="text-gray-700 font-medium">Your Stats:</p>
-                        <p className="text-2xl font-bold text-teal-600">{stat.yourStats}</p>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Your Stats:</span>
+                        <span className="text-2xl font-bold text-blue-600">{stat.yourStats}</span>
                       </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="text-gray-700 font-medium">Your Leading Competitor's Stats:</p>
-                        <p className="text-2xl font-bold text-gray-600">{stat.competitorStats}</p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Competitor Average:</span>
+                        <span className="text-lg font-medium text-gray-500">{stat.competitorStats}</span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
+
+            {/* Total Events Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Analytics Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {isAnalyticsLoading ? "..." : clickAnalytics?.totalEvents || 0}
+                    </div>
+                    <div className="text-sm text-gray-600">Total Events</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {isAnalyticsLoading ? "..." : clickAnalytics?.profileViews || 0}
+                    </div>
+                    <div className="text-sm text-gray-600">Profile Views</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {isAnalyticsLoading ? "..." : clickAnalytics?.photoAlbumClicks || 0}
+                    </div>
+                    <div className="text-sm text-gray-600">Photo Album Views</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {isAnalyticsLoading
+                        ? "..."
+                        : (clickAnalytics?.phoneClicks || 0) + (clickAnalytics?.websiteClicks || 0)}
+                    </div>
+                    <div className="text-sm text-gray-600">Contact Actions</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Details Tab */}
-          <TabsContent value="details">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                  <CardTitle className="text-teal-700">Top ZIP Codes Leading to Profile Views</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  {isZipCodeAnalyticsLoading ? (
-                    <div className="flex justify-center items-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      <span className="ml-2">Loading ZIP code analytics...</span>
-                    </div>
-                  ) : zipCodeAnalytics.length > 0 ? (
-                    <div className="space-y-4">
-                      <p className="text-gray-600 mb-4">
-                        See which ZIP codes your customers are searching from when they view your business profile:
-                      </p>
-                      <div className="grid gap-3">
-                        {zipCodeAnalytics.slice(0, 10).map((zipData, index) => (
-                          <div
-                            key={zipData.zipCode}
-                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center justify-center w-8 h-8 bg-teal-100 text-teal-700 rounded-full text-sm font-bold">
-                                {index + 1}
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-800">{zipData.zipCode}</span>
-                                {zipData.city && zipData.state && (
-                                  <span className="text-sm text-gray-500 ml-2">
-                                    {zipData.city}, {zipData.state}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600">
-                                {zipData.count} view{zipData.count !== 1 ? "s" : ""}
-                              </span>
-                              <div className="w-16 bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-teal-600 h-2 rounded-full"
-                                  style={{
-                                    width: `${Math.min((zipData.count / Math.max(...zipCodeAnalytics.map((z) => z.count))) * 100, 100)}%`,
-                                  }}
-                                ></div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      {zipCodeAnalytics.length > 10 && (
-                        <p className="text-sm text-gray-500 text-center mt-4">
-                          Showing top 10 of {zipCodeAnalytics.length} ZIP codes
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="flex justify-center mb-4">
-                        <MapPin className="h-12 w-12 text-gray-400" />
-                      </div>
-                      <p className="text-gray-500 mb-2">No ZIP code data available yet.</p>
-                      <p className="text-sm text-gray-400">
-                        ZIP code tracking will appear here once users start viewing your business profile.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
-                  <CardTitle className="text-blue-700">Test Zip Code Tracking</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    <p className="text-gray-600">
-                      Test the zip code tracking functionality by simulating profile views from different locations:
-                    </p>
-                    <Button onClick={() => router.push("/test-zip-tracking")} className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      Open Zip Code Tracking Test
-                    </Button>
+          <TabsContent value="details" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>ZIP Code Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isZipCodeAnalyticsLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2">Loading ZIP code analytics...</span>
                   </div>
-                </CardContent>
-              </Card>
+                ) : zipCodeAnalytics.length > 0 ? (
+                  <div className="space-y-3">
+                    {zipCodeAnalytics.map((zipData, index) => (
+                      <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <span className="font-mono font-medium">{zipData.zipCode}</span>
+                          {zipData.city && zipData.state && (
+                            <span className="text-sm text-gray-600 ml-2">
+                              ({zipData.city}, {zipData.state})
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium">{zipData.count} views</div>
+                          {zipData.lastViewed && (
+                            <div className="text-xs text-gray-500">
+                              Last: {new Date(zipData.lastViewed).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No ZIP code analytics data available yet.</p>
+                    <p className="text-sm text-gray-400 mt-2">
+                      Data will appear here when users view your business profile from different locations.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                  <CardTitle className="text-teal-700">Detailed Analytics</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <p className="text-gray-600">More detailed analytics features coming soon...</p>
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer Ratings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {ratings.map((rating, index) => (
+                    <div key={index} className="border-b pb-4 last:border-b-0">
+                      <p className="text-sm text-gray-700 mb-2">{rating.question}</p>
+                      <p className="font-medium text-gray-900">{rating.rating}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Awards & Achievements</CardTitle>
+                <Link href="/awards-explained" className="text-sm text-blue-600 hover:underline">
+                  How awards work
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {awards.map((award) => (
+                    <div key={award.id} className="text-center">
+                      <div className={`relative ${award.unlocked ? "" : "opacity-30"}`}>
+                        <Image
+                          src={award.image || "/placeholder.svg"}
+                          alt={award.name}
+                          width={80}
+                          height={80}
+                          className="mx-auto mb-2"
+                        />
+                        {!award.unlocked && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="bg-gray-800 bg-opacity-75 text-white text-xs px-2 py-1 rounded">Locked</div>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm font-medium">{award.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Outreach Tab */}
-          <TabsContent value="outreach">
+          <TabsContent value="outreach" className="space-y-6">
             <Card>
-              <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 border-b">
-                <CardTitle className="text-teal-700">Outreach Tools</CardTitle>
+              <CardHeader>
+                <CardTitle>Outreach Opportunities</CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
-                <p className="text-gray-600">Outreach tools and features coming soon...</p>
+              <CardContent>
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Outreach features coming soon!</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    This section will help you connect with potential customers in your area.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1567,14 +1547,14 @@ export default function StatisticsPage() {
 
       <MainFooter />
 
-      {/* Remove Category Dialog */}
+      {/* Remove Category Confirmation Dialog */}
       <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Category</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to remove this category? This action cannot be undone and will remove your business
-              from this category's search results.
+              from this category's listings.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1602,13 +1582,12 @@ export default function StatisticsPage() {
               Remove Job Listing
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <p>
-                  Are you sure you want to remove <strong>"{jobRemovalDetails?.job.jobTitle}"</strong>?
+                  You're about to remove <strong>"{jobRemovalDetails?.job.jobTitle}"</strong>
                 </p>
-
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <h4 className="font-medium text-amber-800 mb-2">This will remove the job from:</h4>
+                  <p className="text-sm font-medium text-amber-800 mb-2">This will remove the job from:</p>
                   <ul className="text-sm text-amber-700 space-y-1">
                     {jobRemovalDetails?.willRemoveFrom.map((location, index) => (
                       <li key={index} className="flex items-center gap-2">
@@ -1618,7 +1597,6 @@ export default function StatisticsPage() {
                     ))}
                   </ul>
                 </div>
-
                 <p className="text-sm text-gray-600">This action cannot be undone.</p>
               </div>
             </AlertDialogDescription>

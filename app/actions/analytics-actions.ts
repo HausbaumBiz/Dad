@@ -4,7 +4,14 @@ import { kv } from "@/lib/redis"
 
 export interface AnalyticsEvent {
   businessId: string
-  eventType: "profile_view" | "contact_click" | "website_click" | "phone_click"
+  eventType:
+    | "profile_view"
+    | "contact_click"
+    | "website_click"
+    | "phone_click"
+    | "photo_album_click"
+    | "coupon_click"
+    | "job_click"
   zipCode?: string
   timestamp: number
   metadata?: Record<string, any>
@@ -171,6 +178,9 @@ export async function getBusinessAnalytics(businessId: string) {
       contactClicks: Number.parseInt(eventsData?.contact_click?.toString() || "0"),
       websiteClicks: Number.parseInt(eventsData?.website_click?.toString() || "0"),
       phoneClicks: Number.parseInt(eventsData?.phone_click?.toString() || "0"),
+      photoAlbumClicks: Number.parseInt(eventsData?.photo_album_click?.toString() || "0"),
+      couponClicks: Number.parseInt(eventsData?.coupon_click?.toString() || "0"),
+      jobClicks: Number.parseInt(eventsData?.job_click?.toString() || "0"),
       zipCodeAnalytics,
       lastUpdated: Date.now(),
     }
@@ -186,6 +196,9 @@ export async function getBusinessAnalytics(businessId: string) {
       contactClicks: 0,
       websiteClicks: 0,
       phoneClicks: 0,
+      photoAlbumClicks: 0,
+      couponClicks: 0,
+      jobClicks: 0,
       zipCodeAnalytics: [],
       lastUpdated: Date.now(),
     }
