@@ -11,7 +11,15 @@ export interface Review {
   businessId: string
   userId: string
   userName: string
-  rating: number
+  ratings: {
+    serviceQuality: number
+    costTransparency: number
+    communication: number
+    expertise: number
+    dependability: number
+    professionalism: number
+  }
+  overallRating: number
   comment: string
   date: string
   verified: boolean
@@ -19,7 +27,14 @@ export interface Review {
 
 interface ReviewSubmission {
   businessId: string
-  rating: number
+  ratings: {
+    serviceQuality: number
+    costTransparency: number
+    communication: number
+    expertise: number
+    dependability: number
+    professionalism: number
+  }
   comment: string
 }
 
@@ -39,13 +54,18 @@ export async function submitReview(data: ReviewSubmission) {
       return { success: false, message: "User not found" }
     }
 
+    // Calculate overall rating as average of all ratings
+    const ratingsArray = Object.values(data.ratings)
+    const overallRating = ratingsArray.reduce((sum, rating) => sum + rating, 0) / ratingsArray.length
+
     // Create review object
     const review: Review = {
       id: uuidv4(),
       businessId: data.businessId,
       userId: userId,
       userName: `${user.firstName} ${user.lastName.charAt(0)}.`, // Show first name and last initial for privacy
-      rating: data.rating,
+      ratings: data.ratings,
+      overallRating: Math.round(overallRating * 10) / 10, // Round to 1 decimal place
       comment: data.comment,
       date: new Date().toISOString(),
       verified: true, // User is logged in, so we mark as verified
@@ -99,6 +119,22 @@ export async function getBusinessReviews(businessId: string): Promise<Review[]> 
 
         // Parse the review data
         const review = JSON.parse(reviewString) as Review
+
+        // Handle legacy reviews that might not have the new structure
+        if (!review.ratings) {
+          // Convert old single rating to new structure
+          const oldRating = (review as any).rating || 5
+          review.ratings = {
+            serviceQuality: oldRating,
+            costTransparency: oldRating,
+            communication: oldRating,
+            expertise: oldRating,
+            dependability: oldRating,
+            professionalism: oldRating,
+          }
+          review.overallRating = oldRating
+        }
+
         reviews.push(review)
       } catch (err) {
         console.error(`Error parsing review ${id}:`, err)
@@ -123,8 +159,8 @@ async function updateBusinessRating(businessId: string) {
       return
     }
 
-    // Calculate average rating
-    const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0)
+    // Calculate average rating using overall ratings
+    const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
     const averageRating = totalRating / reviews.length
 
     // Check if the business exists and what type it is

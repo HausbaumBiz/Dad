@@ -9,6 +9,7 @@ import { ReviewForm } from "@/components/review-form"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { StarRating } from "./star-rating"
+import { Star } from "lucide-react"
 
 interface ReviewsDialogProps {
   isOpen: boolean
@@ -16,6 +17,15 @@ interface ReviewsDialogProps {
   providerName: string
   businessId: string
   reviews?: any[]
+}
+
+const questionLabels = {
+  serviceQuality: "Service Quality",
+  costTransparency: "Cost Transparency",
+  communication: "Communication",
+  expertise: "Expertise",
+  dependability: "Dependability",
+  professionalism: "Professionalism",
 }
 
 export function ReviewsDialog({ isOpen, onClose, providerName, businessId, reviews = [] }: ReviewsDialogProps) {
@@ -105,7 +115,7 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent
-          className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto"
+          className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto"
           aria-describedby="reviews-dialog-description"
         >
           <DialogHeader>
@@ -137,12 +147,16 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
               ) : displayReviews.length > 0 ? (
                 <div className="space-y-6">
                   {displayReviews.map((review, index) => (
-                    <div key={review.id || index} className="border-b pb-4 last:border-b-0">
-                      <div className="flex justify-between items-start">
+                    <div key={review.id || index} className="border-b pb-6 last:border-b-0">
+                      <div className="flex justify-between items-start mb-4">
                         <div>
                           <p className="font-semibold">{review.userName || "Anonymous"}</p>
                           <div className="flex items-center mt-1">
-                            <StarRating rating={review.rating} />
+                            <StarRating rating={review.overallRating || review.rating || 0} />
+                            <span className="text-sm text-gray-500 ml-2">
+                              Overall: {(review.overallRating || review.rating || 0).toFixed(1)} stars
+                            </span>
+                            <span className="text-sm text-gray-500 ml-2">•</span>
                             <span className="text-sm text-gray-500 ml-2">
                               {new Date(review.date).toLocaleDateString()}
                             </span>
@@ -152,7 +166,37 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
                           <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Verified</span>
                         )}
                       </div>
-                      <p className="mt-3 text-gray-700">{review.comment}</p>
+
+                      {/* Detailed ratings if available */}
+                      {review.ratings && (
+                        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                          <h4 className="text-sm font-medium mb-2">Detailed Ratings:</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                            {Object.entries(review.ratings).map(([key, rating]) => (
+                              <div key={key} className="flex justify-between items-center">
+                                <span className="text-gray-600">
+                                  {questionLabels[key as keyof typeof questionLabels]}:
+                                </span>
+                                <div className="flex items-center">
+                                  <div className="flex">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <Star
+                                        key={star}
+                                        className={`h-3 w-3 ${
+                                          star <= rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <span className="ml-1 text-xs">({rating})</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <p className="text-gray-700">{review.comment}</p>
                     </div>
                   ))}
                 </div>
