@@ -421,12 +421,14 @@ export async function registerBusiness(formData: FormData) {
   }
 }
 
-// Login a business
+// Login a business - FIXED VERSION
 export async function loginBusiness(formData: FormData) {
   try {
     const email = (formData.get("email") as string).toLowerCase()
     const password = formData.get("password") as string
     const rememberMe = formData.get("rememberMe") === "on"
+
+    console.log(`Login attempt for email: ${email}`)
 
     // Validate form data
     if (!email || !password) {
@@ -434,20 +436,92 @@ export async function loginBusiness(formData: FormData) {
     }
 
     // Get business ID by email
-    const businessId = await kv.get(`${KEY_PREFIXES.BUSINESS_EMAIL}${email}`)
+    let businessId: string | null = null
+    try {
+      const businessIdResult = await kv.get(`${KEY_PREFIXES.BUSINESS_EMAIL}${email}`)
+      console.log(`Business ID lookup result:`, businessIdResult, typeof businessIdResult)
+
+      if (businessIdResult) {
+        if (typeof businessIdResult === "string") {
+          businessId = businessIdResult
+        } else if (typeof businessIdResult === "object" && businessIdResult !== null) {
+          // Handle case where Redis returns an object instead of string
+          businessId = String(businessIdResult)
+        }
+      }
+    } catch (error) {
+      console.error("Error looking up business by email:", getErrorMessage(error))
+      return { success: false, message: "Login failed. Please try again." }
+    }
+
     if (!businessId) {
+      console.log(`No business found for email: ${email}`)
       return { success: false, message: "Invalid email or password" }
     }
 
-    // Get business by ID
-    const business = (await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)) as Business
-    if (!business) {
+    console.log(`Found business ID: ${businessId}`)
+
+    // Get business by ID with enhanced error handling
+    let businessData: any = null
+    try {
+      businessData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
+      console.log(`Business data type:`, typeof businessData)
+      console.log(`Business data is array:`, Array.isArray(businessData))
+    } catch (error) {
+      console.error("Error fetching business data:", getErrorMessage(error))
+      return { success: false, message: "Login failed. Please try again." }
+    }
+
+    if (!businessData) {
+      console.log(`No business data found for ID: ${businessId}`)
       return { success: false, message: "Invalid email or password" }
+    }
+
+    // Handle different data types that might come from Redis
+    let business: any = null
+
+    if (typeof businessData === "string") {
+      try {
+        business = JSON.parse(businessData)
+        console.log("Parsed business data from string")
+      } catch (parseError) {
+        console.error("Failed to parse business data string:", getErrorMessage(parseError))
+        return { success: false, message: "Login failed. Please try again." }
+      }
+    } else if (Array.isArray(businessData)) {
+      console.error("Business data is unexpectedly an array:", businessData)
+      return { success: false, message: "Login failed. Please try again." }
+    } else if (businessData && typeof businessData === "object") {
+      business = businessData
+      console.log("Using business data object directly")
+    } else {
+      console.error("Business data is unexpected type:", typeof businessData)
+      return { success: false, message: "Login failed. Please try again." }
+    }
+
+    // Validate that business is a proper object
+    if (!business || typeof business !== "object" || Array.isArray(business)) {
+      console.error("Business is not a valid object:", typeof business, Array.isArray(business))
+      return { success: false, message: "Login failed. Please try again." }
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, business.passwordHash || "")
+    const storedPasswordHash = business.passwordHash
+    if (!storedPasswordHash || typeof storedPasswordHash !== "string") {
+      console.error("No valid password hash found for business")
+      return { success: false, message: "Invalid email or password" }
+    }
+
+    let isPasswordValid = false
+    try {
+      isPasswordValid = await bcrypt.compare(password, storedPasswordHash)
+    } catch (error) {
+      console.error("Error comparing passwords:", getErrorMessage(error))
+      return { success: false, message: "Login failed. Please try again." }
+    }
+
     if (!isPasswordValid) {
+      console.log("Password verification failed")
       return { success: false, message: "Invalid email or password" }
     }
 
@@ -457,14 +531,19 @@ export async function loginBusiness(formData: FormData) {
     }
 
     // Set cookie with business ID
-    cookies().set("businessId", business.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7, // 30 days if remember me, otherwise 7 days
-      path: "/",
-    })
+    try {
+      cookies().set("businessId", businessId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7, // 30 days if remember me, otherwise 7 days
+        path: "/",
+      })
+    } catch (error) {
+      console.error("Error setting cookie:", getErrorMessage(error))
+      return { success: false, message: "Login failed. Please try again." }
+    }
 
-    console.log(`Business logged in: ${business.businessName} (${business.id})`)
+    console.log(`Business logged in successfully: ${business.businessName || "Unknown"} (${businessId})`)
 
     // Return success with redirect URL instead of directly redirecting
     return {

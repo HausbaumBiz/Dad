@@ -33,14 +33,8 @@ interface BusinessAnalytics {
   lastUpdated: number
 }
 
-// import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-// import { MainHeader } from "@/components/main-header"
-// import { MainFooter } from "@/components/main-footer"
-// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-// import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,13 +45,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-// import Link from "next/link"
 import { Loader2, PlusCircle, X, Edit, AlertCircle, Trash2, RotateCcwIcon } from "lucide-react"
 import type { CategorySelection } from "@/components/category-selector"
 import { getBusinessCategories, removeBusinessCategory } from "@/app/actions/category-actions"
-// import { useToast } from "@/components/ui/use-toast"
 import { getBusinessKeywords } from "@/app/actions/keyword-actions"
-// import { Badge } from "@/components/ui/badge"
 import {
   type JobListing,
   getBusinessJobs,
@@ -69,13 +60,6 @@ import { getBusinessZipCodes } from "@/app/actions/zip-code-actions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
 import { getBusinessCoupons, reinstateCoupon, type Coupon } from "@/app/actions/coupon-actions"
-// import {
-//   getBusinessAnalytics,
-//   resetAllAnalytics,
-//   type AnalyticsData,
-//   getBusinessZipCodeAnalytics,
-//   type ZipCodeAnalytics,
-// } from "@/app/actions/analytics-actions"
 import { Calendar, Clock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1242,10 +1226,17 @@ export default function StatisticsPage() {
                         {zipCodes.length !== 1 ? "s" : ""}
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                       {zipCodes.map((zipCode, index) => (
                         <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                          <span className="font-mono">{zipCode.zipCode}</span>
+                          <div className="flex flex-col">
+                            <span className="font-mono font-medium">{zipCode.zip}</span>
+                            {zipCode.city && zipCode.state && (
+                              <span className="text-xs text-gray-500">
+                                {zipCode.city}, {zipCode.state}
+                              </span>
+                            )}
+                          </div>
                           <span className="text-xs text-gray-500">0 views</span>
                         </div>
                       ))}

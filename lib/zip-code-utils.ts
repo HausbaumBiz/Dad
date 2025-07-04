@@ -9,6 +9,9 @@ export interface ZipCodeData {
   longitude: number
   city?: string
   state?: string
+  county?: string
+  country?: string
+  distance?: number
 }
 
 /**
@@ -20,6 +23,12 @@ export interface ZipCodeData {
  * @returns Distance in miles
  */
 export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  // Validate input parameters
+  if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) {
+    console.error("Invalid coordinates provided to haversineDistance:", { lat1, lon1, lat2, lon2 })
+    return 0
+  }
+
   // Earth's radius in miles
   const R = 3958.8
 
@@ -38,6 +47,12 @@ export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   const distance = R * c
+
+  // Validate result
+  if (isNaN(distance) || distance < 0) {
+    console.error("Invalid distance calculated:", distance, "for coordinates:", { lat1, lon1, lat2, lon2 })
+    return 0
+  }
 
   return distance
 }
@@ -62,42 +77,45 @@ export async function findZipCodesInRadius(
   }
 
   // Find all ZIP codes within the radius
-  const zipCodesInRadius = zipCodeDatabase.filter((zipData) => {
-    // Skip the calculation if it's the same ZIP code
-    if (zipData.zip === centralZip) return true
+  const zipCodesInRadius = zipCodeDatabase
+    .map((zipData) => {
+      // Skip the calculation if it's the same ZIP code
+      if (zipData.zip === centralZip) {
+        return { ...zipData, distance: 0 }
+      }
 
-    const distance = haversineDistance(
-      centralZipData.latitude,
-      centralZipData.longitude,
-      zipData.latitude,
-      zipData.longitude,
-    )
+      const distance = haversineDistance(
+        centralZipData.latitude,
+        centralZipData.longitude,
+        zipData.latitude,
+        zipData.longitude,
+      )
 
-    return distance <= radius
-  })
+      return { ...zipData, distance }
+    })
+    .filter((zipData) => zipData.distance !== undefined && zipData.distance <= radius)
+    .sort((a, b) => (a.distance || 0) - (b.distance || 0))
 
   return zipCodesInRadius
 }
 
 /**
- * Get ZIP code data from the database or API
- * This is a placeholder function - in a real implementation,
- * this would fetch from a database or API
+ * Validate ZIP code format
+ * @param zip ZIP code to validate
+ * @returns true if valid 5-digit ZIP code
  */
-export async function getZipCodeData(): Promise<ZipCodeData[]> {
-  // In a real implementation, this would fetch from a database or API
-  // For now, return a small sample dataset
-  return [
-    { zip: "10001", latitude: 40.7501, longitude: -73.9964, city: "New York", state: "NY" },
-    { zip: "10002", latitude: 40.7168, longitude: -73.9861, city: "New York", state: "NY" },
-    { zip: "10003", latitude: 40.7335, longitude: -73.9905, city: "New York", state: "NY" },
-    { zip: "10004", latitude: 40.7037, longitude: -74.012, city: "New York", state: "NY" },
-    { zip: "10005", latitude: 40.7047, longitude: -74.008, city: "New York", state: "NY" },
-    { zip: "10006", latitude: 40.7092, longitude: -74.0113, city: "New York", state: "NY" },
-    { zip: "10007", latitude: 40.7145, longitude: -74.0071, city: "New York", state: "NY" },
-    { zip: "90001", latitude: 33.9731, longitude: -118.2479, city: "Los Angeles", state: "CA" },
-    { zip: "90002", latitude: 33.9497, longitude: -118.2462, city: "Los Angeles", state: "CA" },
-    { zip: "90003", latitude: 33.9653, longitude: -118.2729, city: "Los Angeles", state: "CA" },
-    // In a real implementation, this would include thousands of ZIP codes
-  ]
+export function isValidZipCode(zip: string): boolean {
+  return /^\d{5}$/.test(zip)
+}
+
+/**
+ * Format distance for display
+ * @param distance Distance in miles
+ * @returns Formatted distance string
+ */
+export function formatDistance(distance: number): string {
+  if (distance < 0.1) {
+    return "< 0.1 mi"
+  }
+  return `${distance.toFixed(1)} mi`
 }

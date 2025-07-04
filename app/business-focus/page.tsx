@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
-import { ServiceAreaSectionEnhanced } from "@/components/service-area-section-enhanced"
 import { KeywordsSection } from "@/components/keywords-section"
 import { CategorySelector, type CategorySelection } from "@/components/category-selector"
 import { SuggestCategoryModal } from "@/components/suggest-category-modal"
@@ -14,6 +13,25 @@ import { Button } from "@/components/ui/button"
 import { Search, Loader2 } from "lucide-react"
 import { saveBusinessCategories, getBusinessCategories } from "@/app/actions/category-actions"
 import { useToast } from "@/components/ui/use-toast"
+import { Suspense } from "react"
+import { ServiceAreaSectionEnhanced } from "@/components/service-area-section-enhanced"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+function ServiceAreaLoading() {
+  return (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="text-2xl text-center">Service Area</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Loading service area tools...</span>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function BusinessFocusPage() {
   const router = useRouter()
@@ -142,13 +160,15 @@ export default function BusinessFocusPage() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Your Business Focus</h1>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Business Focus & Service Area</h1>
             <p className="text-gray-600">
-              Define your service area, keywords, and business categories to help customers find you
+              Define your business focus and service area to help customers find you more easily.
             </p>
           </div>
 
-          <ServiceAreaSectionEnhanced />
+          <Suspense fallback={<ServiceAreaLoading />}>
+            <ServiceAreaSectionEnhanced />
+          </Suspense>
 
           <KeywordsSection />
 
@@ -185,7 +205,12 @@ export default function BusinessFocusPage() {
                     className="pl-10"
                   />
                 </div>
-                <Button variant="outline" className="ml-2" onClick={() => setSearchTerm("")} disabled={!searchTerm}>
+                <Button
+                  variant="outline"
+                  className="ml-2 bg-transparent"
+                  onClick={() => setSearchTerm("")}
+                  disabled={!searchTerm}
+                >
                   Clear
                 </Button>
               </div>
