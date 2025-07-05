@@ -638,9 +638,11 @@ export default function PetCarePage() {
 
                   {/* Subcategories/Specialties */}
                   {business.subcategories && business.subcategories.length > 0 && (
-                    <div className="lg:w-64">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
-                      <div className="flex flex-wrap gap-2">
+                    <div className="w-full">
+                      <div className="lg:w-64">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2 w-full">
                         {business.subcategories.map((subcategory: any, index: number) => (
                           <span
                             key={index}
