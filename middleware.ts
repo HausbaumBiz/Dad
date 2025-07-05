@@ -2,81 +2,52 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
-  // Get the pathname of the request
   const path = request.nextUrl.pathname
 
   // Define public paths that don't require authentication
   const isPublicPath =
+    path === "/" ||
     path === "/user-login" ||
     path === "/user-register" ||
     path === "/business-login" ||
     path === "/business-register" ||
-    path === "/" ||
+    path === "/registration-confirmation" ||
+    path === "/legal-notice" ||
+    path === "/contact-us" ||
+    path === "/awards-explained" ||
     path.startsWith("/api/") ||
-    path.startsWith("/_next/") ||
-    path.includes(".") || // Static files
-    // Allow all category pages to be public
-    path === "/home-improvement" ||
-    path === "/automotive-services" ||
-    path === "/elder-care" ||
-    path === "/pet-care" ||
-    path === "/weddings-events" ||
-    path === "/fitness-athletics" ||
-    path === "/education-tutoring" ||
-    path === "/music-lessons" ||
-    path === "/real-estate" ||
-    path === "/food-dining" ||
-    path === "/retail-stores" ||
-    path === "/legal-services" ||
-    path === "/funeral-services" ||
-    path === "/personal-assistants" ||
-    path === "/travel-vacation" ||
-    path === "/tailoring-clothing" ||
-    path === "/arts-entertainment" ||
-    path === "/tech-it-services" ||
-    path === "/beauty-wellness" ||
-    path === "/physical-rehabilitation" ||
-    path === "/medical-practitioners" ||
-    path === "/mental-health" ||
-    path === "/financial-services" ||
-    path === "/child-care" ||
-    path === "/penny-saver" ||
-    path === "/job-listings" ||
-    // Allow all job-listings category pages to be public
-    path.startsWith("/job-listings/") ||
-    // Allow subcategory pages to be public too
-    path.startsWith("/home-improvement/") ||
-    // More efficient way to handle all category pages
-    path.match(/^\/[a-z-]+\/?$/) !== null
+    path.startsWith("/admin") || // Make admin pages public
+    path.startsWith("/_next") ||
+    path.startsWith("/favicon") ||
+    path.includes(".")
 
-  // Check if path is admin-related
-  const isAdminPath = path.startsWith("/admin")
-
-  // Get authentication status from cookies
-  const isAuthenticated = request.cookies.has("userId") || request.cookies.has("businessId")
-
-  // For admin paths, we might want to check for admin privileges
-  // This is a simplified example - in a real app, you'd verify the user has admin role
-  const isAdmin = request.cookies.has("userId") && request.cookies.get("userId")?.value === "admin-user-id"
-
-  // Redirect logic
-  if (isAdminPath && !isAdmin) {
-    // If trying to access admin pages without admin privileges
-    return NextResponse.redirect(new URL("/user-login", request.url))
+  // Allow all public paths
+  if (isPublicPath) {
+    return NextResponse.next()
   }
 
-  if (!isPublicPath && !isAuthenticated) {
-    // If trying to access protected pages without authentication
-    return NextResponse.redirect(new URL("/user-login", request.url))
+  // Check for authentication cookie
+  const userId = request.cookies.get("userId")?.value
+
+  if (!userId) {
+    // Redirect to login with return URL
+    const loginUrl = new URL("/user-login", request.url)
+    loginUrl.searchParams.set("returnTo", path)
+    return NextResponse.redirect(loginUrl)
   }
 
   return NextResponse.next()
 }
 
-// Configure the middleware to run on specific paths
 export const config = {
   matcher: [
-    // Match all paths except static files, api routes, and _next
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 }
