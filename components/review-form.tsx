@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { submitReview } from "@/app/actions/review-actions"
 import { useToast } from "@/components/ui/use-toast"
 import { Star, ChevronLeft, ChevronRight } from "lucide-react"
@@ -53,8 +54,9 @@ export function ReviewForm({ businessId, businessName, onSuccess }: ReviewFormPr
     professionalism: 0,
   })
   const [hoveredRatings, setHoveredRatings] = useState<Record<string, number>>({})
+  const [comment, setComment] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errors, setErrors] = useState<{ ratings?: string }>({})
+  const [errors, setErrors] = useState<{ ratings?: string; comment?: string }>({})
 
   const currentQuestion = questions[currentQuestionIndex]
   const currentRating = ratings[currentQuestion.id] || 0
@@ -97,12 +99,16 @@ export function ReviewForm({ businessId, businessName, onSuccess }: ReviewFormPr
     e.preventDefault()
 
     // Validate form
-    const newErrors: { ratings?: string } = {}
+    const newErrors: { ratings?: string; comment?: string } = {}
 
     // Check if all ratings are provided
     const unratedQuestions = questions.filter((q) => !ratings[q.id] || ratings[q.id] === 0)
     if (unratedQuestions.length > 0) {
       newErrors.ratings = `Please rate all questions. Missing: ${unratedQuestions.map((q) => `Question ${questions.indexOf(q) + 1}`).join(", ")}`
+    }
+
+    if (!comment.trim()) {
+      newErrors.comment = "Please enter a review comment"
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -123,7 +129,7 @@ export function ReviewForm({ businessId, businessName, onSuccess }: ReviewFormPr
           dependability: ratings.dependability,
           professionalism: ratings.professionalism,
         },
-        comment: "", // Empty comment since we removed the text box
+        comment,
       })
 
       if (result.success) {
@@ -142,6 +148,7 @@ export function ReviewForm({ businessId, businessName, onSuccess }: ReviewFormPr
           dependability: 0,
           professionalism: 0,
         })
+        setComment("")
         setErrors({})
 
         // Call success callback if provided
@@ -264,6 +271,22 @@ export function ReviewForm({ businessId, businessName, onSuccess }: ReviewFormPr
           ))}
         </div>
         {errors.ratings && <p className="text-red-500 text-sm mt-2">{errors.ratings}</p>}
+      </div>
+
+      {/* Comment section */}
+      <div>
+        <label htmlFor="comment" className="block text-sm font-medium mb-2">
+          Your detailed review
+        </label>
+        <Textarea
+          id="comment"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Share your experience with this business..."
+          rows={5}
+          className={errors.comment ? "border-red-500" : ""}
+        />
+        {errors.comment && <p className="text-red-500 text-sm mt-1">{errors.comment}</p>}
       </div>
 
       <Button type="submit" disabled={isSubmitting} className="w-full">

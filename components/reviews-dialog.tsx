@@ -129,7 +129,7 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
             <div className="flex justify-between items-center">
               <TabsList>
                 <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                <TabsTrigger value="write-review">Leave a Review</TabsTrigger>
+                <TabsTrigger value="write-review">Write a Review</TabsTrigger>
               </TabsList>
               {activeTab === "reviews" && (
                 <Button variant="outline" size="sm" onClick={handleWriteReviewClick}>
@@ -196,8 +196,7 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
                         </div>
                       )}
 
-                      {/* Only show comment if it exists and is not empty */}
-                      {review.comment && review.comment.trim() && <p className="text-gray-700">{review.comment}</p>}
+                      <p className="text-gray-700">{review.comment}</p>
                     </div>
                   ))}
                 </div>
