@@ -400,7 +400,8 @@ export async function registerBusiness(formData: FormData) {
     })
 
     // Set a cookie with the business ID
-    cookies().set("businessId", id, {
+    const cookieStore = await cookies()
+    cookieStore.set("businessId", id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 7, // 1 week
@@ -435,6 +436,30 @@ export async function loginBusiness(formData: FormData) {
       return { success: false, message: "Email and password are required" }
     }
 
+    // Check if KV environment variables are available
+    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      console.warn("KV environment variables are missing. Using mock login for development.")
+
+      // Mock login for development - check if it's a demo email
+      if (email === "demo@example.com" && password === "demo123") {
+        const cookieStore = await cookies()
+        cookieStore.set("businessId", "demo-business", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7,
+          path: "/",
+        })
+
+        return {
+          success: true,
+          message: "Login successful",
+          redirectUrl: "/workbench",
+        }
+      } else {
+        return { success: false, message: "Invalid email or password" }
+      }
+    }
+
     // Get business ID by email
     let businessId: string | null = null
     try {
@@ -467,6 +492,11 @@ export async function loginBusiness(formData: FormData) {
       businessData = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}`)
       console.log(`Business data type:`, typeof businessData)
       console.log(`Business data is array:`, Array.isArray(businessData))
+
+      // Additional debugging
+      if (businessData) {
+        console.log(`Business data keys:`, typeof businessData === "object" ? Object.keys(businessData) : "N/A")
+      }
     } catch (error) {
       console.error("Error fetching business data:", getErrorMessage(error))
       return { success: false, message: "Login failed. Please try again." }
@@ -480,76 +510,82 @@ export async function loginBusiness(formData: FormData) {
     // Handle different data types that might come from Redis
     let business: any = null
 
-    if (typeof businessData === "string") {
-      try {
-        business = JSON.parse(businessData)
-        console.log("Parsed business data from string")
-      } catch (parseError) {
-        console.error("Failed to parse business data string:", getErrorMessage(parseError))
+    try {
+      if (typeof businessData === "string") {
+        try {
+          business = JSON.parse(businessData)
+          console.log("Parsed business data from string")
+        } catch (parseError) {
+          console.error("Failed to parse business data string:", getErrorMessage(parseError))
+          return { success: false, message: "Login failed. Please try again." }
+        }
+      } else if (Array.isArray(businessData)) {
+        console.error("Business data is unexpectedly an array:", businessData)
+        return { success: false, message: "Login failed. Please try again." }
+      } else if (businessData && typeof businessData === "object") {
+        business = businessData
+        console.log("Using business data object directly")
+      } else {
+        console.error("Business data is unexpected type:", typeof businessData)
         return { success: false, message: "Login failed. Please try again." }
       }
-    } else if (Array.isArray(businessData)) {
-      console.error("Business data is unexpectedly an array:", businessData)
-      return { success: false, message: "Login failed. Please try again." }
-    } else if (businessData && typeof businessData === "object") {
-      business = businessData
-      console.log("Using business data object directly")
-    } else {
-      console.error("Business data is unexpected type:", typeof businessData)
-      return { success: false, message: "Login failed. Please try again." }
-    }
 
-    // Validate that business is a proper object
-    if (!business || typeof business !== "object" || Array.isArray(business)) {
-      console.error("Business is not a valid object:", typeof business, Array.isArray(business))
-      return { success: false, message: "Login failed. Please try again." }
-    }
+      // Validate that business is a proper object
+      if (!business || typeof business !== "object" || Array.isArray(business)) {
+        console.error("Business is not a valid object:", typeof business, Array.isArray(business))
+        return { success: false, message: "Login failed. Please try again." }
+      }
 
-    // Verify password
-    const storedPasswordHash = business.passwordHash
-    if (!storedPasswordHash || typeof storedPasswordHash !== "string") {
-      console.error("No valid password hash found for business")
-      return { success: false, message: "Invalid email or password" }
-    }
+      // Verify password
+      const storedPasswordHash = business.passwordHash
+      if (!storedPasswordHash || typeof storedPasswordHash !== "string") {
+        console.error("No valid password hash found for business")
+        return { success: false, message: "Invalid email or password" }
+      }
 
-    let isPasswordValid = false
-    try {
-      isPasswordValid = await bcrypt.compare(password, storedPasswordHash)
+      let isPasswordValid = false
+      try {
+        isPasswordValid = await bcrypt.compare(password, storedPasswordHash)
+      } catch (error) {
+        console.error("Error comparing passwords:", getErrorMessage(error))
+        return { success: false, message: "Login failed. Please try again." }
+      }
+
+      if (!isPasswordValid) {
+        console.log("Password verification failed")
+        return { success: false, message: "Invalid email or password" }
+      }
+
+      // Check if email is verified
+      if (!business.isEmailVerified) {
+        return { success: false, message: "Please verify your email before logging in" }
+      }
+
+      // Set cookie with business ID
+      try {
+        const cookieStore = await cookies()
+        cookieStore.set("businessId", businessId, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7, // 30 days if remember me, otherwise 7 days
+          path: "/",
+        })
+      } catch (error) {
+        console.error("Error setting cookie:", getErrorMessage(error))
+        return { success: false, message: "Login failed. Please try again." }
+      }
+
+      console.log(`Business logged in successfully: ${business.businessName || "Unknown"} (${businessId})`)
+
+      // Return success with redirect URL instead of directly redirecting
+      return {
+        success: true,
+        message: "Login successful",
+        redirectUrl: "/workbench",
+      }
     } catch (error) {
-      console.error("Error comparing passwords:", getErrorMessage(error))
+      console.error("Error processing business data:", getErrorMessage(error))
       return { success: false, message: "Login failed. Please try again." }
-    }
-
-    if (!isPasswordValid) {
-      console.log("Password verification failed")
-      return { success: false, message: "Invalid email or password" }
-    }
-
-    // Check if email is verified
-    if (!business.isEmailVerified) {
-      return { success: false, message: "Please verify your email before logging in" }
-    }
-
-    // Set cookie with business ID
-    try {
-      cookies().set("businessId", businessId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7, // 30 days if remember me, otherwise 7 days
-        path: "/",
-      })
-    } catch (error) {
-      console.error("Error setting cookie:", getErrorMessage(error))
-      return { success: false, message: "Login failed. Please try again." }
-    }
-
-    console.log(`Business logged in successfully: ${business.businessName || "Unknown"} (${businessId})`)
-
-    // Return success with redirect URL instead of directly redirecting
-    return {
-      success: true,
-      message: "Login successful",
-      redirectUrl: "/workbench",
     }
   } catch (error) {
     console.error("Business login failed:", getErrorMessage(error))
@@ -577,7 +613,8 @@ export async function getCurrentBusiness() {
       }
     }
 
-    const businessId = cookies().get("businessId")?.value
+    const cookieStore = await cookies()
+    const businessId = cookieStore.get("businessId")?.value
     if (!businessId) {
       console.log("No businessId cookie found")
       return null
@@ -684,7 +721,8 @@ export async function getCurrentBusiness() {
 // Logout the current business
 export async function logoutBusiness() {
   try {
-    cookies().delete("businessId")
+    const cookieStore = await cookies()
+    cookieStore.delete("businessId")
     return { success: true }
   } catch (error) {
     console.error("Error during logout:", getErrorMessage(error))

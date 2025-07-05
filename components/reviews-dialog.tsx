@@ -139,6 +139,42 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
             </div>
 
             <TabsContent value="reviews" className="mt-4">
+              {/* Average Rating and Review Count */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-gray-900">
+                      {displayReviews.length > 0
+                        ? (
+                            displayReviews.reduce(
+                              (sum, review) => sum + (review.overallRating || review.rating || 0),
+                              0,
+                            ) / displayReviews.length
+                          ).toFixed(1)
+                        : "0.0"}
+                    </div>
+                    <div className="flex justify-center mt-1">
+                      <StarRating
+                        rating={
+                          displayReviews.length > 0
+                            ? displayReviews.reduce(
+                                (sum, review) => sum + (review.overallRating || review.rating || 0),
+                                0,
+                              ) / displayReviews.length
+                            : 0
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <div className="text-lg font-semibold text-gray-900">
+                      {displayReviews.length} {displayReviews.length === 1 ? "Review" : "Reviews"}
+                    </div>
+                    <div className="text-sm text-gray-600">Based on customer feedback</div>
+                  </div>
+                </div>
+              </div>
+
               {isLoading ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mx-auto"></div>

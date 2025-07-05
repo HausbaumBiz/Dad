@@ -5,11 +5,12 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Phone, MapPin, Star } from "lucide-react"
+import { Phone, MapPin, Star, ChevronLeft, ChevronRight } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 
 // Enhanced Business interface
 interface Business {
@@ -25,6 +26,7 @@ interface Business {
   zipCode?: string
   serviceArea?: string[]
   isNationwide?: boolean
+  photos?: string[]
 }
 
 // Helper function to extract string from subcategory data
@@ -39,6 +41,193 @@ const getSubcategoryString = (subcategory: any): string => {
   }
 
   return "Unknown Service"
+}
+
+// Photo Carousel Component - displays 5 photos in landscape format
+interface PhotoCarouselProps {
+  photos: string[]
+  businessName: string
+}
+
+function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (!photos || photos.length === 0) {
+    return null // Don't show anything if no photos
+  }
+
+  const photosPerView = 5
+  const maxIndex = Math.max(0, photos.length - photosPerView)
+
+  const nextPhotos = () => {
+    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
+  }
+
+  const prevPhotos = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0))
+  }
+
+  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
+
+  return (
+    <div className="hidden lg:block w-full">
+      <div className="relative group w-full">
+        <div className="flex gap-2 justify-center w-full">
+          {visiblePhotos.map((photo, index) => (
+            <div key={currentIndex + index} className="w-48 h-36 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+              <Image
+                src={photo || "/placeholder.svg"}
+                alt={`${businessName} photo ${currentIndex + index + 1}`}
+                width={192}
+                height={144}
+                className="w-full h-full object-cover"
+                sizes="192px"
+              />
+            </div>
+          ))}
+
+          {/* Fill empty slots if less than 5 photos visible */}
+          {visiblePhotos.length < photosPerView && (
+            <>
+              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
+                <div
+                  key={`empty-${index}`}
+                  className="w-48 h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                ></div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Navigation arrows - only show if there are more than 5 photos */}
+        {photos.length > photosPerView && (
+          <>
+            <button
+              onClick={prevPhotos}
+              disabled={currentIndex === 0}
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={nextPhotos}
+              disabled={currentIndex >= maxIndex}
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </>
+        )}
+
+        {/* Photo counter */}
+        {photos.length > photosPerView && (
+          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination dots - only show if there are more than 5 photos */}
+      {photos.length > photosPerView && (
+        <div className="flex justify-center mt-2 space-x-1">
+          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
+            const pageStartIndex = index * photosPerView
+            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
+            return (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(pageStartIndex)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
+              />
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Function to load business photos from Cloudflare using public URLs
+const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
+  try {
+    console.log(`Loading photos for business ${businessId}`)
+
+    // Fetch business media data from the updated API
+    const response = await fetch(`/api/businesses/${businessId}`)
+    if (!response.ok) {
+      console.error(`Failed to fetch business data: ${response.status} ${response.statusText}`)
+      return []
+    }
+
+    const businessData = await response.json()
+    console.log(`Business data for ${businessId}:`, businessData)
+
+    // Try multiple possible locations for photo data
+    let photoAlbum = null
+
+    // Check direct photoAlbum property
+    if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
+      photoAlbum = businessData.photoAlbum
+    }
+    // Check nested media.photoAlbum
+    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
+      photoAlbum = businessData.media.photoAlbum
+    }
+    // Check adDesign.photoAlbum
+    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
+      photoAlbum = businessData.adDesign.photoAlbum
+    }
+
+    if (!photoAlbum || !Array.isArray(photoAlbum)) {
+      console.log(`No photo album found for business ${businessId}`)
+      return []
+    }
+
+    console.log(`Found ${photoAlbum.length} photos in album for business ${businessId}`)
+
+    // Convert Cloudflare image IDs to public URLs
+    const photoUrls = photoAlbum
+      .map((photo: any, index: number) => {
+        // Handle different photo data structures
+        let imageId = null
+
+        if (typeof photo === "string") {
+          // If photo is just a string (image ID)
+          imageId = photo
+        } else if (photo && typeof photo === "object") {
+          // If photo is an object, try to extract the image ID
+          imageId = photo.imageId || photo.id || photo.cloudflareId || photo.url
+
+          // If it's already a full URL, return it as-is
+          if (typeof imageId === "string" && (imageId.startsWith("http") || imageId.startsWith("https"))) {
+            console.log(`Photo ${index} already has full URL: ${imageId}`)
+            return imageId
+          }
+        }
+
+        if (!imageId) {
+          console.warn(`No image ID found for photo ${index}:`, photo)
+          return null
+        }
+
+        // Generate public Cloudflare URL
+        try {
+          const publicUrl = getCloudflareImageUrl(imageId, "public")
+          console.log(`Generated URL for image ${imageId}: ${publicUrl}`)
+          return publicUrl
+        } catch (error) {
+          console.error(`Error generating URL for image ${imageId}:`, error)
+          return null
+        }
+      })
+      .filter(Boolean) // Remove null/undefined URLs
+
+    console.log(`Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
+    return photoUrls
+  } catch (error) {
+    console.error(`Error loading photos for business ${businessId}:`, error)
+    return []
+  }
 }
 
 export default function PetCarePage() {
@@ -173,6 +362,14 @@ export default function PetCarePage() {
         setLoading(true)
         const fetchedBusinesses = await getBusinessesForCategoryPage("/pet-care")
 
+        // Load photos for each business using public Cloudflare URLs
+        const businessesWithPhotos = await Promise.all(
+          fetchedBusinesses.map(async (business: Business) => {
+            const photos = await loadBusinessPhotos(business.id)
+            return { ...business, photos }
+          }),
+        )
+
         // Only update if this is still the current request
         if (currentFetchId !== fetchIdRef.current) {
           console.log(`[PetCare] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
@@ -183,8 +380,8 @@ export default function PetCarePage() {
 
         // Filter businesses by zip code if userZipCode is available
         if (userZipCode) {
-          const originalCount = fetchedBusinesses.length
-          const filteredBusinesses = fetchedBusinesses.filter((business: Business) =>
+          const originalCount = businessesWithPhotos.length
+          const filteredBusinesses = businessesWithPhotos.filter((business: Business) =>
             businessServesZipCode(business, userZipCode),
           )
           console.log(
@@ -194,9 +391,9 @@ export default function PetCarePage() {
           setAllBusinesses(filteredBusinesses)
           setFilteredBusinesses(filteredBusinesses)
         } else {
-          setBusinesses(fetchedBusinesses)
-          setAllBusinesses(fetchedBusinesses)
-          setFilteredBusinesses(fetchedBusinesses)
+          setBusinesses(businessesWithPhotos)
+          setAllBusinesses(businessesWithPhotos)
+          setFilteredBusinesses(businessesWithPhotos)
         }
       } catch (error) {
         // Only update error if this is still the current request
@@ -313,7 +510,7 @@ export default function PetCarePage() {
             Apply Filters
           </Button>
           {appliedFilters.length > 0 && (
-            <Button variant="outline" onClick={clearFilters} className="min-w-[120px]">
+            <Button variant="outline" onClick={clearFilters} className="min-w-[120px] bg-transparent">
               Clear Filters
             </Button>
           )}
@@ -354,16 +551,17 @@ export default function PetCarePage() {
                     )}
                   </div>
 
-                  {/* Contact and Location Info */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div className="space-y-2">
+                  {/* Main content area with contact info, photos, and buttons */}
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                    {/* Left side - Contact and Location Info - Made smaller */}
+                    <div className="lg:w-64 space-y-2 flex-shrink-0">
                       {/* Phone */}
                       {business.displayPhone && (
                         <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-500" />
+                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
                           <a
                             href={`tel:${business.displayPhone}`}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
                           >
                             {business.displayPhone}
                           </a>
@@ -373,7 +571,7 @@ export default function PetCarePage() {
                       {/* Location */}
                       {business.displayLocation && (
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-gray-500" />
+                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
                           <span className="text-gray-700 text-sm">{business.displayLocation}</span>
                         </div>
                       )}
@@ -409,21 +607,29 @@ export default function PetCarePage() {
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
+                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
+                    <div className="flex-1 flex justify-center">
+                      <PhotoCarousel
+                        photos={business.photos || []}
+                        businessName={business.displayName || business.businessName || "Pet Care Provider"}
+                      />
+                    </div>
+
+                    {/* Right side - Action Buttons */}
+                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleViewReviews(business)}
-                        className="text-sm"
+                        className="text-sm min-w-[100px]"
                       >
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="default"
                         size="sm"
                         onClick={() => handleViewProfile(business)}
-                        className="text-sm"
+                        className="text-sm min-w-[100px]"
                       >
                         View Profile
                       </Button>
@@ -432,7 +638,7 @@ export default function PetCarePage() {
 
                   {/* Subcategories/Specialties */}
                   {business.subcategories && business.subcategories.length > 0 && (
-                    <div>
+                    <div className="lg:w-64">
                       <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
                       <div className="flex flex-wrap gap-2">
                         {business.subcategories.map((subcategory: any, index: number) => (
