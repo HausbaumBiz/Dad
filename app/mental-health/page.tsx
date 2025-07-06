@@ -454,7 +454,7 @@ export default function MentalHealthPage() {
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   {/* Left Column - Business Info */}
-                  <div className="lg:col-span-4 space-y-3">
+                  <div className="lg:col-span-3 space-y-3">
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
 
                     {provider.location && (
@@ -510,7 +510,7 @@ export default function MentalHealthPage() {
                   </div>
 
                   {/* Center Column - Photos */}
-                  <div className="lg:col-span-6">
+                  <div className="lg:col-span-8">
                     <div className="w-full h-32 bg-gray-100 rounded-lg overflow-hidden">
                       {businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
                         <div className="flex space-x-1 h-full">
@@ -554,7 +554,7 @@ export default function MentalHealthPage() {
                   </div>
 
                   {/* Right Column - Action Buttons */}
-                  <div className="lg:col-span-2 flex flex-col justify-center space-y-2">
+                  <div className="lg:col-span-1 flex flex-col justify-center space-y-2">
                     <Button
                       variant="outline"
                       size="sm"
