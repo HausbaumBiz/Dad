@@ -1,7 +1,6 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
@@ -10,7 +9,7 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useState } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useEffect } from "react"
-import { MapPin, Phone } from "lucide-react"
+import { MapPin, Phone, ChevronLeft, ChevronRight } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
 
@@ -26,6 +25,85 @@ const getSubcategoryString = (subcategory: any): string => {
   }
 
   return "Unknown Service"
+}
+
+// Photo Carousel Component
+const PhotoCarousel = ({ photos }: { photos: any[] }) => {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (!photos || photos.length === 0) {
+    return (
+      <div className="w-48 h-36 bg-gray-100 rounded-lg flex items-center justify-center">
+        <span className="text-gray-400 text-sm">No photos</span>
+      </div>
+    )
+  }
+
+  const nextPhoto = () => {
+    setCurrentIndex((prev) => (prev + 1) % photos.length)
+  }
+
+  const prevPhoto = () => {
+    setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length)
+  }
+
+  return (
+    <div className="relative w-48 h-36 bg-gray-100 rounded-lg overflow-hidden group">
+      <Image
+        src={photos[currentIndex]?.url || "/placeholder.svg"}
+        alt={`Photo ${currentIndex + 1}`}
+        fill
+        className="object-cover"
+        sizes="192px"
+      />
+
+      {photos.length > 1 && (
+        <>
+          <button
+            onClick={prevPhoto}
+            className="absolute left-1 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            onClick={nextPhoto}
+            className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <ChevronRight size={16} />
+          </button>
+
+          <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex space-x-1">
+            {photos.slice(0, 5).map((_, index) => (
+              <div
+                key={index}
+                className={`w-1.5 h-1.5 rounded-full ${index === currentIndex ? "bg-white" : "bg-white/50"}`}
+              />
+            ))}
+            {photos.length > 5 && <span className="text-white text-xs ml-1">+{photos.length - 5}</span>}
+          </div>
+
+          <div className="absolute top-1 right-1 bg-black/50 text-white text-xs px-1 rounded">
+            {currentIndex + 1}/{photos.length}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Function to load business photos
+const loadBusinessPhotos = async (businessId: string) => {
+  try {
+    const response = await fetch(`/api/cloudflare-images/get-image?businessId=${businessId}`)
+    if (!response.ok) {
+      return []
+    }
+    const data = await response.json()
+    return data.photos || []
+  } catch (error) {
+    console.error(`Error loading photos for business ${businessId}:`, error)
+    return []
+  }
 }
 
 export default function PersonalAssistantsPage() {
@@ -296,6 +374,7 @@ export default function PersonalAssistantsPage() {
     allSubcategories?: any[]
     zipCode?: string
     serviceArea?: string[]
+    photos?: any[]
     adDesignData?: {
       businessInfo?: {
         phone?: string
@@ -345,11 +424,24 @@ export default function PersonalAssistantsPage() {
         console.log(`[Personal Assistants] Fetch ${currentFetchId} completed, got ${businesses.length} businesses`)
         console.log("Sample business data:", businesses[0]) // Debug log
 
+        // Load photos for each business
+        const businessesWithPhotos = await Promise.all(
+          businesses.map(async (business: Business) => {
+            try {
+              const photos = await loadBusinessPhotos(business.id)
+              return { ...business, photos }
+            } catch (error) {
+              console.error(`Error loading photos for business ${business.id}:`, error)
+              return { ...business, photos: [] }
+            }
+          }),
+        )
+
         // Filter by zip code if available
-        let filteredBusinesses = businesses
+        let filteredBusinesses = businessesWithPhotos
         if (userZipCode) {
           console.log(`[Personal Assistants] Filtering by zip code: ${userZipCode}`)
-          filteredBusinesses = businesses.filter((business: Business) => {
+          filteredBusinesses = businessesWithPhotos.filter((business: Business) => {
             const serves = businessServesZipCode(business, userZipCode)
             console.log(
               `[Personal Assistants] Business ${business.displayName || business.name} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
@@ -427,8 +519,6 @@ export default function PersonalAssistantsPage() {
         </div>
       </div>
 
-      {/* Remove the CategoryFilter component that appears after the hero section: */}
-
       {/* Enhanced Filter Controls */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
         <div className="flex flex-wrap gap-4 mb-4">
@@ -477,7 +567,7 @@ export default function PersonalAssistantsPage() {
                 Showing {filteredProviders.length} of {allProviders.length} businesses
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs">
+            <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs bg-transparent">
               Clear
             </Button>
           </div>
@@ -554,13 +644,18 @@ export default function PersonalAssistantsPage() {
       ) : (
         <div className="space-y-6">
           {filteredProviders.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{provider.displayName || provider.name}</h3>
-                    <div className="flex items-center text-gray-600 text-sm mt-1">
-                      <MapPin className="w-4 h-4 mr-1" />
+            <div
+              key={provider.id}
+              className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow"
+            >
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Left: Contact Info */}
+                <div className="lg:w-64 flex-shrink-0">
+                  <h3 className="text-xl font-semibold mb-2">{provider.displayName || provider.name}</h3>
+
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex items-center">
+                      <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
                       <span>
                         {provider.adDesignData?.businessInfo?.city && provider.adDesignData?.businessInfo?.state
                           ? `${provider.adDesignData.businessInfo.city}, ${provider.adDesignData.businessInfo.state}`
@@ -574,10 +669,9 @@ export default function PersonalAssistantsPage() {
                       </span>
                     </div>
 
-                    {/* Phone Number Display */}
                     {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
-                      <div className="flex items-center text-gray-600 text-sm mt-1">
-                        <Phone className="w-4 h-4 mr-1" />
+                      <div className="flex items-center">
+                        <Phone className="w-4 h-4 mr-2 flex-shrink-0" />
                         <span>
                           {formatPhoneNumber(
                             provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
@@ -587,8 +681,8 @@ export default function PersonalAssistantsPage() {
                     )}
 
                     {provider.serviceArea && provider.serviceArea.length > 0 && (
-                      <div className="flex items-center text-gray-600 text-xs mt-1">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800">
+                      <div className="mt-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
                           {provider.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))
                             ? "Serves nationwide"
                             : `Serves ${userZipCode} and surrounding areas`}
@@ -596,7 +690,7 @@ export default function PersonalAssistantsPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center mt-2">
+                    <div className="flex items-center mt-3">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
                           <svg
@@ -609,12 +703,12 @@ export default function PersonalAssistantsPage() {
                           </svg>
                         ))}
                       </div>
-                      <span className="text-sm text-gray-600 ml-2">
+                      <span className="ml-2 text-sm">
                         {provider.rating || 0} ({provider.reviewCount || 0} reviews)
                       </span>
                     </div>
 
-                    <div className="mt-2 flex flex-wrap gap-1">
+                    <div className="mt-3 flex flex-wrap gap-1">
                       {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
                         provider.allSubcategories.map((service: string, idx: number) => (
                           <span
@@ -640,25 +734,33 @@ export default function PersonalAssistantsPage() {
                       )}
                     </div>
                   </div>
-
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button
-                      className="w-full md:w-auto"
-                      onClick={() => handleOpenReviews(provider.displayName || provider.name)}
-                    >
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
+
+                {/* Center: Photo Carousel */}
+                <div className="flex-1 flex justify-center items-center">
+                  <PhotoCarousel photos={provider.photos || []} />
+                </div>
+
+                {/* Right: Action Buttons */}
+                <div className="lg:w-24 flex lg:flex-col gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 lg:flex-none"
+                    onClick={() => handleOpenReviews(provider.displayName || provider.name)}
+                  >
+                    Reviews
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 lg:flex-none bg-transparent"
+                    onClick={() => handleOpenProfile(provider)}
+                  >
+                    Profile
+                  </Button>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}
