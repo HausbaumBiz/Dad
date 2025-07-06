@@ -10,7 +10,7 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useState } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useEffect } from "react"
-import { MapPin, Phone, Camera } from "lucide-react"
+import { MapPin, Phone, Camera, ChevronLeft, ChevronRight } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
 import { getBusinessMedia, type MediaItem } from "@/app/actions/media-actions"
@@ -47,6 +47,9 @@ export default function PersonalAssistantsPage() {
   // State for media/photos
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, MediaItem[]>>({})
   const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
+
+  // State for carousel navigation
+  const [carouselIndex, setCarouselIndex] = useState<Record<string, number>>({})
 
   const mockReviews = {
     "Elite Personal Assistants": [
@@ -339,12 +342,29 @@ export default function PersonalAssistantsPage() {
       const photos = mediaData?.photoAlbum || []
 
       setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
+      setCarouselIndex((prev) => ({ ...prev, [businessId]: 0 }))
     } catch (error) {
       console.error(`Error loading photos for business ${businessId}:`, error)
       setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
     } finally {
       setLoadingPhotos((prev) => ({ ...prev, [businessId]: false }))
     }
+  }
+
+  // Carousel navigation functions
+  const handlePrevious = (businessId: string) => {
+    const photos = businessPhotos[businessId] || []
+    const currentIndex = carouselIndex[businessId] || 0
+    const newIndex = currentIndex > 0 ? currentIndex - 1 : Math.max(0, photos.length - 5)
+    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
+  }
+
+  const handleNext = (businessId: string) => {
+    const photos = businessPhotos[businessId] || []
+    const currentIndex = carouselIndex[businessId] || 0
+    const maxIndex = Math.max(0, photos.length - 5)
+    const newIndex = currentIndex < maxIndex ? currentIndex + 1 : 0
+    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
   }
 
   // Replace the useEffect:
@@ -688,8 +708,8 @@ export default function PersonalAssistantsPage() {
                     </div>
                   </div>
 
-                  {/* Right side - Photo Album */}
-                  <div className="lg:w-80 flex-shrink-0">
+                  {/* Right side - Photo Carousel */}
+                  <div className="lg:w-96 flex-shrink-0">
                     <div className="bg-gray-50 rounded-lg p-4 h-full">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-medium text-gray-700 flex items-center">
@@ -709,25 +729,70 @@ export default function PersonalAssistantsPage() {
                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                         </div>
                       ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          {businessPhotos[provider.id].slice(0, 4).map((photo, index) => (
-                            <div key={photo.id} className="relative aspect-square">
-                              <Image
-                                src={photo.url || "/placeholder.svg"}
-                                alt={photo.filename || `Photo ${index + 1}`}
-                                fill
-                                className="object-cover rounded-md"
-                                sizes="(max-width: 768px) 50vw, 150px"
-                              />
-                              {index === 3 && businessPhotos[provider.id].length > 4 && (
-                                <div className="absolute inset-0 bg-black bg-opacity-50 rounded-md flex items-center justify-center">
-                                  <span className="text-white text-sm font-medium">
-                                    +{businessPhotos[provider.id].length - 4} more
-                                  </span>
+                        <div className="relative">
+                          {/* Carousel Container */}
+                          <div className="overflow-hidden rounded-lg">
+                            <div
+                              className="flex transition-transform duration-300 ease-in-out gap-2"
+                              style={{
+                                transform: `translateX(-${(carouselIndex[provider.id] || 0) * (100 / 5)}%)`,
+                              }}
+                            >
+                              {businessPhotos[provider.id].map((photo, index) => (
+                                <div key={photo.id} className="flex-shrink-0 w-1/5">
+                                  <div className="aspect-square relative">
+                                    <Image
+                                      src={photo.url || "/placeholder.svg"}
+                                      alt={photo.filename || `Photo ${index + 1}`}
+                                      fill
+                                      className="object-cover rounded-md"
+                                      sizes="(max-width: 768px) 20vw, 80px"
+                                    />
+                                  </div>
                                 </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Navigation Buttons */}
+                          {businessPhotos[provider.id].length > 5 && (
+                            <>
+                              <button
+                                onClick={() => handlePrevious(provider.id)}
+                                className="absolute left-0 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1 shadow-md transition-colors"
+                                aria-label="Previous photos"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleNext(provider.id)}
+                                className="absolute right-0 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1 shadow-md transition-colors"
+                                aria-label="Next photos"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+
+                          {/* Dots Indicator */}
+                          {businessPhotos[provider.id].length > 5 && (
+                            <div className="flex justify-center mt-2 gap-1">
+                              {Array.from({ length: Math.ceil(businessPhotos[provider.id].length / 5) }).map(
+                                (_, index) => (
+                                  <button
+                                    key={index}
+                                    onClick={() => setCarouselIndex((prev) => ({ ...prev, [provider.id]: index }))}
+                                    className={`w-2 h-2 rounded-full transition-colors ${
+                                      Math.floor(carouselIndex[provider.id] || 0) === index
+                                        ? "bg-primary"
+                                        : "bg-gray-300"
+                                    }`}
+                                    aria-label={`Go to photo set ${index + 1}`}
+                                  />
+                                ),
                               )}
                             </div>
-                          ))}
+                          )}
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-32 text-gray-400">
