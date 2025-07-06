@@ -607,7 +607,7 @@ export default function PersonalAssistantsPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col lg:flex-row gap-6">
                   {/* Left side - Business Info */}
-                  <div className="lg:w-1/2 flex-shrink-0">
+                  <div className="lg:w-1/3 flex-shrink-0">
                     <h3 className="text-xl font-semibold">{provider.displayName || provider.name}</h3>
                     <div className="flex items-center text-gray-600 text-sm mt-1">
                       <MapPin className="w-4 h-4 mr-1" />
@@ -689,27 +689,10 @@ export default function PersonalAssistantsPage() {
                         </span>
                       )}
                     </div>
-
-                    {/* Action Buttons */}
-                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                      <Button
-                        className="flex-1 sm:flex-none"
-                        onClick={() => handleOpenReviews(provider.displayName || provider.name)}
-                      >
-                        Reviews
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 sm:flex-none bg-transparent"
-                        onClick={() => handleOpenProfile(provider)}
-                      >
-                        View Profile
-                      </Button>
-                    </div>
                   </div>
 
-                  {/* Right side - Photo Carousel */}
-                  <div className="lg:w-1/2 flex-shrink-0">
+                  {/* Center - Photo Carousel */}
+                  <div className="lg:w-1/3 flex-shrink-0">
                     <div className="bg-gray-50 rounded-lg p-4 h-full">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-medium text-gray-700 flex items-center">
@@ -800,6 +783,25 @@ export default function PersonalAssistantsPage() {
                           <p className="text-sm text-center">No photos available</p>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Right side - Action Buttons */}
+                  <div className="lg:w-1/3 flex-shrink-0 flex flex-col justify-center items-end">
+                    <div className="flex flex-col gap-2 w-full max-w-xs">
+                      <Button
+                        className="w-full"
+                        onClick={() => handleOpenReviews(provider.displayName || provider.name)}
+                      >
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full bg-transparent"
+                        onClick={() => handleOpenProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
                     </div>
                   </div>
                 </div>
