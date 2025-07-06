@@ -555,13 +555,13 @@ export default function MentalHealthPage() {
 
                   {/* Right Column - Action Buttons */}
                   <div className="lg:col-span-3 flex flex-col justify-center space-y-2">
-                    <Button size="xs" className="w-full" onClick={() => handleOpenReviews(provider)}>
+                    <Button size="sm" className="w-auto px-4" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="outline"
-                      className="w-full bg-transparent"
+                      className="w-auto px-4 bg-transparent"
                       onClick={() => handleOpenProfile(provider)}
                     >
                       View Profile
