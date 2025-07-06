@@ -77,7 +77,7 @@ export async function uploadDocument(formData: FormData, businessId: string): Pr
 
     return metadata
   } catch (error) {
-    console.error("Error uploading document:", error instanceof Error ? error.message : String(error))
+    console.error("Error uploading document:", error)
     return null
   }
 }
@@ -88,12 +88,11 @@ export async function getBusinessDocuments(businessId: string, type?: DocumentTy
 
     if (type) {
       // Get documents of specific type
-      const typeIds = await kv.smembers(`business:${businessId}:documents:${type}`)
-      documentIds = Array.isArray(typeIds) ? typeIds : []
+      documentIds = await kv.smembers(`business:${businessId}:documents:${type}`)
     } else {
       // Get all document IDs for this business
       const allDocuments = await kv.hgetall(`business:${businessId}:documents`)
-      documentIds = allDocuments ? Object.keys(allDocuments) : []
+      documentIds = Object.keys(allDocuments || {})
     }
 
     if (!documentIds.length) return []
@@ -106,10 +105,7 @@ export async function getBusinessDocuments(businessId: string, type?: DocumentTy
         const data = await kv.hget(`business:${businessId}:documents`, id)
 
         // Check if data exists
-        if (!data) {
-          console.warn(`No data found for document ${id}`)
-          continue
-        }
+        if (!data) continue
 
         let document: DocumentMetadata | null = null
 
@@ -124,26 +120,19 @@ export async function getBusinessDocuments(businessId: string, type?: DocumentTy
               console.error(
                 `Document ${id} has invalid structure - expected object, got:`,
                 typeof parsed,
-                Array.isArray(parsed) ? "array" : "other",
+                Array.isArray(parsed) ? "array" : parsed,
               )
               continue
             }
           } catch (parseError) {
-            console.error(
-              `Error parsing document JSON for ${id}:`,
-              parseError instanceof Error ? parseError.message : String(parseError),
-            )
+            console.error(`Error parsing document JSON for ${id}:`, parseError)
             continue
           }
         } else if (typeof data === "object" && data !== null && !Array.isArray(data)) {
           // Ensure it's an object and not an array
           document = data as DocumentMetadata
         } else {
-          console.error(
-            `Document ${id} has unexpected data type:`,
-            typeof data,
-            Array.isArray(data) ? "array" : "other",
-          )
+          console.error(`Document ${id} has unexpected data type:`, typeof data, Array.isArray(data) ? "array" : data)
           continue
         }
 
@@ -159,10 +148,10 @@ export async function getBusinessDocuments(businessId: string, type?: DocumentTy
         ) {
           documents.push(document)
         } else {
-          console.error(`Document ${id} failed validation:`, JSON.stringify(document, null, 2))
+          console.error(`Document ${id} failed validation:`, document)
         }
       } catch (err) {
-        console.error(`Error processing document ${id}:`, err instanceof Error ? err.message : String(err))
+        console.error(`Error processing document ${id}:`, err)
         continue
       }
     }
@@ -174,7 +163,7 @@ export async function getBusinessDocuments(businessId: string, type?: DocumentTy
       return bTime - aTime
     })
   } catch (error) {
-    console.error("Error getting business documents:", error instanceof Error ? error.message : String(error))
+    console.error("Error getting business documents:", error)
     return []
   }
 }
@@ -202,9 +191,7 @@ export async function deleteDocument(businessId: string, documentId: string): Pr
           )
         }
       } catch (parseError) {
-        throw new Error(
-          "Failed to parse document data: " + (parseError instanceof Error ? parseError.message : String(parseError)),
-        )
+        throw new Error("Failed to parse document data: " + parseError)
       }
     } else if (typeof documentData === "object" && documentData !== null && !Array.isArray(documentData)) {
       document = documentData as DocumentMetadata
@@ -234,7 +221,7 @@ export async function deleteDocument(businessId: string, documentId: string): Pr
 
     return true
   } catch (error) {
-    console.error("Error deleting document:", error instanceof Error ? error.message : String(error))
+    console.error("Error deleting document:", error)
     return false
   }
 }
@@ -264,9 +251,7 @@ export async function renameDocument(businessId: string, documentId: string, new
           )
         }
       } catch (parseError) {
-        throw new Error(
-          "Failed to parse document data: " + (parseError instanceof Error ? parseError.message : String(parseError)),
-        )
+        throw new Error("Failed to parse document data: " + parseError)
       }
     } else if (typeof documentData === "object" && documentData !== null && !Array.isArray(documentData)) {
       document = documentData as DocumentMetadata
@@ -291,7 +276,7 @@ export async function renameDocument(businessId: string, documentId: string, new
 
     return true
   } catch (error) {
-    console.error("Error renaming document:", error instanceof Error ? error.message : String(error))
+    console.error("Error renaming document:", error)
     return false
   }
 }
