@@ -355,14 +355,14 @@ export default function PersonalAssistantsPage() {
   const handlePrevious = (businessId: string) => {
     const photos = businessPhotos[businessId] || []
     const currentIndex = carouselIndex[businessId] || 0
-    const newIndex = currentIndex > 0 ? currentIndex - 1 : Math.max(0, photos.length - 5)
+    const newIndex = currentIndex > 0 ? currentIndex - 1 : Math.max(0, photos.length - 4)
     setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
   }
 
   const handleNext = (businessId: string) => {
     const photos = businessPhotos[businessId] || []
     const currentIndex = carouselIndex[businessId] || 0
-    const maxIndex = Math.max(0, photos.length - 5)
+    const maxIndex = Math.max(0, photos.length - 4)
     const newIndex = currentIndex < maxIndex ? currentIndex + 1 : 0
     setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
   }
@@ -607,7 +607,7 @@ export default function PersonalAssistantsPage() {
               <CardContent className="p-6">
                 <div className="flex flex-col lg:flex-row gap-6">
                   {/* Left side - Business Info */}
-                  <div className="flex-1">
+                  <div className="lg:w-1/2 flex-shrink-0">
                     <h3 className="text-xl font-semibold">{provider.displayName || provider.name}</h3>
                     <div className="flex items-center text-gray-600 text-sm mt-1">
                       <MapPin className="w-4 h-4 mr-1" />
@@ -709,7 +709,7 @@ export default function PersonalAssistantsPage() {
                   </div>
 
                   {/* Right side - Photo Carousel */}
-                  <div className="lg:w-96 flex-shrink-0">
+                  <div className="lg:w-1/2 flex-shrink-0">
                     <div className="bg-gray-50 rounded-lg p-4 h-full">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-medium text-gray-700 flex items-center">
@@ -735,18 +735,18 @@ export default function PersonalAssistantsPage() {
                             <div
                               className="flex transition-transform duration-300 ease-in-out gap-2"
                               style={{
-                                transform: `translateX(-${(carouselIndex[provider.id] || 0) * (100 / 5)}%)`,
+                                transform: `translateX(-${(carouselIndex[provider.id] || 0) * (100 / 4)}%)`,
                               }}
                             >
                               {businessPhotos[provider.id].map((photo, index) => (
-                                <div key={photo.id} className="flex-shrink-0 w-1/5">
+                                <div key={photo.id} className="flex-shrink-0 w-1/4">
                                   <div className="aspect-square relative">
                                     <Image
                                       src={photo.url || "/placeholder.svg"}
                                       alt={photo.filename || `Photo ${index + 1}`}
                                       fill
                                       className="object-cover rounded-md"
-                                      sizes="(max-width: 768px) 20vw, 80px"
+                                      sizes="(max-width: 768px) 25vw, 120px"
                                     />
                                   </div>
                                 </div>
@@ -755,7 +755,7 @@ export default function PersonalAssistantsPage() {
                           </div>
 
                           {/* Navigation Buttons */}
-                          {businessPhotos[provider.id].length > 5 && (
+                          {businessPhotos[provider.id].length > 4 && (
                             <>
                               <button
                                 onClick={() => handlePrevious(provider.id)}
@@ -775,9 +775,9 @@ export default function PersonalAssistantsPage() {
                           )}
 
                           {/* Dots Indicator */}
-                          {businessPhotos[provider.id].length > 5 && (
+                          {businessPhotos[provider.id].length > 4 && (
                             <div className="flex justify-center mt-2 gap-1">
-                              {Array.from({ length: Math.ceil(businessPhotos[provider.id].length / 5) }).map(
+                              {Array.from({ length: Math.ceil(businessPhotos[provider.id].length / 4) }).map(
                                 (_, index) => (
                                   <button
                                     key={index}
