@@ -2,15 +2,15 @@
 
 import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, Phone, Star } from "lucide-react"
+import { Loader2, Phone, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 
 // Enhanced Business interface
 interface Business {
@@ -33,6 +33,7 @@ interface Business {
   zipCode?: string
   serviceArea?: string[]
   isNationwide?: boolean
+  photos?: string[]
   adDesignData?: {
     businessInfo?: {
       businessName?: string
@@ -40,6 +41,193 @@ interface Business {
       city?: string
       state?: string
     }
+  }
+}
+
+// Photo Carousel Component - displays 5 photos in landscape format
+interface PhotoCarouselProps {
+  photos: string[]
+  businessName: string
+}
+
+function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (!photos || photos.length === 0) {
+    return null // Don't show anything if no photos
+  }
+
+  const photosPerView = 5
+  const maxIndex = Math.max(0, photos.length - photosPerView)
+
+  const nextPhotos = () => {
+    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
+  }
+
+  const prevPhotos = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0))
+  }
+
+  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
+
+  return (
+    <div className="hidden lg:block w-full">
+      <div className="relative group w-full">
+        <div className="flex gap-2 justify-center w-full">
+          {visiblePhotos.map((photo, index) => (
+            <div key={currentIndex + index} className="w-48 h-36 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+              <Image
+                src={photo || "/placeholder.svg"}
+                alt={`${businessName} photo ${currentIndex + index + 1}`}
+                width={192}
+                height={144}
+                className="w-full h-full object-cover"
+                sizes="192px"
+              />
+            </div>
+          ))}
+
+          {/* Fill empty slots if less than 5 photos visible */}
+          {visiblePhotos.length < photosPerView && (
+            <>
+              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
+                <div
+                  key={`empty-${index}`}
+                  className="w-48 h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                ></div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Navigation arrows - only show if there are more than 5 photos */}
+        {photos.length > photosPerView && (
+          <>
+            <button
+              onClick={prevPhotos}
+              disabled={currentIndex === 0}
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={nextPhotos}
+              disabled={currentIndex >= maxIndex}
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </>
+        )}
+
+        {/* Photo counter */}
+        {photos.length > photosPerView && (
+          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination dots - only show if there are more than 5 photos */}
+      {photos.length > photosPerView && (
+        <div className="flex justify-center mt-2 space-x-1">
+          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
+            const pageStartIndex = index * photosPerView
+            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
+            return (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(pageStartIndex)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
+              />
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Function to load business photos from Cloudflare using public URLs
+const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
+  try {
+    console.log(`Loading photos for business ${businessId}`)
+
+    // Fetch business media data from the updated API
+    const response = await fetch(`/api/businesses/${businessId}`)
+    if (!response.ok) {
+      console.error(`Failed to fetch business data: ${response.status} ${response.statusText}`)
+      return []
+    }
+
+    const businessData = await response.json()
+    console.log(`Business data for ${businessId}:`, businessData)
+
+    // Try multiple possible locations for photo data
+    let photoAlbum = null
+
+    // Check direct photoAlbum property
+    if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
+      photoAlbum = businessData.photoAlbum
+    }
+    // Check nested media.photoAlbum
+    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
+      photoAlbum = businessData.media.photoAlbum
+    }
+    // Check adDesign.photoAlbum
+    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
+      photoAlbum = businessData.adDesign.photoAlbum
+    }
+
+    if (!photoAlbum || !Array.isArray(photoAlbum)) {
+      console.log(`No photo album found for business ${businessId}`)
+      return []
+    }
+
+    console.log(`Found ${photoAlbum.length} photos in album for business ${businessId}`)
+
+    // Convert Cloudflare image IDs to public URLs
+    const photoUrls = photoAlbum
+      .map((photo: any, index: number) => {
+        // Handle different photo data structures
+        let imageId = null
+
+        if (typeof photo === "string") {
+          // If photo is just a string (image ID)
+          imageId = photo
+        } else if (photo && typeof photo === "object") {
+          // If photo is an object, try to extract the image ID
+          imageId = photo.imageId || photo.id || photo.cloudflareId || photo.url
+
+          // If it's already a full URL, return it as-is
+          if (typeof imageId === "string" && (imageId.startsWith("http") || imageId.startsWith("https"))) {
+            console.log(`Photo ${index} already has full URL: ${imageId}`)
+            return imageId
+          }
+        }
+
+        if (!imageId) {
+          console.warn(`No image ID found for photo ${index}:`, photo)
+          return null
+        }
+
+        // Generate public Cloudflare URL
+        try {
+          const publicUrl = getCloudflareImageUrl(imageId, "public")
+          console.log(`Generated URL for image ${imageId}: ${publicUrl}`)
+          return publicUrl
+        } catch (error) {
+          console.error(`Error generating URL for image ${imageId}:`, error)
+          return null
+        }
+      })
+      .filter(Boolean) // Remove null/undefined URLs
+
+    console.log(`Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
+    return photoUrls
+  } catch (error) {
+    console.error(`Error loading photos for business ${businessId}:`, error)
+    return []
   }
 }
 
@@ -156,6 +344,14 @@ export default function FoodDiningPage() {
 
       const result = await getBusinessesForCategoryPage("/food-dining")
 
+      // Load photos for each business using public Cloudflare URLs
+      const businessesWithPhotos = await Promise.all(
+        result.map(async (business: Business) => {
+          const photos = await loadBusinessPhotos(business.id)
+          return { ...business, photos }
+        }),
+      )
+
       // Check if this is still the current request
       if (currentFetchId !== fetchIdRef.current) {
         console.log(`[Food Dining] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
@@ -165,10 +361,10 @@ export default function FoodDiningPage() {
       console.log(`[Food Dining] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
 
       // Filter by zip code if available
-      let filteredResult = result
+      let filteredResult = businessesWithPhotos
       if (userZipCode) {
         console.log(`[Food Dining] Filtering by zip code: ${userZipCode}`)
-        filteredResult = result.filter((business: Business) => {
+        filteredResult = businessesWithPhotos.filter((business: Business) => {
           const serves = businessServesZipCode(business, userZipCode)
           console.log(
             `[Food Dining] Business ${business.displayName || business.adDesignData?.businessInfo?.businessName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
@@ -441,7 +637,7 @@ export default function FoodDiningPage() {
             </Button>
 
             {appliedFilters.length > 0 && (
-              <Button variant="outline" onClick={clearFilters} className="text-sm">
+              <Button variant="outline" onClick={clearFilters} className="text-sm bg-transparent">
                 Clear Filters
               </Button>
             )}
@@ -475,7 +671,7 @@ export default function FoodDiningPage() {
               <span className="font-medium">Showing restaurants for zip code:</span> {userZipCode}
               <span className="text-xs block mt-1">(Includes businesses with {userZipCode} in their service area)</span>
             </p>
-            <Button variant="outline" size="sm" onClick={clearZipCodeFilter} className="text-xs">
+            <Button variant="outline" size="sm" onClick={clearZipCodeFilter} className="text-xs bg-transparent">
               Clear Filter
             </Button>
           </div>
@@ -488,100 +684,117 @@ export default function FoodDiningPage() {
           <p>Loading restaurants...</p>
         </div>
       ) : filteredBusinesses.length > 0 ? (
-        <div className="space-y-6 mt-6">
-          {filteredBusinesses.map((business) => (
-            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
+        <div className="mt-8 space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900">Restaurants ({filteredBusinesses.length})</h2>
+          <div className="grid gap-6">
+            {filteredBusinesses.map((business: Business) => (
+              <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                <div className="flex flex-col space-y-4">
+                  {/* Business Name and Description */}
                   <div>
-                    <h3 className="text-xl font-semibold">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
                       {business.displayName ||
                         business.adDesignData?.businessInfo?.businessName ||
                         business.businessName}
                     </h3>
-                    <p className="text-gray-600 text-sm mt-1">{getLocation(business)}</p>
-
-                    {/* Phone Number */}
-                    {getPhoneNumber(business) && (
-                      <div className="flex items-center mt-1">
-                        <Phone className="w-4 h-4 text-gray-500 mr-1" />
-                        <span className="text-gray-600 text-sm">{formatPhoneNumber(getPhoneNumber(business)!)}</span>
-                      </div>
+                    {business.description && (
+                      <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
                     )}
+                  </div>
 
-                    {/* Service Area Indicator */}
-                    {(business.isNationwide || (business.serviceArea && business.serviceArea.length > 0)) && (
-                      <div className="flex items-center mt-1">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
-                          {business.isNationwide ? "Serves nationwide" : `Serves ${userZipCode} and surrounding areas`}
-                        </span>
+                  {/* Main content area with contact info, photos, and buttons */}
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                    {/* Left side - Contact and Location Info - Made smaller */}
+                    <div className="lg:w-64 space-y-2 flex-shrink-0">
+                      {/* Phone Number */}
+                      {getPhoneNumber(business) && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <a
+                            href={`tel:${getPhoneNumber(business)}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                          >
+                            {formatPhoneNumber(getPhoneNumber(business)!)}
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Location */}
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <span className="text-gray-700 text-sm">{getLocation(business)}</span>
                       </div>
-                    )}
 
-                    {/* Rating Stars */}
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-4 h-4 ${
-                              business.reviews && business.reviews.length > 0 && i < Math.floor(business.rating || 0)
-                                ? "text-yellow-400 fill-current"
-                                : "text-gray-300"
-                            }`}
-                          />
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {business.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : business.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} and surrounding areas</span>
+                          ) : business.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
+                    <div className="flex-1 flex justify-center">
+                      <PhotoCarousel
+                        photos={business.photos || []}
+                        businessName={
+                          business.displayName ||
+                          business.adDesignData?.businessInfo?.businessName ||
+                          business.businessName ||
+                          "Restaurant"
+                        }
+                      />
+                    </div>
+
+                    {/* Right side - Action Buttons */}
+                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleReviewsClick(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleProfileClick(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        View Profile
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Subcategories/Cuisine Types */}
+                  {getSubcategories(business).length > 0 && (
+                    <div className="w-full">
+                      <div className="lg:w-64">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Cuisine:</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2 w-full">
+                        {getSubcategories(business).map((subcategory: any, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {typeof subcategory === "string" ? subcategory : subcategory.name || "Unknown"}
+                          </span>
                         ))}
                       </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {business.reviews && business.reviews.length > 0
-                          ? `${business.rating} (${business.reviews.length} ${business.reviews.length === 1 ? "review" : "reviews"})`
-                          : "No reviews yet"}
-                      </span>
                     </div>
-
-                    {/* Description */}
-                    {business.description && (
-                      <p className="text-gray-600 text-sm mt-2 line-clamp-2">{business.description}</p>
-                    )}
-
-                    {/* Subcategories/Cuisine Types */}
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Cuisine:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {getSubcategories(business).length > 0 ? (
-                          getSubcategories(business).map((subcategory: any, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {typeof subcategory === "string" ? subcategory : subcategory.name || "Unknown"}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {business.subcategory || "Restaurant"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleReviewsClick(business)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleProfileClick(business)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="text-center py-12">
