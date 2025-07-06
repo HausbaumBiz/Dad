@@ -168,7 +168,7 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
   try {
     if (!businessId) {
       console.log("No businessId provided to getBusinessMedia")
-      return null
+      return { photoAlbum: [], folders: [], tags: [] }
     }
 
     console.log(`Getting media for business: ${businessId}`)
@@ -178,7 +178,7 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
 
     console.log("Raw media data from KV:", mediaData)
 
-    if (!mediaData) {
+    if (!mediaData || Object.keys(mediaData).length === 0) {
       console.log("No media data found, returning default structure")
       return { photoAlbum: [], folders: [], tags: [] }
     }
@@ -242,8 +242,8 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
 
     return businessMedia
   } catch (error) {
-    console.error("Error getting business media:", error instanceof Error ? error.message : String(error))
-    console.error("Full error object:", error)
+    console.error("Error getting business media:", error instanceof Error ? error.message : JSON.stringify(error))
+    console.error("Full error stack:", error instanceof Error ? error.stack : error)
     return { photoAlbum: [], folders: [], tags: [] }
   }
 }
