@@ -510,7 +510,7 @@ export default function MentalHealthPage() {
                   </div>
 
                   {/* Center Column - Photos */}
-                  <div className="lg:col-span-5">
+                  <div className="lg:col-span-6">
                     <div className="w-full h-32 bg-gray-100 rounded-lg overflow-hidden">
                       {businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
                         <div className="flex space-x-1 h-full">
@@ -554,7 +554,7 @@ export default function MentalHealthPage() {
                   </div>
 
                   {/* Right Column - Action Buttons */}
-                  <div className="lg:col-span-3 flex flex-col justify-center space-y-2">
+                  <div className="lg:col-span-2 flex flex-col justify-center space-y-2">
                     <Button
                       variant="outline"
                       size="sm"
