@@ -12,6 +12,8 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 // Helper function to safely extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -71,6 +73,26 @@ export default function WeddingsEventsPage() {
     zipCode?: string
     serviceArea?: string[]
     isNationwide?: boolean
+  }
+
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (!businessPhotos[businessId]) {
+      try {
+        const photos = await loadBusinessPhotos(businessId)
+        setBusinessPhotos((prev) => ({
+          ...prev,
+          [businessId]: photos,
+        }))
+      } catch (error) {
+        console.error(`Error loading photos for business ${businessId}:`, error)
+        setBusinessPhotos((prev) => ({
+          ...prev,
+          [businessId]: [],
+        }))
+      }
+    }
   }
 
   // Helper function to check if business serves the zip code
@@ -295,7 +317,7 @@ export default function WeddingsEventsPage() {
               Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
             </Button>
             {appliedFilters.length > 0 && (
-              <Button onClick={handleClearFilters} variant="outline" size="sm" className="min-w-[100px]">
+              <Button onClick={handleClearFilters} variant="outline" size="sm" className="min-w-[100px] bg-transparent">
                 Clear Filters
               </Button>
             )}
@@ -364,71 +386,89 @@ export default function WeddingsEventsPage() {
           {filteredProviders.map((provider: any) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      {provider.displayName || provider.businessName || "Wedding Professional"}
-                    </h3>
+                <div className="flex flex-col lg:flex-row gap-6">
+                  {/* Left side - Photo Carousel */}
+                  <div className="flex-shrink-0">
+                    <PhotoCarousel
+                      businessId={provider.id}
+                      photos={businessPhotos[provider.id] || []}
+                      onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                      className="w-40 h-30"
+                    />
+                  </div>
 
-                    {provider.businessDescription && (
-                      <p className="text-gray-600 text-sm mt-1">{provider.businessDescription}</p>
-                    )}
+                  {/* Right side - Business Info and Buttons */}
+                  <div className="flex-1 flex flex-col lg:flex-row justify-between min-w-0">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-xl font-semibold text-gray-900 truncate">
+                        {provider.displayName || provider.businessName || "Wedding Professional"}
+                      </h3>
 
-                    <div className="mt-3 space-y-2">
-                      {/* Location Display */}
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MapPin className="h-4 w-4 mr-2 text-primary" />
-                        <span>{provider.displayLocation || "Location not specified"}</span>
-                      </div>
-
-                      {/* Phone Display */}
-                      {provider.displayPhone && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Phone className="h-4 w-4 mr-2 text-primary" />
-                          <a href={`tel:${provider.displayPhone}`} className="hover:text-primary transition-colors">
-                            {provider.displayPhone}
-                          </a>
-                        </div>
+                      {provider.businessDescription && (
+                        <p className="text-gray-600 text-sm mt-1 line-clamp-2">{provider.businessDescription}</p>
                       )}
 
-                      {/* Service Area Indicator */}
-                      {userZipCode && (
-                        <div className="text-xs text-green-600 mt-1">
-                          {provider.isNationwide ? (
-                            <span>✓ Serves nationwide</span>
-                          ) : provider.serviceArea?.includes(userZipCode) ? (
-                            <span>✓ Serves {userZipCode} area</span>
-                          ) : provider.zipCode === userZipCode ? (
-                            <span>✓ Located in {userZipCode}</span>
-                          ) : null}
+                      <div className="mt-3 space-y-2">
+                        {/* Location Display */}
+                        <div className="flex items-center text-sm text-gray-600">
+                          <MapPin className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
+                          <span className="truncate">{provider.displayLocation || "Location not specified"}</span>
+                        </div>
+
+                        {/* Phone Display */}
+                        {provider.displayPhone && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Phone className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
+                            <a href={`tel:${provider.displayPhone}`} className="hover:text-primary transition-colors">
+                              {provider.displayPhone}
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Service Area Indicator */}
+                        {userZipCode && (
+                          <div className="text-xs text-green-600 mt-1">
+                            {provider.isNationwide ? (
+                              <span>✓ Serves nationwide</span>
+                            ) : provider.serviceArea?.includes(userZipCode) ? (
+                              <span>✓ Serves {userZipCode} area</span>
+                            ) : provider.zipCode === userZipCode ? (
+                              <span>✓ Located in {userZipCode}</span>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+
+                      {provider.subcategories && provider.subcategories.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {provider.subcategories.map((subcategory: any, idx: number) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800"
+                              >
+                                {getSubcategoryString(subcategory)}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
 
-                    {provider.subcategories && provider.subcategories.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {provider.subcategories.map((subcategory: any, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800"
-                            >
-                              {getSubcategoryString(subcategory)}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-4 md:mt-0 md:ml-6 flex flex-col space-y-2">
-                    <Button className="min-w-[120px]" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button variant="outline" className="min-w-[120px]" onClick={() => handleViewProfile(provider)}>
-                      View Profile
-                    </Button>
+                    {/* Buttons */}
+                    <div className="mt-4 lg:mt-0 lg:ml-6 flex flex-col space-y-2 lg:w-32 flex-shrink-0">
+                      <Button className="min-w-[120px]" onClick={() => handleOpenReviews(provider)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="min-w-[120px] bg-transparent"
+                        onClick={() => handleViewProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
