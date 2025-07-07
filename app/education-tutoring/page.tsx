@@ -93,7 +93,7 @@ function formatPhoneNumber(phoneNumberString: string | undefined | null): string
   return phoneNumberString
 }
 
-// Photo Carousel Component - displays exactly 5 photos in smaller landscape format
+// Photo Carousel Component - displays exactly 5 photos in landscape format
 interface PhotoCarouselProps {
   photos: string[]
   businessName: string
@@ -123,14 +123,14 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
         <div className="flex gap-1.5 justify-center w-full">
           {/* Show actual photos - smaller size */}
           {visiblePhotos.map((photo, index) => (
-            <div key={currentIndex + index} className="w-32 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+            <div key={currentIndex + index} className="w-40 h-30 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
               <Image
                 src={photo || "/placeholder.svg"}
                 alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={128}
-                height={96}
+                width={160}
+                height={120}
                 className="w-full h-full object-cover"
-                sizes="128px"
+                sizes="160px"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement
                   target.src = "/placeholder.svg"
@@ -143,7 +143,7 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
           {Array.from({ length: emptySlots }).map((_, index) => (
             <div
               key={`empty-${index}`}
-              className="w-32 h-24 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0 flex items-center justify-center"
+              className="w-40 h-30 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0 flex items-center justify-center"
             >
               <span className="text-gray-400 text-xs">No Photo</span>
             </div>
@@ -253,7 +253,7 @@ export default function EducationTutoringPage() {
           return
         }
 
-        console.log(`[Education] Fetch ${currentFetchId} got ${result.length} businesses`)
+        console.log(`[Education] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
 
         // Filter by zip code if available
         if (userZipCode) {
@@ -487,9 +487,9 @@ export default function EducationTutoringPage() {
                   </div>
 
                   {/* Main content area with contact info, photos, and buttons */}
-                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                     {/* Left side - Contact and Location Info */}
-                    <div className="lg:w-64 space-y-2 flex-shrink-0">
+                    <div className="lg:w-56 space-y-2 flex-shrink-0">
                       {/* Phone */}
                       {(business.displayPhone || business.phone) && (
                         <div className="flex items-center gap-2">
@@ -523,30 +523,9 @@ export default function EducationTutoringPage() {
                           ) : null}
                         </div>
                       )}
-
-                      {/* Rating */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex">
-                          {[...Array(5)].map((_, i) => (
-                            <svg
-                              key={i}
-                              className={`w-4 h-4 ${business.reviews && business.reviews > 0 && i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          ))}
-                        </div>
-                        <span className="text-sm text-gray-600">
-                          {business.reviews && business.reviews > 0
-                            ? `${business.rating} (${business.reviews} ${business.reviews === 1 ? "review" : "reviews"})`
-                            : "No reviews yet"}
-                        </span>
-                      </div>
                     </div>
 
-                    {/* Middle - Photo Carousel (desktop only) - Smaller size to fit with buttons */}
+                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
                     <div className="flex-1 flex justify-center">
                       {loadingPhotos[business.id] ? (
                         <div className="hidden lg:flex items-center justify-center w-full h-24 bg-gray-50 rounded-lg">
@@ -563,7 +542,7 @@ export default function EducationTutoringPage() {
                       )}
                     </div>
 
-                    {/* Right side - Action Buttons - Adjusted to fit better */}
+                    {/* Right side - Action Buttons */}
                     <div className="flex flex-col gap-2 lg:items-end lg:w-28 flex-shrink-0">
                       <Button
                         variant="outline"
