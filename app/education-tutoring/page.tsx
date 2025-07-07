@@ -93,7 +93,7 @@ function formatPhoneNumber(phoneNumberString: string | undefined | null): string
   return phoneNumberString
 }
 
-// Photo Carousel Component - displays 5 photos in landscape format
+// Photo Carousel Component - displays exactly 5 photos in landscape format
 interface PhotoCarouselProps {
   photos: string[]
   businessName: string
@@ -101,10 +101,6 @@ interface PhotoCarouselProps {
 
 function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
-
-  if (!photos || photos.length === 0) {
-    return null // Don't show anything if no photos
-  }
 
   const photosPerView = 5
   const maxIndex = Math.max(0, photos.length - photosPerView)
@@ -117,12 +113,15 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
     setCurrentIndex((prev) => Math.max(prev - 1, 0))
   }
 
+  // Always show exactly 5 slots
   const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
+  const emptySlots = Math.max(0, photosPerView - visiblePhotos.length)
 
   return (
     <div className="hidden lg:block w-full">
       <div className="relative group w-full">
         <div className="flex gap-2 justify-center w-full">
+          {/* Show actual photos */}
           {visiblePhotos.map((photo, index) => (
             <div key={currentIndex + index} className="w-48 h-36 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
               <Image
@@ -132,21 +131,23 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
                 height={144}
                 className="w-full h-full object-cover"
                 sizes="192px"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = "/placeholder.svg"
+                }}
               />
             </div>
           ))}
 
-          {/* Fill empty slots if less than 5 photos visible */}
-          {visiblePhotos.length < photosPerView && (
-            <>
-              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  className="w-48 h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
-                ></div>
-              ))}
-            </>
-          )}
+          {/* Fill empty slots to always show 5 total */}
+          {Array.from({ length: emptySlots }).map((_, index) => (
+            <div
+              key={`empty-${index}`}
+              className="w-48 h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0 flex items-center justify-center"
+            >
+              <span className="text-gray-400 text-xs">No Photo</span>
+            </div>
+          ))}
         </div>
 
         {/* Navigation arrows - only show if there are more than 5 photos */}
@@ -170,9 +171,9 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
         )}
 
         {/* Photo counter */}
-        {photos.length > photosPerView && (
+        {photos.length > 0 && (
           <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
+            {Math.min(currentIndex + Math.min(visiblePhotos.length, photosPerView), photos.length)} of {photos.length}
           </div>
         )}
       </div>
@@ -286,6 +287,15 @@ export default function EducationTutoringPage() {
 
     fetchBusinesses()
   }, [toast, userZipCode])
+
+  // Load photos for all businesses after they're loaded
+  useEffect(() => {
+    if (filteredBusinesses.length > 0) {
+      filteredBusinesses.forEach((business) => {
+        loadPhotosForBusiness(business.id, business.displayName || business.businessName || "Education Provider")
+      })
+    }
+  }, [filteredBusinesses])
 
   // Function to check if business has exact subcategory match
   const hasExactSubcategoryMatch = (business: Business, subcategory: string): boolean => {
@@ -538,12 +548,7 @@ export default function EducationTutoringPage() {
 
                     {/* Middle - Photo Carousel (desktop only) - Now has more space */}
                     <div className="flex-1 flex justify-center">
-                      {businessPhotos[business.id] && businessPhotos[business.id].length > 0 ? (
-                        <PhotoCarousel
-                          photos={businessPhotos[business.id]}
-                          businessName={business.displayName || business.businessName || "Education Provider"}
-                        />
-                      ) : loadingPhotos[business.id] ? (
+                      {loadingPhotos[business.id] ? (
                         <div className="hidden lg:flex items-center justify-center w-full h-36 bg-gray-50 rounded-lg">
                           <div className="flex items-center gap-2 text-gray-500">
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -551,19 +556,10 @@ export default function EducationTutoringPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="hidden lg:flex items-center justify-center w-full h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-                          <button
-                            onClick={() =>
-                              loadPhotosForBusiness(
-                                business.id,
-                                business.displayName || business.businessName || "Education Provider",
-                              )
-                            }
-                            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                          >
-                            Load Photos
-                          </button>
-                        </div>
+                        <PhotoCarousel
+                          photos={businessPhotos[business.id] || []}
+                          businessName={business.displayName || business.businessName || "Education Provider"}
+                        />
                       )}
                     </div>
 
