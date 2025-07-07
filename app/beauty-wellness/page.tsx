@@ -8,41 +8,10 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, Phone, MapPin, Star, ChevronLeft, ChevronRight } from "lucide-react"
+import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
+import { ChevronLeft, ChevronRight, MapPin, Star } from "lucide-react"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
-
-// Enhanced Business interface with service area support
-interface Business {
-  id: string
-  businessName: string
-  displayName?: string
-  city?: string
-  state?: string
-  zipCode?: string
-  displayCity?: string
-  displayState?: string
-  displayLocation?: string
-  displayPhone?: string
-  phone?: string
-  rating?: number
-  reviews?: number
-  reviewCount?: number
-  allSubcategories?: string[]
-  subcategory?: string
-  subcategories?: string[]
-  businessDescription?: string
-  adDesignData?: {
-    businessInfo?: {
-      phone?: string
-      city?: string
-      state?: string
-    }
-  }
-  serviceArea?: string[]
-  isNationwide?: boolean
-  photos?: string[]
-}
 
 // Photo Carousel Component - displays 5 photos in landscape format
 interface PhotoCarouselProps {
@@ -231,6 +200,38 @@ const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
   }
 }
 
+// Enhanced Business interface with service area support
+interface Business {
+  id: string
+  businessName: string
+  displayName?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  displayCity?: string
+  displayState?: string
+  displayLocation?: string
+  displayPhone?: string
+  phone?: string
+  rating?: number
+  reviews?: number
+  reviewCount?: number
+  allSubcategories?: string[]
+  subcategory?: string
+  subcategories?: string[]
+  businessDescription?: string
+  adDesignData?: {
+    businessInfo?: {
+      phone?: string
+      city?: string
+      state?: string
+    }
+  }
+  serviceArea?: string[]
+  isNationwide?: boolean
+  photos?: string[]
+}
+
 // Format phone number to (XXX) XXX-XXXX
 function formatPhoneNumber(phoneNumberString: string) {
   if (!phoneNumberString) return "No phone provided"
@@ -249,6 +250,8 @@ function formatPhoneNumber(phoneNumberString: string) {
   return phoneNumberString
 }
 
+// Add this helper function after the formatPhoneNumber function and before the BeautyWellnessPage component
+
 // Helper function to extract string value from subcategory (which might be an object)
 function getSubcategoryString(subcategory: any): string {
   if (typeof subcategory === "string") {
@@ -261,33 +264,6 @@ function getSubcategoryString(subcategory: any): string {
   }
 
   return "Unknown Service"
-}
-
-// Helper function to check if business serves a zip code
-const businessServesZipCode = (business: Business, zipCode: string): boolean => {
-  console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
-    isNationwide: business.isNationwide,
-    serviceArea: business.serviceArea,
-    primaryZip: business.zipCode,
-  })
-
-  // Check if business serves nationwide
-  if (business.isNationwide) {
-    console.log(`✓ Business serves nationwide`)
-    return true
-  }
-
-  // Check if zip code is in service area
-  if (business.serviceArea && Array.isArray(business.serviceArea)) {
-    const serves = business.serviceArea.includes(zipCode)
-    console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
-    return serves
-  }
-
-  // Fallback to primary zip code
-  const matches = business.zipCode === zipCode
-  console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
-  return matches
 }
 
 // Now update the hasExactSubcategoryMatch function to use the helper
@@ -347,6 +323,41 @@ export default function BeautyWellnessPage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+
+  // Helper function to check if business serves a zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    console.log(
+      `[Beauty Wellness] Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`,
+      {
+        isNationwide: business.isNationwide,
+        serviceArea: business.serviceArea,
+        primaryZip: business.zipCode,
+      },
+    )
+
+    // Check if business serves nationwide
+    if (business.isNationwide) {
+      console.log(`[Beauty Wellness] Business serves nationwide`)
+      return true
+    }
+
+    // Check if business service area includes the zip code
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const serves = business.serviceArea.some((area) => {
+        if (typeof area === "string") {
+          return area.toLowerCase().includes("nationwide") || area === zipCode
+        }
+        return false
+      })
+      console.log(`[Beauty Wellness] Service area check result: ${serves}`)
+      if (serves) return true
+    }
+
+    // Fall back to primary zip code comparison
+    const primaryMatch = business.zipCode === zipCode
+    console.log(`[Beauty Wellness] Primary zip code match: ${primaryMatch}`)
+    return primaryMatch
+  }
 
   // Clear zip code filter
   const clearZipCodeFilter = () => {
@@ -609,7 +620,7 @@ export default function BeautyWellnessPage() {
         <div className="text-center py-8">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : filteredBusinesses.length > 0 ? (
+      ) : (
         <div className="mt-8 space-y-6">
           <h2 className="text-2xl font-bold text-gray-900">
             Beauty & Wellness Providers ({filteredBusinesses.length})
@@ -757,7 +768,7 @@ export default function BeautyWellnessPage() {
             ))}
           </div>
         </div>
-      ) : (
+      ) : (\
         <div className="text-center py-12">
           <div className="bg-pink-50 border border-pink-200 rounded-lg p-8 max-w-2xl mx-auto">
             <h3 className="text-xl font-medium text-pink-800 mb-2">
