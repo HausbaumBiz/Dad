@@ -50,7 +50,7 @@ interface Business {
   displayLocation?: string
 }
 
-// Photo Carousel Component - displays 5 photos in smaller landscape format
+// Photo Carousel Component - displays 5 photos in optimized landscape format
 interface PhotoCarouselProps {
   photos: string[]
   businessName: string
@@ -81,14 +81,14 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
       <div className="relative group w-full">
         <div className="flex gap-2 justify-center w-full">
           {visiblePhotos.map((photo, index) => (
-            <div key={currentIndex + index} className="w-32 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+            <div key={currentIndex + index} className="w-40 h-30 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
               <Image
                 src={photo || "/placeholder.svg"}
                 alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={128}
-                height={96}
+                width={160}
+                height={120}
                 className="w-full h-full object-cover"
-                sizes="128px"
+                sizes="160px"
               />
             </div>
           ))}
@@ -99,7 +99,7 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
               {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
                 <div
                   key={`empty-${index}`}
-                  className="w-32 h-24 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                  className="w-40 h-30 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
                 ></div>
               ))}
             </>
@@ -742,7 +742,7 @@ export default function AutomotiveServicesPage() {
                     {/* Main content area with contact info, photos, and buttons */}
                     <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                       {/* Left side - Contact and Location Info */}
-                      <div className="lg:w-64 space-y-2 flex-shrink-0">
+                      <div className="lg:w-56 space-y-2 flex-shrink-0">
                         {/* Phone */}
                         {(business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone) && (
                           <div className="flex items-center gap-2">
@@ -809,7 +809,7 @@ export default function AutomotiveServicesPage() {
                         )}
                       </div>
 
-                      {/* Middle - Photo Carousel (desktop only) - Smaller photos */}
+                      {/* Middle - Photo Carousel (desktop only) - Optimized size */}
                       <div className="flex-1 flex justify-center">
                         <PhotoCarousel
                           photos={business.photos || []}
@@ -817,13 +817,13 @@ export default function AutomotiveServicesPage() {
                         />
                       </div>
 
-                      {/* Right side - Action Buttons - Increased width */}
-                      <div className="flex flex-col gap-2 lg:items-end lg:w-32 flex-shrink-0">
+                      {/* Right side - Action Buttons - Optimized width */}
+                      <div className="flex flex-col gap-2 lg:items-end lg:w-28 flex-shrink-0">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleOpenReviews(business)}
-                          className="text-sm min-w-[120px]"
+                          className="text-sm min-w-[110px]"
                         >
                           Reviews
                         </Button>
@@ -831,7 +831,7 @@ export default function AutomotiveServicesPage() {
                           variant="default"
                           size="sm"
                           onClick={() => handleOpenProfile(business)}
-                          className="text-sm min-w-[120px]"
+                          className="text-sm min-w-[110px]"
                         >
                           View Profile
                         </Button>
@@ -842,7 +842,7 @@ export default function AutomotiveServicesPage() {
                     {(business.subcategories && business.subcategories.length > 0) ||
                     (business.services && business.services.length > 0) ? (
                       <div className="w-full">
-                        <div className="lg:w-64">
+                        <div className="lg:w-56">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">Specializes in:</h4>
                         </div>
                         <div className="flex flex-wrap gap-2 w-full">
