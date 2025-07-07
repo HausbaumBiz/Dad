@@ -2,7 +2,6 @@
 
 import { CategoryLayout } from "@/components/category-layout"
 import type { FilterOption } from "@/components/category-filter"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
@@ -12,6 +11,7 @@ import { Phone, MapPin, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { Checkbox } from "@/components/ui/checkbox"
 
 // Helper function to extract string from subcategory data
@@ -54,115 +54,190 @@ interface Business {
   }
   serviceArea?: string[]
   isNationwide?: boolean
+  photos?: string[]
 }
 
-// Photo Carousel Component
-const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessName: string }) => {
+// Photo Carousel Component - displays 5 photos in landscape format
+interface PhotoCarouselProps {
+  photos: string[]
+  businessName: string
+}
+
+function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
   if (!photos || photos.length === 0) {
-    return (
-      <div className="w-40 h-30 bg-gray-100 rounded-lg flex items-center justify-center">
-        <span className="text-gray-400 text-sm">No photos</span>
-      </div>
-    )
+    return null // Don't show anything if no photos
   }
 
-  const visiblePhotos = photos.slice(0, 5) // Show max 5 photos
+  const photosPerView = 5
+  const maxIndex = Math.max(0, photos.length - photosPerView)
 
-  const nextPhoto = () => {
-    setCurrentIndex((prev) => (prev + 1) % visiblePhotos.length)
+  const nextPhotos = () => {
+    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
   }
 
-  const prevPhoto = () => {
-    setCurrentIndex((prev) => (prev - 1 + visiblePhotos.length) % visiblePhotos.length)
+  const prevPhotos = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0))
   }
+
+  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
 
   return (
-    <div className="relative">
-      <div className="relative overflow-hidden rounded-lg bg-gray-100 w-40 h-30">
-        <div
-          className="flex transition-transform duration-300 ease-in-out h-full"
-          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-        >
+    <div className="hidden lg:block w-full">
+      <div className="relative group w-full">
+        <div className="flex gap-2 justify-center w-full">
           {visiblePhotos.map((photo, index) => (
-            <div key={index} className="w-full h-full flex-shrink-0">
+            <div key={currentIndex + index} className="w-40 h-30 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
               <Image
                 src={photo || "/placeholder.svg"}
-                alt={`${businessName} - Photo ${index + 1}`}
+                alt={`${businessName} photo ${currentIndex + index + 1}`}
                 width={160}
                 height={120}
                 className="w-full h-full object-cover"
                 sizes="160px"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = "/placeholder.svg?height=120&width=160&text=No+Image"
-                }}
               />
             </div>
           ))}
+
+          {/* Fill empty slots if less than 5 photos visible */}
+          {visiblePhotos.length < photosPerView && (
+            <>
+              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
+                <div
+                  key={`empty-${index}`}
+                  className="w-40 h-30 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                ></div>
+              ))}
+            </>
+          )}
         </div>
 
-        {visiblePhotos.length > 1 && (
+        {/* Navigation arrows - only show if there are more than 5 photos */}
+        {photos.length > photosPerView && (
           <>
             <button
-              onClick={prevPhoto}
-              className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors z-10"
-              aria-label="Previous photo"
+              onClick={prevPhotos}
+              disabled={currentIndex === 0}
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
             >
-              <ChevronLeft className="h-3 w-3" />
+              <ChevronLeft size={16} />
             </button>
             <button
-              onClick={nextPhoto}
-              className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors z-10"
-              aria-label="Next photo"
+              onClick={nextPhotos}
+              disabled={currentIndex >= maxIndex}
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
             >
-              <ChevronRight className="h-3 w-3" />
+              <ChevronRight size={16} />
             </button>
           </>
         )}
+
+        {/* Photo counter */}
+        {photos.length > photosPerView && (
+          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
+          </div>
+        )}
       </div>
 
-      {visiblePhotos.length > 1 && (
+      {/* Pagination dots - only show if there are more than 5 photos */}
+      {photos.length > photosPerView && (
         <div className="flex justify-center mt-2 space-x-1">
-          {visiblePhotos.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                index === currentIndex ? "bg-primary" : "bg-gray-300"
-              }`}
-              aria-label={`Go to photo ${index + 1}`}
-            />
-          ))}
+          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
+            const pageStartIndex = index * photosPerView
+            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
+            return (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(pageStartIndex)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
+              />
+            )
+          })}
         </div>
       )}
     </div>
   )
 }
 
-// Function to load business photos from Cloudflare Images
+// Function to load business photos from Cloudflare using public URLs
 const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
   try {
-    const response = await fetch(`/api/cloudflare-images/get-image?businessId=${businessId}`)
+    console.log(`Loading photos for business ${businessId}`)
+
+    // Fetch business media data from the updated API
+    const response = await fetch(`/api/businesses/${businessId}`)
     if (!response.ok) {
-      console.log(`No photos found for business ${businessId}`)
+      console.error(`Failed to fetch business data: ${response.status} ${response.statusText}`)
       return []
     }
 
-    const data = await response.json()
-    if (data.success && data.images && Array.isArray(data.images)) {
-      // Return the Cloudflare image URLs
-      const imageUrls = data.images.map((image: any) => {
-        // Construct Cloudflare Images URL
-        const accountHash = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID || "your-account-hash"
-        return `https://imagedelivery.net/${accountHash}/${image.id}/public`
-      })
-      console.log(`Loaded ${imageUrls.length} photos for business ${businessId}`)
-      return imageUrls
+    const businessData = await response.json()
+    console.log(`Business data for ${businessId}:`, businessData)
+
+    // Try multiple possible locations for photo data
+    let photoAlbum = null
+
+    // Check direct photoAlbum property
+    if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
+      photoAlbum = businessData.photoAlbum
+    }
+    // Check nested media.photoAlbum
+    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
+      photoAlbum = businessData.media.photoAlbum
+    }
+    // Check adDesign.photoAlbum
+    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
+      photoAlbum = businessData.adDesign.photoAlbum
     }
 
-    return []
+    if (!photoAlbum || !Array.isArray(photoAlbum)) {
+      console.log(`No photo album found for business ${businessId}`)
+      return []
+    }
+
+    console.log(`Found ${photoAlbum.length} photos in album for business ${businessId}`)
+
+    // Convert Cloudflare image IDs to public URLs
+    const photoUrls = photoAlbum
+      .map((photo: any, index: number) => {
+        // Handle different photo data structures
+        let imageId = null
+
+        if (typeof photo === "string") {
+          // If photo is just a string (image ID)
+          imageId = photo
+        } else if (photo && typeof photo === "object") {
+          // If photo is an object, try to extract the image ID
+          imageId = photo.imageId || photo.id || photo.cloudflareId || photo.url
+
+          // If it's already a full URL, return it as-is
+          if (typeof imageId === "string" && (imageId.startsWith("http") || imageId.startsWith("https"))) {
+            console.log(`Photo ${index} already has full URL: ${imageId}`)
+            return imageId
+          }
+        }
+
+        if (!imageId) {
+          console.warn(`No image ID found for photo ${index}:`, photo)
+          return null
+        }
+
+        // Generate public Cloudflare URL
+        try {
+          const publicUrl = getCloudflareImageUrl(imageId, "public")
+          console.log(`Generated URL for image ${imageId}: ${publicUrl}`)
+          return publicUrl
+        } catch (error) {
+          console.error(`Error generating URL for image ${imageId}:`, error)
+          return null
+        }
+      })
+      .filter(Boolean) // Remove null/undefined URLs
+
+    console.log(`Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
+    return photoUrls
   } catch (error) {
     console.error(`Error loading photos for business ${businessId}:`, error)
     return []
@@ -209,10 +284,6 @@ export default function MusicLessonsPage() {
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allProviders, setAllProviders] = useState<Business[]>([])
   const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
-
-  // State for business photos
-  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
-  const [photosLoading, setPhotosLoading] = useState<Record<string, boolean>>({})
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -319,7 +390,7 @@ export default function MusicLessonsPage() {
         setError(null)
 
         console.log("Fetching music lesson businesses...")
-        let businesses = await getBusinessesForCategoryPage("/music-lessons")
+        const businesses = await getBusinessesForCategoryPage("/music-lessons")
 
         // Check if this is still the current request
         if (currentFetchId !== fetchIdRef.current) {
@@ -329,10 +400,19 @@ export default function MusicLessonsPage() {
 
         console.log(`[Music Lessons] Fetch ${currentFetchId} completed, got ${businesses.length} businesses`)
 
+        // Load photos for each business using public Cloudflare URLs
+        const businessesWithPhotos = await Promise.all(
+          businesses.map(async (business: Business) => {
+            const photos = await loadBusinessPhotos(business.id)
+            return { ...business, photos }
+          }),
+        )
+
         // Filter by zip code if available
+        let filteredBusinesses = businessesWithPhotos
         if (userZipCode) {
           console.log(`[Music Lessons] Filtering by zip code: ${userZipCode}`)
-          businesses = businesses.filter((business: Business) => {
+          filteredBusinesses = businessesWithPhotos.filter((business: Business) => {
             const serves = businessServesZipCode(business, userZipCode)
             console.log(
               `[Music Lessons] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
@@ -340,25 +420,12 @@ export default function MusicLessonsPage() {
             )
             return serves
           })
-          console.log(`[Music Lessons] After filtering: ${businesses.length} businesses`)
+          console.log(`[Music Lessons] After filtering: ${filteredBusinesses.length} businesses`)
         }
 
-        console.log("Fetched music lesson businesses:", businesses)
-        setAllProviders(businesses)
-        setFilteredProviders(businesses)
-
-        // Load photos for each business
-        businesses.forEach(async (business: Business) => {
-          setPhotosLoading((prev) => ({ ...prev, [business.id]: true }))
-          try {
-            const photos = await loadBusinessPhotos(business.id)
-            setBusinessPhotos((prev) => ({ ...prev, [business.id]: photos }))
-          } catch (error) {
-            console.error(`Failed to load photos for business ${business.id}:`, error)
-          } finally {
-            setPhotosLoading((prev) => ({ ...prev, [business.id]: false }))
-          }
-        })
+        console.log("Fetched music lesson businesses:", filteredBusinesses)
+        setAllProviders(filteredBusinesses)
+        setFilteredProviders(filteredBusinesses)
       } catch (error) {
         // Only update error state if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -527,91 +594,106 @@ export default function MusicLessonsPage() {
             )}
 
             {filteredProviders.map((business: Business) => (
-              <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row justify-between">
-                    <div className="lg:w-56 flex-shrink-0">
-                      <h3 className="text-xl font-semibold text-gray-900">
-                        {business.displayName || business.businessName || "Music Instructor"}
-                      </h3>
+              <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                <div className="flex flex-col space-y-4">
+                  {/* Business Name and Description */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {business.displayName || business.businessName || "Music Instructor"}
+                    </h3>
+                    {business.businessDescription && (
+                      <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
+                    )}
+                  </div>
+
+                  {/* Main content area with contact info, photos, and buttons */}
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                    {/* Left side - Contact and Location Info */}
+                    <div className="lg:w-56 space-y-2 flex-shrink-0">
+                      {/* Phone */}
+                      {business.displayPhone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <a
+                            href={`tel:${business.displayPhone}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                          >
+                            {business.displayPhone}
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Location */}
+                      {business.displayLocation && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <span className="text-gray-700 text-sm">{business.displayLocation}</span>
+                        </div>
+                      )}
 
                       {/* Service Area Indicator */}
-                      {business.isNationwide ? (
-                        <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
-                      ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
-                        <div className="text-xs text-green-600 font-medium mb-1">
-                          ✓ Serves {userZipCode} and surrounding areas
-                        </div>
-                      ) : null}
-
-                      {business.businessDescription && (
-                        <p className="text-gray-600 text-sm mt-1">{business.businessDescription}</p>
-                      )}
-
-                      <div className="mt-3 space-y-2">
-                        {/* Location Display */}
-                        <div className="flex items-center text-sm text-gray-600">
-                          <MapPin className="h-4 w-4 mr-2 text-primary" />
-                          <span>{business.displayLocation || "Location not specified"}</span>
-                        </div>
-
-                        {/* Phone Display */}
-                        {business.displayPhone && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Phone className="h-4 w-4 mr-2 text-primary" />
-                            <a href={`tel:${business.displayPhone}`} className="hover:text-primary transition-colors">
-                              {business.displayPhone}
-                            </a>
-                          </div>
-                        )}
-                      </div>
-
-                      {business.subcategories && business.subcategories.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {business.subcategories.map((subcategory: any, idx: number) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                              >
-                                {getSubcategoryString(subcategory)}
-                              </span>
-                            ))}
-                          </div>
+                      {userZipCode && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {business.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : business.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} and surrounding areas</span>
+                          ) : business.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
                         </div>
                       )}
                     </div>
 
-                    {/* Photo Carousel - Desktop Only */}
-                    <div className="hidden lg:block mt-4 lg:mt-0 lg:ml-6">
-                      {photosLoading[business.id] ? (
-                        <div className="w-40 h-30 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                        </div>
-                      ) : (
-                        <PhotoCarousel
-                          photos={businessPhotos[business.id] || []}
-                          businessName={business.displayName || business.businessName || "Music Instructor"}
-                        />
-                      )}
+                    {/* Middle - Photo Carousel (desktop only) */}
+                    <div className="flex-1 flex justify-center">
+                      <PhotoCarousel
+                        photos={business.photos || []}
+                        businessName={business.displayName || business.businessName || "Music Instructor"}
+                      />
                     </div>
 
-                    <div className="mt-4 md:mt-0 md:ml-6 flex flex-col space-y-2">
-                      <Button className="min-w-[120px]" onClick={() => handleViewReviews(business)}>
+                    {/* Right side - Action Buttons */}
+                    <div className="flex flex-col gap-2 lg:items-end lg:w-28 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewReviews(business)}
+                        className="text-sm min-w-[110px] bg-transparent"
+                      >
                         Reviews
                       </Button>
                       <Button
-                        variant="outline"
-                        className="min-w-[120px] bg-transparent"
+                        variant="default"
+                        size="sm"
                         onClick={() => handleViewProfile(business)}
+                        className="text-sm min-w-[110px]"
                       >
                         View Profile
                       </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+
+                  {/* Subcategories/Specialties */}
+                  {business.subcategories && business.subcategories.length > 0 && (
+                    <div className="w-full">
+                      <div className="lg:w-56">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2 w-full">
+                        {business.subcategories.map((subcategory: any, index: number) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                          >
+                            {getSubcategoryString(subcategory)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             ))}
           </>
         )}
