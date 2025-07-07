@@ -386,28 +386,28 @@ export default function WeddingsEventsPage() {
           {filteredProviders.map((provider: any) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col space-y-4">
-                  {/* Business Info */}
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900">
+                <div className="space-y-4">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold text-gray-900 leading-tight">
                       {provider.displayName || provider.businessName || "Wedding Professional"}
                     </h3>
 
                     {provider.businessDescription && (
-                      <p className="text-gray-600 text-sm mt-1">{provider.businessDescription}</p>
+                      <p className="text-gray-600 text-sm line-clamp-2">{provider.businessDescription}</p>
                     )}
 
-                    <div className="mt-3 space-y-2">
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                       {/* Location Display */}
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MapPin className="h-4 w-4 mr-2 text-primary" />
-                        <span>{provider.displayLocation || "Location not specified"}</span>
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 mr-1 text-primary" />
+                        <span className="truncate">{provider.displayLocation || "Location not specified"}</span>
                       </div>
 
                       {/* Phone Display */}
                       {provider.displayPhone && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Phone className="h-4 w-4 mr-2 text-primary" />
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1 text-primary" />
                           <a href={`tel:${provider.displayPhone}`} className="hover:text-primary transition-colors">
                             {provider.displayPhone}
                           </a>
@@ -416,7 +416,7 @@ export default function WeddingsEventsPage() {
 
                       {/* Service Area Indicator */}
                       {userZipCode && (
-                        <div className="text-xs text-green-600 mt-1">
+                        <div className="text-xs text-green-600">
                           {provider.isNationwide ? (
                             <span>✓ Serves nationwide</span>
                           ) : provider.serviceArea?.includes(userZipCode) ? (
@@ -429,45 +429,52 @@ export default function WeddingsEventsPage() {
                     </div>
 
                     {provider.subcategories && provider.subcategories.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {provider.subcategories.map((subcategory: any, idx: number) => (
+                      <div className="mt-2">
+                        <div className="flex flex-wrap gap-1">
+                          {provider.subcategories.slice(0, 4).map((subcategory: any, idx: number) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800"
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800"
                             >
                               {getSubcategoryString(subcategory)}
                             </span>
                           ))}
+                          {provider.subcategories.length > 4 && (
+                            <span className="text-xs text-gray-500 px-2 py-0.5">
+                              +{provider.subcategories.length - 4} more
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Photo Carousel */}
-                  <div className="w-full">
-                    <PhotoCarousel
-                      businessId={provider.id}
-                      photos={businessPhotos[provider.id] || []}
-                      onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
-                      showMultiple={true}
-                      photosPerView={5}
-                    />
-                  </div>
+                  {/* Photos and Buttons on same line */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                    {/* Photo Carousel - takes most of the width */}
+                    <div className="flex-1 min-w-0">
+                      <PhotoCarousel
+                        businessId={provider.id}
+                        photos={businessPhotos[provider.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                      />
+                    </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                    <Button className="flex-1" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 bg-transparent"
-                      onClick={() => handleViewProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
+                    {/* Action Buttons - fixed width on the right */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32 flex-shrink-0">
+                      <Button className="flex-1 lg:w-full" onClick={() => handleOpenReviews(provider)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:w-full bg-transparent"
+                        onClick={() => handleViewProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
