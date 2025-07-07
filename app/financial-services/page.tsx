@@ -433,62 +433,53 @@ export default function FinancialServicesPage() {
           {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col lg:flex-row gap-4">
-                  {/* Photo Carousel */}
-                  <div className="lg:w-40 flex-shrink-0">
-                    <PhotoCarousel
-                      businessId={business.id}
-                      photos={businessPhotos[business.id] || []}
-                      onLoadPhotos={() => loadPhotosForBusiness(business.id)}
-                      className="w-40 h-30"
-                    />
-                  </div>
-
-                  {/* Business Info */}
-                  <div className="flex-1 min-w-0">
+                <div className="space-y-4">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
 
-                    {business.displayLocation && (
-                      <div className="flex items-center mt-2 text-gray-600">
-                        <MapPin className="h-4 w-4 mr-1" />
-                        <span className="text-sm">{business.displayLocation}</span>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {business.displayLocation && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span>{business.displayLocation}</span>
+                        </div>
+                      )}
 
-                    {business.displayPhone && (
-                      <div className="flex items-center mt-1 text-gray-600">
-                        <Phone className="h-4 w-4 mr-1" />
-                        <a href={`tel:${business.displayPhone}`} className="text-sm hover:text-primary">
-                          {business.displayPhone}
-                        </a>
-                      </div>
-                    )}
+                      {business.displayPhone && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          <a href={`tel:${business.displayPhone}`} className="hover:text-primary">
+                            {business.displayPhone}
+                          </a>
+                        </div>
+                      )}
 
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div className="flex items-center mt-1 text-blue-600">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                        <span className="text-xs">
-                          {business.isNationwide
-                            ? "Serves nationwide"
-                            : business.serviceArea?.includes(userZipCode)
-                              ? `Serves ${userZipCode} and surrounding areas`
-                              : `Primary location: ${business.zipCode}`}
-                        </span>
-                      </div>
-                    )}
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="flex items-center text-blue-600">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <span className="text-xs">
+                            {business.isNationwide
+                              ? "Serves nationwide"
+                              : business.serviceArea?.includes(userZipCode)
+                                ? `Serves ${userZipCode} area`
+                                : `Primary: ${business.zipCode}`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                    <div className="flex items-center mt-2">
+                    <div className="flex items-center">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => {
-                          // Only show yellow stars if business has reviews AND a rating
                           const hasReviews = business.reviews && business.reviews > 0
                           const rating = hasReviews ? business.rating || 0 : 0
 
@@ -513,39 +504,59 @@ export default function FinancialServicesPage() {
                       )}
                     </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
+                      <div className="flex flex-wrap gap-1">
                         {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service, idx) => (
+                          business.allSubcategories.slice(0, 4).map((service, idx) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
                               {getSubcategoryString(service)}
                             </span>
                           ))
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
                             {getSubcategoryString(business.subcategory) || "Financial Services"}
+                          </span>
+                        )}
+                        {business.allSubcategories && business.allSubcategories.length > 4 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            +{business.allSubcategories.length - 4} more
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
-                    <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 lg:flex-none lg:w-full bg-transparent"
-                      onClick={() => handleOpenProfile(business)}
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={business.id}
+                        photos={businessPhotos[business.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
+                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none lg:w-full bg-transparent"
+                        onClick={() => handleOpenProfile(business)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
