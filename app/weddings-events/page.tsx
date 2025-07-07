@@ -386,89 +386,88 @@ export default function WeddingsEventsPage() {
           {filteredProviders.map((provider: any) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col lg:flex-row gap-6">
-                  {/* Left side - Photo Carousel */}
-                  <div className="flex-shrink-0">
+                <div className="flex flex-col space-y-4">
+                  {/* Business Info */}
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      {provider.displayName || provider.businessName || "Wedding Professional"}
+                    </h3>
+
+                    {provider.businessDescription && (
+                      <p className="text-gray-600 text-sm mt-1">{provider.businessDescription}</p>
+                    )}
+
+                    <div className="mt-3 space-y-2">
+                      {/* Location Display */}
+                      <div className="flex items-center text-sm text-gray-600">
+                        <MapPin className="h-4 w-4 mr-2 text-primary" />
+                        <span>{provider.displayLocation || "Location not specified"}</span>
+                      </div>
+
+                      {/* Phone Display */}
+                      {provider.displayPhone && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Phone className="h-4 w-4 mr-2 text-primary" />
+                          <a href={`tel:${provider.displayPhone}`} className="hover:text-primary transition-colors">
+                            {provider.displayPhone}
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {provider.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : provider.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} area</span>
+                          ) : provider.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+
+                    {provider.subcategories && provider.subcategories.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {provider.subcategories.map((subcategory: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800"
+                            >
+                              {getSubcategoryString(subcategory)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Photo Carousel */}
+                  <div className="w-full">
                     <PhotoCarousel
                       businessId={provider.id}
                       photos={businessPhotos[provider.id] || []}
                       onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
-                      className="w-40 h-30"
+                      showMultiple={true}
+                      photosPerView={5}
                     />
                   </div>
 
-                  {/* Right side - Business Info and Buttons */}
-                  <div className="flex-1 flex flex-col lg:flex-row justify-between min-w-0">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-semibold text-gray-900 truncate">
-                        {provider.displayName || provider.businessName || "Wedding Professional"}
-                      </h3>
-
-                      {provider.businessDescription && (
-                        <p className="text-gray-600 text-sm mt-1 line-clamp-2">{provider.businessDescription}</p>
-                      )}
-
-                      <div className="mt-3 space-y-2">
-                        {/* Location Display */}
-                        <div className="flex items-center text-sm text-gray-600">
-                          <MapPin className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
-                          <span className="truncate">{provider.displayLocation || "Location not specified"}</span>
-                        </div>
-
-                        {/* Phone Display */}
-                        {provider.displayPhone && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Phone className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
-                            <a href={`tel:${provider.displayPhone}`} className="hover:text-primary transition-colors">
-                              {provider.displayPhone}
-                            </a>
-                          </div>
-                        )}
-
-                        {/* Service Area Indicator */}
-                        {userZipCode && (
-                          <div className="text-xs text-green-600 mt-1">
-                            {provider.isNationwide ? (
-                              <span>✓ Serves nationwide</span>
-                            ) : provider.serviceArea?.includes(userZipCode) ? (
-                              <span>✓ Serves {userZipCode} area</span>
-                            ) : provider.zipCode === userZipCode ? (
-                              <span>✓ Located in {userZipCode}</span>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-
-                      {provider.subcategories && provider.subcategories.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {provider.subcategories.map((subcategory: any, idx: number) => (
-                              <span
-                                key={idx}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800"
-                              >
-                                {getSubcategoryString(subcategory)}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Buttons */}
-                    <div className="mt-4 lg:mt-0 lg:ml-6 flex flex-col space-y-2 lg:w-32 flex-shrink-0">
-                      <Button className="min-w-[120px]" onClick={() => handleOpenReviews(provider)}>
-                        Reviews
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="min-w-[120px] bg-transparent"
-                        onClick={() => handleViewProfile(provider)}
-                      >
-                        View Profile
-                      </Button>
-                    </div>
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                    <Button className="flex-1" onClick={() => handleOpenReviews(provider)}>
+                      Reviews
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 bg-transparent"
+                      onClick={() => handleViewProfile(provider)}
+                    >
+                      View Profile
+                    </Button>
                   </div>
                 </div>
               </CardContent>
