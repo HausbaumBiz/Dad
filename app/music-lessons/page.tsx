@@ -530,7 +530,7 @@ export default function MusicLessonsPage() {
               <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row justify-between">
-                    <div className="flex-1">
+                    <div className="lg:w-56 flex-shrink-0">
                       <h3 className="text-xl font-semibold text-gray-900">
                         {business.displayName || business.businessName || "Music Instructor"}
                       </h3>
