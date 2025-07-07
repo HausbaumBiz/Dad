@@ -10,7 +10,7 @@ import { AdBox } from "@/components/ad-box"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
-import { Phone, Loader2, MapPin, Star, ChevronLeft, ChevronRight } from "lucide-react"
+import { Phone, Loader2, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 
@@ -807,23 +807,6 @@ export default function AutomotiveServicesPage() {
                             ) : null}
                           </div>
                         )}
-
-                        {/* Rating */}
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`h-4 w-4 ${
-                                  star <= (business.rating || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          <span className="text-sm text-gray-600">
-                            {business.rating?.toFixed(1) || "0.0"} ({business.reviews || 0} reviews)
-                          </span>
-                        </div>
                       </div>
 
                       {/* Middle - Photo Carousel (desktop only) - Now has more space */}
