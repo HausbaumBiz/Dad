@@ -9,9 +9,10 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, Phone } from "lucide-react"
+import { Loader2, Phone, ChevronLeft, ChevronRight, MapPin } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { Checkbox } from "@/components/ui/checkbox"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -46,6 +47,7 @@ interface Business {
   subcategory?: string
   serviceArea?: string[]
   isNationwide?: boolean
+  businessDescription?: string
 }
 
 // Helper function to check if business serves the zip code
@@ -91,6 +93,110 @@ function formatPhoneNumber(phoneNumberString: string | undefined | null): string
   return phoneNumberString
 }
 
+// Photo Carousel Component - displays 5 photos in landscape format
+interface PhotoCarouselProps {
+  photos: string[]
+  businessName: string
+}
+
+function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (!photos || photos.length === 0) {
+    return null // Don't show anything if no photos
+  }
+
+  const photosPerView = 5
+  const maxIndex = Math.max(0, photos.length - photosPerView)
+
+  const nextPhotos = () => {
+    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
+  }
+
+  const prevPhotos = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0))
+  }
+
+  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
+
+  return (
+    <div className="hidden lg:block w-full">
+      <div className="relative group w-full">
+        <div className="flex gap-2 justify-center w-full">
+          {visiblePhotos.map((photo, index) => (
+            <div key={currentIndex + index} className="w-48 h-36 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+              <Image
+                src={photo || "/placeholder.svg"}
+                alt={`${businessName} photo ${currentIndex + index + 1}`}
+                width={192}
+                height={144}
+                className="w-full h-full object-cover"
+                sizes="192px"
+              />
+            </div>
+          ))}
+
+          {/* Fill empty slots if less than 5 photos visible */}
+          {visiblePhotos.length < photosPerView && (
+            <>
+              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
+                <div
+                  key={`empty-${index}`}
+                  className="w-48 h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                ></div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Navigation arrows - only show if there are more than 5 photos */}
+        {photos.length > photosPerView && (
+          <>
+            <button
+              onClick={prevPhotos}
+              disabled={currentIndex === 0}
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={nextPhotos}
+              disabled={currentIndex >= maxIndex}
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </>
+        )}
+
+        {/* Photo counter */}
+        {photos.length > photosPerView && (
+          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination dots - only show if there are more than 5 photos */}
+      {photos.length > photosPerView && (
+        <div className="flex justify-center mt-2 space-x-1">
+          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
+            const pageStartIndex = index * photosPerView
+            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
+            return (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(pageStartIndex)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
+              />
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function EducationTutoringPage() {
   const { toast } = useToast()
   const filterOptions = [
@@ -120,6 +226,9 @@ export default function EducationTutoringPage() {
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
   const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
+
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+  const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -234,6 +343,28 @@ export default function EducationTutoringPage() {
     setIsProfileDialogOpen(true)
   }
 
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string, businessName: string) => {
+    if (businessPhotos[businessId] || loadingPhotos[businessId]) {
+      return // Already loaded or loading
+    }
+
+    setLoadingPhotos((prev) => ({ ...prev, [businessId]: true }))
+
+    try {
+      console.log(`Loading photos for business: ${businessName}`, { id: businessId })
+      const photos = await loadBusinessPhotos(businessId)
+      console.log(`Loaded ${photos.length} photos for business ${businessId}`)
+
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
+    } finally {
+      setLoadingPhotos((prev) => ({ ...prev, [businessId]: false }))
+    }
+  }
+
   return (
     <CategoryLayout title="Language Lessons & School Subject Tutoring" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -334,89 +465,147 @@ export default function EducationTutoringPage() {
           {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
+                <div className="flex flex-col space-y-4">
+                  {/* Business Name and Description */}
                   <div>
-                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">
-                      {business.displayLocation ||
-                        (business.city && business.state
-                          ? `${business.city}, ${business.state}`
-                          : business.city || business.state || `Zip: ${business.zipCode}`)}
-                    </p>
-
-                    {(business.displayPhone || business.phone) && (
-                      <div className="flex items-center text-gray-600 text-sm mt-1">
-                        <Phone className="h-3 w-3 mr-1" />
-                        <span>{formatPhoneNumber(business.displayPhone || business.phone)}</span>
-                      </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {business.displayName || business.businessName}
+                    </h3>
+                    {business.businessDescription && (
+                      <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
                     )}
+                  </div>
 
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div className="text-xs text-green-600 mt-1">
-                        {business.isNationwide ? (
-                          <span>✓ Serves nationwide</span>
-                        ) : business.serviceArea?.includes(userZipCode) ? (
-                          <span>✓ Serves {userZipCode} and surrounding areas</span>
-                        ) : business.zipCode === userZipCode ? (
-                          <span>✓ Located in {userZipCode}</span>
-                        ) : null}
-                      </div>
-                    )}
-
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${business.reviews && business.reviews > 0 && i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
+                  {/* Main content area with contact info, photos, and buttons */}
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                    {/* Left side - Contact and Location Info - Made smaller */}
+                    <div className="lg:w-64 space-y-2 flex-shrink-0">
+                      {/* Phone */}
+                      {(business.displayPhone || business.phone) && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <a
+                            href={`tel:${business.displayPhone || business.phone}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
+                            {formatPhoneNumber(business.displayPhone || business.phone)}
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Location */}
+                      {business.displayLocation && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <span className="text-gray-700 text-sm">{business.displayLocation}</span>
+                        </div>
+                      )}
+
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {business.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : business.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} and surrounding areas</span>
+                          ) : business.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
+                        </div>
+                      )}
+
+                      {/* Rating */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <svg
+                              key={i}
+                              className={`w-4 h-4 ${business.reviews && business.reviews > 0 && i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          ))}
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          {business.reviews && business.reviews > 0
+                            ? `${business.rating} (${business.reviews} ${business.reviews === 1 ? "review" : "reviews"})`
+                            : "No reviews yet"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
+                    <div className="flex-1 flex justify-center">
+                      {businessPhotos[business.id] && businessPhotos[business.id].length > 0 ? (
+                        <PhotoCarousel
+                          photos={businessPhotos[business.id]}
+                          businessName={business.displayName || business.businessName || "Education Provider"}
+                        />
+                      ) : loadingPhotos[business.id] ? (
+                        <div className="hidden lg:flex items-center justify-center w-full h-36 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Loading photos...</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="hidden lg:flex items-center justify-center w-full h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                          <button
+                            onClick={() =>
+                              loadPhotosForBusiness(
+                                business.id,
+                                business.displayName || business.businessName || "Education Provider",
+                              )
+                            }
+                            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                          >
+                            Load Photos
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right side - Action Buttons */}
+                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenReviews(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleOpenProfile(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        View Profile
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Subcategories/Services */}
+                  {business.allSubcategories && business.allSubcategories.length > 0 && (
+                    <div className="w-full">
+                      <div className="lg:w-64">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2 w-full">
+                        {business.allSubcategories.map((service: any, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {getSubcategoryString(service)}
+                          </span>
                         ))}
                       </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {business.reviews && business.reviews > 0
-                          ? `${business.rating} (${business.reviews} ${business.reviews === 1 ? "review" : "reviews"})`
-                          : "No reviews yet"}
-                      </span>
                     </div>
-
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service: any, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {business.subcategory || "Education & Tutoring"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(business)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
