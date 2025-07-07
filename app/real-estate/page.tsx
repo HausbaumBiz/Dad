@@ -10,7 +10,7 @@ import { Phone, ChevronLeft, ChevronRight } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 // PhotoCarousel Component
 interface PhotoCarouselProps {
@@ -115,92 +115,6 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
   )
 }
 
-// Function to load business photos from Cloudflare
-async function loadBusinessPhotos(business: any): Promise<string[]> {
-  try {
-    console.log(`Loading photos for business: ${business.displayName || business.businessName}`, business)
-
-    const photos: string[] = []
-
-    // Check photoAlbum field
-    if (business.photoAlbum && Array.isArray(business.photoAlbum)) {
-      console.log("Found photoAlbum array:", business.photoAlbum)
-      business.photoAlbum.forEach((photo: any) => {
-        if (typeof photo === "string") {
-          // If it's already a URL, use it; otherwise generate Cloudflare URL
-          if (photo.startsWith("http")) {
-            photos.push(photo)
-          } else {
-            photos.push(getCloudflareImageUrl(photo, "public"))
-          }
-        } else if (photo && typeof photo === "object") {
-          // Handle object format
-          const imageId = photo.id || photo.imageId || photo.url
-          if (imageId) {
-            if (imageId.startsWith("http")) {
-              photos.push(imageId)
-            } else {
-              photos.push(getCloudflareImageUrl(imageId, "public"))
-            }
-          }
-        }
-      })
-    }
-
-    // Check media.photoAlbum field
-    if (business.media && business.media.photoAlbum && Array.isArray(business.media.photoAlbum)) {
-      console.log("Found media.photoAlbum array:", business.media.photoAlbum)
-      business.media.photoAlbum.forEach((photo: any) => {
-        if (typeof photo === "string") {
-          if (photo.startsWith("http")) {
-            photos.push(photo)
-          } else {
-            photos.push(getCloudflareImageUrl(photo, "public"))
-          }
-        } else if (photo && typeof photo === "object") {
-          const imageId = photo.id || photo.imageId || photo.url
-          if (imageId) {
-            if (imageId.startsWith("http")) {
-              photos.push(imageId)
-            } else {
-              photos.push(getCloudflareImageUrl(imageId, "public"))
-            }
-          }
-        }
-      })
-    }
-
-    // Check adDesign.photoAlbum field
-    if (business.adDesign && business.adDesign.photoAlbum && Array.isArray(business.adDesign.photoAlbum)) {
-      console.log("Found adDesign.photoAlbum array:", business.adDesign.photoAlbum)
-      business.adDesign.photoAlbum.forEach((photo: any) => {
-        if (typeof photo === "string") {
-          if (photo.startsWith("http")) {
-            photos.push(photo)
-          } else {
-            photos.push(getCloudflareImageUrl(photo, "public"))
-          }
-        } else if (photo && typeof photo === "object") {
-          const imageId = photo.id || photo.imageId || photo.url
-          if (imageId) {
-            if (imageId.startsWith("http")) {
-              photos.push(imageId)
-            } else {
-              photos.push(getCloudflareImageUrl(imageId, "public"))
-            }
-          }
-        }
-      })
-    }
-
-    console.log(`Total photos found for ${business.displayName || business.businessName}:`, photos.length)
-    return photos
-  } catch (error) {
-    console.error("Error loading business photos:", error)
-    return []
-  }
-}
-
 export default function RealEstatePage() {
   const filterOptions = [
     { id: "home1", label: "Real Estate Agent", value: "Real Estate Agent" },
@@ -302,6 +216,7 @@ export default function RealEstatePage() {
 
   // State for business photos
   const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: string[] }>({})
+  const [photosLoading, setPhotosLoading] = useState<{ [key: string]: boolean }>({})
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -369,6 +284,28 @@ export default function RealEstatePage() {
     setFilteredProviders(allProviders)
   }
 
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (photosLoading[businessId] || businessPhotos[businessId]) {
+      return // Already loading or loaded
+    }
+
+    setPhotosLoading((prev) => ({ ...prev, [businessId]: true }))
+
+    try {
+      console.log(`Loading photos for business ${businessId}`)
+      const photos = await loadBusinessPhotos(businessId)
+      console.log(`Loaded ${photos.length} photos for business ${businessId}`)
+
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
+    } finally {
+      setPhotosLoading((prev) => ({ ...prev, [businessId]: false }))
+    }
+  }
+
   useEffect(() => {
     async function fetchBusinesses() {
       const currentFetchId = ++fetchIdRef.current
@@ -402,18 +339,10 @@ export default function RealEstatePage() {
         setAllProviders(fetchedBusinesses)
         setFilteredProviders(fetchedBusinesses)
 
-        // Load photos for all businesses
-        const photoPromises = fetchedBusinesses.map(async (business: any) => {
-          const photos = await loadBusinessPhotos(business)
-          return { businessId: business.id, photos }
+        // Load photos for each business individually
+        fetchedBusinesses.forEach((business: any) => {
+          loadPhotosForBusiness(business.id)
         })
-
-        const photoResults = await Promise.all(photoPromises)
-        const photoMap: { [key: string]: string[] } = {}
-        photoResults.forEach(({ businessId, photos }) => {
-          photoMap[businessId] = photos
-        })
-        setBusinessPhotos(photoMap)
       } catch (err) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -639,7 +568,18 @@ export default function RealEstatePage() {
 
                   {/* Center: Photo Carousel (Desktop Only) */}
                   <div className="hidden lg:block flex-1">
-                    {businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
+                    {photosLoading[provider.id] ? (
+                      <div className="grid grid-cols-5 gap-2">
+                        {Array.from({ length: 5 }, (_, index) => (
+                          <div
+                            key={index}
+                            className="w-40 h-30 bg-gray-200 rounded-lg flex items-center justify-center animate-pulse"
+                          >
+                            <span className="text-xs text-gray-400">Loading...</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
                       <PhotoCarousel
                         photos={businessPhotos[provider.id]}
                         businessName={provider.displayName || provider.businessName || "Real Estate Professional"}
