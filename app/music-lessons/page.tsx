@@ -61,7 +61,11 @@ const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessNam
   const [currentIndex, setCurrentIndex] = useState(0)
 
   if (!photos || photos.length === 0) {
-    return null
+    return (
+      <div className="w-40 h-30 bg-gray-100 rounded-lg flex items-center justify-center">
+        <span className="text-gray-400 text-sm">No photos</span>
+      </div>
+    )
   }
 
   const visiblePhotos = photos.slice(0, 5) // Show max 5 photos
@@ -75,21 +79,25 @@ const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessNam
   }
 
   return (
-    <div className="relative flex-1 max-w-md">
-      <div className="relative overflow-hidden rounded-lg bg-gray-100">
+    <div className="relative">
+      <div className="relative overflow-hidden rounded-lg bg-gray-100 w-40 h-30">
         <div
-          className="flex transition-transform duration-300 ease-in-out"
+          className="flex transition-transform duration-300 ease-in-out h-full"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
           {visiblePhotos.map((photo, index) => (
-            <div key={index} className="w-full flex-shrink-0">
+            <div key={index} className="w-full h-full flex-shrink-0">
               <Image
                 src={photo || "/placeholder.svg"}
                 alt={`${businessName} - Photo ${index + 1}`}
                 width={160}
                 height={120}
-                className="w-40 h-30 object-cover"
+                className="w-full h-full object-cover"
                 sizes="160px"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = "/placeholder.svg?height=120&width=160&text=No+Image"
+                }}
               />
             </div>
           ))}
@@ -99,17 +107,17 @@ const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessNam
           <>
             <button
               onClick={prevPhoto}
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
+              className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors z-10"
               aria-label="Previous photo"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3 w-3" />
             </button>
             <button
               onClick={nextPhoto}
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
+              className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors z-10"
               aria-label="Next photo"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3 w-3" />
             </button>
           </>
         )}
@@ -121,7 +129,7 @@ const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessNam
             <button
               key={index}
               onClick={() => setCurrentIndex(index)}
-              className={`w-2 h-2 rounded-full transition-colors ${
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${
                 index === currentIndex ? "bg-primary" : "bg-gray-300"
               }`}
               aria-label={`Go to photo ${index + 1}`}
@@ -138,17 +146,20 @@ const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
   try {
     const response = await fetch(`/api/cloudflare-images/get-image?businessId=${businessId}`)
     if (!response.ok) {
+      console.log(`No photos found for business ${businessId}`)
       return []
     }
 
     const data = await response.json()
     if (data.success && data.images && Array.isArray(data.images)) {
       // Return the Cloudflare image URLs
-      return data.images.map((image: any) => {
+      const imageUrls = data.images.map((image: any) => {
         // Construct Cloudflare Images URL
-        const accountHash = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID
+        const accountHash = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID || "your-account-hash"
         return `https://imagedelivery.net/${accountHash}/${image.id}/public`
       })
+      console.log(`Loaded ${imageUrls.length} photos for business ${businessId}`)
+      return imageUrls
     }
 
     return []
@@ -201,6 +212,7 @@ export default function MusicLessonsPage() {
 
   // State for business photos
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+  const [photosLoading, setPhotosLoading] = useState<Record<string, boolean>>({})
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -336,19 +348,17 @@ export default function MusicLessonsPage() {
         setFilteredProviders(businesses)
 
         // Load photos for each business
-        const photoPromises = businesses.map(async (business: Business) => {
-          const photos = await loadBusinessPhotos(business.id)
-          return { businessId: business.id, photos }
+        businesses.forEach(async (business: Business) => {
+          setPhotosLoading((prev) => ({ ...prev, [business.id]: true }))
+          try {
+            const photos = await loadBusinessPhotos(business.id)
+            setBusinessPhotos((prev) => ({ ...prev, [business.id]: photos }))
+          } catch (error) {
+            console.error(`Failed to load photos for business ${business.id}:`, error)
+          } finally {
+            setPhotosLoading((prev) => ({ ...prev, [business.id]: false }))
+          }
         })
-
-        const photoResults = await Promise.all(photoPromises)
-        const photosMap: Record<string, string[]> = {}
-
-        photoResults.forEach(({ businessId, photos }) => {
-          photosMap[businessId] = photos
-        })
-
-        setBusinessPhotos(photosMap)
       } catch (error) {
         // Only update error state if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -519,86 +529,85 @@ export default function MusicLessonsPage() {
             {filteredProviders.map((business: Business) => (
               <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
-                  <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Left sidebar - Business info */}
-                    <div className="lg:w-56 flex-shrink-0">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <div className="flex flex-col md:flex-row justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-gray-900">
                         {business.displayName || business.businessName || "Music Instructor"}
                       </h3>
 
                       {/* Service Area Indicator */}
                       {business.isNationwide ? (
-                        <div className="text-xs text-green-600 font-medium mb-2">✓ Serves nationwide</div>
+                        <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
                       ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
-                        <div className="text-xs text-green-600 font-medium mb-2">
+                        <div className="text-xs text-green-600 font-medium mb-1">
                           ✓ Serves {userZipCode} and surrounding areas
                         </div>
                       ) : null}
 
                       {business.businessDescription && (
-                        <p className="text-gray-600 text-sm mb-3">{business.businessDescription}</p>
+                        <p className="text-gray-600 text-sm mt-1">{business.businessDescription}</p>
                       )}
 
-                      <div className="space-y-2">
+                      <div className="mt-3 space-y-2">
                         {/* Location Display */}
                         <div className="flex items-center text-sm text-gray-600">
-                          <MapPin className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
+                          <MapPin className="h-4 w-4 mr-2 text-primary" />
                           <span>{business.displayLocation || "Location not specified"}</span>
                         </div>
 
                         {/* Phone Display */}
                         {business.displayPhone && (
                           <div className="flex items-center text-sm text-gray-600">
-                            <Phone className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
+                            <Phone className="h-4 w-4 mr-2 text-primary" />
                             <a href={`tel:${business.displayPhone}`} className="hover:text-primary transition-colors">
                               {business.displayPhone}
                             </a>
                           </div>
                         )}
                       </div>
-                    </div>
 
-                    {/* Center - Photo Carousel */}
-                    <div className="hidden lg:block flex-1">
-                      <PhotoCarousel
-                        photos={businessPhotos[business.id] || []}
-                        businessName={business.displayName || business.businessName || "Music Instructor"}
-                      />
-                    </div>
-
-                    {/* Right sidebar - Specialties and Buttons */}
-                    <div className="lg:w-28 flex-shrink-0 space-y-4">
                       {business.subcategories && business.subcategories.length > 0 && (
-                        <div>
+                        <div className="mt-3">
                           <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {business.subcategories.slice(0, 3).map((subcategory: any, idx: number) => (
+                          <div className="flex flex-wrap gap-2">
+                            {business.subcategories.map((subcategory: any, idx: number) => (
                               <span
                                 key={idx}
-                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                               >
                                 {getSubcategoryString(subcategory)}
                               </span>
                             ))}
-                            {business.subcategories.length > 3 && (
-                              <span className="text-xs text-gray-500">+{business.subcategories.length - 3} more</span>
-                            )}
                           </div>
                         </div>
                       )}
+                    </div>
 
-                      <div className="flex flex-col space-y-2">
-                        <Button className="min-w-[110px]" onClick={() => handleViewReviews(business)}>
-                          Reviews
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="min-w-[110px] bg-transparent"
-                          onClick={() => handleViewProfile(business)}
-                        >
-                          View Profile
-                        </Button>
-                      </div>
+                    {/* Photo Carousel - Desktop Only */}
+                    <div className="hidden lg:block mt-4 lg:mt-0 lg:ml-6">
+                      {photosLoading[business.id] ? (
+                        <div className="w-40 h-30 bg-gray-100 rounded-lg flex items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                        </div>
+                      ) : (
+                        <PhotoCarousel
+                          photos={businessPhotos[business.id] || []}
+                          businessName={business.displayName || business.businessName || "Music Instructor"}
+                        />
+                      )}
+                    </div>
+
+                    <div className="mt-4 md:mt-0 md:ml-6 flex flex-col space-y-2">
+                      <Button className="min-w-[120px]" onClick={() => handleViewReviews(business)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="min-w-[120px] bg-transparent"
+                        onClick={() => handleViewProfile(business)}
+                      >
+                        View Profile
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
