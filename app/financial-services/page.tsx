@@ -9,8 +9,10 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { PhotoCarousel } from "@/components/photo-carousel"
 import { Loader2, MapPin, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 interface Business {
   id: string
@@ -75,6 +77,9 @@ export default function FinancialServicesPage() {
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
   const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
+  // Photo state
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
   // Use a ref to track the current fetch request
   const fetchIdRef = useRef<number>(0)
 
@@ -112,6 +117,27 @@ export default function FinancialServicesPage() {
       `  - ${business.displayName}: primaryZip="${businessZip}", userZip="${targetZipCode}", matches=${matches}`,
     )
     return matches
+  }
+
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) {
+      return // Already loaded
+    }
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
   }
 
   // Separate useEffect for fetching businesses to avoid race conditions
@@ -407,8 +433,19 @@ export default function FinancialServicesPage() {
           {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Photo Carousel */}
+                  <div className="lg:w-40 flex-shrink-0">
+                    <PhotoCarousel
+                      businessId={business.id}
+                      photos={businessPhotos[business.id] || []}
+                      onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                      className="w-40 h-30"
+                    />
+                  </div>
+
+                  {/* Business Info */}
+                  <div className="flex-1 min-w-0">
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
 
                     {business.displayLocation && (
@@ -497,13 +534,14 @@ export default function FinancialServicesPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
+                  {/* Action Buttons */}
+                  <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
+                    <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
                       Reviews
                     </Button>
                     <Button
                       variant="outline"
-                      className="mt-2 w-full md:w-auto"
+                      className="flex-1 lg:flex-none lg:w-full bg-transparent"
                       onClick={() => handleOpenProfile(business)}
                     >
                       View Profile
