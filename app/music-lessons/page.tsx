@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, MapPin, Loader2 } from "lucide-react"
+import { Phone, MapPin, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
@@ -56,6 +56,108 @@ interface Business {
   isNationwide?: boolean
 }
 
+// Photo Carousel Component
+const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessName: string }) => {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (!photos || photos.length === 0) {
+    return null
+  }
+
+  const visiblePhotos = photos.slice(0, 5) // Show max 5 photos
+
+  const nextPhoto = () => {
+    setCurrentIndex((prev) => (prev + 1) % visiblePhotos.length)
+  }
+
+  const prevPhoto = () => {
+    setCurrentIndex((prev) => (prev - 1 + visiblePhotos.length) % visiblePhotos.length)
+  }
+
+  return (
+    <div className="relative flex-1 max-w-md">
+      <div className="relative overflow-hidden rounded-lg bg-gray-100">
+        <div
+          className="flex transition-transform duration-300 ease-in-out"
+          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+        >
+          {visiblePhotos.map((photo, index) => (
+            <div key={index} className="w-full flex-shrink-0">
+              <Image
+                src={photo || "/placeholder.svg"}
+                alt={`${businessName} - Photo ${index + 1}`}
+                width={160}
+                height={120}
+                className="w-40 h-30 object-cover"
+                sizes="160px"
+              />
+            </div>
+          ))}
+        </div>
+
+        {visiblePhotos.length > 1 && (
+          <>
+            <button
+              onClick={prevPhoto}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
+              aria-label="Previous photo"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={nextPhoto}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
+              aria-label="Next photo"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {visiblePhotos.length > 1 && (
+        <div className="flex justify-center mt-2 space-x-1">
+          {visiblePhotos.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentIndex(index)}
+              className={`w-2 h-2 rounded-full transition-colors ${
+                index === currentIndex ? "bg-primary" : "bg-gray-300"
+              }`}
+              aria-label={`Go to photo ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Function to load business photos from Cloudflare Images
+const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
+  try {
+    const response = await fetch(`/api/cloudflare-images/get-image?businessId=${businessId}`)
+    if (!response.ok) {
+      return []
+    }
+
+    const data = await response.json()
+    if (data.success && data.images && Array.isArray(data.images)) {
+      // Return the Cloudflare image URLs
+      return data.images.map((image: any) => {
+        // Construct Cloudflare Images URL
+        const accountHash = process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID
+        return `https://imagedelivery.net/${accountHash}/${image.id}/public`
+      })
+    }
+
+    return []
+  } catch (error) {
+    console.error(`Error loading photos for business ${businessId}:`, error)
+    return []
+  }
+}
+
 export default function MusicLessonsPage() {
   const { toast } = useToast()
   const fetchIdRef = useRef(0)
@@ -96,6 +198,9 @@ export default function MusicLessonsPage() {
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allProviders, setAllProviders] = useState<Business[]>([])
   const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
+
+  // State for business photos
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -229,6 +334,21 @@ export default function MusicLessonsPage() {
         console.log("Fetched music lesson businesses:", businesses)
         setAllProviders(businesses)
         setFilteredProviders(businesses)
+
+        // Load photos for each business
+        const photoPromises = businesses.map(async (business: Business) => {
+          const photos = await loadBusinessPhotos(business.id)
+          return { businessId: business.id, photos }
+        })
+
+        const photoResults = await Promise.all(photoPromises)
+        const photosMap: Record<string, string[]> = {}
+
+        photoResults.forEach(({ businessId, photos }) => {
+          photosMap[businessId] = photos
+        })
+
+        setBusinessPhotos(photosMap)
       } catch (error) {
         // Only update error state if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -350,7 +470,7 @@ export default function MusicLessonsPage() {
               variant="outline"
               size="sm"
               onClick={clearZipCodeFilter}
-              className="text-blue-600 border-blue-300 hover:bg-blue-100"
+              className="text-blue-600 border-blue-300 hover:bg-blue-100 bg-transparent"
             >
               Clear Filter
             </Button>
@@ -399,67 +519,86 @@ export default function MusicLessonsPage() {
             {filteredProviders.map((business: Business) => (
               <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900">
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    {/* Left sidebar - Business info */}
+                    <div className="lg:w-56 flex-shrink-0">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
                         {business.displayName || business.businessName || "Music Instructor"}
                       </h3>
 
                       {/* Service Area Indicator */}
                       {business.isNationwide ? (
-                        <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
+                        <div className="text-xs text-green-600 font-medium mb-2">✓ Serves nationwide</div>
                       ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
-                        <div className="text-xs text-green-600 font-medium mb-1">
+                        <div className="text-xs text-green-600 font-medium mb-2">
                           ✓ Serves {userZipCode} and surrounding areas
                         </div>
                       ) : null}
 
                       {business.businessDescription && (
-                        <p className="text-gray-600 text-sm mt-1">{business.businessDescription}</p>
+                        <p className="text-gray-600 text-sm mb-3">{business.businessDescription}</p>
                       )}
 
-                      <div className="mt-3 space-y-2">
+                      <div className="space-y-2">
                         {/* Location Display */}
                         <div className="flex items-center text-sm text-gray-600">
-                          <MapPin className="h-4 w-4 mr-2 text-primary" />
+                          <MapPin className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
                           <span>{business.displayLocation || "Location not specified"}</span>
                         </div>
 
                         {/* Phone Display */}
                         {business.displayPhone && (
                           <div className="flex items-center text-sm text-gray-600">
-                            <Phone className="h-4 w-4 mr-2 text-primary" />
+                            <Phone className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
                             <a href={`tel:${business.displayPhone}`} className="hover:text-primary transition-colors">
                               {business.displayPhone}
                             </a>
                           </div>
                         )}
                       </div>
+                    </div>
 
+                    {/* Center - Photo Carousel */}
+                    <div className="hidden lg:block flex-1">
+                      <PhotoCarousel
+                        photos={businessPhotos[business.id] || []}
+                        businessName={business.displayName || business.businessName || "Music Instructor"}
+                      />
+                    </div>
+
+                    {/* Right sidebar - Specialties and Buttons */}
+                    <div className="lg:w-28 flex-shrink-0 space-y-4">
                       {business.subcategories && business.subcategories.length > 0 && (
-                        <div className="mt-3">
+                        <div>
                           <p className="text-sm font-medium text-gray-700 mb-2">Specialties:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {business.subcategories.map((subcategory: any, idx: number) => (
+                          <div className="flex flex-wrap gap-1">
+                            {business.subcategories.slice(0, 3).map((subcategory: any, idx: number) => (
                               <span
                                 key={idx}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
                               >
                                 {getSubcategoryString(subcategory)}
                               </span>
                             ))}
+                            {business.subcategories.length > 3 && (
+                              <span className="text-xs text-gray-500">+{business.subcategories.length - 3} more</span>
+                            )}
                           </div>
                         </div>
                       )}
-                    </div>
 
-                    <div className="mt-4 md:mt-0 md:ml-6 flex flex-col space-y-2">
-                      <Button className="min-w-[120px]" onClick={() => handleViewReviews(business)}>
-                        Reviews
-                      </Button>
-                      <Button variant="outline" className="min-w-[120px]" onClick={() => handleViewProfile(business)}>
-                        View Profile
-                      </Button>
+                      <div className="flex flex-col space-y-2">
+                        <Button className="min-w-[110px]" onClick={() => handleViewReviews(business)}>
+                          Reviews
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="min-w-[110px] bg-transparent"
+                          onClick={() => handleViewProfile(business)}
+                        >
+                          View Profile
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
