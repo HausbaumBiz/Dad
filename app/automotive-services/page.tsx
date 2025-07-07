@@ -50,7 +50,7 @@ interface Business {
   displayLocation?: string
 }
 
-// Photo Carousel Component - displays 5 photos in landscape format
+// Photo Carousel Component - displays 5 photos in smaller landscape format
 interface PhotoCarouselProps {
   photos: string[]
   businessName: string
@@ -81,14 +81,14 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
       <div className="relative group w-full">
         <div className="flex gap-2 justify-center w-full">
           {visiblePhotos.map((photo, index) => (
-            <div key={currentIndex + index} className="w-48 h-36 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+            <div key={currentIndex + index} className="w-32 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
               <Image
                 src={photo || "/placeholder.svg"}
                 alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={192}
-                height={144}
+                width={128}
+                height={96}
                 className="w-full h-full object-cover"
-                sizes="192px"
+                sizes="128px"
               />
             </div>
           ))}
@@ -99,7 +99,7 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
               {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
                 <div
                   key={`empty-${index}`}
-                  className="w-48 h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                  className="w-32 h-24 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
                 ></div>
               ))}
             </>
@@ -741,7 +741,7 @@ export default function AutomotiveServicesPage() {
 
                     {/* Main content area with contact info, photos, and buttons */}
                     <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                      {/* Left side - Contact and Location Info - Made smaller */}
+                      {/* Left side - Contact and Location Info */}
                       <div className="lg:w-64 space-y-2 flex-shrink-0">
                         {/* Phone */}
                         {(business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone) && (
@@ -809,7 +809,7 @@ export default function AutomotiveServicesPage() {
                         )}
                       </div>
 
-                      {/* Middle - Photo Carousel (desktop only) - Now has more space */}
+                      {/* Middle - Photo Carousel (desktop only) - Smaller photos */}
                       <div className="flex-1 flex justify-center">
                         <PhotoCarousel
                           photos={business.photos || []}
@@ -817,13 +817,13 @@ export default function AutomotiveServicesPage() {
                         />
                       </div>
 
-                      {/* Right side - Action Buttons */}
-                      <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                      {/* Right side - Action Buttons - Increased width */}
+                      <div className="flex flex-col gap-2 lg:items-end lg:w-32 flex-shrink-0">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleOpenReviews(business)}
-                          className="text-sm min-w-[100px]"
+                          className="text-sm min-w-[120px]"
                         >
                           Reviews
                         </Button>
@@ -831,7 +831,7 @@ export default function AutomotiveServicesPage() {
                           variant="default"
                           size="sm"
                           onClick={() => handleOpenProfile(business)}
-                          className="text-sm min-w-[100px]"
+                          className="text-sm min-w-[120px]"
                         >
                           View Profile
                         </Button>
