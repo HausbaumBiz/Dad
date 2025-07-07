@@ -8,8 +8,10 @@ import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { PhotoCarousel } from "@/components/photo-carousel"
 import { MapPin, Phone, X } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -46,6 +48,27 @@ export default function PhysicalRehabilitationPage() {
   const [selectedBusiness, setSelectedBusiness] = useState<any>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const fetchIdRef = useRef(0)
+
+  // Photo state management
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) return // Already loaded
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Failed to load photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -394,25 +417,50 @@ export default function PhysicalRehabilitationPage() {
           providers.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="space-y-4">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <div className="flex items-center mt-2 text-gray-600">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      <span className="text-sm">{provider.location}</span>
+
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {provider.location && (
+                        <div className="flex items-center">
+                          <MapPin className="w-4 h-4 mr-1" />
+                          <span>{provider.location}</span>
+                        </div>
+                      )}
+
+                      {provider.phone && (
+                        <div className="flex items-center">
+                          <Phone className="w-4 h-4 mr-1" />
+                          <a href={`tel:${provider.phone}`} className="hover:text-primary">
+                            {provider.phone}
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Service Area Indicator */}
+                      {userZipCode && (provider.serviceArea || provider.isNationwide) && (
+                        <div>
+                          {provider.isNationwide ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Serves nationwide
+                            </span>
+                          ) : provider.serviceArea && provider.serviceArea.includes(userZipCode) ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Serves {userZipCode}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              Primary: {provider.zipCode}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    {provider.phone && (
-                      <div className="flex items-center mt-1 text-gray-600">
-                        <Phone className="w-4 h-4 mr-1" />
-                        <a href={`tel:${provider.phone}`} className="text-sm hover:text-primary">
-                          {provider.phone}
-                        </a>
-                      </div>
-                    )}
-
-                    {/* Add Star Rating Display */}
-                    <div className="flex items-center mt-2">
+                    {/* Star Rating Display */}
+                    <div className="flex items-center">
                       <div className="flex">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <svg
@@ -435,30 +483,11 @@ export default function PhysicalRehabilitationPage() {
                       </span>
                     </div>
 
-                    {/* Service Area Indicator */}
-                    {userZipCode && (provider.serviceArea || provider.isNationwide) && (
-                      <div className="mt-2">
-                        {provider.isNationwide ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Serves nationwide
-                          </span>
-                        ) : provider.serviceArea && provider.serviceArea.includes(userZipCode) ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Serves {userZipCode} and surrounding areas
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            Primary location: {provider.zipCode}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
+                    {/* Services */}
                     {provider.services && provider.services.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-sm font-medium text-gray-700">Services:</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.services.map((service, idx) => (
+                      <div>
+                        <div className="flex flex-wrap gap-2">
+                          {provider.services.slice(0, 4).map((service, idx) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
@@ -466,22 +495,43 @@ export default function PhysicalRehabilitationPage() {
                               {getSubcategoryString(service)}
                             </span>
                           ))}
+                          {provider.services.length > 4 && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                              +{provider.services.length - 4} more
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photo Carousel and Buttons Layout */}
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={provider.id}
+                        photos={businessPhotos[provider.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                      <Button className="flex-1 lg:flex-none w-full" onClick={() => handleOpenReviews(provider)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none w-full bg-transparent"
+                        onClick={() => handleOpenProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
