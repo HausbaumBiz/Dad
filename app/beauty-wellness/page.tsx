@@ -620,7 +620,7 @@ export default function BeautyWellnessPage() {
         <div className="text-center py-8">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : (
+      ) : filteredBusinesses.length > 0 ? (
         <div className="mt-8 space-y-6">
           <h2 className="text-2xl font-bold text-gray-900">
             Beauty & Wellness Providers ({filteredBusinesses.length})
@@ -768,7 +768,7 @@ export default function BeautyWellnessPage() {
             ))}
           </div>
         </div>
-      ) : (\
+      ) : (
         <div className="text-center py-12">
           <div className="bg-pink-50 border border-pink-200 rounded-lg p-8 max-w-2xl mx-auto">
             <h3 className="text-xl font-medium text-pink-800 mb-2">
