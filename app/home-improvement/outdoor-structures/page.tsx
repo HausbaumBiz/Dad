@@ -9,6 +9,8 @@ import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/lib/business-category-service"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 export default function OutdoorStructuresPage() {
   // Define the getAllTerminalSubcategories function first to avoid initialization errors
@@ -84,6 +86,28 @@ export default function OutdoorStructuresPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // State for business photos
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) return // Already loaded
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Failed to load photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
 
   // Filter businesses based on selected filters
   const filteredBusinesses = businesses.filter((business) => {
@@ -324,107 +348,108 @@ export default function OutdoorStructuresPage() {
           {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="space-y-4">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{business.displayLocation}</p>
 
-                    {/* Phone Number Display */}
-                    {business.displayPhone && (
-                      <div className="flex items-center mt-1">
-                        <svg
-                          className="w-4 h-4 text-gray-500 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                          />
-                        </svg>
-                        <span className="text-sm text-gray-600">{business.displayPhone}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
+                    {/* Combined location, phone, and service area in one row */}
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      <span>{business.displayLocation}</span>
+                      {business.displayPhone && (
+                        <div className="flex items-center">
                           <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
+                            className="w-4 h-4 text-gray-500 mr-1"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.588h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                            />
                           </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {business.rating || 0} ({business.reviewCount || 0} reviews)
-                      </span>
+                          <span>{business.displayPhone}</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">
+                    {/* Services - show only 4 with +X more indicator */}
+                    <div className="mt-2">
+                      <p className="text-sm font-medium text-gray-700 mb-1">
                         Services ({getAllTerminalSubcategories(business.subcategories).length}):
                       </p>
-                      <div className="mt-1 max-h-32 overflow-y-auto pr-1">
-                        <div className="flex flex-wrap gap-2">
-                          {getAllTerminalSubcategories(business.subcategories).length > 0 ? (
-                            getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
-                              // Check if this service matches any selected filter
-                              const isMatched =
-                                selectedFilters.length > 0 &&
-                                selectedFilters.some((filterId) => {
-                                  const filterValue = filterOptions.find((opt) => opt.id === filterId)?.value
-                                  return (
-                                    filterValue &&
-                                    (service.toLowerCase().includes(filterValue.toLowerCase()) ||
-                                      filterValue.toLowerCase().includes(service.toLowerCase()))
-                                  )
-                                })
+                      <div className="flex flex-wrap gap-1">
+                        {getAllTerminalSubcategories(business.subcategories).length > 0 ? (
+                          <>
+                            {getAllTerminalSubcategories(business.subcategories)
+                              .slice(0, 4)
+                              .map((service, idx) => {
+                                const isMatched =
+                                  selectedFilters.length > 0 &&
+                                  selectedFilters.some((filterId) => {
+                                    const filterValue = filterOptions.find((opt) => opt.id === filterId)?.value
+                                    return (
+                                      filterValue &&
+                                      (service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                        filterValue.toLowerCase().includes(service.toLowerCase()))
+                                    )
+                                  })
 
-                              return (
-                                <span
-                                  key={idx}
-                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap mb-1
-                                    ${
-                                      isMatched
-                                        ? "bg-green-100 text-green-800 ring-1 ring-green-400"
-                                        : "bg-primary/10 text-primary"
-                                    }`}
-                                >
-                                  {service}
-                                </span>
-                              )
-                            })
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                              Outdoor Structure Construction
-                            </span>
-                          )}
-                        </div>
-                        {getAllTerminalSubcategories(business.subcategories).length > 8 && (
-                          <p className="text-xs text-gray-500 mt-1 italic">Scroll to see more services</p>
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
+                                    ${isMatched ? "bg-green-100 text-green-800 ring-1 ring-green-400" : "bg-primary/10 text-primary"}`}
+                                  >
+                                    {service}
+                                  </span>
+                                )
+                              })}
+                            {getAllTerminalSubcategories(business.subcategories).length > 4 && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                +{getAllTerminalSubcategories(business.subcategories).length - 4} more
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            Outdoor Structure Construction
+                          </span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleViewProfile(business)}
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={business.id}
+                        photos={businessPhotos[business.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                      <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none bg-transparent"
+                        onClick={() => handleViewProfile(business)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
