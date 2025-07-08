@@ -10,6 +10,8 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useEffect } from "react"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 const filterOptions = [
   { id: "cleaning1", label: "House Cleaning", value: "House Cleaning" },
@@ -55,6 +57,28 @@ export default function CleaningPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [allBusinesses, setAllBusinesses] = useState<any[]>([])
+
+  // Photo state
+  const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: any[] }>({})
+
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) return // Already loaded
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
 
   // Handle filter changes
   const handleFilterChange = (filterId: string, checked: boolean) => {
@@ -377,31 +401,22 @@ export default function CleaningPage() {
           providers.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="space-y-4">
+                  {/* Business Info */}
+                  <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
 
-                    {provider.phone && <p className="text-gray-600 text-sm mt-1">{provider.phone}</p>}
-
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${provider.reviews > 0 && i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.reviews > 0
-                          ? `${provider.rating} (${provider.reviews} ${provider.reviews === 1 ? "review" : "reviews"})`
-                          : "No reviews yet"}
-                      </span>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {provider.location && (
+                        <div className="flex items-center">
+                          <span>📍 {provider.location}</span>
+                        </div>
+                      )}
+                      {provider.phone && (
+                        <div className="flex items-center">
+                          <span>📞 {provider.phone}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-3">
@@ -410,42 +425,59 @@ export default function CleaningPage() {
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
                         {getAllTerminalSubcategories(provider.businessData.subcategories).length > 0 ? (
-                          getAllTerminalSubcategories(provider.businessData.subcategories).map((service, idx) => (
-                            <span
-                              key={idx}
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
+                          getAllTerminalSubcategories(provider.businessData.subcategories)
+                            .slice(0, 4)
+                            .map((service, idx) => (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
                                 ${
                                   isServiceMatched(service)
                                     ? "bg-green-100 text-green-800 ring-1 ring-green-400"
                                     : "bg-primary/10 text-primary"
                                 }`}
-                            >
-                              {service}
-                            </span>
-                          ))
+                              >
+                                {service}
+                              </span>
+                            ))
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
                             Cleaning Services
                           </span>
                         )}
+                        {getAllTerminalSubcategories(provider.businessData.subcategories).length > 4 && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            +{getAllTerminalSubcategories(provider.businessData.subcategories).length - 4} more
+                          </span>
+                        )}
                       </div>
-                      {getAllTerminalSubcategories(provider.businessData.subcategories).length > 8 && (
-                        <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
-                      )}
                     </div>
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleViewProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photo Carousel and Buttons */}
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={provider.id}
+                        photos={businessPhotos[provider.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                      />
+                    </div>
+
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                      <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(provider)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none bg-transparent"
+                        onClick={() => handleViewProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
