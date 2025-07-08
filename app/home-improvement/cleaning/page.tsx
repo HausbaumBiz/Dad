@@ -425,32 +425,28 @@ export default function CleaningPage() {
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
                         {getAllTerminalSubcategories(provider.businessData.subcategories).length > 0 ? (
-                          getAllTerminalSubcategories(provider.businessData.subcategories)
-                            .slice(0, 4)
-                            .map((service, idx) => (
-                              <span
-                                key={idx}
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
+                          getAllTerminalSubcategories(provider.businessData.subcategories).map((service, idx) => (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
                                 ${
                                   isServiceMatched(service)
                                     ? "bg-green-100 text-green-800 ring-1 ring-green-400"
                                     : "bg-primary/10 text-primary"
                                 }`}
-                              >
-                                {service}
-                              </span>
-                            ))
+                            >
+                              {service}
+                            </span>
+                          ))
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
                             Cleaning Services
                           </span>
                         )}
-                        {getAllTerminalSubcategories(provider.businessData.subcategories).length > 4 && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            +{getAllTerminalSubcategories(provider.businessData.subcategories).length - 4} more
-                          </span>
-                        )}
                       </div>
+                      {getAllTerminalSubcategories(provider.businessData.subcategories).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                      )}
                     </div>
                   </div>
 
@@ -468,7 +464,7 @@ export default function CleaningPage() {
 
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
                       <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(provider)}>
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"
