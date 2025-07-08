@@ -10,6 +10,8 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/lib/business-category-service"
 import { Phone } from "lucide-react"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 export default function PoolServicesPage() {
   const filterOptions = [
@@ -32,6 +34,28 @@ export default function PoolServicesPage() {
   const [selectedBusinessName, setSelectedBusinessName] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+
+  // State for photos
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, any[]>>({})
+
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) return // Already loaded
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Failed to load photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
 
   // Updated function to display ALL terminal subcategories instead of limiting to 4
   const getAllTerminalSubcategories = (subcategories) => {
@@ -287,97 +311,100 @@ export default function PoolServicesPage() {
           {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="flex flex-col space-y-4">
+                  {/* Business Info Section - Compact */}
+                  <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{business.displayLocation}</p>
 
-                    {/* Display phone number if available */}
-                    {business.displayPhone && (
-                      <div className="flex items-center mt-1 text-sm text-gray-600">
-                        <Phone className="h-3.5 w-3.5 mr-1" />
-                        <span>{business.displayPhone}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {business.rating || 0} ({business.reviewCount || 0} reviews)
-                      </span>
+                    {/* Contact Info Row */}
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      <span>{business.displayLocation}</span>
+                      {business.displayPhone && (
+                        <div className="flex items-center">
+                          <Phone className="h-3.5 w-3.5 mr-1" />
+                          <span>{business.displayPhone}</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-3">
+                    {/* Services Tags */}
+                    <div>
                       {(() => {
                         const services = getAllTerminalSubcategories(business.subcategories)
-                        return (
-                          <>
-                            <p className="text-sm font-medium text-gray-700">Services ({services.length}):</p>
-                            <div className="max-h-32 overflow-y-auto mt-1">
-                              <div className="flex flex-wrap gap-2">
-                                {services.length > 0 ? (
-                                  services.map((service, idx) => {
-                                    // Check if this service matches any selected filter
-                                    const isHighlighted = selectedFilters.some((filterId) => {
-                                      const filterLabel =
-                                        filterOptions.find((opt) => opt.id === filterId)?.label || filterId
-                                      return (
-                                        service.toLowerCase().includes(filterLabel.toLowerCase()) ||
-                                        filterLabel.toLowerCase().includes(service.toLowerCase())
-                                      )
-                                    })
+                        const displayServices = services.slice(0, 4)
+                        const remainingCount = services.length - 4
 
+                        return (
+                          <div className="flex flex-wrap gap-2">
+                            {displayServices.length > 0 ? (
+                              <>
+                                {displayServices.map((service, idx) => {
+                                  // Check if this service matches any selected filter
+                                  const isHighlighted = selectedFilters.some((filterId) => {
+                                    const filterLabel =
+                                      filterOptions.find((opt) => opt.id === filterId)?.label || filterId
                                     return (
-                                      <span
-                                        key={idx}
-                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                                          isHighlighted
-                                            ? "bg-green-100 text-green-800 ring-2 ring-green-300"
-                                            : "bg-primary/10 text-primary"
-                                        }`}
-                                      >
-                                        {service}
-                                      </span>
+                                      service.toLowerCase().includes(filterLabel.toLowerCase()) ||
+                                      filterLabel.toLowerCase().includes(service.toLowerCase())
                                     )
                                   })
-                                ) : (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                                    Pool Services
+
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                        isHighlighted
+                                          ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                          : "bg-primary/10 text-primary"
+                                      }`}
+                                    >
+                                      {service}
+                                    </span>
+                                  )
+                                })}
+                                {remainingCount > 0 && (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                    +{remainingCount} more
                                   </span>
                                 )}
-                              </div>
-                              {services.length > 8 && (
-                                <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
-                              )}
-                            </div>
-                          </>
+                              </>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                Pool Services
+                              </span>
+                            )}
+                          </div>
                         )
                       })()}
                     </div>
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleViewProfile(business)}
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photos and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={business.id}
+                        photos={businessPhotos[business.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                      <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none bg-transparent"
+                        onClick={() => handleViewProfile(business)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
