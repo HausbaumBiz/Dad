@@ -79,6 +79,28 @@ export default function InsideMaintenancePage() {
     return allServices
   }
 
+  // Function to extract main zip code from business data
+  const getMainZipCode = (business) => {
+    // Try to get zip code from various possible fields
+    if (business.zipCode) return business.zipCode
+    if (business.mainZipCode) return business.mainZipCode
+    if (business.primaryZipCode) return business.primaryZipCode
+
+    // Try to extract from displayLocation if it contains a zip code pattern
+    if (business.displayLocation) {
+      const zipMatch = business.displayLocation.match(/\b\d{5}(-\d{4})?\b/)
+      if (zipMatch) return zipMatch[0]
+    }
+
+    // Try to extract from address if available
+    if (business.address) {
+      const zipMatch = business.address.match(/\b\d{5}(-\d{4})?\b/)
+      if (zipMatch) return zipMatch[0]
+    }
+
+    return null
+  }
+
   // State for reviews dialog
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
@@ -376,9 +398,8 @@ export default function InsideMaintenancePage() {
                   <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                      {business.displayLocation && <span>📍 {business.displayLocation}</span>}
+                      {getMainZipCode(business) && <span>📍 {getMainZipCode(business)}</span>}
                       {business.displayPhone && <span>📞 {business.displayPhone}</span>}
-                      {business.serviceArea && <span>🗺️ {business.serviceArea}</span>}
                     </div>
                     {business.subcategories && getAllTerminalSubcategories(business.subcategories).length > 0 && (
                       <div>
