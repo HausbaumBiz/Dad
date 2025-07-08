@@ -417,7 +417,6 @@ export default function HandymenPage() {
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                       <span>📍 {provider.location}</span>
                       {provider.phone && <span>📞 {provider.phone}</span>}
-                      <span>Service Area</span>
                     </div>
 
                     <div className="mt-3">
@@ -470,7 +469,7 @@ export default function HandymenPage() {
 
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
                       <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(provider)}>
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"
