@@ -396,11 +396,10 @@ export default function AsphaltConcretePage() {
                       )}
                     </div>
 
-                    {/* Services Tags - Limited to 4 */}
-                    <div className="flex flex-wrap gap-2">
-                      {getAllTerminalSubcategories(business.subcategories)
-                        .slice(0, 4)
-                        .map((service, idx) => {
+                    {/* Services Tags - All services displayed in scrollable container */}
+                    <div className="max-h-32 overflow-y-auto">
+                      <div className="flex flex-wrap gap-2">
+                        {getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
                           // Check if this service matches any selected filter
                           const isHighlighted = selectedFilters.some((filterId) => {
                             const filterOption = filterOptions.find((option) => option.id === filterId)
@@ -424,10 +423,9 @@ export default function AsphaltConcretePage() {
                             </span>
                           )
                         })}
-                      {getAllTerminalSubcategories(business.subcategories).length > 4 && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          +{getAllTerminalSubcategories(business.subcategories).length - 4} more
-                        </span>
+                      </div>
+                      {getAllTerminalSubcategories(business.subcategories).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-2">Scroll to see more services</p>
                       )}
                     </div>
                   </div>
@@ -448,7 +446,7 @@ export default function AsphaltConcretePage() {
                     {/* Action Buttons */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
                       <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"
