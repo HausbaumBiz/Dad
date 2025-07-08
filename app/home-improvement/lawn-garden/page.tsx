@@ -428,8 +428,9 @@ export default function LawnGardenPage() {
                         {/* Photo Carousel */}
                         <div className="flex-1">
                           <PhotoCarousel
+                            businessId={provider.id}
                             photos={businessPhotos[provider.id] || []}
-                            onLoad={() => loadPhotosForBusiness(provider.id)}
+                            onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
                             showMultiple={true}
                             photosPerView={5}
                           />
