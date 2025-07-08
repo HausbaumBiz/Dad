@@ -81,7 +81,6 @@ export default function HandymenPage() {
       })
       .filter(Boolean) // Remove nulls
       .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-    // Remove the .slice(0, 4) limit to show all subcategories
   }
 
   const handleFilterChange = (filterId: string, checked: boolean) => {
@@ -181,9 +180,6 @@ export default function HandymenPage() {
           // Transform the data for display with city/state lookup
           const transformedBusinesses = await Promise.all(
             filteredBusinessesByZip.map(async (business: any) => {
-              // Extract service tags from subcategories
-              // Add this improved function that shows all terminal subcategories
-
               // Fetch city and state from ZIP code database
               let location = "Service Area"
 
@@ -236,9 +232,6 @@ export default function HandymenPage() {
           // Transform the data for display with city/state lookup
           const transformedBusinesses = await Promise.all(
             allBusinessesData.map(async (business: any) => {
-              // Extract service tags from subcategories
-              // Add this improved function that shows all terminal subcategories
-
               // Fetch city and state from ZIP code database
               let location = "Service Area"
 
@@ -432,37 +425,33 @@ export default function HandymenPage() {
                         Services ({getAllTerminalSubcategories(provider.services || []).length}):
                       </p>
                       <div className="flex flex-wrap gap-2 mt-1 max-h-32 overflow-y-auto">
-                        {getAllTerminalSubcategories(provider.services || [])
-                          .slice(0, 4)
-                          .map((service, idx) => {
-                            const filterValues = selectedFilters
-                              .map((filterId) => {
-                                const option = filterOptions.find((opt) => opt.id === filterId)
-                                return option?.value
-                              })
-                              .filter(Boolean)
+                        {getAllTerminalSubcategories(provider.services || []).map((service, idx) => {
+                          const filterValues = selectedFilters
+                            .map((filterId) => {
+                              const option = filterOptions.find((opt) => opt.id === filterId)
+                              return option?.value
+                            })
+                            .filter(Boolean)
 
-                            const isHighlighted = filterValues.includes(service)
+                          const isHighlighted = filterValues.includes(service)
 
-                            return (
-                              <span
-                                key={idx}
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                                  isHighlighted
-                                    ? "bg-green-100 text-green-800 ring-2 ring-green-300"
-                                    : "bg-primary/10 text-primary"
-                                }`}
-                              >
-                                {service}
-                              </span>
-                            )
-                          })}
-                        {getAllTerminalSubcategories(provider.services || []).length > 4 && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            +{getAllTerminalSubcategories(provider.services || []).length - 4} more
-                          </span>
-                        )}
+                          return (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                isHighlighted
+                                  ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                  : "bg-primary/10 text-primary"
+                              }`}
+                            >
+                              {service}
+                            </span>
+                          )
+                        })}
                       </div>
+                      {getAllTerminalSubcategories(provider.services || []).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                      )}
                     </div>
                   </div>
 
