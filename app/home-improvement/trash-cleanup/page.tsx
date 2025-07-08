@@ -380,30 +380,30 @@ export default function TrashCleanupPage() {
                       {allServices.length > 0 && (
                         <div>
                           <p className="text-sm font-medium text-gray-700">Services ({allServices.length}):</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {allServices.slice(0, 4).map((service, idx) => {
-                              const isHighlighted =
-                                selectedFilters.length > 0 &&
-                                filterValues.some((filterValue) => service === filterValue)
-                              return (
-                                <span
-                                  key={idx}
-                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                                    isHighlighted
-                                      ? "bg-green-100 text-green-800 ring-2 ring-green-300"
-                                      : "bg-primary/10 text-primary"
-                                  }`}
-                                >
-                                  {service}
-                                </span>
-                              )
-                            })}
-                            {allServices.length > 4 && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                +{allServices.length - 4} more
-                              </span>
-                            )}
+                          <div className="max-h-32 overflow-y-auto">
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {allServices.map((service, idx) => {
+                                const isHighlighted =
+                                  selectedFilters.length > 0 &&
+                                  filterValues.some((filterValue) => service === filterValue)
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                      isHighlighted
+                                        ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                        : "bg-primary/10 text-primary"
+                                    }`}
+                                  >
+                                    {service}
+                                  </span>
+                                )
+                              })}
+                            </div>
                           </div>
+                          {allServices.length > 8 && (
+                            <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -423,7 +423,7 @@ export default function TrashCleanupPage() {
 
                       <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
                         <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(provider)}>
-                          Reviews
+                          Ratings
                         </Button>
                         <Button
                           variant="outline"
