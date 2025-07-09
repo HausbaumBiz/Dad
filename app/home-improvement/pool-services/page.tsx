@@ -328,55 +328,53 @@ export default function PoolServicesPage() {
                     </div>
 
                     {/* Services Tags */}
-                    <div>
-                      {(() => {
-                        const services = getAllTerminalSubcategories(business.subcategories)
-                        const displayServices = services.slice(0, 4)
-                        const remainingCount = services.length - 4
+                    {(() => {
+                      const services = getAllTerminalSubcategories(business.subcategories)
 
-                        return (
-                          <div className="flex flex-wrap gap-2">
-                            {displayServices.length > 0 ? (
-                              <>
-                                {displayServices.map((service, idx) => {
-                                  // Check if this service matches any selected filter
-                                  const isHighlighted = selectedFilters.some((filterId) => {
-                                    const filterLabel =
-                                      filterOptions.find((opt) => opt.id === filterId)?.label || filterId
-                                    return (
-                                      service.toLowerCase().includes(filterLabel.toLowerCase()) ||
-                                      filterLabel.toLowerCase().includes(service.toLowerCase())
-                                    )
-                                  })
-
+                      return (
+                        <div className="space-y-2">
+                          {services.length > 0 ? (
+                            <div
+                              className={`flex flex-wrap gap-2 ${services.length > 8 ? "max-h-32 overflow-y-auto" : ""}`}
+                            >
+                              {services.map((service, idx) => {
+                                // Check if this service matches any selected filter
+                                const isHighlighted = selectedFilters.some((filterId) => {
+                                  const filterLabel =
+                                    filterOptions.find((opt) => opt.id === filterId)?.label || filterId
                                   return (
-                                    <span
-                                      key={idx}
-                                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                                        isHighlighted
-                                          ? "bg-green-100 text-green-800 ring-2 ring-green-300"
-                                          : "bg-primary/10 text-primary"
-                                      }`}
-                                    >
-                                      {service}
-                                    </span>
+                                    service.toLowerCase().includes(filterLabel.toLowerCase()) ||
+                                    filterLabel.toLowerCase().includes(service.toLowerCase())
                                   )
-                                })}
-                                {remainingCount > 0 && (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                    +{remainingCount} more
+                                })
+
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                      isHighlighted
+                                        ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                        : "bg-primary/10 text-primary"
+                                    }`}
+                                  >
+                                    {service}
                                   </span>
-                                )}
-                              </>
-                            ) : (
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
                                 Pool Services
                               </span>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </div>
+                            </div>
+                          )}
+                          {services.length > 8 && (
+                            <p className="text-xs text-gray-500 italic">Scroll to see more services</p>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Photos and Buttons Row */}
@@ -395,7 +393,7 @@ export default function PoolServicesPage() {
                     {/* Action Buttons */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
                       <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"
