@@ -381,45 +381,41 @@ export default function OutdoorStructuresPage() {
                       <p className="text-sm font-medium text-gray-700 mb-1">
                         Services ({getAllTerminalSubcategories(business.subcategories).length}):
                       </p>
-                      <div className="flex flex-wrap gap-1">
+                      <div
+                        className={`flex flex-wrap gap-1 ${getAllTerminalSubcategories(business.subcategories).length > 8 ? "max-h-32 overflow-y-auto" : ""}`}
+                      >
                         {getAllTerminalSubcategories(business.subcategories).length > 0 ? (
-                          <>
-                            {getAllTerminalSubcategories(business.subcategories)
-                              .slice(0, 4)
-                              .map((service, idx) => {
-                                const isMatched =
-                                  selectedFilters.length > 0 &&
-                                  selectedFilters.some((filterId) => {
-                                    const filterValue = filterOptions.find((opt) => opt.id === filterId)?.value
-                                    return (
-                                      filterValue &&
-                                      (service.toLowerCase().includes(filterValue.toLowerCase()) ||
-                                        filterValue.toLowerCase().includes(service.toLowerCase()))
-                                    )
-                                  })
-
+                          getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
+                            const isMatched =
+                              selectedFilters.length > 0 &&
+                              selectedFilters.some((filterId) => {
+                                const filterValue = filterOptions.find((opt) => opt.id === filterId)?.value
                                 return (
-                                  <span
-                                    key={idx}
-                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
-                                    ${isMatched ? "bg-green-100 text-green-800 ring-1 ring-green-400" : "bg-primary/10 text-primary"}`}
-                                  >
-                                    {service}
-                                  </span>
+                                  filterValue &&
+                                  (service.toLowerCase().includes(filterValue.toLowerCase()) ||
+                                    filterValue.toLowerCase().includes(service.toLowerCase()))
                                 )
-                              })}
-                            {getAllTerminalSubcategories(business.subcategories).length > 4 && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                +{getAllTerminalSubcategories(business.subcategories).length - 4} more
+                              })
+
+                            return (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
+                                    ${isMatched ? "bg-green-100 text-green-800 ring-1 ring-green-400" : "bg-primary/10 text-primary"}`}
+                              >
+                                {service}
                               </span>
-                            )}
-                          </>
+                            )
+                          })
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
                             Outdoor Structure Construction
                           </span>
                         )}
                       </div>
+                      {getAllTerminalSubcategories(business.subcategories).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                      )}
                     </div>
                   </div>
 
@@ -440,7 +436,7 @@ export default function OutdoorStructuresPage() {
                     {/* Action Buttons */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
                       <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"
