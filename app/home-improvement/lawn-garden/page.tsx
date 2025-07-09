@@ -380,9 +380,11 @@ export default function LawnGardenPage() {
                           <p className="text-sm font-medium text-gray-700">
                             Services ({terminalSubcategories.length}):
                           </p>
-                          <div className="flex flex-wrap gap-2 mt-1">
+                          <div
+                            className={`flex flex-wrap gap-2 mt-1 ${terminalSubcategories.length > 8 ? "max-h-32 overflow-y-auto" : ""}`}
+                          >
                             {terminalSubcategories.length > 0 ? (
-                              terminalSubcategories.slice(0, 4).map((service, idx) => {
+                              terminalSubcategories.map((service, idx) => {
                                 // Highlight services that match selected filters
                                 const isMatchingFilter =
                                   selectedFilters.length > 0 &&
@@ -414,10 +416,8 @@ export default function LawnGardenPage() {
                                 General Services
                               </span>
                             )}
-                            {terminalSubcategories.length > 4 && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                                +{terminalSubcategories.length - 4} more
-                              </span>
+                            {terminalSubcategories.length > 8 && (
+                              <div className="w-full text-xs text-gray-500 mt-1">Scroll to see more services</div>
                             )}
                           </div>
                         </div>
@@ -439,7 +439,7 @@ export default function LawnGardenPage() {
                         {/* Action Buttons */}
                         <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
                           <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(provider)}>
-                            Reviews
+                            Ratings
                           </Button>
                           <Button
                             variant="outline"
