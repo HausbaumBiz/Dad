@@ -11,6 +11,8 @@ import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-
 import { Phone, X, Tag } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useToast } from "@/components/ui/use-toast"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -84,6 +86,27 @@ export default function TravelVacationPage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allProviders, setAllProviders] = useState<Business[]>([])
+
+  // Add photo state management
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (!businessPhotos[businessId]) {
+      try {
+        const photos = await loadBusinessPhotos(businessId)
+        setBusinessPhotos((prev) => ({
+          ...prev,
+          [businessId]: photos,
+        }))
+      } catch (error) {
+        console.error(`Failed to load photos for business ${businessId}:`, error)
+        setBusinessPhotos((prev) => ({
+          ...prev,
+          [businessId]: [],
+        }))
+      }
+    }
+  }
 
   // Get user's zip code from localStorage
   useEffect(() => {
@@ -348,7 +371,11 @@ export default function TravelVacationPage() {
             </Button>
 
             {appliedFilters.length > 0 && (
-              <Button onClick={clearFilters} variant="outline" className="text-gray-600 hover:text-gray-800">
+              <Button
+                onClick={clearFilters}
+                variant="outline"
+                className="text-gray-600 hover:text-gray-800 bg-transparent"
+              >
                 Clear Filters
               </Button>
             )}
@@ -465,20 +492,31 @@ export default function TravelVacationPage() {
           {providers.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="space-y-3">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
                     <h3 className="text-xl font-semibold">
                       {provider.displayName || provider.businessName || "Business Name"}
                     </h3>
-                    <p className="text-gray-600 text-sm mt-1">
-                      {provider.displayLocation ||
-                        `${provider.city || ""}, ${provider.state || ""}`.trim().replace(/^,|,$/, "") ||
-                        "Location not specified"}
-                    </p>
+
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      <span>
+                        {provider.displayLocation ||
+                          `${provider.city || ""}, ${provider.state || ""}`.trim().replace(/^,|,$/, "") ||
+                          "Location not specified"}
+                      </span>
+
+                      {(provider.adDesignData?.businessInfo?.phone || provider.phone) && (
+                        <div className="flex items-center">
+                          <Phone className="w-4 h-4 mr-1" />
+                          <span>{formatPhoneNumber(provider.adDesignData?.businessInfo?.phone || provider.phone)}</span>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Service Area Indicator */}
                     {userZipCode && (
-                      <div className="mt-2">
+                      <div>
                         {provider.isNationwide ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             Serves nationwide
@@ -495,74 +533,68 @@ export default function TravelVacationPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || 0} ({provider.reviews || 0} reviews)
-                      </span>
-                    </div>
-
-                    {(provider.adDesignData?.businessInfo?.phone || provider.phone) && (
-                      <div className="mt-2 flex items-center">
-                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
-                        <p className="text-sm text-gray-600">
-                          {formatPhoneNumber(provider.adDesignData?.businessInfo?.phone || provider.phone)}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Display Business Subcategories */}
+                    {/* Display Business Subcategories - Limited to 4 */}
                     {getBusinessSubcategories(provider).length > 0 && (
-                      <div className="mt-3">
+                      <div>
                         <div className="flex items-center mb-1">
                           <Tag className="w-4 h-4 text-gray-500 mr-1" />
                           <span className="text-xs font-medium text-gray-600">Services Offered:</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {getBusinessSubcategories(provider).map((subcategory, index) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                            >
-                              {subcategory}
+                          {getBusinessSubcategories(provider)
+                            .slice(0, 4)
+                            .map((subcategory, index) => (
+                              <span
+                                key={index}
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                              >
+                                {subcategory}
+                              </span>
+                            ))}
+                          {getBusinessSubcategories(provider).length > 4 && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
+                              +{getBusinessSubcategories(provider).length - 4} more
                             </span>
-                          ))}
+                          )}
                         </div>
                       </div>
                     )}
 
                     {provider.businessDescription && (
-                      <div className="mt-3">
-                        <p className="text-sm text-gray-700">{provider.businessDescription}</p>
-                      </div>
+                      <p className="text-sm text-gray-700 line-clamp-2">{provider.businessDescription}</p>
                     )}
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button
-                      className="w-full md:w-auto"
-                      onClick={() => handleOpenReviews(provider.displayName || provider.businessName || "Business")}
-                    >
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={provider.id}
+                        photos={businessPhotos[provider.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                      <Button
+                        className="flex-1 lg:flex-none lg:w-full"
+                        onClick={() => handleOpenReviews(provider.displayName || provider.businessName || "Business")}
+                      >
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none lg:w-full bg-transparent"
+                        onClick={() => handleOpenProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>

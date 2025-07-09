@@ -9,8 +9,10 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { PhotoCarousel } from "@/components/photo-carousel"
 import { Loader2, MapPin, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 interface Business {
   id: string
@@ -75,6 +77,9 @@ export default function FinancialServicesPage() {
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
   const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
+  // Photo state
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
   // Use a ref to track the current fetch request
   const fetchIdRef = useRef<number>(0)
 
@@ -112,6 +117,27 @@ export default function FinancialServicesPage() {
       `  - ${business.displayName}: primaryZip="${businessZip}", userZip="${targetZipCode}", matches=${matches}`,
     )
     return matches
+  }
+
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) {
+      return // Already loaded
+    }
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
   }
 
   // Separate useEffect for fetching businesses to avoid race conditions
@@ -407,51 +433,53 @@ export default function FinancialServicesPage() {
           {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="space-y-4">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
 
-                    {business.displayLocation && (
-                      <div className="flex items-center mt-2 text-gray-600">
-                        <MapPin className="h-4 w-4 mr-1" />
-                        <span className="text-sm">{business.displayLocation}</span>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {business.displayLocation && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span>{business.displayLocation}</span>
+                        </div>
+                      )}
 
-                    {business.displayPhone && (
-                      <div className="flex items-center mt-1 text-gray-600">
-                        <Phone className="h-4 w-4 mr-1" />
-                        <a href={`tel:${business.displayPhone}`} className="text-sm hover:text-primary">
-                          {business.displayPhone}
-                        </a>
-                      </div>
-                    )}
+                      {business.displayPhone && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          <a href={`tel:${business.displayPhone}`} className="hover:text-primary">
+                            {business.displayPhone}
+                          </a>
+                        </div>
+                      )}
 
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div className="flex items-center mt-1 text-blue-600">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                        <span className="text-xs">
-                          {business.isNationwide
-                            ? "Serves nationwide"
-                            : business.serviceArea?.includes(userZipCode)
-                              ? `Serves ${userZipCode} and surrounding areas`
-                              : `Primary location: ${business.zipCode}`}
-                        </span>
-                      </div>
-                    )}
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="flex items-center text-blue-600">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <span className="text-xs">
+                            {business.isNationwide
+                              ? "Serves nationwide"
+                              : business.serviceArea?.includes(userZipCode)
+                                ? `Serves ${userZipCode} area`
+                                : `Primary: ${business.zipCode}`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                    <div className="flex items-center mt-2">
+                    <div className="flex items-center">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => {
-                          // Only show yellow stars if business has reviews AND a rating
                           const hasReviews = business.reviews && business.reviews > 0
                           const rating = hasReviews ? business.rating || 0 : 0
 
@@ -476,38 +504,59 @@ export default function FinancialServicesPage() {
                       )}
                     </div>
 
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
+                      <div className="flex flex-wrap gap-1">
                         {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service, idx) => (
+                          business.allSubcategories.slice(0, 4).map((service, idx) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
                             >
                               {getSubcategoryString(service)}
                             </span>
                           ))
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
                             {getSubcategoryString(business.subcategory) || "Financial Services"}
+                          </span>
+                        )}
+                        {business.allSubcategories && business.allSubcategories.length > 4 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                            +{business.allSubcategories.length - 4} more
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(business)}
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={business.id}
+                        photos={businessPhotos[business.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
+                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
+                        Reviews
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none lg:w-full bg-transparent"
+                        onClick={() => handleOpenProfile(business)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>

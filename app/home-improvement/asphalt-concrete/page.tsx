@@ -8,8 +8,10 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { PhotoCarousel } from "@/components/photo-carousel"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { getBusinessAdDesign } from "@/app/actions/business-actions"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { Phone } from "lucide-react"
 
 export default function AsphaltConcretePage() {
@@ -35,6 +37,28 @@ export default function AsphaltConcretePage() {
 
   // State for filtering
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+
+  // State for photos
+  const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: any[] }>({})
+
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) return // Already loaded
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
 
   // Helper to extract service names from full paths - moved to top to avoid initialization errors
   const getAllTerminalSubcategories = (subcategories) => {
@@ -356,95 +380,82 @@ export default function AsphaltConcretePage() {
           {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="space-y-4">
+                  {/* Business Info Section - Compact */}
+                  <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{business.displayLocation}</p>
 
-                    {/* Display phone number if available */}
-                    {business.displayPhone && (
-                      <div className="flex items-center text-sm text-gray-600 mt-1">
-                        <Phone className="h-3.5 w-3.5 mr-1" />
-                        <span>{business.displayPhone}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(business.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {business.rating || 0} ({business.reviewCount || 0} reviews)
-                      </span>
+                    {/* Contact Info Row */}
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      <span>{business.displayLocation}</span>
+                      {business.displayPhone && (
+                        <div className="flex items-center">
+                          <Phone className="h-3.5 w-3.5 mr-1" />
+                          <span>{business.displayPhone}</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-3">
-                      {/* Show service count */}
-                      {business.subcategories && business.subcategories.length > 0 && (
-                        <p className="text-sm font-medium text-gray-700">
-                          Services ({getAllTerminalSubcategories(business.subcategories).length}):
-                        </p>
-                      )}
+                    {/* Services Tags - All services displayed in scrollable container */}
+                    <div className="max-h-32 overflow-y-auto">
+                      <div className="flex flex-wrap gap-2">
+                        {getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
+                          // Check if this service matches any selected filter
+                          const isHighlighted = selectedFilters.some((filterId) => {
+                            const filterOption = filterOptions.find((option) => option.id === filterId)
+                            if (!filterOption) return false
 
-                      {/* Scrollable container for services */}
-                      <div className="mt-1">
-                        <div
-                          className={`flex flex-wrap gap-2 ${getAllTerminalSubcategories(business.subcategories).length > 8 ? "max-h-32 overflow-y-auto pr-2" : ""}`}
-                        >
-                          {getAllTerminalSubcategories(business.subcategories).map((service, idx) => {
-                            // Check if this service matches any selected filter
-                            const isHighlighted = selectedFilters.some((filterId) => {
-                              const filterOption = filterOptions.find((option) => option.id === filterId)
-                              if (!filterOption) return false
+                            const filterValue = filterOption.value.toLowerCase()
+                            const serviceLower = service.toLowerCase()
+                            return serviceLower.includes(filterValue) || filterValue.includes(serviceLower)
+                          })
 
-                              const filterValue = filterOption.value.toLowerCase()
-                              const serviceLower = service.toLowerCase()
-                              return serviceLower.includes(filterValue) || filterValue.includes(serviceLower)
-                            })
-
-                            return (
-                              <span
-                                key={idx}
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-                                  isHighlighted
-                                    ? "bg-green-100 text-green-800 ring-2 ring-green-300"
-                                    : "bg-primary/10 text-primary"
-                                }`}
-                              >
-                                {service}
-                              </span>
-                            )
-                          })}
-                        </div>
-
-                        {/* Scroll hint */}
-                        {getAllTerminalSubcategories(business.subcategories).length > 8 && (
-                          <p className="text-xs text-gray-500 mt-1 italic">Scroll to see more services</p>
-                        )}
+                          return (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                                isHighlighted
+                                  ? "bg-green-100 text-green-800 ring-2 ring-green-300"
+                                  : "bg-primary/10 text-primary"
+                              }`}
+                            >
+                              {service}
+                            </span>
+                          )
+                        })}
                       </div>
+                      {getAllTerminalSubcategories(business.subcategories).length > 8 && (
+                        <p className="text-xs text-gray-500 mt-2">Scroll to see more services</p>
+                      )}
                     </div>
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(business)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleViewProfile(business)}
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={business.id}
+                        photos={businessPhotos[business.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                      <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none bg-transparent"
+                        onClick={() => handleViewProfile(business)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>

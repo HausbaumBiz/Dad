@@ -10,6 +10,8 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { MapPin, Phone, X } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessMedia } from "@/app/actions/media-actions"
+import { getCloudflareImageUrl } from "@/lib/cloudflare-images"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -55,6 +57,8 @@ export default function MentalHealthPage() {
   const [allProviders, setAllProviders] = useState<any[]>([])
 
   const fetchIdRef = useRef(0)
+
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, any[]>>({})
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -108,6 +112,25 @@ export default function MentalHealthPage() {
       return subcategory.subcategory || subcategory.category || "Unknown Service"
     }
     return "Unknown Service"
+  }
+
+  // Helper function to load business photos from Cloudflare
+  const loadBusinessPhotos = async (businessId: string) => {
+    try {
+      const media = await getBusinessMedia(businessId)
+      if (media && media.photoAlbum && media.photoAlbum.length > 0) {
+        // Take first 5 photos and convert to the format expected by PhotoCarousel
+        return media.photoAlbum.slice(0, 5).map((photo) => ({
+          id: photo.id,
+          url: getCloudflareImageUrl(photo.id, "public"),
+          filename: photo.filename,
+        }))
+      }
+      return []
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      return []
+    }
   }
 
   useEffect(() => {
@@ -167,6 +190,27 @@ export default function MentalHealthPage() {
 
         setProviders(transformedProviders)
         setAllProviders(transformedProviders)
+
+        // Load photos for each provider
+        const loadPhotos = async () => {
+          const photoPromises = transformedProviders.map(async (provider) => {
+            const photos = await loadBusinessPhotos(provider.id)
+            return { businessId: provider.id, photos }
+          })
+
+          const photoResults = await Promise.all(photoPromises)
+          const photoMap: Record<string, any[]> = {}
+
+          photoResults.forEach(({ businessId, photos }) => {
+            photoMap[businessId] = photos
+          })
+
+          setBusinessPhotos(photoMap)
+        }
+
+        if (transformedProviders.length > 0) {
+          loadPhotos()
+        }
       } catch (err) {
         console.error("Error fetching mental health providers:", err)
         if (currentFetchId === fetchIdRef.current) {
@@ -408,20 +452,21 @@ export default function MentalHealthPage() {
           providers.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div className="flex-1">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left Column - Business Info */}
+                  <div className="lg:col-span-3 space-y-3">
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
 
                     {provider.location && (
-                      <div className="flex items-center text-gray-600 text-sm mt-1">
-                        <MapPin className="w-4 h-4 mr-1" />
+                      <div className="flex items-center text-gray-600 text-sm">
+                        <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
                         <span>{provider.location}</span>
                       </div>
                     )}
 
                     {provider.phone && (
-                      <div className="flex items-center text-gray-600 text-sm mt-1">
-                        <Phone className="w-4 h-4 mr-1" />
+                      <div className="flex items-center text-gray-600 text-sm">
+                        <Phone className="w-4 h-4 mr-1 flex-shrink-0" />
                         <a href={`tel:${provider.phone}`} className="hover:text-primary">
                           {provider.phone}
                         </a>
@@ -430,7 +475,7 @@ export default function MentalHealthPage() {
 
                     {/* Service Area Indicator */}
                     {userZipCode && (
-                      <div className="mt-2">
+                      <div>
                         {provider.isNationwide ? (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             Serves nationwide
@@ -447,30 +492,8 @@ export default function MentalHealthPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${
-                              provider.reviews > 0 && i < Math.floor(provider.rating)
-                                ? "text-yellow-400"
-                                : "text-gray-300"
-                            }`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.reviews > 0 ? `${provider.rating} (${provider.reviews} reviews)` : "No reviews yet"}
-                      </span>
-                    </div>
-
                     {provider.services && provider.services.length > 0 && (
-                      <div className="mt-3">
+                      <div>
                         <p className="text-sm font-medium text-gray-700">Services:</p>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {provider.services.map((service, idx) => (
@@ -486,11 +509,66 @@ export default function MentalHealthPage() {
                     )}
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between space-y-2">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                  {/* Center Column - Photos */}
+                  <div className="lg:col-span-8">
+                    <div className="w-full h-32 bg-gray-100 rounded-lg overflow-hidden">
+                      {businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
+                        <div className="flex space-x-1 h-full">
+                          {businessPhotos[provider.id].slice(0, 5).map((photo, index) => (
+                            <div key={photo.id} className="flex-1 h-full">
+                              <Image
+                                src={photo.url || "/placeholder.svg"}
+                                alt={`${provider.name} photo ${index + 1}`}
+                                width={120}
+                                height={128}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.src = "/placeholder.svg?height=128&width=120&text=No+Image"
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                          <div className="text-center">
+                            <svg
+                              className="w-8 h-8 text-gray-400 mx-auto mb-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                            <p className="text-xs text-gray-500">No photos available</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column - Action Buttons */}
+                  <div className="lg:col-span-1 flex flex-col justify-center space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenReviews(provider)}
+                      className="text-sm min-w-[100px]"
+                    >
                       Reviews
                     </Button>
-                    <Button variant="outline" className="w-full md:w-auto" onClick={() => handleOpenProfile(provider)}>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleOpenProfile(provider)}
+                      className="text-sm min-w-[100px]"
+                    >
                       View Profile
                     </Button>
                   </div>

@@ -11,6 +11,8 @@ import { useEffect } from "react"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getZipCode } from "@/lib/zip-code-db"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 const filterOptions = [
   { id: "handymen1", label: "Odd Jobs and Repairs", value: "Odd Jobs and Repairs" },
@@ -37,6 +39,28 @@ export default function HandymenPage() {
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
 
+  // Add photo state management
+  const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: string[] }>({})
+
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) return // Already loaded
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Failed to load photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
+
   // Add this function:
   const getAllTerminalSubcategories = (subcategories) => {
     if (!Array.isArray(subcategories)) return []
@@ -57,7 +81,6 @@ export default function HandymenPage() {
       })
       .filter(Boolean) // Remove nulls
       .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
-    // Remove the .slice(0, 4) limit to show all subcategories
   }
 
   const handleFilterChange = (filterId: string, checked: boolean) => {
@@ -157,9 +180,6 @@ export default function HandymenPage() {
           // Transform the data for display with city/state lookup
           const transformedBusinesses = await Promise.all(
             filteredBusinessesByZip.map(async (business: any) => {
-              // Extract service tags from subcategories
-              // Add this improved function that shows all terminal subcategories
-
               // Fetch city and state from ZIP code database
               let location = "Service Area"
 
@@ -212,9 +232,6 @@ export default function HandymenPage() {
           // Transform the data for display with city/state lookup
           const transformedBusinesses = await Promise.all(
             allBusinessesData.map(async (business: any) => {
-              // Extract service tags from subcategories
-              // Add this improved function that shows all terminal subcategories
-
               // Fetch city and state from ZIP code database
               let location = "Service Area"
 
@@ -392,32 +409,15 @@ export default function HandymenPage() {
           filteredBusinesses.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="space-y-4">
+                  {/* Business Info Section */}
+                  <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.location}</p>
 
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${provider.reviews > 0 && i < Math.floor(provider.rating) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.reviews > 0
-                          ? `${provider.rating} (${provider.reviews} ${provider.reviews === 1 ? "review" : "reviews"})`
-                          : "No reviews yet"}
-                      </span>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      <span>📍 {provider.location}</span>
+                      {provider.phone && <span>📞 {provider.phone}</span>}
                     </div>
-
-                    {provider.phone && <p className="text-sm text-gray-600 mt-1">📞 {provider.phone}</p>}
 
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">
@@ -454,17 +454,31 @@ export default function HandymenPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleViewProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photo Carousel and Buttons Section */}
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={provider.id}
+                        photos={businessPhotos[provider.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                      <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(provider)}>
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none bg-transparent"
+                        onClick={() => handleViewProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>

@@ -6,10 +6,114 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone } from "lucide-react"
+import { Phone, ChevronLeft, ChevronRight } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+
+// PhotoCarousel Component
+interface PhotoCarouselProps {
+  photos: string[]
+  businessName: string
+}
+
+function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+  const [currentPage, setCurrentPage] = useState(0)
+  const photosPerPage = 5
+  const totalPages = Math.ceil(photos.length / photosPerPage)
+
+  const nextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
+
+  const prevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  const startIndex = currentPage * photosPerPage
+  const endIndex = Math.min(startIndex + photosPerPage, photos.length)
+  const currentPhotos = photos.slice(startIndex, endIndex)
+
+  // Fill empty slots to always show 5 slots
+  const displayPhotos = [...currentPhotos]
+  while (displayPhotos.length < photosPerPage) {
+    displayPhotos.push("")
+  }
+
+  return (
+    <div className="relative">
+      <div className="grid grid-cols-5 gap-2">
+        {displayPhotos.map((photo, index) => (
+          <div key={index} className="w-40 h-30 bg-gray-100 rounded-lg overflow-hidden">
+            {photo ? (
+              <Image
+                src={photo || "/placeholder.svg"}
+                alt={`${businessName} photo ${startIndex + index + 1}`}
+                width={160}
+                height={120}
+                className="w-full h-full object-cover"
+                sizes="160px"
+                onError={(e) => {
+                  console.error(`Failed to load image: ${photo}`)
+                  e.currentTarget.src = "/placeholder.svg?height=120&width=160&text=No+Image"
+                }}
+              />
+            ) : (
+              <div className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                <span className="text-xs text-gray-400">No photo</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Navigation arrows */}
+      {totalPages > 1 && (
+        <>
+          <button
+            onClick={prevPage}
+            disabled={currentPage === 0}
+            className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4 bg-white rounded-full p-1 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="h-3 w-3" />
+          </button>
+          <button
+            onClick={nextPage}
+            disabled={currentPage === totalPages - 1}
+            className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4 bg-white rounded-full p-1 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="h-3 w-3" />
+          </button>
+        </>
+      )}
+
+      {/* Photo counter */}
+      {photos.length > photosPerPage && (
+        <div className="absolute top-1 right-1 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+          {startIndex + 1}-{endIndex} of {photos.length}
+        </div>
+      )}
+
+      {/* Pagination dots */}
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-2 space-x-1">
+          {Array.from({ length: totalPages }, (_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentPage(i)}
+              className={`w-1.5 h-1.5 rounded-full ${i === currentPage ? "bg-primary" : "bg-gray-300"}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function RealEstatePage() {
   const filterOptions = [
@@ -110,6 +214,10 @@ export default function RealEstatePage() {
   const [allProviders, setAllProviders] = useState<Business[]>([])
   const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
 
+  // State for business photos
+  const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: string[] }>({})
+  const [photosLoading, setPhotosLoading] = useState<{ [key: string]: boolean }>({})
+
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
@@ -176,6 +284,28 @@ export default function RealEstatePage() {
     setFilteredProviders(allProviders)
   }
 
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (photosLoading[businessId] || businessPhotos[businessId]) {
+      return // Already loading or loaded
+    }
+
+    setPhotosLoading((prev) => ({ ...prev, [businessId]: true }))
+
+    try {
+      console.log(`Loading photos for business ${businessId}`)
+      const photos = await loadBusinessPhotos(businessId)
+      console.log(`Loaded ${photos.length} photos for business ${businessId}`)
+
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
+    } finally {
+      setPhotosLoading((prev) => ({ ...prev, [businessId]: false }))
+    }
+  }
+
   useEffect(() => {
     async function fetchBusinesses() {
       const currentFetchId = ++fetchIdRef.current
@@ -208,6 +338,11 @@ export default function RealEstatePage() {
         setProviders(fetchedBusinesses)
         setAllProviders(fetchedBusinesses)
         setFilteredProviders(fetchedBusinesses)
+
+        // Load photos for each business individually
+        fetchedBusinesses.forEach((business: any) => {
+          loadPhotosForBusiness(business.id)
+        })
       } catch (err) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -376,23 +511,12 @@ export default function RealEstatePage() {
           {filteredProviders.map((provider: any) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Left: Business Information */}
+                  <div className="lg:w-56 flex-shrink-0">
                     <h3 className="text-xl font-semibold">
                       {provider.displayName || provider.businessName || "Real Estate Professional"}
                     </h3>
-                    <p className="text-gray-600 text-sm mt-1">{provider.displayLocation || "Location not specified"}</p>
-
-                    {provider.displayPhone && (
-                      <div className="flex items-center mt-2">
-                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
-                        <span className="text-sm text-gray-600">
-                          <a href={`tel:${provider.displayPhone}`} className="hover:text-blue-600 hover:underline">
-                            {provider.displayPhone}
-                          </a>
-                        </span>
-                      </div>
-                    )}
 
                     {/* Service Area Indicator */}
                     {userZipCode && (
@@ -407,29 +531,24 @@ export default function RealEstatePage() {
                       </div>
                     )}
 
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
+                    <p className="text-gray-600 text-sm mt-2">{provider.displayLocation || "Location not specified"}</p>
+
+                    {provider.displayPhone && (
+                      <div className="flex items-center mt-2">
+                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
+                        <span className="text-sm text-gray-600">
+                          <a href={`tel:${provider.displayPhone}`} className="hover:text-blue-600 hover:underline">
+                            {provider.displayPhone}
+                          </a>
+                        </span>
                       </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || 0} ({provider.reviews || 0} reviews)
-                      </span>
-                    </div>
+                    )}
 
                     {provider.subcategories && provider.subcategories.length > 0 && (
                       <div className="mt-3">
                         <p className="text-sm font-medium text-gray-700">Services:</p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.subcategories.map((subcategory: any, idx: number) => (
+                          {provider.subcategories.slice(0, 3).map((subcategory: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
@@ -437,18 +556,56 @@ export default function RealEstatePage() {
                               {getSubcategoryString(subcategory)}
                             </span>
                           ))}
+                          {provider.subcategories.length > 3 && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                              +{provider.subcategories.length - 3} more
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
-                    <Button className="w-full md:w-auto" onClick={() => handleOpenReviews(provider)}>
+                  {/* Center: Photo Carousel (Desktop Only) */}
+                  <div className="hidden lg:block flex-1">
+                    {photosLoading[provider.id] ? (
+                      <div className="grid grid-cols-5 gap-2">
+                        {Array.from({ length: 5 }, (_, index) => (
+                          <div
+                            key={index}
+                            className="w-40 h-30 bg-gray-200 rounded-lg flex items-center justify-center animate-pulse"
+                          >
+                            <span className="text-xs text-gray-400">Loading...</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
+                      <PhotoCarousel
+                        photos={businessPhotos[provider.id]}
+                        businessName={provider.displayName || provider.businessName || "Real Estate Professional"}
+                      />
+                    ) : (
+                      <div className="grid grid-cols-5 gap-2">
+                        {Array.from({ length: 5 }, (_, index) => (
+                          <div
+                            key={index}
+                            className="w-40 h-30 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center"
+                          >
+                            <span className="text-xs text-gray-400">No photo</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Action Buttons */}
+                  <div className="lg:w-28 flex flex-col gap-2 lg:items-end">
+                    <Button className="w-full lg:w-auto min-w-[110px]" onClick={() => handleOpenReviews(provider)}>
                       Reviews
                     </Button>
                     <Button
                       variant="outline"
-                      className="mt-2 w-full md:w-auto"
+                      className="w-full lg:w-auto min-w-[110px] bg-transparent"
                       onClick={() => handleViewProfile(provider)}
                     >
                       View Profile

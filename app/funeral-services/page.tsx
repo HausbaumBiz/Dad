@@ -1,15 +1,16 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, MapPin, Tag } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Phone, MapPin, Star, ChevronLeft, ChevronRight } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { toast } from "@/components/ui/use-toast"
 
 // Helper function to extract string from subcategory (handles both string and object formats)
@@ -35,10 +36,13 @@ interface Business {
   displayLocation?: string
   rating?: number
   reviews?: number
-  subcategories?: any[] // Changed from string[] to any[]
+  reviewCount?: number
+  subcategories?: any[]
   businessDescription?: string
   zipCode?: string
   serviceArea?: string[]
+  isNationwide?: boolean
+  photos?: string[]
   adDesignData?: {
     businessInfo?: {
       phone?: string
@@ -46,24 +50,222 @@ interface Business {
       state?: string
     }
   }
-  allSubcategories?: any[] // Changed from string[] to any[]
+  allSubcategories?: any[]
   subcategory?: string
+}
+
+// Photo Carousel Component - displays 5 photos in landscape format
+interface PhotoCarouselProps {
+  photos: string[]
+  businessName: string
+}
+
+function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (!photos || photos.length === 0) {
+    return null // Don't show anything if no photos
+  }
+
+  const photosPerView = 5
+  const maxIndex = Math.max(0, photos.length - photosPerView)
+
+  const nextPhotos = () => {
+    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
+  }
+
+  const prevPhotos = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0))
+  }
+
+  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
+
+  return (
+    <div className="hidden lg:block w-full">
+      <div className="relative group w-full">
+        <div className="flex gap-2 justify-center w-full">
+          {visiblePhotos.map((photo, index) => (
+            <div key={currentIndex + index} className="w-48 h-36 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+              <Image
+                src={photo || "/placeholder.svg"}
+                alt={`${businessName} photo ${currentIndex + index + 1}`}
+                width={192}
+                height={144}
+                className="w-full h-full object-cover"
+                sizes="192px"
+              />
+            </div>
+          ))}
+
+          {/* Fill empty slots if less than 5 photos visible */}
+          {visiblePhotos.length < photosPerView && (
+            <>
+              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
+                <div
+                  key={`empty-${index}`}
+                  className="w-48 h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                ></div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Navigation arrows - only show if there are more than 5 photos */}
+        {photos.length > photosPerView && (
+          <>
+            <button
+              onClick={prevPhotos}
+              disabled={currentIndex === 0}
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={nextPhotos}
+              disabled={currentIndex >= maxIndex}
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </>
+        )}
+
+        {/* Photo counter */}
+        {photos.length > photosPerView && (
+          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination dots - only show if there are more than 5 photos */}
+      {photos.length > photosPerView && (
+        <div className="flex justify-center mt-2 space-x-1">
+          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
+            const pageStartIndex = index * photosPerView
+            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
+            return (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(pageStartIndex)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
+              />
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Function to load business photos from Cloudflare using public URLs
+const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
+  try {
+    console.log(`Loading photos for business ${businessId}`)
+
+    // Fetch business media data from the updated API
+    const response = await fetch(`/api/businesses/${businessId}`)
+    if (!response.ok) {
+      console.error(`Failed to fetch business data: ${response.status} ${response.statusText}`)
+      return []
+    }
+
+    const businessData = await response.json()
+    console.log(`Business data for ${businessId}:`, businessData)
+
+    // Try multiple possible locations for photo data
+    let photoAlbum = null
+
+    // Check direct photoAlbum property
+    if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
+      photoAlbum = businessData.photoAlbum
+    }
+    // Check nested media.photoAlbum
+    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
+      photoAlbum = businessData.media.photoAlbum
+    }
+    // Check adDesign.photoAlbum
+    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
+      photoAlbum = businessData.adDesign.photoAlbum
+    }
+
+    if (!photoAlbum || !Array.isArray(photoAlbum)) {
+      console.log(`No photo album found for business ${businessId}`)
+      return []
+    }
+
+    console.log(`Found ${photoAlbum.length} photos in album for business ${businessId}`)
+
+    // Convert Cloudflare image IDs to public URLs
+    const photoUrls = photoAlbum
+      .map((photo: any, index: number) => {
+        // Handle different photo data structures
+        let imageId = null
+
+        if (typeof photo === "string") {
+          // If photo is just a string (image ID)
+          imageId = photo
+        } else if (photo && typeof photo === "object") {
+          // If photo is an object, try to extract the image ID
+          imageId = photo.imageId || photo.id || photo.cloudflareId || photo.url
+
+          // If it's already a full URL, return it as-is
+          if (typeof imageId === "string" && (imageId.startsWith("http") || imageId.startsWith("https"))) {
+            console.log(`Photo ${index} already has full URL: ${imageId}`)
+            return imageId
+          }
+        }
+
+        if (!imageId) {
+          console.warn(`No image ID found for photo ${index}:`, photo)
+          return null
+        }
+
+        // Generate public Cloudflare URL
+        try {
+          const publicUrl = getCloudflareImageUrl(imageId, "public")
+          console.log(`Generated URL for image ${imageId}: ${publicUrl}`)
+          return publicUrl
+        } catch (error) {
+          console.error(`Error generating URL for image ${imageId}:`, error)
+          return null
+        }
+      })
+      .filter(Boolean) // Remove null/undefined URLs
+
+    console.log(`Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
+    return photoUrls
+  } catch (error) {
+    console.error(`Error loading photos for business ${businessId}:`, error)
+    return []
+  }
 }
 
 // Helper function to check if business serves a zip code
 const businessServesZipCode = (business: Business, zipCode: string): boolean => {
-  // If business has no service area defined, fall back to primary zip code
-  if (!business.serviceArea || business.serviceArea.length === 0) {
-    return business.zipCode === zipCode
-  }
+  console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
+    isNationwide: business.isNationwide,
+    serviceArea: business.serviceArea,
+    primaryZip: business.zipCode,
+  })
 
-  // Check if business serves nationwide (indicated by having "nationwide" in service area)
-  if (business.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))) {
+  // Check if business serves nationwide
+  if (business.isNationwide) {
+    console.log(`✓ Business serves nationwide`)
     return true
   }
 
-  // Check if the zip code is in the business's service area
-  return business.serviceArea.includes(zipCode)
+  // Check if zip code is in service area
+  if (business.serviceArea && Array.isArray(business.serviceArea)) {
+    const serves = business.serviceArea.includes(zipCode)
+    console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
+    return serves
+  }
+
+  // Fallback to primary zip code
+  const matches = business.zipCode === zipCode
+  console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
+  return matches
 }
 
 export default function FuneralServicesPage() {
@@ -84,17 +286,16 @@ export default function FuneralServicesPage() {
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
-    id: string
+    id: number
     name: string
-    reviews: any[]
+    rating: number
+    reviews: number
   } | null>(null)
 
   // State for business profile dialog
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-  const [selectedBusiness, setSelectedBusiness] = useState<{
-    id: string
-    name: string
-  } | null>(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
 
   // State for businesses
   const [businesses, setBusinesses] = useState<Business[]>([])
@@ -103,9 +304,11 @@ export default function FuneralServicesPage() {
 
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
+  // Filter state
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -114,6 +317,65 @@ export default function FuneralServicesPage() {
     }
   }, [])
 
+  // Helper function for exact subcategory matching
+  const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
+    if (filters.length === 0) return true
+
+    console.log(`Checking business ${business.displayName || business.businessName} subcategories:`, {
+      subcategories: business.subcategories,
+      filters,
+    })
+
+    // Check subcategories array
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      const hasMatch = filters.some((filter) =>
+        business.subcategories!.some((subcat) => getSubcategoryString(subcat) === filter),
+      )
+      if (hasMatch) return true
+    }
+
+    return false
+  }
+
+  // Filter handlers
+  const handleFilterChange = (filterValue: string, checked: boolean) => {
+    setSelectedFilters((prev) => (checked ? [...prev, filterValue] : prev.filter((f) => f !== filterValue)))
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All businesses:", allBusinesses)
+
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(allBusinesses)
+      setAppliedFilters([])
+      toast({
+        title: "Filters cleared",
+        description: `Showing all ${allBusinesses.length} funeral service providers`,
+      })
+    } else {
+      const filtered = allBusinesses.filter((business) => hasExactSubcategoryMatch(business, selectedFilters))
+      console.log("Filtered results:", filtered)
+      setFilteredBusinesses(filtered)
+      setAppliedFilters([...selectedFilters])
+      toast({
+        title: "Filters applied",
+        description: `Found ${filtered.length} funeral service providers matching your criteria`,
+      })
+    }
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredBusinesses(allBusinesses)
+    toast({
+      title: "Filters cleared",
+      description: `Showing all ${allBusinesses.length} funeral service providers`,
+    })
+  }
+
+  // Fetch businesses with race condition prevention
   useEffect(() => {
     async function fetchBusinesses() {
       const currentFetchId = ++fetchIdRef.current
@@ -126,6 +388,14 @@ export default function FuneralServicesPage() {
 
         const fetchedBusinesses = await getBusinessesForCategoryPage("/funeral-services")
 
+        // Load photos for each business using public Cloudflare URLs
+        const businessesWithPhotos = await Promise.all(
+          fetchedBusinesses.map(async (business: Business) => {
+            const photos = await loadBusinessPhotos(business.id)
+            return { ...business, photos }
+          }),
+        )
+
         // Check if this is still the current request
         if (currentFetchId !== fetchIdRef.current) {
           console.log(`[Funeral Services] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
@@ -135,10 +405,10 @@ export default function FuneralServicesPage() {
         console.log(`[Funeral Services] Fetch ${currentFetchId} completed, got ${fetchedBusinesses.length} businesses`)
 
         // Filter by zip code if available
-        let filteredBusinesses = fetchedBusinesses
+        let filteredBusinesses = businessesWithPhotos
         if (userZipCode) {
           console.log(`[Funeral Services] Filtering by zip code: ${userZipCode}`)
-          filteredBusinesses = fetchedBusinesses.filter((business: Business) => {
+          filteredBusinesses = businessesWithPhotos.filter((business: Business) => {
             const serves = businessServesZipCode(business, userZipCode)
             console.log(
               `[Funeral Services] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
@@ -154,6 +424,7 @@ export default function FuneralServicesPage() {
 
         setBusinesses(filteredBusinesses)
         setAllBusinesses(filteredBusinesses)
+        setFilteredBusinesses(filteredBusinesses)
       } catch (err) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -173,66 +444,19 @@ export default function FuneralServicesPage() {
 
   const handleOpenReviews = (business: Business) => {
     setSelectedProvider({
-      id: business.id,
+      id: Number.parseInt(business.id || "0"),
       name: business.displayName || business.businessName || "Funeral Service Provider",
-      reviews: business.reviews ? [business.reviews] : [],
+      rating: business.rating || 0,
+      reviews: business.reviewCount || business.reviews || 0,
     })
     setIsReviewsDialogOpen(true)
   }
 
   const handleViewProfile = (business: Business) => {
-    setSelectedBusiness({
-      id: business.id,
-      name: business.displayName || business.businessName || "Funeral Service Provider",
-    })
+    console.log("Opening profile for business:", business.id, business.businessName)
+    setSelectedBusinessId(business.id || "")
+    setSelectedBusinessName(business.displayName || business.businessName || "Funeral Service Provider")
     setIsProfileDialogOpen(true)
-  }
-
-  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
-    const subcategories = business.subcategories || []
-    const allSubcategories = business.allSubcategories || []
-    const subcategory = business.subcategory || ""
-
-    const allSubs = [...subcategories, ...allSubcategories, subcategory].filter(Boolean)
-
-    return allSubs.some((sub) => getSubcategoryString(sub).toLowerCase().trim() === filterValue.toLowerCase().trim())
-  }
-
-  const handleFilterChange = (filterValue: string, checked: boolean) => {
-    setSelectedFilters((prev) => (checked ? [...prev, filterValue] : prev.filter((f) => f !== filterValue)))
-  }
-
-  const applyFilters = () => {
-    if (selectedFilters.length === 0) {
-      setBusinesses(allBusinesses)
-      setAppliedFilters([])
-      toast({
-        title: "Filters cleared",
-        description: `Showing all ${allBusinesses.length} funeral service providers`,
-      })
-      return
-    }
-
-    const filtered = allBusinesses.filter((business) =>
-      selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter)),
-    )
-
-    setBusinesses(filtered)
-    setAppliedFilters([...selectedFilters])
-    toast({
-      title: "Filters applied",
-      description: `Found ${filtered.length} funeral service providers matching your criteria`,
-    })
-  }
-
-  const clearFilters = () => {
-    setSelectedFilters([])
-    setAppliedFilters([])
-    setBusinesses(allBusinesses)
-    toast({
-      title: "Filters cleared",
-      description: `Showing all ${allBusinesses.length} funeral service providers`,
-    })
   }
 
   return (
@@ -270,82 +494,78 @@ export default function FuneralServicesPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h3 className="text-lg font-semibold mb-4">Filter by Services</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Showing businesses that serve zip code:</span> {userZipCode}
+            <span className="text-xs block mt-1">Includes businesses with {userZipCode} in their service area</span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem("savedZipCode")
+              setUserZipCode(null)
+            }}
+            className="text-blue-700 border-blue-300 hover:bg-blue-100"
+          >
+            Clear Filter
+          </Button>
+        </div>
+      )}
+
+      {/* Enhanced Filter Controls */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Filter by Service Type</h3>
+          <div className="text-sm text-gray-600">
+            {selectedFilters.length > 0 &&
+              `${selectedFilters.length} filter${selectedFilters.length > 1 ? "s" : ""} selected`}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {filterOptions.map((option) => (
-            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="checkbox"
+            <label
+              key={option.id}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:border-primary/50 cursor-pointer transition-colors"
+            >
+              <Checkbox
                 checked={selectedFilters.includes(option.value)}
-                onChange={(e) => handleFilterChange(option.value, e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                onCheckedChange={(checked) => handleFilterChange(option.value, checked as boolean)}
               />
-              <span className="text-sm text-gray-700">{option.label}</span>
+              <span className="text-sm font-medium">{option.label}</span>
             </label>
           ))}
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-600">
-            {selectedFilters.length > 0 && (
-              <span>
-                {selectedFilters.length} filter{selectedFilters.length !== 1 ? "s" : ""} selected
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} size="sm">
-              Apply Filters
+        <div className="flex gap-3">
+          <Button onClick={applyFilters} disabled={selectedFilters.length === 0} className="min-w-[120px]">
+            Apply Filters
+          </Button>
+          {appliedFilters.length > 0 && (
+            <Button variant="outline" onClick={clearFilters} className="min-w-[120px] bg-transparent">
+              Clear Filters
             </Button>
-            {appliedFilters.length > 0 && (
-              <Button onClick={clearFilters} variant="outline" size="sm">
-                Clear Filters
-              </Button>
-            )}
-          </div>
+          )}
         </div>
+
+        {appliedFilters.length > 0 && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Active filters:</strong> {appliedFilters.join(", ")}
+              <br />
+              <span className="text-blue-600">
+                Showing {filteredBusinesses.length} of {allBusinesses.length} businesses
+              </span>
+            </p>
+          </div>
+        )}
       </div>
 
-      {appliedFilters.length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-blue-700">
-                <span className="font-medium">Active filters:</span> {appliedFilters.join(", ")}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Showing {businesses.length} of {allBusinesses.length} funeral service providers
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {userZipCode && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-blue-700">
-              <span className="font-medium">Showing funeral services for zip code:</span> {userZipCode}
-              <span className="text-xs block mt-1">(Includes businesses with {userZipCode} in their service area)</span>
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.removeItem("savedZipCode")
-                setUserZipCode(null)
-              }}
-              className="text-xs"
-            >
-              Clear Filter
-            </Button>
-          </div>
-        </div>
-      )}
-
       {loading ? (
-        <div className="text-center py-8">
+        <div className="mt-8 p-8 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
           <p className="mt-2 text-gray-600">Loading funeral service providers...</p>
         </div>
@@ -353,7 +573,7 @@ export default function FuneralServicesPage() {
         <div className="text-center py-8">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : businesses.length === 0 ? (
+      ) : filteredBusinesses.length === 0 ? (
         <div className="text-center py-12">
           <div className="max-w-md mx-auto">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -378,123 +598,149 @@ export default function FuneralServicesPage() {
           </div>
         </div>
       ) : (
-        <div className="space-y-6">
-          {businesses.map((provider: Business) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div className="flex-1">
+        <div className="mt-8 space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900">Funeral Service Providers ({filteredBusinesses.length})</h2>
+          <div className="grid gap-6">
+            {filteredBusinesses.map((business: Business) => (
+              <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                <div className="flex flex-col space-y-4">
+                  {/* Business Name and Description */}
+                  <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {provider.displayName || provider.businessName || "Funeral Service Provider"}
+                      {business.displayName || business.businessName || "Funeral Service Provider"}
                     </h3>
-
-                    {provider.businessDescription && (
-                      <p className="text-gray-700 mb-3 leading-relaxed">{provider.businessDescription}</p>
+                    {business.businessDescription && (
+                      <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
                     )}
+                  </div>
 
-                    {provider.displayPhone && (
-                      <div className="flex items-center mb-2">
-                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
-                        <span className="text-sm text-gray-600">
-                          <a href={`tel:${provider.displayPhone}`} className="hover:text-blue-600 hover:underline">
-                            {provider.displayPhone}
-                          </a>
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center mb-3">
-                      <MapPin className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
-                      <span className="text-sm text-gray-600">
-                        {provider.displayLocation || "Location not specified"}
-                      </span>
-                    </div>
-
-                    {provider.serviceArea && provider.serviceArea.length > 0 && (
-                      <div className="flex items-center text-gray-600 text-xs mb-3">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800">
-                          {provider.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))
-                            ? "Serves nationwide"
-                            : `Serves ${userZipCode} and surrounding areas`}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center mb-3">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
+                  {/* Main content area with contact info, photos, and buttons */}
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                    {/* Left side - Contact and Location Info - Made smaller */}
+                    <div className="lg:w-64 space-y-2 flex-shrink-0">
+                      {/* Phone */}
+                      {business.displayPhone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <a
+                            href={`tel:${business.displayPhone}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
                           >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-.181h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || 0} ({provider.reviews || 0} reviews)
-                      </span>
-                    </div>
-
-                    {provider.subcategories && provider.subcategories.length > 0 && (
-                      <div className="mb-3">
-                        <div className="flex items-center mb-2">
-                          <Tag className="w-4 h-4 text-gray-500 mr-2" />
-                          <span className="text-sm font-medium text-gray-700">Services:</span>
+                            {business.displayPhone}
+                          </a>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {provider.subcategories.map((subcategory: any, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
-                            >
-                              {getSubcategoryString(subcategory)}
-                            </span>
+                      )}
+
+                      {/* Location */}
+                      {business.displayLocation && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <span className="text-gray-700 text-sm">{business.displayLocation}</span>
+                        </div>
+                      )}
+
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {business.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : business.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} and surrounding areas</span>
+                          ) : business.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
+                        </div>
+                      )}
+
+                      {/* Rating */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`h-4 w-4 ${
+                                star <= (business.rating || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
+                              }`}
+                            />
                           ))}
                         </div>
+                        <span className="text-sm text-gray-600">
+                          {business.rating?.toFixed(1) || "0.0"} ({business.reviewCount || business.reviews || 0}{" "}
+                          reviews)
+                        </span>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
+                    <div className="flex-1 flex justify-center">
+                      <PhotoCarousel
+                        photos={business.photos || []}
+                        businessName={business.displayName || business.businessName || "Funeral Service Provider"}
+                      />
+                    </div>
+
+                    {/* Right side - Action Buttons */}
+                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenReviews(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleViewProfile(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="mt-4 md:mt-0 md:ml-6 flex flex-col items-start md:items-end justify-start space-y-2">
-                    <Button className="w-full md:w-auto min-w-[120px]" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full md:w-auto min-w-[120px]"
-                      onClick={() => handleViewProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
+                  {/* Subcategories/Specialties */}
+                  {business.subcategories && business.subcategories.length > 0 && (
+                    <div className="w-full">
+                      <div className="lg:w-64">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2 w-full">
+                        {business.subcategories.map((subcategory: any, index: number) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                          >
+                            {getSubcategoryString(subcategory)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {selectedProvider && (
-        <ReviewsDialog
-          isOpen={isReviewsDialogOpen}
-          onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.name}
-          businessId={selectedProvider.id}
-          reviews={selectedProvider.reviews}
-        />
-      )}
+      {/* Reviews Dialog */}
+      <ReviewsDialog
+        isOpen={isReviewsDialogOpen}
+        onClose={() => setIsReviewsDialogOpen(false)}
+        providerName={selectedProvider?.name || ""}
+        businessId={selectedProvider?.id.toString() || ""}
+        reviews={[]}
+      />
 
-      {selectedBusiness && (
-        <BusinessProfileDialog
-          isOpen={isProfileDialogOpen}
-          onClose={() => setIsProfileDialogOpen(false)}
-          businessId={selectedBusiness.id}
-          businessName={selectedBusiness.name}
-        />
-      )}
+      {/* Business Profile Dialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusinessId}
+        businessName={selectedBusinessName}
+      />
 
       <Toaster />
     </CategoryLayout>

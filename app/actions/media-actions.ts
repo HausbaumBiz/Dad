@@ -167,13 +167,19 @@ export async function deletePhoto(businessId: string, photoId: string) {
 export async function getBusinessMedia(businessId: string): Promise<BusinessMedia | null> {
   try {
     if (!businessId) {
-      return null
+      console.log("No businessId provided to getBusinessMedia")
+      return { photoAlbum: [], folders: [], tags: [] }
     }
+
+    console.log(`Getting media for business: ${businessId}`)
 
     // Get the media data from KV
     const mediaData = await kv.hgetall(`business:${businessId}:media`)
 
-    if (!mediaData) {
+    console.log("Raw media data from KV:", mediaData)
+
+    if (!mediaData || Object.keys(mediaData).length === 0) {
+      console.log("No media data found, returning default structure")
       return { photoAlbum: [], folders: [], tags: [] }
     }
 
@@ -236,7 +242,8 @@ export async function getBusinessMedia(businessId: string): Promise<BusinessMedi
 
     return businessMedia
   } catch (error) {
-    console.error("Error getting business media:", error)
+    console.error("Error getting business media:", error instanceof Error ? error.message : JSON.stringify(error))
+    console.error("Full error stack:", error instanceof Error ? error.stack : error)
     return { photoAlbum: [], folders: [], tags: [] }
   }
 }

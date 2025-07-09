@@ -10,9 +10,10 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useState } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useEffect } from "react"
-import { MapPin, Phone } from "lucide-react"
+import { MapPin, Phone, Camera, ChevronLeft, ChevronRight } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
+import { getBusinessMedia, type MediaItem } from "@/app/actions/media-actions"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -42,6 +43,13 @@ export default function PersonalAssistantsPage() {
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allProviders, setAllProviders] = useState([])
   const [filteredProviders, setFilteredProviders] = useState([])
+
+  // State for media/photos
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, MediaItem[]>>({})
+  const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
+
+  // State for carousel navigation
+  const [carouselIndex, setCarouselIndex] = useState<Record<string, number>>({})
 
   const mockReviews = {
     "Elite Personal Assistants": [
@@ -321,6 +329,44 @@ export default function PersonalAssistantsPage() {
     return business.serviceArea.includes(zipCode)
   }
 
+  // Function to load photos for a business
+  const loadBusinessPhotos = async (businessId: string) => {
+    if (loadingPhotos[businessId] || businessPhotos[businessId]) {
+      return // Already loading or loaded
+    }
+
+    setLoadingPhotos((prev) => ({ ...prev, [businessId]: true }))
+
+    try {
+      const mediaData = await getBusinessMedia(businessId)
+      const photos = mediaData?.photoAlbum || []
+
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
+      setCarouselIndex((prev) => ({ ...prev, [businessId]: 0 }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
+    } finally {
+      setLoadingPhotos((prev) => ({ ...prev, [businessId]: false }))
+    }
+  }
+
+  // Carousel navigation functions
+  const handlePrevious = (businessId: string) => {
+    const photos = businessPhotos[businessId] || []
+    const currentIndex = carouselIndex[businessId] || 0
+    const newIndex = currentIndex > 0 ? currentIndex - 1 : Math.max(0, photos.length - 5)
+    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
+  }
+
+  const handleNext = (businessId: string) => {
+    const photos = businessPhotos[businessId] || []
+    const currentIndex = carouselIndex[businessId] || 0
+    const maxIndex = Math.max(0, photos.length - 5)
+    const newIndex = currentIndex < maxIndex ? currentIndex + 1 : 0
+    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
+  }
+
   // Replace the useEffect:
   useEffect(() => {
     async function fetchBusinesses() {
@@ -366,6 +412,11 @@ export default function PersonalAssistantsPage() {
         // Use businesses as-is without adding default subcategories
         setAllProviders(filteredBusinesses)
         setFilteredProviders(filteredBusinesses)
+
+        // Load photos for each business
+        filteredBusinesses.forEach((business: Business) => {
+          loadBusinessPhotos(business.id)
+        })
       } catch (err) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -427,8 +478,6 @@ export default function PersonalAssistantsPage() {
         </div>
       </div>
 
-      {/* Remove the CategoryFilter component that appears after the hero section: */}
-
       {/* Enhanced Filter Controls */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
         <div className="flex flex-wrap gap-4 mb-4">
@@ -477,7 +526,7 @@ export default function PersonalAssistantsPage() {
                 Showing {filteredProviders.length} of {allProviders.length} businesses
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs">
+            <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs bg-transparent">
               Clear
             </Button>
           </div>
@@ -556,103 +605,157 @@ export default function PersonalAssistantsPage() {
           {filteredProviders.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold">{provider.displayName || provider.name}</h3>
-                    <div className="flex items-center text-gray-600 text-sm mt-1">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      <span>
-                        {provider.adDesignData?.businessInfo?.city && provider.adDesignData?.businessInfo?.state
-                          ? `${provider.adDesignData.businessInfo.city}, ${provider.adDesignData.businessInfo.state}`
-                          : provider.displayCity && provider.displayState
-                            ? `${provider.displayCity}, ${provider.displayState}`
-                            : provider.city && provider.state
-                              ? `${provider.city}, ${provider.state}`
-                              : provider.zipCode
-                                ? `ZIP: ${provider.zipCode}`
-                                : "Location not specified"}
-                      </span>
-                    </div>
+                <div className="flex items-start justify-between gap-6">
+                  {/* Left: Business Info */}
+                  <div className="flex-shrink-0 w-80">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {provider.displayName || provider.name}
+                    </h3>
 
-                    {/* Phone Number Display */}
-                    {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
-                      <div className="flex items-center text-gray-600 text-sm mt-1">
-                        <Phone className="w-4 h-4 mr-1" />
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
                         <span>
-                          {formatPhoneNumber(
-                            provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
-                          )}
+                          {provider.adDesignData?.businessInfo?.city && provider.adDesignData?.businessInfo?.state
+                            ? `${provider.adDesignData.businessInfo.city}, ${provider.adDesignData.businessInfo.state}`
+                            : provider.displayCity && provider.displayState
+                              ? `${provider.displayCity}, ${provider.displayState}`
+                              : provider.city && provider.state
+                                ? `${provider.city}, ${provider.state}`
+                                : provider.zipCode
+                                  ? `ZIP: ${provider.zipCode}`
+                                  : "Location not specified"}
                         </span>
                       </div>
-                    )}
-
-                    {provider.serviceArea && provider.serviceArea.length > 0 && (
-                      <div className="flex items-center text-gray-600 text-xs mt-1">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800">
-                          {provider.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))
-                            ? "Serves nationwide"
-                            : `Serves ${userZipCode} and surrounding areas`}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center mt-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <svg
-                            key={i}
-                            className={`w-4 h-4 ${i < Math.floor(provider.rating || 0) ? "text-yellow-400" : "text-gray-300"}`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {provider.rating || 0} ({provider.reviewCount || 0} reviews)
-                      </span>
-                    </div>
-
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
-                        provider.allSubcategories.map((service: string, idx: number) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {getSubcategoryString(service)}
+                      {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Phone className="w-4 h-4 mr-2 flex-shrink-0" />
+                          <span>
+                            {formatPhoneNumber(
+                              provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
+                            )}
                           </span>
-                        ))
-                      ) : provider.subcategories && provider.subcategories.length > 0 ? (
-                        provider.subcategories.map((service: string, idx: number) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {getSubcategoryString(service)}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                          Personal Services
-                        </span>
+                        </div>
                       )}
                     </div>
+
+                    <div className="mb-4">
+                      <div className="flex flex-wrap gap-1">
+                        {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
+                          provider.allSubcategories.map((service: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : provider.subcategories && provider.subcategories.length > 0 ? (
+                          provider.subcategories.map((service: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            Personal Services
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {provider.serviceArea && provider.serviceArea.length > 0 && (
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">Service Area:</span>{" "}
+                        {provider.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))
+                          ? "Serves nationwide"
+                          : `Serves ${userZipCode} and surrounding areas`}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end justify-between">
+                  {/* Center: Photo Carousel */}
+                  <div className="flex-1 relative">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePrevious(provider.id)}
+                        disabled={!businessPhotos[provider.id] || businessPhotos[provider.id].length <= 5}
+                        className="h-8 w-8 p-0 flex-shrink-0 bg-transparent"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+
+                      <div className="flex space-x-2 overflow-hidden flex-1">
+                        {loadingPhotos[provider.id] ? (
+                          <div className="flex items-center justify-center w-full h-32">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          </div>
+                        ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
+                          businessPhotos[provider.id]
+                            .slice(carouselIndex[provider.id] || 0, (carouselIndex[provider.id] || 0) + 5)
+                            .map((photo, index) => (
+                              <div key={photo.id} className="flex-shrink-0 w-32 h-32">
+                                <Image
+                                  src={photo.url || "/placeholder.svg"}
+                                  alt={photo.filename || `Photo ${index + 1}`}
+                                  width={128}
+                                  height={128}
+                                  className="w-full h-full object-cover rounded-lg"
+                                />
+                              </div>
+                            ))
+                        ) : (
+                          <div className="flex items-center justify-center w-full h-32 bg-gray-100 rounded-lg">
+                            <div className="text-center">
+                              <Camera className="w-8 h-8 mx-auto text-gray-400 mb-1" />
+                              <span className="text-gray-500 text-sm">No photos available</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleNext(provider.id)}
+                        disabled={
+                          !businessPhotos[provider.id] ||
+                          businessPhotos[provider.id].length <= 5 ||
+                          (carouselIndex[provider.id] || 0) >= businessPhotos[provider.id].length - 5
+                        }
+                        className="h-8 w-8 p-0 flex-shrink-0"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {businessPhotos[provider.id] && businessPhotos[provider.id].length > 5 && (
+                      <div className="text-center mt-2">
+                        <span className="text-xs text-gray-500">
+                          {(carouselIndex[provider.id] || 0) + 1}-
+                          {Math.min((carouselIndex[provider.id] || 0) + 5, businessPhotos[provider.id].length)} of{" "}
+                          {businessPhotos[provider.id].length} photos
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Action Buttons */}
+                  <div className="flex flex-col space-y-2 flex-shrink-0">
                     <Button
-                      className="w-full md:w-auto"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs px-3 py-1 h-7 bg-transparent"
                       onClick={() => handleOpenReviews(provider.displayName || provider.name)}
                     >
                       Reviews
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="mt-2 w-full md:w-auto"
-                      onClick={() => handleOpenProfile(provider)}
-                    >
+                    <Button size="sm" className="text-xs px-3 py-1 h-7" onClick={() => handleOpenProfile(provider)}>
                       View Profile
                     </Button>
                   </div>
