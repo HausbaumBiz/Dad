@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, MapPin, Star, ChevronLeft, ChevronRight } from "lucide-react"
+import { Phone, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
@@ -640,21 +640,6 @@ export default function LegalServicesPage() {
                     )}
 
                     {/* Rating */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            className={`h-4 w-4 ${
-                              star <= (provider.rating || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        {provider.rating?.toFixed(1) || "0.0"} ({provider.reviewCount || provider.reviews || 0} reviews)
-                      </span>
-                    </div>
                   </div>
 
                   {/* Middle - Photo Carousel (desktop only) */}

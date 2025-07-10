@@ -514,25 +514,6 @@ export default function TravelVacationPage() {
                       )}
                     </div>
 
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div>
-                        {provider.isNationwide ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Serves nationwide
-                          </span>
-                        ) : provider.serviceArea && provider.serviceArea.includes(userZipCode) ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Serves {userZipCode} area
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            Primary location: {provider.zipCode}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
                     {/* Display Business Subcategories - Limited to 4 */}
                     {getBusinessSubcategories(provider).length > 0 && (
                       <div>
@@ -541,21 +522,14 @@ export default function TravelVacationPage() {
                           <span className="text-xs font-medium text-gray-600">Services Offered:</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {getBusinessSubcategories(provider)
-                            .slice(0, 4)
-                            .map((subcategory, index) => (
-                              <span
-                                key={index}
-                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                              >
-                                {subcategory}
-                              </span>
-                            ))}
-                          {getBusinessSubcategories(provider).length > 4 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
-                              +{getBusinessSubcategories(provider).length - 4} more
+                          {getBusinessSubcategories(provider).map((subcategory, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                            >
+                              {subcategory}
                             </span>
-                          )}
+                          ))}
                         </div>
                       </div>
                     )}
@@ -585,7 +559,7 @@ export default function TravelVacationPage() {
                         className="flex-1 lg:flex-none lg:w-full"
                         onClick={() => handleOpenReviews(provider.displayName || provider.businessName || "Business")}
                       >
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"

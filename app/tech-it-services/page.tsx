@@ -12,6 +12,7 @@ import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { Card, CardContent } from "@/components/ui/card"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -667,100 +668,95 @@ export default function TechITServicesPage() {
             </h2>
             <div className="grid gap-6">
               {(showFiltered ? filteredProviders : providers).map((provider) => (
-                <div key={provider.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                  <div className="flex flex-col space-y-4">
-                    {/* Business Name and Description */}
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        {provider.displayName || provider.businessName}
-                      </h3>
-                      {provider.businessDescription && (
-                        <p className="text-gray-600 text-sm leading-relaxed">{provider.businessDescription}</p>
-                      )}
-                    </div>
+                <Card key={provider.id} className="overflow-hidden">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col space-y-4">
+                      {/* Business Name and Description */}
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          {provider.displayName || provider.businessName}
+                        </h3>
+                        {provider.businessDescription && (
+                          <p className="text-gray-600 text-sm leading-relaxed">{provider.businessDescription}</p>
+                        )}
+                      </div>
 
-                    {/* Main content area with contact info, photos, and buttons */}
-                    <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                      {/* Left side - Contact and Location Info - Made smaller */}
-                      <div className="lg:w-64 space-y-2 flex-shrink-0">
-                        {/* Service Area Indicator */}
-                        {provider.isNationwide ? (
-                          <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
-                        ) : userZipCode && provider.serviceArea?.includes(userZipCode) ? (
-                          <div className="text-xs text-green-600 font-medium mb-1">✓ Serves {userZipCode} area</div>
-                        ) : null}
+                      {/* Main content area with contact info, photos, and buttons */}
+                      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                        {/* Left side - Contact and Location Info */}
+                        <div className="lg:w-64 space-y-2 flex-shrink-0">
+                          {/* Location Display */}
+                          <div className="flex items-center text-gray-600 text-sm">
+                            <MapPin className="w-4 h-4 mr-1" />
+                            <span>{getLocation(provider)}</span>
+                          </div>
 
-                        {/* Location Display */}
-                        <div className="flex items-center text-gray-600 text-sm mt-1">
-                          <MapPin className="w-4 h-4 mr-1" />
-                          <span>{getLocation(provider)}</span>
+                          {/* Phone Number Display */}
+                          {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
+                            <div className="flex items-center text-gray-600 text-sm">
+                              <Phone className="w-4 h-4 mr-1" />
+                              <span>
+                                {formatPhoneNumber(
+                                  provider.adDesignData?.businessInfo?.phone ||
+                                    provider.displayPhone ||
+                                    provider.phone ||
+                                    "",
+                                )}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
-                        {/* Phone Number Display */}
-                        {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
-                          <div className="flex items-center text-gray-600 text-sm mt-1">
-                            <Phone className="w-4 h-4 mr-1" />
-                            <span>
-                              {formatPhoneNumber(
-                                provider.adDesignData?.businessInfo?.phone ||
-                                  provider.displayPhone ||
-                                  provider.phone ||
-                                  "",
-                              )}
-                            </span>
-                          </div>
-                        )}
+                        {/* Middle - Photo Carousel (desktop only) */}
+                        <div className="flex-1 flex justify-center">
+                          <PhotoCarousel
+                            photos={provider.photos || []}
+                            businessName={provider.displayName || provider.businessName}
+                          />
+                        </div>
+
+                        {/* Right side - Action Buttons */}
+                        <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenReviews(provider)}
+                            className="text-sm min-w-[100px]"
+                          >
+                            Ratings
+                          </Button>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleOpenProfile(provider)}
+                            className="text-sm min-w-[100px]"
+                          >
+                            View Profile
+                          </Button>
+                        </div>
                       </div>
 
-                      {/* Middle - Photo Carousel (desktop only) - Now has more space */}
-                      <div className="flex-1 flex justify-center">
-                        <PhotoCarousel
-                          photos={provider.photos || []}
-                          businessName={provider.displayName || provider.businessName}
-                        />
-                      </div>
-
-                      {/* Right side - Action Buttons */}
-                      <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenReviews(provider)}
-                          className="text-sm min-w-[100px]"
-                        >
-                          Reviews
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleOpenProfile(provider)}
-                          className="text-sm min-w-[100px]"
-                        >
-                          View Profile
-                        </Button>
+                      {/* Services */}
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Services:</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {provider.services && Array.isArray(provider.services) ? (
+                            provider.services.map((service, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                              >
+                                {getSubcategoryString(service)}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-500">No services listed</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-
-                    {/* Services */}
-                    <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Services:</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {provider.services && Array.isArray(provider.services) ? (
-                          provider.services.map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-gray-500">No services listed</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>

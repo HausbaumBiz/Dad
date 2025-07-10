@@ -457,46 +457,22 @@ export default function TailoringClothingPage() {
                         </div>
                       )}
 
-                      {/* Service Area Indicator */}
-                      {userZipCode && (business.serviceArea || business.isNationwide) && (
+                      {business.subcategories && business.subcategories.length > 0 && (
                         <div>
-                          {business.isNationwide ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              Serves nationwide
-                            </span>
-                          ) : business.serviceArea && business.serviceArea.includes(userZipCode) ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Serves {userZipCode} area
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              Primary location: {business.zipCode}
-                            </span>
-                          )}
+                          <p className="text-sm font-medium text-gray-700">Services:</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {business.subcategories.map((service, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                              >
+                                {getSubcategoryString(service)}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
-
-                    {business.subcategories && business.subcategories.length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Services:</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {business.subcategories.slice(0, 4).map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))}
-                          {business.subcategories.length > 4 && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                              +{business.subcategories.length - 4} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Photo Carousel and Buttons Row */}
@@ -519,7 +495,7 @@ export default function TailoringClothingPage() {
                         className="flex-1 lg:flex-none lg:w-full"
                         onClick={() => handleOpenReviews(business.displayName || business.businessName)}
                       >
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"

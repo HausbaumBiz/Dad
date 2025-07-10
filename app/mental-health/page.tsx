@@ -4,14 +4,15 @@ import { CategoryLayout } from "@/components/category-layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
+import { useToast } from "@/components/ui/use-toast"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { MapPin, Phone, X } from "lucide-react"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { MapPin, Phone, X, Loader2 } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { getBusinessMedia } from "@/app/actions/media-actions"
-import { getCloudflareImageUrl } from "@/lib/cloudflare-images"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -25,9 +26,35 @@ interface Business {
   isNationwide?: boolean // Whether the business serves nationwide
   subcategories?: string[]
   adDesignData?: any
+  allSubcategories?: any[]
+  subcategory?: string | { category: string; subcategory: string; fullPath: string }
+  rating?: number
+  reviews?: number
+}
+
+// Helper function to extract string value from subcategory (whether it's a string or object)
+function getSubcategoryString(sub: any): string {
+  if (typeof sub === "string") {
+    return sub
+  }
+
+  if (sub && typeof sub === "object") {
+    // If it's an object with subcategory property, use that
+    if (sub.subcategory) {
+      return sub.subcategory
+    }
+    // Otherwise try fullPath
+    if (sub.fullPath) {
+      return sub.fullPath
+    }
+  }
+
+  // Fallback
+  return "Mental Health Services"
 }
 
 export default function MentalHealthPage() {
+  const { toast } = useToast()
   const filterOptions = [
     { id: "counselors1", label: "Counselors", value: "Counselors" },
     {
@@ -55,10 +82,12 @@ export default function MentalHealthPage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allProviders, setAllProviders] = useState<any[]>([])
+  const [filteredProviders, setFilteredProviders] = useState<any[]>([])
+
+  // Photo state
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
   const fetchIdRef = useRef(0)
-
-  const [businessPhotos, setBusinessPhotos] = useState<Record<string, any[]>>({})
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -101,35 +130,24 @@ export default function MentalHealthPage() {
     return matches
   }
 
-  // Add this helper function after the businessServesZipCode function and before the useEffect
-
-  // Helper function to extract string value from subcategory object or return the string itself
-  const getSubcategoryString = (subcategory: any): string => {
-    if (typeof subcategory === "string") {
-      return subcategory
-    } else if (subcategory && typeof subcategory === "object") {
-      // If it's an object with subcategory property, return that
-      return subcategory.subcategory || subcategory.category || "Unknown Service"
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) {
+      return // Already loaded
     }
-    return "Unknown Service"
-  }
 
-  // Helper function to load business photos from Cloudflare
-  const loadBusinessPhotos = async (businessId: string) => {
     try {
-      const media = await getBusinessMedia(businessId)
-      if (media && media.photoAlbum && media.photoAlbum.length > 0) {
-        // Take first 5 photos and convert to the format expected by PhotoCarousel
-        return media.photoAlbum.slice(0, 5).map((photo) => ({
-          id: photo.id,
-          url: getCloudflareImageUrl(photo.id, "public"),
-          filename: photo.filename,
-        }))
-      }
-      return []
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
     } catch (error) {
       console.error(`Error loading photos for business ${businessId}:`, error)
-      return []
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
     }
   }
 
@@ -177,11 +195,17 @@ export default function MentalHealthPage() {
         const transformedProviders = businesses.map((business) => ({
           id: business.id,
           name: business.displayName || business.businessName,
+          displayName: business.displayName || business.businessName,
+          businessName: business.businessName,
           location: business.displayLocation || `${business.city}, ${business.state}`,
+          displayLocation: business.displayLocation || `${business.city}, ${business.state}`,
           phone: business.displayPhone || business.phone,
-          rating: 0, // Remove default rating - will be calculated from actual reviews
-          reviews: 0, // Default review count
+          displayPhone: business.displayPhone || business.phone,
+          rating: business.rating || 0,
+          reviews: business.reviews || 0,
           services: business.subcategories || ["Mental Health Services"],
+          allSubcategories: business.allSubcategories || business.subcategories || [],
+          subcategory: business.subcategory,
           adDesignData: business.adDesignData,
           serviceArea: business.serviceArea,
           isNationwide: business.isNationwide,
@@ -190,31 +214,16 @@ export default function MentalHealthPage() {
 
         setProviders(transformedProviders)
         setAllProviders(transformedProviders)
-
-        // Load photos for each provider
-        const loadPhotos = async () => {
-          const photoPromises = transformedProviders.map(async (provider) => {
-            const photos = await loadBusinessPhotos(provider.id)
-            return { businessId: provider.id, photos }
-          })
-
-          const photoResults = await Promise.all(photoPromises)
-          const photoMap: Record<string, any[]> = {}
-
-          photoResults.forEach(({ businessId, photos }) => {
-            photoMap[businessId] = photos
-          })
-
-          setBusinessPhotos(photoMap)
-        }
-
-        if (transformedProviders.length > 0) {
-          loadPhotos()
-        }
+        setFilteredProviders(transformedProviders)
       } catch (err) {
         console.error("Error fetching mental health providers:", err)
         if (currentFetchId === fetchIdRef.current) {
           setError("Failed to load providers")
+          toast({
+            title: "Error loading providers",
+            description: "There was a problem loading mental health providers. Please try again later.",
+            variant: "destructive",
+          })
         }
       } finally {
         if (currentFetchId === fetchIdRef.current) {
@@ -224,7 +233,7 @@ export default function MentalHealthPage() {
     }
 
     fetchProviders()
-  }, [userZipCode])
+  }, [userZipCode, toast])
 
   // State for dialogs
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
@@ -233,10 +242,25 @@ export default function MentalHealthPage() {
 
   // Helper function to check if business has exact subcategory match
   const hasExactSubcategoryMatch = (provider: any, filterValue: string): boolean => {
+    // Check allSubcategories array
+    if (provider.allSubcategories && Array.isArray(provider.allSubcategories)) {
+      return provider.allSubcategories.some((sub) => {
+        const subString = getSubcategoryString(sub)
+        return subString === filterValue
+      })
+    }
+
     // Check services array (which comes from subcategories)
     if (provider.services && Array.isArray(provider.services)) {
       return provider.services.some((service) => getSubcategoryString(service) === filterValue)
     }
+
+    // Check single subcategory field
+    if (provider.subcategory) {
+      const subString = getSubcategoryString(provider.subcategory)
+      return subString === filterValue
+    }
+
     return false
   }
 
@@ -250,8 +274,12 @@ export default function MentalHealthPage() {
     console.log("All providers:", allProviders)
 
     if (selectedFilters.length === 0) {
-      setProviders(allProviders)
+      setFilteredProviders(allProviders)
       setAppliedFilters([])
+      toast({
+        title: "Filters cleared",
+        description: `Showing all ${allProviders.length} mental health providers.`,
+      })
       return
     }
 
@@ -263,14 +291,24 @@ export default function MentalHealthPage() {
     })
 
     console.log("Filtered results:", filtered)
-    setProviders(filtered)
+    setFilteredProviders(filtered)
     setAppliedFilters([...selectedFilters])
+
+    toast({
+      title: "Filters applied",
+      description: `Found ${filtered.length} mental health providers matching your criteria.`,
+    })
   }
 
   const clearFilters = () => {
     setSelectedFilters([])
     setAppliedFilters([])
-    setProviders(allProviders)
+    setFilteredProviders(allProviders)
+
+    toast({
+      title: "Filters cleared",
+      description: `Showing all ${allProviders.length} mental health providers.`,
+    })
   }
 
   // Handle opening reviews dialog
@@ -370,7 +408,7 @@ export default function MentalHealthPage() {
             <div>
               <p className="text-sm font-medium text-blue-800">Active filters: {appliedFilters.join(", ")}</p>
               <p className="text-sm text-blue-700">
-                Showing {providers.length} of {allProviders.length} mental health providers
+                Showing {filteredProviders.length} of {allProviders.length} mental health providers
               </p>
             </div>
           </div>
@@ -416,15 +454,15 @@ export default function MentalHealthPage() {
 
       <div className="space-y-6">
         {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading mental health providers...</p>
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+            <p>Loading mental health providers...</p>
           </div>
         ) : error ? (
           <div className="text-center py-8">
             <p className="text-red-600">{error}</p>
           </div>
-        ) : providers.length === 0 ? (
+        ) : filteredProviders.length === 0 ? (
           <div className="text-center py-12">
             <div className="max-w-md mx-auto">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -449,128 +487,89 @@ export default function MentalHealthPage() {
             </div>
           </div>
         ) : (
-          providers.map((provider) => (
+          filteredProviders.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* Left Column - Business Info */}
-                  <div className="lg:col-span-3 space-y-3">
-                    <h3 className="text-xl font-semibold">{provider.name}</h3>
+                <div className="space-y-4">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold">{provider.displayName}</h3>
 
-                    {provider.location && (
-                      <div className="flex items-center text-gray-600 text-sm">
-                        <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-                        <span>{provider.location}</span>
-                      </div>
-                    )}
-
-                    {provider.phone && (
-                      <div className="flex items-center text-gray-600 text-sm">
-                        <Phone className="w-4 h-4 mr-1 flex-shrink-0" />
-                        <a href={`tel:${provider.phone}`} className="hover:text-primary">
-                          {provider.phone}
-                        </a>
-                      </div>
-                    )}
-
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div>
-                        {provider.isNationwide ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Serves nationwide
-                          </span>
-                        ) : provider.serviceArea && provider.serviceArea.includes(userZipCode) ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Serves {userZipCode} and surrounding areas
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            Primary location: {provider.zipCode}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {provider.services && provider.services.length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Services:</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.services.map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))}
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {provider.displayLocation && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span>{provider.displayLocation}</span>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
 
-                  {/* Center Column - Photos */}
-                  <div className="lg:col-span-8">
-                    <div className="w-full h-32 bg-gray-100 rounded-lg overflow-hidden">
-                      {businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
-                        <div className="flex space-x-1 h-full">
-                          {businessPhotos[provider.id].slice(0, 5).map((photo, index) => (
-                            <div key={photo.id} className="flex-1 h-full">
-                              <Image
-                                src={photo.url || "/placeholder.svg"}
-                                alt={`${provider.name} photo ${index + 1}`}
-                                width={120}
-                                height={128}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement
-                                  target.src = "/placeholder.svg?height=128&width=120&text=No+Image"
-                                }}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                          <div className="text-center">
-                            <svg
-                              className="w-8 h-8 text-gray-400 mx-auto mb-1"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                              />
-                            </svg>
-                            <p className="text-xs text-gray-500">No photos available</p>
-                          </div>
+                      {provider.displayPhone && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          <a href={`tel:${provider.displayPhone}`} className="hover:text-primary">
+                            {provider.displayPhone}
+                          </a>
                         </div>
                       )}
                     </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
+                          provider.allSubcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : provider.services && provider.services.length > 0 ? (
+                          provider.services.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            {getSubcategoryString(provider.subcategory) || "Mental Health Services"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Right Column - Action Buttons */}
-                  <div className="lg:col-span-1 flex flex-col justify-center space-y-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenReviews(provider)}
-                      className="text-sm min-w-[100px]"
-                    >
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleOpenProfile(provider)}
-                      className="text-sm min-w-[100px]"
-                    >
-                      View Profile
-                    </Button>
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={provider.id}
+                        photos={businessPhotos[provider.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
+                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(provider)}>
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none lg:w-full bg-transparent"
+                        onClick={() => handleOpenProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -584,6 +583,7 @@ export default function MentalHealthPage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.name}
+        businessId={selectedProvider?.id}
         reviews={selectedProvider?.reviews || []}
       />
 

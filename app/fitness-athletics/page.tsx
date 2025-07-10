@@ -31,19 +31,19 @@ const getSubcategoryString = (subcategory: any): string => {
 
 // Photo Carousel Component
 const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessName: string }) => {
-  const [currentPage, setCurrentPage] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0)
   const photosPerPage = 5
   const totalPages = Math.ceil(photos.length / photosPerPage)
 
   const handlePrevious = () => {
-    setCurrentPage((prev) => (prev > 0 ? prev - 1 : totalPages - 1))
+    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : totalPages - 1))
   }
 
   const handleNext = () => {
-    setCurrentPage((prev) => (prev < totalPages - 1 ? prev + 1 : 0))
+    setCurrentIndex((prev) => (prev < totalPages - 1 ? prev + 1 : 0))
   }
 
-  const currentPhotos = photos.slice(currentPage * photosPerPage, (currentPage + 1) * photosPerPage)
+  const currentPhotos = photos.slice(currentIndex * photosPerPage, (currentIndex + 1) * photosPerPage)
 
   // Fill empty slots to always show 5 slots
   const displayPhotos = [...currentPhotos]
@@ -52,7 +52,7 @@ const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessNam
   }
 
   return (
-    <div className="relative">
+    <div className="relative group">
       {/* Navigation arrows */}
       {photos.length > photosPerPage && (
         <>
@@ -61,22 +61,22 @@ const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessNam
             className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
             aria-label="Previous photos"
           >
-            <ChevronLeft className="h-3 w-3" />
+            <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             onClick={handleNext}
             className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
             aria-label="Next photos"
           >
-            <ChevronRight className="h-3 w-3" />
+            <ChevronRight className="h-4 w-4" />
           </button>
         </>
       )}
 
       {/* Photo counter */}
       {photos.length > photosPerPage && (
-        <div className="absolute top-1 right-1 bg-black/50 text-white text-xs px-1.5 py-0.5 rounded z-10">
-          {currentPage * photosPerPage + 1}-{Math.min((currentPage + 1) * photosPerPage, photos.length)} of{" "}
+        <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded z-10">
+          {currentIndex * photosPerPage + 1}-{Math.min((currentIndex + 1) * photosPerPage, photos.length)} of{" "}
           {photos.length}
         </div>
       )}
@@ -84,19 +84,23 @@ const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessNam
       {/* Photos grid */}
       <div className="flex gap-2">
         {displayPhotos.map((photo, index) => (
-          <div key={index} className="w-40 h-30 flex-shrink-0">
+          <div key={index} className="w-48 h-36 flex-shrink-0">
             {photo ? (
               <Image
                 src={photo || "/placeholder.svg"}
-                alt={`${businessName} photo ${currentPage * photosPerPage + index + 1}`}
-                width={160}
-                height={120}
+                alt={`${businessName} photo ${currentIndex * photosPerPage + index + 1}`}
+                width={192}
+                height={144}
                 className="w-full h-full object-cover rounded-lg"
-                sizes="160px"
+                sizes="192px"
+                onError={(e) => {
+                  console.error(`Failed to load image: ${photo}`)
+                  e.currentTarget.src = "/placeholder.svg"
+                }}
               />
             ) : (
               <div className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                <Camera className="h-6 w-6 text-gray-400" />
+                <Camera className="h-8 w-8 text-gray-400" />
               </div>
             )}
           </div>
@@ -105,13 +109,13 @@ const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessNam
 
       {/* Pagination dots */}
       {photos.length > photosPerPage && totalPages > 1 && (
-        <div className="flex justify-center mt-2 gap-1">
+        <div className="flex justify-center mt-3 gap-1">
           {Array.from({ length: totalPages }).map((_, index) => (
             <button
               key={index}
-              onClick={() => setCurrentPage(index)}
-              className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                index === currentPage ? "bg-primary" : "bg-gray-300"
+              onClick={() => setCurrentIndex(index)}
+              className={`w-2 h-2 rounded-full transition-colors ${
+                index === currentIndex ? "bg-primary" : "bg-gray-300"
               }`}
               aria-label={`Go to page ${index + 1}`}
             />
@@ -399,6 +403,7 @@ export default function FitnessAthleticsPage() {
         city?: string
         state?: string
       }
+      photoAlbum?: any[]
     }
     photoAlbum?: any[]
     media?: {
@@ -425,83 +430,120 @@ export default function FitnessAthleticsPage() {
     return business.serviceArea.includes(zipCode)
   }
 
-  // Function to load photos for businesses
+  // IMPROVED: Function to load photos with better error handling
   const loadBusinessPhotos = async (businesses: Business[]) => {
     console.log("[Fitness Athletics] Loading photos for businesses:", businesses.length)
 
     const photoPromises = businesses.map(async (business) => {
       try {
-        // Get photos from multiple possible sources
-        const photoSources = [
-          ...(business.photoAlbum || []),
-          ...(business.media?.photoAlbum || []),
-          ...(business.adDesign?.photoAlbum || []),
-        ]
+        console.log(`[Fitness Athletics] Processing business ${business.displayName || business.name}:`, {
+          id: business.id,
+        })
 
-        console.log(
-          `[Fitness Athletics] Business ${business.displayName || business.name} photo sources:`,
-          photoSources,
-        )
+        let photoUrls: string[] = []
 
-        if (photoSources.length === 0) {
-          return { businessId: business.id, photos: [] }
+        try {
+          // Method 1: Try to get photos from the photo album API endpoint
+          const response = await fetch(`/api/businesses/${business.id}/photos`)
+
+          if (response.ok) {
+            const photoData = await response.json()
+            console.log(`[Fitness Athletics] Got photos from API for ${business.id}:`, photoData)
+
+            if (photoData.success && photoData.photos && Array.isArray(photoData.photos)) {
+              photoUrls = photoData.photos
+                .map((photoId: string) => {
+                  try {
+                    // If it's already a full URL, use it
+                    if (photoId.startsWith("http")) return photoId
+                    // Otherwise, generate Cloudflare URL
+                    return getCloudflareImageUrl(photoId, "public")
+                  } catch (error) {
+                    console.error(`[Fitness Athletics] Error generating URL for photo ${photoId}:`, error)
+                    return null
+                  }
+                })
+                .filter((url: string | null): url is string => url !== null)
+            }
+          } else {
+            console.log(
+              `[Fitness Athletics] API response not OK for ${business.id}:`,
+              response.status,
+              response.statusText,
+            )
+          }
+        } catch (apiError) {
+          console.log(`[Fitness Athletics] API fetch failed for ${business.id}:`, apiError)
         }
 
-        // Convert photo data to URLs
-        const photoUrls = await Promise.all(
-          photoSources.map(async (photo) => {
-            try {
-              // Handle different photo formats
-              let photoId = null
-              if (typeof photo === "string") {
-                photoId = photo
-              } else if (photo && typeof photo === "object") {
-                photoId = photo.id || photo.imageId || photo.url
-              }
+        // Method 2: If API failed or returned no photos, try direct data access
+        if (photoUrls.length === 0) {
+          console.log(`[Fitness Athletics] Trying direct data access for ${business.id}`)
 
-              if (!photoId) {
-                console.log(`[Fitness Athletics] No valid photo ID found for photo:`, photo)
+          const allPhotoSources = [
+            ...(business.photoAlbum || []),
+            ...(business.media?.photoAlbum || []),
+            ...(business.adDesign?.photoAlbum || []),
+            ...(business.adDesignData?.photoAlbum || []),
+          ]
+
+          console.log(`[Fitness Athletics] Direct photo sources for ${business.id}:`, allPhotoSources)
+
+          photoUrls = allPhotoSources
+            .map((photo) => {
+              try {
+                let photoId = null
+                if (typeof photo === "string") {
+                  photoId = photo
+                } else if (photo && typeof photo === "object") {
+                  photoId = photo.id || photo.imageId || photo.url || photo.cloudflareId
+                }
+
+                if (!photoId) {
+                  return null
+                }
+
+                // If it's already a full URL, use it
+                if (typeof photoId === "string" && photoId.startsWith("http")) {
+                  return photoId
+                }
+
+                // Generate Cloudflare public URL
+                return getCloudflareImageUrl(photoId, "public")
+              } catch (error) {
+                console.error(`[Fitness Athletics] Error processing photo:`, photo, error)
                 return null
               }
+            })
+            .filter((url): url is string => url !== null)
+        }
 
-              // If it's already a URL, use it
-              if (typeof photoId === "string" && photoId.startsWith("http")) {
-                return photoId
-              }
+        console.log(`[Fitness Athletics] Final photo URLs for ${business.displayName || business.name}:`, photoUrls)
 
-              // Generate Cloudflare URL
-              const url = getCloudflareImageUrl(photoId, "public")
-              console.log(`[Fitness Athletics] Generated URL for photo ${photoId}:`, url)
-              return url
-            } catch (error) {
-              console.error(`[Fitness Athletics] Error processing photo:`, photo, error)
-              return null
-            }
-          }),
-        )
-
-        // Filter out null URLs
-        const validUrls = photoUrls.filter((url): url is string => url !== null)
-        console.log(`[Fitness Athletics] Valid URLs for ${business.displayName || business.name}:`, validUrls)
-
-        return { businessId: business.id, photos: validUrls }
+        return { businessId: business.id, photos: photoUrls }
       } catch (error) {
         console.error(`[Fitness Athletics] Error loading photos for business ${business.id}:`, error)
         return { businessId: business.id, photos: [] }
       }
     })
 
-    const results = await Promise.all(photoPromises)
-    const photosMap = results.reduce(
-      (acc, { businessId, photos }) => {
-        acc[businessId] = photos
-        return acc
-      },
-      {} as Record<string, string[]>,
-    )
+    try {
+      const results = await Promise.all(photoPromises)
+      const photosMap = results.reduce(
+        (acc, { businessId, photos }) => {
+          acc[businessId] = photos
+          return acc
+        },
+        {} as Record<string, string[]>,
+      )
 
-    console.log("[Fitness Athletics] Final photos map:", photosMap)
-    setBusinessPhotos(photosMap)
+      console.log("[Fitness Athletics] Final photos map:", photosMap)
+      setBusinessPhotos(photosMap)
+    } catch (error) {
+      console.error("[Fitness Athletics] Error in Promise.all for photo loading:", error)
+      // Set empty photos map on error
+      setBusinessPhotos({})
+    }
   }
 
   // Replace the useEffect:
@@ -585,7 +627,7 @@ export default function FitnessAthleticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/fitness-athletics-hero-YGJCy1KrgYFG9a6r1XgV5abefXkzCB.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/baseball-WpgfS7MciTxGMJwNZTzlAFewS1DPX0.png"
             alt="Fitness & Athletics"
             width={500}
             height={500}
@@ -731,35 +773,29 @@ export default function FitnessAthleticsPage() {
       ) : (
         <div className="space-y-6">
           {filteredProviders.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow group">
+            <Card
+              key={provider.id}
+              className="bg-white shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+            >
               <CardContent className="p-6">
-                <div className="flex gap-4">
-                  {/* Left: Business Info */}
-                  <div className="lg:w-56 flex-shrink-0">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <div className="flex gap-6">
+                  {/* Left: Contact Info */}
+                  <div className="w-64 flex-shrink-0">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
                       {provider.displayName || provider.name}
                     </h3>
 
-                    {/* Service Area Indicator */}
-                    {provider.serviceArea && provider.serviceArea.length > 0 && (
-                      <div className="mb-2">
-                        {provider.serviceArea.some((area) => area.toLowerCase().includes("nationwide")) ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Serves Nationwide
-                          </span>
-                        ) : userZipCode && provider.serviceArea.includes(userZipCode) ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Serves {userZipCode}
-                          </span>
-                        ) : null}
-                      </div>
-                    )}
-
-                    <p className="text-gray-600 mb-4 text-sm leading-relaxed">
-                      Professional fitness and athletics services to help you reach your health and performance goals.
-                    </p>
-
                     <div className="space-y-2 mb-4">
+                      {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Phone className="w-4 h-4 mr-2 flex-shrink-0" />
+                          <span>
+                            {formatPhoneNumber(
+                              provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
+                            )}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center text-sm text-gray-600">
                         <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
                         <span>
@@ -774,51 +810,6 @@ export default function FitnessAthleticsPage() {
                                   : "Location not specified"}
                         </span>
                       </div>
-                      {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Phone className="w-4 h-4 mr-2 flex-shrink-0" />
-                          <span>
-                            {formatPhoneNumber(
-                              provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
-                            )}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Specialties */}
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-1">
-                        {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
-                          provider.allSubcategories.slice(0, 3).map((service: string, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))
-                        ) : provider.subcategories && provider.subcategories.length > 0 ? (
-                          provider.subcategories.slice(0, 3).map((service: string, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            Fitness Services
-                          </span>
-                        )}
-                        {((provider.allSubcategories && provider.allSubcategories.length > 3) ||
-                          (provider.subcategories && provider.subcategories.length > 3)) && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            +{(provider.allSubcategories || provider.subcategories).length - 3} more
-                          </span>
-                        )}
-                      </div>
                     </div>
                   </div>
 
@@ -830,9 +821,9 @@ export default function FitnessAthleticsPage() {
                         businessName={provider.displayName || provider.name}
                       />
                     ) : (
-                      <div className="flex items-center justify-center h-30 bg-gray-100 rounded-lg">
+                      <div className="flex items-center justify-center h-36 bg-gray-100 rounded-lg">
                         <div className="text-center">
-                          <Camera className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                          <Camera className="w-8 w-8 mx-auto text-gray-400 mb-2" />
                           <span className="text-gray-500 text-sm">No photos available</span>
                         </div>
                       </div>
@@ -840,22 +831,51 @@ export default function FitnessAthleticsPage() {
                   </div>
 
                   {/* Right: Action Buttons */}
-                  <div className="lg:w-28 flex flex-col justify-start space-y-2 flex-shrink-0">
+                  <div className="w-32 flex flex-col justify-start space-y-2 flex-shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-xs px-3 py-1 h-7 min-w-[110px] bg-transparent"
+                      className="text-xs px-3 py-2 h-8 w-full bg-transparent"
                       onClick={() => handleOpenReviews(provider.displayName || provider.name)}
                     >
-                      Reviews
+                      Ratings
                     </Button>
                     <Button
                       size="sm"
-                      className="text-xs px-3 py-1 h-7 min-w-[110px]"
+                      className="text-xs px-3 py-2 h-8 w-full"
                       onClick={() => handleOpenProfile(provider)}
                     >
                       View Profile
                     </Button>
+                  </div>
+                </div>
+
+                {/* Services - Display ALL services */}
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex flex-wrap gap-2">
+                    {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
+                      provider.allSubcategories.map((service: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                        >
+                          {getSubcategoryString(service)}
+                        </span>
+                      ))
+                    ) : provider.subcategories && provider.subcategories.length > 0 ? (
+                      provider.subcategories.map((service: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                        >
+                          {getSubcategoryString(service)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                        Fitness Services
+                      </span>
+                    )}
                   </div>
                 </div>
               </CardContent>

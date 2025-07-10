@@ -462,7 +462,7 @@ export default function RetailStoresPage() {
                       {provider.displayName || provider.businessName || "Retail Store"}
                     </h3>
 
-                    {/* Combined location, phone, and service area in one row */}
+                    {/* Combined location and phone in one row */}
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                       {provider.displayLocation && <span>{provider.displayLocation}</span>}
                       {provider.displayPhone && (
@@ -473,34 +473,14 @@ export default function RetailStoresPage() {
                           </a>
                         </div>
                       )}
-                      {/* Service Area Indicator */}
-                      {userZipCode && (
-                        <div>
-                          {provider.isNationwide ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              Serves nationwide
-                            </span>
-                          ) : provider.serviceArea &&
-                            Array.isArray(provider.serviceArea) &&
-                            provider.serviceArea.includes(userZipCode) ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Serves {userZipCode} area
-                            </span>
-                          ) : provider.zipCode === userZipCode ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                              Primary location: {userZipCode}
-                            </span>
-                          ) : null}
-                        </div>
-                      )}
                     </div>
 
-                    {/* Store Type Tags */}
+                    {/* Store Type Tags - Display ALL services */}
                     {provider.subcategories && provider.subcategories.length > 0 && (
                       <div>
                         <p className="text-sm font-medium text-gray-700">Store Type:</p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.subcategories.slice(0, 4).map((subcategory: any, idx: number) => (
+                          {provider.subcategories.map((subcategory: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
@@ -508,11 +488,6 @@ export default function RetailStoresPage() {
                               {getSubcategoryString(subcategory)}
                             </span>
                           ))}
-                          {provider.subcategories.length > 4 && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                              +{provider.subcategories.length - 4} more
-                            </span>
-                          )}
                         </div>
                       </div>
                     )}
@@ -535,7 +510,7 @@ export default function RetailStoresPage() {
                     {/* Action Buttons */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32 w-full">
                       <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(provider)}>
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"

@@ -1,121 +1,286 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
+import { useToast } from "@/components/ui/use-toast"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, ChevronLeft, ChevronRight } from "lucide-react"
+import { Phone, MapPin, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 
-// PhotoCarousel Component
+// Enhanced Business interface
+interface Business {
+  id: string
+  businessName?: string
+  displayName?: string
+  displayPhone?: string
+  displayCity?: string
+  displayState?: string
+  city?: string
+  state?: string
+  phone?: string
+  rating?: number
+  reviews?: any[]
+  description?: string
+  subcategory?: string
+  subcategories?: string[]
+  allSubcategories?: string[]
+  services?: string[]
+  zipCode?: string
+  serviceArea?: string[]
+  isNationwide?: boolean
+  photos?: string[]
+  adDesignData?: {
+    businessInfo?: {
+      businessName?: string
+      phone?: string
+      city?: string
+      state?: string
+    }
+  }
+}
+
+// Photo Carousel Component - displays 5 photos in landscape format
 interface PhotoCarouselProps {
   photos: string[]
   businessName: string
 }
 
 function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
-  const [currentPage, setCurrentPage] = useState(0)
-  const photosPerPage = 5
-  const totalPages = Math.ceil(photos.length / photosPerPage)
+  const [currentIndex, setCurrentIndex] = useState(0)
 
-  const nextPage = () => {
-    if (currentPage < totalPages - 1) {
-      setCurrentPage(currentPage + 1)
-    }
+  if (!photos || photos.length === 0) {
+    return null // Don't show anything if no photos
   }
 
-  const prevPage = () => {
-    if (currentPage > 0) {
-      setCurrentPage(currentPage - 1)
-    }
+  const photosPerView = 5
+  const maxIndex = Math.max(0, photos.length - photosPerView)
+
+  const nextPhotos = () => {
+    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
   }
 
-  const startIndex = currentPage * photosPerPage
-  const endIndex = Math.min(startIndex + photosPerPage, photos.length)
-  const currentPhotos = photos.slice(startIndex, endIndex)
-
-  // Fill empty slots to always show 5 slots
-  const displayPhotos = [...currentPhotos]
-  while (displayPhotos.length < photosPerPage) {
-    displayPhotos.push("")
+  const prevPhotos = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0))
   }
+
+  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
 
   return (
-    <div className="relative">
-      <div className="grid grid-cols-5 gap-2">
-        {displayPhotos.map((photo, index) => (
-          <div key={index} className="w-40 h-30 bg-gray-100 rounded-lg overflow-hidden">
-            {photo ? (
+    <div className="hidden lg:block w-full">
+      <div className="relative group w-full">
+        <div className="flex gap-2 justify-center w-full">
+          {visiblePhotos.map((photo, index) => (
+            <div key={currentIndex + index} className="w-48 h-36 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
               <Image
                 src={photo || "/placeholder.svg"}
-                alt={`${businessName} photo ${startIndex + index + 1}`}
-                width={160}
-                height={120}
+                alt={`${businessName} photo ${currentIndex + index + 1}`}
+                width={192}
+                height={144}
                 className="w-full h-full object-cover"
-                sizes="160px"
-                onError={(e) => {
-                  console.error(`Failed to load image: ${photo}`)
-                  e.currentTarget.src = "/placeholder.svg?height=120&width=160&text=No+Image"
-                }}
+                sizes="192px"
               />
-            ) : (
-              <div className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                <span className="text-xs text-gray-400">No photo</span>
-              </div>
-            )}
+            </div>
+          ))}
+
+          {/* Fill empty slots if less than 5 photos visible */}
+          {visiblePhotos.length < photosPerView && (
+            <>
+              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
+                <div
+                  key={`empty-${index}`}
+                  className="w-48 h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                ></div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Navigation arrows - only show if there are more than 5 photos */}
+        {photos.length > photosPerView && (
+          <>
+            <button
+              onClick={prevPhotos}
+              disabled={currentIndex === 0}
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={nextPhotos}
+              disabled={currentIndex >= maxIndex}
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </>
+        )}
+
+        {/* Photo counter */}
+        {photos.length > photosPerView && (
+          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
           </div>
-        ))}
+        )}
       </div>
 
-      {/* Navigation arrows */}
-      {totalPages > 1 && (
-        <>
-          <button
-            onClick={prevPage}
-            disabled={currentPage === 0}
-            className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4 bg-white rounded-full p-1 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="h-3 w-3" />
-          </button>
-          <button
-            onClick={nextPage}
-            disabled={currentPage === totalPages - 1}
-            className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4 bg-white rounded-full p-1 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronRight className="h-3 w-3" />
-          </button>
-        </>
-      )}
-
-      {/* Photo counter */}
-      {photos.length > photosPerPage && (
-        <div className="absolute top-1 right-1 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-          {startIndex + 1}-{endIndex} of {photos.length}
-        </div>
-      )}
-
-      {/* Pagination dots */}
-      {totalPages > 1 && (
+      {/* Pagination dots - only show if there are more than 5 photos */}
+      {photos.length > photosPerView && (
         <div className="flex justify-center mt-2 space-x-1">
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrentPage(i)}
-              className={`w-1.5 h-1.5 rounded-full ${i === currentPage ? "bg-primary" : "bg-gray-300"}`}
-            />
-          ))}
+          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
+            const pageStartIndex = index * photosPerView
+            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
+            return (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(pageStartIndex)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
+              />
+            )
+          })}
         </div>
       )}
     </div>
   )
 }
 
+// Function to load business photos from Cloudflare using public URLs
+const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
+  try {
+    console.log(`Loading photos for business ${businessId}`)
+
+    // Fetch business media data from the updated API
+    const response = await fetch(`/api/businesses/${businessId}`)
+    if (!response.ok) {
+      console.error(`Failed to fetch business data: ${response.status} ${response.statusText}`)
+      return []
+    }
+
+    const businessData = await response.json()
+    console.log(`Business data for ${businessId}:`, businessData)
+
+    // Try multiple possible locations for photo data
+    let photoAlbum = null
+
+    // Check direct photoAlbum property
+    if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
+      photoAlbum = businessData.photoAlbum
+    }
+    // Check nested media.photoAlbum
+    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
+      photoAlbum = businessData.media.photoAlbum
+    }
+    // Check adDesign.photoAlbum
+    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
+      photoAlbum = businessData.adDesign.photoAlbum
+    }
+
+    if (!photoAlbum || !Array.isArray(photoAlbum)) {
+      console.log(`No photo album found for business ${businessId}`)
+      return []
+    }
+
+    console.log(`Found ${photoAlbum.length} photos in album for business ${businessId}`)
+
+    // Convert Cloudflare image IDs to public URLs
+    const photoUrls = photoAlbum
+      .map((photo: any, index: number) => {
+        // Handle different photo data structures
+        let imageId = null
+
+        if (typeof photo === "string") {
+          // If photo is just a string (image ID)
+          imageId = photo
+        } else if (photo && typeof photo === "object") {
+          // If photo is an object, try to extract the image ID
+          imageId = photo.imageId || photo.id || photo.cloudflareId || photo.url
+
+          // If it's already a full URL, return it as-is
+          if (typeof imageId === "string" && (imageId.startsWith("http") || imageId.startsWith("https"))) {
+            console.log(`Photo ${index} already has full URL: ${imageId}`)
+            return imageId
+          }
+        }
+
+        if (!imageId) {
+          console.warn(`No image ID found for photo ${index}:`, photo)
+          return null
+        }
+
+        // Generate public Cloudflare URL
+        try {
+          const publicUrl = getCloudflareImageUrl(imageId, "public")
+          console.log(`Generated URL for image ${imageId}: ${publicUrl}`)
+          return publicUrl
+        } catch (error) {
+          console.error(`Error generating URL for image ${imageId}:`, error)
+          return null
+        }
+      })
+      .filter(Boolean) // Remove null/undefined URLs
+
+    console.log(`Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
+    return photoUrls
+  } catch (error) {
+    console.error(`Error loading photos for business ${businessId}:`, error)
+    return []
+  }
+}
+
+// Helper function to check if business serves a zip code
+const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+  console.log(`[Real Estate] Checking if business serves ${zipCode}:`, {
+    businessName: business.displayName || business.businessName,
+    isNationwide: business.isNationwide,
+    serviceArea: business.serviceArea,
+    primaryZip: business.zipCode,
+  })
+
+  // Check if business serves nationwide
+  if (business.isNationwide) {
+    console.log(`[Real Estate] Business serves nationwide`)
+    return true
+  }
+
+  // Check if the zip code is in the business's service area
+  if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
+    const serves = business.serviceArea.includes(zipCode)
+    console.log(`[Real Estate] Service area check: ${serves}`)
+    return serves
+  }
+
+  // Fall back to primary zip code comparison
+  const primaryMatch = business.zipCode === zipCode
+  console.log(`[Real Estate] Primary zip code check: ${primaryMatch}`)
+  return primaryMatch
+}
+
+// Format phone number to (XXX) XXX-XXXX
+function formatPhoneNumber(phoneNumberString: string) {
+  if (!phoneNumberString) return "No phone provided"
+
+  // Strip all non-numeric characters
+  const cleaned = phoneNumberString.replace(/\D/g, "")
+
+  // Check if the number is valid
+  const match = cleaned.match(/^(\d{3})(\d{3})(\d{4})$/)
+
+  if (match) {
+    return `(${match[1]}) ${match[2]}-${match[3]}`
+  }
+
+  // If the format doesn't match, return the original
+  return phoneNumberString
+}
+
 export default function RealEstatePage() {
+  const { toast } = useToast()
+  const fetchIdRef = useRef(0)
+
   const filterOptions = [
     { id: "home1", label: "Real Estate Agent", value: "Real Estate Agent" },
     { id: "home2", label: "Real Estate Appraising", value: "Real Estate Appraising" },
@@ -125,98 +290,15 @@ export default function RealEstatePage() {
     { id: "home6", label: "Other Home Buying and Selling", value: "Other Home Buying and Selling" },
   ]
 
-  // Helper function to safely extract string from subcategory data
-  const getSubcategoryString = (subcategory: any): string => {
-    if (typeof subcategory === "string") {
-      return subcategory
-    }
-
-    if (subcategory && typeof subcategory === "object") {
-      // Try to get the subcategory field first, then category, then fullPath
-      return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
-    }
-
-    return "Unknown Service"
-  }
-
-  // State for reviews dialog
+  const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-  const [selectedProvider, setSelectedProvider] = useState<{
-    id: number
-    name: string
-    reviews: any[]
-  } | null>(null)
-
-  // State for business profile dialog
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-  const [selectedBusiness, setSelectedBusiness] = useState<{
-    id: string
-    name: string
-  } | null>(null)
-
-  // Add fetchIdRef for race condition prevention
-  const fetchIdRef = useRef(0)
-
-  // Enhanced Business interface
-  interface Business {
-    id: string
-    displayName?: string
-    businessName?: string
-    displayLocation?: string
-    zipCode?: string
-    displayPhone?: string
-    rating?: number
-    reviews?: number
-    subcategories?: any[] // Changed from string[] to any[]
-    serviceArea?: string[]
-    isNationwide?: boolean
-    allSubcategories?: any[] // Changed from string[] to any[]
-    subcategory?: string
-  }
-
-  // Helper function to check if business serves the zip code
-  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
-    console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
-      isNationwide: business.isNationwide,
-      serviceArea: business.serviceArea,
-      primaryZip: business.zipCode,
-    })
-
-    // Check if business serves nationwide
-    if (business.isNationwide) {
-      console.log(`✓ Business serves nationwide`)
-      return true
-    }
-
-    // Check if zip code is in service area
-    if (business.serviceArea && Array.isArray(business.serviceArea)) {
-      const serves = business.serviceArea.includes(zipCode)
-      console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
-      return serves
-    }
-
-    // Fallback to primary zip code
-    const matches = business.zipCode === zipCode
-    console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
-    return matches
-  }
-
-  // State for businesses
-  const [providers, setProviders] = useState<Business[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
-
-  // Filter state
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
-  const [allProviders, setAllProviders] = useState<Business[]>([])
-  const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
-
-  // State for business photos
-  const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: string[] }>({})
-  const [photosLoading, setPhotosLoading] = useState<{ [key: string]: boolean }>({})
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -225,156 +307,251 @@ export default function RealEstatePage() {
     }
   }, [])
 
-  // Helper function to check if business has exact subcategory match
-  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
-    // Check subcategories array
+  const fetchBusinesses = async () => {
+    const currentFetchId = ++fetchIdRef.current
+
+    try {
+      setIsLoading(true)
+
+      console.log(`[Real Estate] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+
+      const result = await getBusinessesForCategoryPage("/real-estate")
+
+      // Load photos for each business using public Cloudflare URLs
+      const businessesWithPhotos = await Promise.all(
+        result.map(async (business: Business) => {
+          const photos = await loadBusinessPhotos(business.id)
+          return { ...business, photos }
+        }),
+      )
+
+      // Check if this is still the current request
+      if (currentFetchId !== fetchIdRef.current) {
+        console.log(`[Real Estate] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+        return
+      }
+
+      console.log(`[Real Estate] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+
+      // Filter by zip code if available
+      let filteredResult = businessesWithPhotos
+      if (userZipCode) {
+        console.log(`[Real Estate] Filtering by zip code: ${userZipCode}`)
+        filteredResult = businessesWithPhotos.filter((business: Business) => {
+          const serves = businessServesZipCode(business, userZipCode)
+          console.log(
+            `[Real Estate] Business ${business.displayName || business.adDesignData?.businessInfo?.businessName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
+            {
+              serviceArea: business.serviceArea,
+              primaryZip: business.zipCode,
+              isNationwide: business.isNationwide,
+            },
+          )
+          return serves
+        })
+        console.log(`[Real Estate] After filtering: ${filteredResult.length} businesses`)
+      }
+
+      setBusinesses(filteredResult)
+      setAllBusinesses(filteredResult)
+    } catch (error) {
+      // Only update error if this is still the current request
+      if (currentFetchId === fetchIdRef.current) {
+        console.error(`[Real Estate] Error in fetch ${currentFetchId}:`, error)
+        toast({
+          title: "Error loading businesses",
+          description: "There was a problem loading businesses. Please try again later.",
+          variant: "destructive",
+        })
+      }
+    } finally {
+      // Only update loading if this is still the current request
+      if (currentFetchId === fetchIdRef.current) {
+        setIsLoading(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    fetchBusinesses()
+  }, [userZipCode])
+
+  // Helper function to check if a business has a specific subcategory
+  const hasExactSubcategoryMatch = (business: Business, subcategory: string): boolean => {
+    // Check in subcategories array
     if (business.subcategories && Array.isArray(business.subcategories)) {
-      if (business.subcategories.some((subcat) => getSubcategoryString(subcat) === filterValue)) return true
+      if (
+        business.subcategories.some((sub) => typeof sub === "string" && sub.toLowerCase() === subcategory.toLowerCase())
+      ) {
+        return true
+      }
     }
 
-    // Check allSubcategories array
+    // Check in allSubcategories array
     if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-      if (business.allSubcategories.some((subcat) => getSubcategoryString(subcat) === filterValue)) return true
+      if (
+        business.allSubcategories.some(
+          (sub) => typeof sub === "string" && sub.toLowerCase() === subcategory.toLowerCase(),
+        )
+      ) {
+        return true
+      }
     }
 
-    // Check subcategory field
-    if (business.subcategory === filterValue) return true
+    // Check in subcategory field
+    if (business.subcategory && business.subcategory.toLowerCase() === subcategory.toLowerCase()) {
+      return true
+    }
 
     return false
   }
 
-  const handleFilterChange = (filterValue: string) => {
-    setSelectedFilters((prev) =>
-      prev.includes(filterValue) ? prev.filter((f) => f !== filterValue) : [...prev, filterValue],
-    )
+  const handleFilterChange = (value: string) => {
+    setSelectedFilters((prev) => {
+      if (prev.includes(value)) {
+        return prev.filter((item) => item !== value)
+      } else {
+        return [...prev, value]
+      }
+    })
   }
 
   const applyFilters = () => {
-    console.log("Applying filters:", selectedFilters)
-    console.log("All providers:", allProviders)
-
     if (selectedFilters.length === 0) {
-      setFilteredProviders(allProviders)
-      setAppliedFilters([])
       return
     }
 
-    const filtered = allProviders.filter((business) => {
-      console.log(`Business ${business.displayName || business.businessName} subcategories:`, business.subcategories)
+    console.log("Applying filters:", selectedFilters)
 
-      const hasMatch = selectedFilters.some((filter) => {
-        const matches = hasExactSubcategoryMatch(business, filter)
-        console.log(`Filter "${filter}" matches business: ${matches}`)
-        return matches
-      })
+    const filtered = allBusinesses.filter((business) => {
+      // If no filters are selected, show all businesses
+      if (selectedFilters.length === 0) return true
 
-      console.log(`Business ${business.displayName || business.businessName} has match: ${hasMatch}`)
-      return hasMatch
+      // Check if business matches any of the selected filters
+      return selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
     })
 
-    console.log("Filtered results:", filtered)
-    setFilteredProviders(filtered)
     setAppliedFilters([...selectedFilters])
-    setSelectedFilters([])
+    setBusinesses(filtered)
+
+    toast({
+      title: `Filter applied`,
+      description: `Showing ${filtered.length} real estate professionals matching your criteria.`,
+    })
   }
 
   const clearFilters = () => {
     setSelectedFilters([])
     setAppliedFilters([])
-    setFilteredProviders(allProviders)
-  }
+    setBusinesses(allBusinesses)
 
-  // Function to load photos for a specific business
-  const loadPhotosForBusiness = async (businessId: string) => {
-    if (photosLoading[businessId] || businessPhotos[businessId]) {
-      return // Already loading or loaded
-    }
-
-    setPhotosLoading((prev) => ({ ...prev, [businessId]: true }))
-
-    try {
-      console.log(`Loading photos for business ${businessId}`)
-      const photos = await loadBusinessPhotos(businessId)
-      console.log(`Loaded ${photos.length} photos for business ${businessId}`)
-
-      setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
-    } catch (error) {
-      console.error(`Error loading photos for business ${businessId}:`, error)
-      setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
-    } finally {
-      setPhotosLoading((prev) => ({ ...prev, [businessId]: false }))
-    }
-  }
-
-  useEffect(() => {
-    async function fetchBusinesses() {
-      const currentFetchId = ++fetchIdRef.current
-      console.log(`[RealEstate] Starting fetch ${currentFetchId} for zip code:`, userZipCode)
-
-      try {
-        setLoading(true)
-        setError(null)
-        let fetchedBusinesses = await getBusinessesForCategoryPage("/real-estate")
-
-        // Only update if this is still the current request
-        if (currentFetchId !== fetchIdRef.current) {
-          console.log(`[RealEstate] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
-          return
-        }
-
-        console.log(`[RealEstate] Fetch ${currentFetchId} got ${fetchedBusinesses.length} businesses`)
-
-        // Filter by zip code if available
-        if (userZipCode) {
-          const originalCount = fetchedBusinesses.length
-          fetchedBusinesses = fetchedBusinesses.filter((business: Business) =>
-            businessServesZipCode(business, userZipCode),
-          )
-          console.log(
-            `[RealEstate] Filtered from ${originalCount} to ${fetchedBusinesses.length} businesses for zip ${userZipCode}`,
-          )
-        }
-
-        setProviders(fetchedBusinesses)
-        setAllProviders(fetchedBusinesses)
-        setFilteredProviders(fetchedBusinesses)
-
-        // Load photos for each business individually
-        fetchedBusinesses.forEach((business: any) => {
-          loadPhotosForBusiness(business.id)
-        })
-      } catch (err) {
-        // Only update error if this is still the current request
-        if (currentFetchId === fetchIdRef.current) {
-          console.error(`[RealEstate] Fetch ${currentFetchId} error:`, err)
-          setError("Failed to load businesses")
-        }
-      } finally {
-        // Only update loading if this is still the current request
-        if (currentFetchId === fetchIdRef.current) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchBusinesses()
-  }, [userZipCode])
-
-  const handleOpenReviews = (provider: any) => {
-    setSelectedProvider({
-      id: provider.id,
-      name: provider.displayName || provider.businessName || "Real Estate Professional",
-      reviews: provider.reviewsData || [],
+    toast({
+      title: "Filters cleared",
+      description: "Showing all real estate professionals.",
     })
+  }
+
+  // The businesses state now holds the filtered businesses directly
+  const filteredBusinesses = businesses
+
+  // Helper function to get phone number from business data
+  const getPhoneNumber = (business: Business) => {
+    // First try to get phone from ad design data
+    if (business.adDesignData?.businessInfo?.phone) {
+      return business.adDesignData.businessInfo.phone
+    }
+    // Then try displayPhone which might be set by the centralized system
+    if (business.displayPhone) {
+      return business.displayPhone
+    }
+    // Fall back to the business registration phone
+    if (business.phone) {
+      return business.phone
+    }
+    return null
+  }
+
+  // Helper function to get location from business data
+  const getLocation = (business: Business) => {
+    // First try to get location from ad design data
+    const adDesignCity = business.adDesignData?.businessInfo?.city
+    const adDesignState = business.adDesignData?.businessInfo?.state
+
+    // Then try displayCity/displayState which might be set by the centralized system
+    const displayCity = business.displayCity
+    const displayState = business.displayState
+
+    // Finally fall back to registration data
+    const registrationCity = business.city
+    const registrationState = business.state
+
+    // Build location string prioritizing ad design data
+    const city = adDesignCity || displayCity || registrationCity
+    const state = adDesignState || displayState || registrationState
+
+    const parts = []
+    if (city) parts.push(city)
+    if (state) parts.push(state)
+
+    if (parts.length > 0) {
+      return parts.join(", ")
+    }
+
+    // If no city/state available, show zip code as fallback
+    if (business.zipCode) {
+      return `Zip: ${business.zipCode}`
+    }
+
+    return "Location not provided"
+  }
+
+  // Helper function to get subcategories
+  const getSubcategories = (business: Business) => {
+    // Helper function to extract string from subcategory object
+    const getSubcategoryString = (subcategory: any): string => {
+      if (typeof subcategory === "string") {
+        return subcategory
+      }
+
+      if (subcategory && typeof subcategory === "object") {
+        // Try to get the subcategory field first, then category, then fullPath
+        return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+      }
+
+      return "Unknown Service"
+    }
+
+    // First try to get from subcategories (which should contain the full category objects)
+    if (business.subcategories && business.subcategories.length > 0) {
+      return business.subcategories.map(getSubcategoryString).filter((s) => s !== "Unknown Service")
+    }
+
+    // Then try allSubcategories
+    if (business.allSubcategories && business.allSubcategories.length > 0) {
+      return business.allSubcategories.map(getSubcategoryString).filter((s) => s !== "Unknown Service")
+    }
+
+    // Fall back to services if available
+    if (business.services && business.services.length > 0) {
+      return business.services.map(getSubcategoryString).filter((s) => s !== "Unknown Service")
+    }
+
+    return ["Real Estate Professional"]
+  }
+
+  const handleReviewsClick = (provider: Business) => {
+    setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
   }
 
-  const handleViewProfile = (provider: any) => {
-    setSelectedBusiness({
-      id: provider.id,
-      name: provider.displayName || provider.businessName || "Real Estate Professional",
-    })
+  const handleProfileClick = (provider: Business) => {
+    setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
+  }
+
+  const clearZipCodeFilter = () => {
+    localStorage.removeItem("savedZipCode")
+    setUserZipCode(null)
   }
 
   return (
@@ -408,213 +585,201 @@ export default function RealEstatePage() {
         </div>
       </div>
 
-      {/* Enhanced Filter Interface */}
-      <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-        <h3 className="text-lg font-semibold mb-4">Filter by Services</h3>
+      <div className="mb-6">
+        <h3 className="text-lg font-medium mb-3">Filter by Service Type</h3>
+        <div className="bg-gray-50 p-4 rounded-lg border">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            {filterOptions.map((option) => (
+              <div key={option.id} className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={option.id}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  checked={selectedFilters.includes(option.value)}
+                  onChange={() => handleFilterChange(option.value)}
+                />
+                <label htmlFor={option.id} className="ml-2 text-sm text-gray-700">
+                  {option.label}
+                </label>
+              </div>
+            ))}
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-          {filterOptions.map((option) => (
-            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectedFilters.includes(option.value)}
-                onChange={() => handleFilterChange(option.value)}
-                className="rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <span className="text-sm">{option.label}</span>
-            </label>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-600">
-            {selectedFilters.length} filter{selectedFilters.length !== 1 ? "s" : ""} selected
-          </span>
-          <div className="space-x-2">
-            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} size="sm">
-              Apply Filters
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} className="text-sm">
+              Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
             </Button>
+
             {appliedFilters.length > 0 && (
-              <Button onClick={clearFilters} variant="outline" size="sm">
+              <Button variant="outline" onClick={clearFilters} className="text-sm bg-transparent">
                 Clear Filters
               </Button>
             )}
+
+            {appliedFilters.length > 0 && (
+              <span className="text-sm text-gray-500">
+                Showing {filteredBusinesses.length} of {businesses.length} professionals
+              </span>
+            )}
           </div>
+
+          {appliedFilters.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {appliedFilters.map((filter) => (
+                <span
+                  key={filter}
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {filter}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Active Filters Display */}
-      {appliedFilters.length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-700 mb-2">
-            <span className="font-medium">Active filters:</span> {appliedFilters.join(", ")}
-          </p>
-          <p className="text-xs text-blue-600">
-            Showing {filteredProviders.length} of {allProviders.length} businesses
-          </p>
-        </div>
-      )}
-
       {userZipCode && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
-          <p className="text-sm text-blue-700">
-            <span className="font-medium">Showing businesses that serve zip code:</span> {userZipCode}
-            <span className="text-xs block mt-1">Includes businesses with {userZipCode} in their service area</span>
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              localStorage.removeItem("savedZipCode")
-              setUserZipCode(null)
-            }}
-            className="text-blue-700 border-blue-300 hover:bg-blue-100"
-          >
-            Clear Filter
-          </Button>
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-blue-700">
+              <span className="font-medium">Showing professionals for zip code:</span> {userZipCode}
+              <span className="text-xs block mt-1">(Includes businesses with {userZipCode} in their service area)</span>
+            </p>
+            <Button variant="outline" size="sm" onClick={clearZipCodeFilter} className="text-xs bg-transparent">
+              Clear Filter
+            </Button>
+          </div>
         </div>
       )}
 
-      {loading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading real estate professionals...</p>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <p>Loading real estate professionals...</p>
         </div>
-      ) : error ? (
-        <div className="text-center py-8">
-          <p className="text-red-600">{error}</p>
-        </div>
-      ) : filteredProviders.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="max-w-md mx-auto">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Real Estate Professionals Yet</h3>
-            <p className="text-gray-600 mb-4">
-              {userZipCode
-                ? `Be the first real estate professional to join our platform and connect with potential clients in the ${userZipCode} area.`
-                : "Be the first real estate professional to join our platform and connect with potential clients in your area."}
-            </p>
-            <Button className="bg-blue-600 hover:bg-blue-700">Register Your Business</Button>
+      ) : filteredBusinesses.length > 0 ? (
+        <div className="mt-8 space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900">Real Estate Professionals ({filteredBusinesses.length})</h2>
+          <div className="grid gap-6">
+            {filteredBusinesses.map((business: Business) => (
+              <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                <div className="flex flex-col space-y-4">
+                  {/* Business Name and Description */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {business.displayName ||
+                        business.adDesignData?.businessInfo?.businessName ||
+                        business.businessName}
+                    </h3>
+                    {business.description && (
+                      <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
+                    )}
+                  </div>
+
+                  {/* Main content area with contact info, photos, and buttons */}
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                    {/* Left side - Contact and Location Info - Made smaller */}
+                    <div className="lg:w-64 space-y-2 flex-shrink-0">
+                      {/* Phone Number */}
+                      {getPhoneNumber(business) && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <a
+                            href={`tel:${getPhoneNumber(business)}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                          >
+                            {formatPhoneNumber(getPhoneNumber(business)!)}
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Location */}
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <span className="text-gray-700 text-sm">{getLocation(business)}</span>
+                      </div>
+                    </div>
+
+                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
+                    <div className="flex-1 flex justify-center">
+                      <PhotoCarousel
+                        photos={business.photos || []}
+                        businessName={
+                          business.displayName ||
+                          business.adDesignData?.businessInfo?.businessName ||
+                          business.businessName ||
+                          "Real Estate Professional"
+                        }
+                      />
+                    </div>
+
+                    {/* Right side - Action Buttons */}
+                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleReviewsClick(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleProfileClick(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        View Profile
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Services - Display ALL services without truncation */}
+                  {getSubcategories(business).length > 0 && (
+                    <div className="w-full">
+                      <div className="lg:w-64">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2 w-full">
+                        {getSubcategories(business).map((subcategory: any, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {typeof subcategory === "string" ? subcategory : subcategory.name || "Unknown"}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : (
-        <div className="space-y-6">
-          {filteredProviders.map((provider: any) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex flex-col lg:flex-row gap-4">
-                  {/* Left: Business Information */}
-                  <div className="lg:w-56 flex-shrink-0">
-                    <h3 className="text-xl font-semibold">
-                      {provider.displayName || provider.businessName || "Real Estate Professional"}
-                    </h3>
-
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div className="text-xs text-green-600 mt-1">
-                        {provider.isNationwide ? (
-                          <span>✓ Serves nationwide</span>
-                        ) : provider.serviceArea?.includes(userZipCode) ? (
-                          <span>✓ Serves {userZipCode} and surrounding areas</span>
-                        ) : provider.zipCode === userZipCode ? (
-                          <span>✓ Located in {userZipCode}</span>
-                        ) : null}
-                      </div>
-                    )}
-
-                    <p className="text-gray-600 text-sm mt-2">{provider.displayLocation || "Location not specified"}</p>
-
-                    {provider.displayPhone && (
-                      <div className="flex items-center mt-2">
-                        <Phone className="w-4 h-4 text-gray-500 mr-2" />
-                        <span className="text-sm text-gray-600">
-                          <a href={`tel:${provider.displayPhone}`} className="hover:text-blue-600 hover:underline">
-                            {provider.displayPhone}
-                          </a>
-                        </span>
-                      </div>
-                    )}
-
-                    {provider.subcategories && provider.subcategories.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-sm font-medium text-gray-700">Services:</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.subcategories.slice(0, 3).map((subcategory: any, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(subcategory)}
-                            </span>
-                          ))}
-                          {provider.subcategories.length > 3 && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                              +{provider.subcategories.length - 3} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Center: Photo Carousel (Desktop Only) */}
-                  <div className="hidden lg:block flex-1">
-                    {photosLoading[provider.id] ? (
-                      <div className="grid grid-cols-5 gap-2">
-                        {Array.from({ length: 5 }, (_, index) => (
-                          <div
-                            key={index}
-                            className="w-40 h-30 bg-gray-200 rounded-lg flex items-center justify-center animate-pulse"
-                          >
-                            <span className="text-xs text-gray-400">Loading...</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
-                      <PhotoCarousel
-                        photos={businessPhotos[provider.id]}
-                        businessName={provider.displayName || provider.businessName || "Real Estate Professional"}
-                      />
-                    ) : (
-                      <div className="grid grid-cols-5 gap-2">
-                        {Array.from({ length: 5 }, (_, index) => (
-                          <div
-                            key={index}
-                            className="w-40 h-30 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center"
-                          >
-                            <span className="text-xs text-gray-400">No photo</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right: Action Buttons */}
-                  <div className="lg:w-28 flex flex-col gap-2 lg:items-end">
-                    <Button className="w-full lg:w-auto min-w-[110px]" onClick={() => handleOpenReviews(provider)}>
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full lg:w-auto min-w-[110px] bg-transparent"
-                      onClick={() => handleViewProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="text-center py-12">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 max-w-2xl mx-auto">
+            <h3 className="text-xl font-medium text-amber-800 mb-2">
+              {userZipCode
+                ? `No Real Estate Professionals Found in ${userZipCode} Area`
+                : "No Real Estate Professionals Found"}
+            </h3>
+            <p className="text-amber-700 mb-4">
+              {userZipCode
+                ? `We're building our network of real estate professionals in the ${userZipCode} area.`
+                : "We're building our network of real estate professionals in your area."}
+            </p>
+            <div className="bg-white rounded border border-amber-100 p-4">
+              <p className="text-gray-700 font-medium">Are you a real estate professional?</p>
+              <p className="text-gray-600 mt-1">
+                Join Hausbaum to showcase your services and connect with clients in your area.
+              </p>
+              <Button className="mt-3" asChild>
+                <a href="/business-register">Register Your Business</a>
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -622,17 +787,26 @@ export default function RealEstatePage() {
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.name}
-          reviews={selectedProvider.reviews}
+          providerName={
+            selectedProvider.displayName ||
+            selectedProvider.adDesignData?.businessInfo?.businessName ||
+            selectedProvider.businessName
+          }
+          businessId={selectedProvider.id}
+          reviews={selectedProvider.reviews || []}
         />
       )}
 
-      {selectedBusiness && (
+      {selectedProvider && (
         <BusinessProfileDialog
           isOpen={isProfileDialogOpen}
           onClose={() => setIsProfileDialogOpen(false)}
-          businessId={selectedBusiness.id}
-          businessName={selectedBusiness.name}
+          businessId={selectedProvider.id}
+          businessName={
+            selectedProvider.displayName ||
+            selectedProvider.adDesignData?.businessInfo?.businessName ||
+            selectedProvider.businessName
+          }
         />
       )}
 

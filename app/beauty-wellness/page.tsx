@@ -10,7 +10,7 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { Loader2, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/lib/business-category-service"
-import { ChevronLeft, ChevronRight, MapPin, Star } from "lucide-react"
+import { ChevronLeft, ChevronRight, MapPin } from "lucide-react"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 
 // Photo Carousel Component - displays 5 photos in landscape format
@@ -682,23 +682,22 @@ export default function BeautyWellnessPage() {
                         </div>
                       )}
 
-                      {/* Rating */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`h-4 w-4 ${
-                                star <= (business.rating || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-sm text-gray-600">
-                          {business.rating?.toFixed(1) || "0.0"} ({business.reviewCount || business.reviews || 0}{" "}
-                          reviews)
-                        </span>
-                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenReviews(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleOpenProfile(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        View Profile
+                      </Button>
                     </div>
 
                     {/* Middle - Photo Carousel (desktop only) - Now has more space */}
@@ -710,24 +709,7 @@ export default function BeautyWellnessPage() {
                     </div>
 
                     {/* Right side - Action Buttons */}
-                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenReviews(business)}
-                        className="text-sm min-w-[100px]"
-                      >
-                        Reviews
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleOpenProfile(business)}
-                        className="text-sm min-w-[100px]"
-                      >
-                        View Profile
-                      </Button>
-                    </div>
+                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0"></div>
                   </div>
 
                   {/* Subcategories/Services */}

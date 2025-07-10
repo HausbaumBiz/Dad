@@ -51,122 +51,98 @@ export default function PersonalAssistantsPage() {
   // State for carousel navigation
   const [carouselIndex, setCarouselIndex] = useState<Record<string, number>>({})
 
-  const mockReviews = {
-    "Elite Personal Assistants": [
-      {
-        id: 1,
-        username: "Jonathan M.",
-        rating: 5,
-        comment:
-          "My assistant from Elite has been a game-changer for my busy schedule. Incredibly organized and proactive.",
-        date: "2023-12-10",
-      },
-      {
-        id: 2,
-        username: "Rebecca S.",
-        rating: 4,
-        comment:
-          "Professional service that has helped me reclaim hours in my week. My assistant anticipates my needs perfectly.",
-        date: "2023-11-15",
-      },
-      {
-        id: 3,
-        username: "Andrew P.",
-        rating: 5,
-        comment:
-          "The level of detail and efficiency is outstanding. My assistant handles everything from travel arrangements to personal errands flawlessly.",
-        date: "2023-10-20",
-      },
-    ],
-    "Executive Support Services": [
-      {
-        id: 1,
-        username: "Victoria L.",
-        rating: 5,
-        comment:
-          "Executive Support Services matched me with the perfect assistant who understands my business needs and personal preferences.",
-        date: "2023-12-05",
-      },
-      {
-        id: 2,
-        username: "Daniel R.",
-        rating: 4,
-        comment:
-          "Reliable and professional. My assistant has excellent communication skills and handles all tasks promptly.",
-        date: "2023-11-08",
-      },
-      {
-        id: 3,
-        username: "Sophia T.",
-        rating: 5,
-        comment:
-          "Having an assistant from Executive Support has transformed my productivity. Worth every penny for the time saved.",
-        date: "2023-10-12",
-      },
-    ],
-    "Concierge Assistants": [
-      {
-        id: 1,
-        username: "Christopher B.",
-        rating: 5,
-        comment:
-          "The concierge service is exceptional. My assistant handles everything from dinner reservations to gift shopping with style and efficiency.",
-        date: "2023-12-15",
-      },
-      {
-        id: 2,
-        username: "Olivia W.",
-        rating: 4,
-        comment: "Very responsive and attentive to details. My assistant has made my life so much easier.",
-        date: "2023-11-20",
-      },
-      {
-        id: 3,
-        username: "Matthew K.",
-        rating: 5,
-        comment: "Excellent service that goes above and beyond. My assistant anticipates my needs and always delivers.",
-        date: "2023-10-25",
-      },
-    ],
-    "Virtual Assistant Pro": [
-      {
-        id: 1,
-        username: "Emma J.",
-        rating: 5,
-        comment:
-          "My virtual assistant is incredibly efficient and has streamlined all my administrative tasks. Excellent communication.",
-        date: "2023-12-08",
-      },
-      {
-        id: 2,
-        username: "Nathan F.",
-        rating: 4,
-        comment:
-          "Great value for the service provided. My VA handles my email, scheduling, and research tasks perfectly.",
-        date: "2023-11-12",
-      },
-      {
-        id: 3,
-        username: "Isabella M.",
-        rating: 5,
-        comment:
-          "Working with my virtual assistant has been seamless. They're responsive, detail-oriented, and very professional.",
-        date: "2023-10-18",
-      },
-    ],
+  // State for reviews dialog
+  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+
+  // Remove the mock providers state and replace with real data fetching
+  const [providers, setProviders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Add after existing state declarations:
+  const fetchIdRef = useRef(0)
+
+  // Enhanced Business interface
+  interface Business {
+    id: string
+    name?: string
+    displayName?: string
+    displayPhone?: string
+    displayCity?: string
+    displayState?: string
+    city?: string
+    state?: string
+    phone?: string
+    rating?: number
+    reviewCount?: number
+    services?: any[]
+    subcategories?: any[]
+    allSubcategories?: any[]
+    zipCode?: string
+    serviceArea?: string[]
+    adDesignData?: {
+      businessInfo?: {
+        phone?: string
+        city?: string
+        state?: string
+      }
+    }
   }
 
-  const handleOpenReviews = (providerName: string) => {
-    setSelectedProvider(providerName)
-    setIsReviewsOpen(true)
+  // Helper function to check if business serves a zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    // If business has no service area defined, fall back to primary zip code
+    if (!business.serviceArea || business.serviceArea.length === 0) {
+      return business.zipCode === zipCode
+    }
+
+    // Check if business serves nationwide (indicated by having "nationwide" in service area)
+    if (business.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))) {
+      return true
+    }
+
+    // Check if the zip code is in the business's service area
+    return business.serviceArea.includes(zipCode)
   }
 
-  const handleOpenProfile = (provider: any) => {
-    setSelectedBusinessProfile({
-      id: provider.id,
-      name: provider.displayName || provider.name,
-    })
-    setIsProfileDialogOpen(true)
+  // Function to load photos for a business
+  const loadBusinessPhotos = async (businessId: string) => {
+    if (loadingPhotos[businessId] || businessPhotos[businessId]) {
+      return // Already loading or loaded
+    }
+
+    setLoadingPhotos((prev) => ({ ...prev, [businessId]: true }))
+
+    try {
+      const mediaData = await getBusinessMedia(businessId)
+      const photos = mediaData?.photoAlbum || []
+
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
+      setCarouselIndex((prev) => ({ ...prev, [businessId]: 0 }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
+    } finally {
+      setLoadingPhotos((prev) => ({ ...prev, [businessId]: false }))
+    }
+  }
+
+  // Carousel navigation functions
+  const handlePrevious = (businessId: string) => {
+    const photos = businessPhotos[businessId] || []
+    const currentIndex = carouselIndex[businessId] || 0
+    const newIndex = currentIndex > 0 ? currentIndex - 1 : Math.max(0, photos.length - 5)
+    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
+  }
+
+  const handleNext = (businessId: string) => {
+    const photos = businessPhotos[businessId] || []
+    const currentIndex = carouselIndex[businessId] || 0
+    const maxIndex = Math.max(0, photos.length - 5)
+    const newIndex = currentIndex < maxIndex ? currentIndex + 1 : 0
+    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
   }
 
   // Function to format phone numbers
@@ -273,100 +249,6 @@ export default function PersonalAssistantsPage() {
     { id: "assistants5", label: "Personal Shoppers", value: "Personal Shoppers" },
   ]
 
-  // State for reviews dialog
-  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-
-  // Remove the mock providers state and replace with real data fetching
-  const [providers, setProviders] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [userZipCode, setUserZipCode] = useState<string | null>(null)
-
-  // Add after existing state declarations:
-  const fetchIdRef = useRef(0)
-
-  // Enhanced Business interface
-  interface Business {
-    id: string
-    name?: string
-    displayName?: string
-    displayPhone?: string
-    displayCity?: string
-    displayState?: string
-    city?: string
-    state?: string
-    phone?: string
-    rating?: number
-    reviewCount?: number
-    services?: any[]
-    subcategories?: any[]
-    allSubcategories?: any[]
-    zipCode?: string
-    serviceArea?: string[]
-    adDesignData?: {
-      businessInfo?: {
-        phone?: string
-        city?: string
-        state?: string
-      }
-    }
-  }
-
-  // Helper function to check if business serves a zip code
-  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
-    // If business has no service area defined, fall back to primary zip code
-    if (!business.serviceArea || business.serviceArea.length === 0) {
-      return business.zipCode === zipCode
-    }
-
-    // Check if business serves nationwide (indicated by having "nationwide" in service area)
-    if (business.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))) {
-      return true
-    }
-
-    // Check if the zip code is in the business's service area
-    return business.serviceArea.includes(zipCode)
-  }
-
-  // Function to load photos for a business
-  const loadBusinessPhotos = async (businessId: string) => {
-    if (loadingPhotos[businessId] || businessPhotos[businessId]) {
-      return // Already loading or loaded
-    }
-
-    setLoadingPhotos((prev) => ({ ...prev, [businessId]: true }))
-
-    try {
-      const mediaData = await getBusinessMedia(businessId)
-      const photos = mediaData?.photoAlbum || []
-
-      setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
-      setCarouselIndex((prev) => ({ ...prev, [businessId]: 0 }))
-    } catch (error) {
-      console.error(`Error loading photos for business ${businessId}:`, error)
-      setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
-    } finally {
-      setLoadingPhotos((prev) => ({ ...prev, [businessId]: false }))
-    }
-  }
-
-  // Carousel navigation functions
-  const handlePrevious = (businessId: string) => {
-    const photos = businessPhotos[businessId] || []
-    const currentIndex = carouselIndex[businessId] || 0
-    const newIndex = currentIndex > 0 ? currentIndex - 1 : Math.max(0, photos.length - 5)
-    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
-  }
-
-  const handleNext = (businessId: string) => {
-    const photos = businessPhotos[businessId] || []
-    const currentIndex = carouselIndex[businessId] || 0
-    const maxIndex = Math.max(0, photos.length - 5)
-    const newIndex = currentIndex < maxIndex ? currentIndex + 1 : 0
-    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
-  }
-
   // Replace the useEffect:
   useEffect(() => {
     async function fetchBusinesses() {
@@ -442,9 +324,25 @@ export default function PersonalAssistantsPage() {
     }
   }, [])
 
-  const handleOpenReviewsOld = (provider: any) => {
+  const handleOpenReviews = (provider: string) => {
     setSelectedProvider(provider)
-    setIsReviewsDialogOpen(true)
+    setIsReviewsOpen(true)
+  }
+
+  const handleOpenProfile = (provider: Business) => {
+    setSelectedBusinessProfile({ id: provider.id, name: provider.displayName || provider.name })
+    setIsProfileDialogOpen(true)
+  }
+
+  const mockReviews = {
+    "Personal Assistant 1": [
+      { id: 1, rating: 5, comment: "Great service!" },
+      { id: 2, rating: 4, comment: "Good, but could be better." },
+    ],
+    "Personal Assistant 2": [
+      { id: 3, rating: 3, comment: "Average service." },
+      { id: 4, rating: 5, comment: "Excellent!" },
+    ],
   }
 
   return (
@@ -606,8 +504,8 @@ export default function PersonalAssistantsPage() {
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between gap-6">
-                  {/* Left: Business Info */}
-                  <div className="flex-shrink-0 w-80">
+                  {/* Left: Business Info - Made wider */}
+                  <div className="flex-1 min-w-0">
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">
                       {provider.displayName || provider.name}
                     </h3>
@@ -666,83 +564,6 @@ export default function PersonalAssistantsPage() {
                         )}
                       </div>
                     </div>
-
-                    {provider.serviceArea && provider.serviceArea.length > 0 && (
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">Service Area:</span>{" "}
-                        {provider.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))
-                          ? "Serves nationwide"
-                          : `Serves ${userZipCode} and surrounding areas`}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Center: Photo Carousel */}
-                  <div className="flex-1 relative">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePrevious(provider.id)}
-                        disabled={!businessPhotos[provider.id] || businessPhotos[provider.id].length <= 5}
-                        className="h-8 w-8 p-0 flex-shrink-0 bg-transparent"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-
-                      <div className="flex space-x-2 overflow-hidden flex-1">
-                        {loadingPhotos[provider.id] ? (
-                          <div className="flex items-center justify-center w-full h-32">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                          </div>
-                        ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
-                          businessPhotos[provider.id]
-                            .slice(carouselIndex[provider.id] || 0, (carouselIndex[provider.id] || 0) + 5)
-                            .map((photo, index) => (
-                              <div key={photo.id} className="flex-shrink-0 w-32 h-32">
-                                <Image
-                                  src={photo.url || "/placeholder.svg"}
-                                  alt={photo.filename || `Photo ${index + 1}`}
-                                  width={128}
-                                  height={128}
-                                  className="w-full h-full object-cover rounded-lg"
-                                />
-                              </div>
-                            ))
-                        ) : (
-                          <div className="flex items-center justify-center w-full h-32 bg-gray-100 rounded-lg">
-                            <div className="text-center">
-                              <Camera className="w-8 h-8 mx-auto text-gray-400 mb-1" />
-                              <span className="text-gray-500 text-sm">No photos available</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleNext(provider.id)}
-                        disabled={
-                          !businessPhotos[provider.id] ||
-                          businessPhotos[provider.id].length <= 5 ||
-                          (carouselIndex[provider.id] || 0) >= businessPhotos[provider.id].length - 5
-                        }
-                        className="h-8 w-8 p-0 flex-shrink-0"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {businessPhotos[provider.id] && businessPhotos[provider.id].length > 5 && (
-                      <div className="text-center mt-2">
-                        <span className="text-xs text-gray-500">
-                          {(carouselIndex[provider.id] || 0) + 1}-
-                          {Math.min((carouselIndex[provider.id] || 0) + 5, businessPhotos[provider.id].length)} of{" "}
-                          {businessPhotos[provider.id].length} photos
-                        </span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Right: Action Buttons */}
@@ -753,12 +574,84 @@ export default function PersonalAssistantsPage() {
                       className="text-xs px-3 py-1 h-7 bg-transparent"
                       onClick={() => handleOpenReviews(provider.displayName || provider.name)}
                     >
-                      Reviews
+                      Ratings
                     </Button>
                     <Button size="sm" className="text-xs px-3 py-1 h-7" onClick={() => handleOpenProfile(provider)}>
                       View Profile
                     </Button>
                   </div>
+                </div>
+
+                {/* Photo Gallery at Bottom - Landscape sized photos */}
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePrevious(provider.id)}
+                      disabled={!businessPhotos[provider.id] || businessPhotos[provider.id].length <= 5}
+                      className="h-8 w-8 p-0 flex-shrink-0 bg-transparent"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+
+                    <div className="flex space-x-2 overflow-hidden flex-1">
+                      {loadingPhotos[provider.id] ? (
+                        <div className="flex items-center justify-center w-full h-32">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        </div>
+                      ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
+                        businessPhotos[provider.id]
+                          .slice(carouselIndex[provider.id] || 0, (carouselIndex[provider.id] || 0) + 5)
+                          .map((photo, index) => (
+                            <div key={photo.id} className="flex-shrink-0 w-32 h-32">
+                              <Image
+                                src={`https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${photo.cloudflareImageId}/public`}
+                                alt={photo.filename || `Photo ${index + 1}`}
+                                width={128}
+                                height={128}
+                                className="w-full h-full object-cover rounded-lg"
+                                onError={(e) => {
+                                  // Fallback to original URL if Cloudflare fails
+                                  e.currentTarget.src = photo.url || "/placeholder.svg"
+                                }}
+                              />
+                            </div>
+                          ))
+                      ) : (
+                        <div className="flex items-center justify-center w-full h-32 bg-gray-100 rounded-lg">
+                          <div className="text-center">
+                            <Camera className="w-8 h-8 mx-auto text-gray-400 mb-1" />
+                            <span className="text-gray-500 text-sm">No photos available</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleNext(provider.id)}
+                      disabled={
+                        !businessPhotos[provider.id] ||
+                        businessPhotos[provider.id].length <= 5 ||
+                        (carouselIndex[provider.id] || 0) >= businessPhotos[provider.id].length - 5
+                      }
+                      className="h-8 w-8 p-0 flex-shrink-0"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {businessPhotos[provider.id] && businessPhotos[provider.id].length > 5 && (
+                    <div className="text-center mt-2">
+                      <span className="text-xs text-gray-500">
+                        {(carouselIndex[provider.id] || 0) + 1}-
+                        {Math.min((carouselIndex[provider.id] || 0) + 5, businessPhotos[provider.id].length)} of{" "}
+                        {businessPhotos[provider.id].length} photos
+                      </span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -771,7 +664,7 @@ export default function PersonalAssistantsPage() {
           isOpen={isReviewsOpen}
           onClose={() => setIsReviewsOpen(false)}
           providerName={selectedProvider || ""}
-          reviews={selectedProvider ? mockReviews[selectedProvider] || [] : []}
+          reviews={mockReviews[selectedProvider] || []}
         />
       )}
 

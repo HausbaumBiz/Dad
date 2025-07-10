@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Phone, MapPin, Star, ChevronLeft, ChevronRight } from "lucide-react"
+import { Phone, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
@@ -651,24 +651,6 @@ export default function FuneralServicesPage() {
                           ) : null}
                         </div>
                       )}
-
-                      {/* Rating */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`h-4 w-4 ${
-                                star <= (business.rating || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-sm text-gray-600">
-                          {business.rating?.toFixed(1) || "0.0"} ({business.reviewCount || business.reviews || 0}{" "}
-                          reviews)
-                        </span>
-                      </div>
                     </div>
 
                     {/* Middle - Photo Carousel (desktop only) - Now has more space */}

@@ -10,7 +10,14 @@ function getErrorMessage(error: unknown): string {
   if (typeof error === "string") {
     return error
   }
-  return JSON.stringify(error, Object.getOwnPropertyNames(error))
+  if (error && typeof error === "object") {
+    try {
+      return JSON.stringify(error, Object.getOwnPropertyNames(error))
+    } catch (stringifyError) {
+      return `[Error object that cannot be stringified: ${Object.prototype.toString.call(error)}]`
+    }
+  }
+  return `[Unknown error type: ${typeof error}]`
 }
 
 // Helper function to safely get a value from Redis
@@ -49,34 +56,78 @@ async function safeRedisGet(key: string): Promise<any> {
     try {
       switch (keyType) {
         case "string":
-          return await kv.get(key)
+          try {
+            return await kv.get(key)
+          } catch (stringError) {
+            console.error(`Error retrieving string value for key ${key}:`, getErrorMessage(stringError))
+            return null
+          }
 
         case "set":
-          const setMembers = await kv.smembers(key)
-          console.log(`Retrieved set with ${setMembers?.length || 0} members for key ${key}`)
-          return setMembers
+          try {
+            const setMembers = await kv.smembers(key)
+            console.log(`Retrieved set with ${setMembers?.length || 0} members for key ${key}`)
+            return setMembers
+          } catch (setError) {
+            console.error(`Error retrieving set value for key ${key}:`, getErrorMessage(setError))
+            return null
+          }
 
         case "hash":
-          const hashData = await kv.hgetall(key)
-          console.log(`Retrieved hash with keys: ${Object.keys(hashData || {}).join(", ")} for key ${key}`)
-          return hashData
+          try {
+            const hashData = await kv.hgetall(key)
+            console.log(`Retrieved hash with keys: ${Object.keys(hashData || {}).join(", ")} for key ${key}`)
+            return hashData
+          } catch (hashError) {
+            console.error(`Error retrieving hash value for key ${key}:`, getErrorMessage(hashError))
+            // Try alternative approach for hash
+            try {
+              console.log(`Trying alternative hash retrieval for key ${key}`)
+              const keys = await kv.hkeys(key)
+              if (keys && keys.length > 0) {
+                const result: any = {}
+                for (const hashKey of keys) {
+                  try {
+                    const value = await kv.hget(key, hashKey)
+                    result[hashKey] = value
+                  } catch (hgetError) {
+                    console.warn(`Error getting hash field ${hashKey} for key ${key}:`, getErrorMessage(hgetError))
+                  }
+                }
+                return result
+              }
+            } catch (altHashError) {
+              console.error(`Alternative hash retrieval also failed for key ${key}:`, getErrorMessage(altHashError))
+            }
+            return null
+          }
 
         case "list":
-          const listData = await kv.lrange(key, 0, -1)
-          console.log(`Retrieved list with ${listData?.length || 0} items for key ${key}`)
-          return listData
+          try {
+            const listData = await kv.lrange(key, 0, -1)
+            console.log(`Retrieved list with ${listData?.length || 0} items for key ${key}`)
+            return listData
+          } catch (listError) {
+            console.error(`Error retrieving list value for key ${key}:`, getErrorMessage(listError))
+            return null
+          }
 
         case "zset":
-          const zsetData = await kv.zrange(key, 0, -1)
-          console.log(`Retrieved sorted set with ${zsetData?.length || 0} items for key ${key}`)
-          return zsetData
+          try {
+            const zsetData = await kv.zrange(key, 0, -1)
+            console.log(`Retrieved sorted set with ${zsetData?.length || 0} items for key ${key}`)
+            return zsetData
+          } catch (zsetError) {
+            console.error(`Error retrieving sorted set value for key ${key}:`, getErrorMessage(zsetError))
+            return null
+          }
 
         default:
           console.warn(`Unsupported Redis data type: ${keyType} for key ${key}`)
           return null
       }
     } catch (typeSpecificError) {
-      console.error(`Error retrieving ${keyType} value for key ${key}:`, getErrorMessage(typeSpecificError))
+      console.error(`Error in type-specific retrieval for key ${key}:`, getErrorMessage(typeSpecificError))
       return null
     }
   } catch (error) {

@@ -1,204 +1,18 @@
 "use client"
 
 import { CategoryLayout } from "@/components/category-layout"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState } from "react"
+import { useToast } from "@/components/ui/use-toast"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { useEffect, useRef } from "react"
+import { PhotoCarousel } from "@/components/photo-carousel"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { Phone, X } from "lucide-react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
-
-// Photo Carousel Component - displays 5 photos in landscape format
-interface PhotoCarouselProps {
-  photos: string[]
-  businessName: string
-}
-
-function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-
-  if (!photos || photos.length === 0) {
-    return null // Don't show anything if no photos
-  }
-
-  const photosPerView = 5
-  const maxIndex = Math.max(0, photos.length - photosPerView)
-
-  const nextPhotos = () => {
-    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
-  }
-
-  const prevPhotos = () => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0))
-  }
-
-  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
-
-  return (
-    <div className="hidden lg:block w-full">
-      <div className="relative group w-full">
-        <div className="flex gap-2 justify-center w-full">
-          {visiblePhotos.map((photo, index) => (
-            <div key={currentIndex + index} className="w-40 h-30 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-              <Image
-                src={photo || "/placeholder.svg"}
-                alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={160}
-                height={120}
-                className="w-full h-full object-cover"
-                sizes="160px"
-              />
-            </div>
-          ))}
-
-          {/* Fill empty slots if less than 5 photos visible */}
-          {visiblePhotos.length < photosPerView && (
-            <>
-              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  className="w-40 h-30 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
-                ></div>
-              ))}
-            </>
-          )}
-        </div>
-
-        {/* Navigation arrows - only show if there are more than 5 photos */}
-        {photos.length > photosPerView && (
-          <>
-            <button
-              onClick={prevPhotos}
-              disabled={currentIndex === 0}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={nextPhotos}
-              disabled={currentIndex >= maxIndex}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </>
-        )}
-
-        {/* Photo counter */}
-        {photos.length > photosPerView && (
-          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination dots - only show if there are more than 5 photos */}
-      {photos.length > photosPerView && (
-        <div className="flex justify-center mt-2 space-x-1">
-          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
-            const pageStartIndex = index * photosPerView
-            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
-            return (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(pageStartIndex)}
-                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
-              />
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Function to load business photos from Cloudflare using public URLs
-const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
-  try {
-    console.log(`Loading photos for business ${businessId}`)
-
-    // Fetch business media data from the updated API
-    const response = await fetch(`/api/businesses/${businessId}`)
-    if (!response.ok) {
-      console.error(`Failed to fetch business data: ${response.status} ${response.statusText}`)
-      return []
-    }
-
-    const businessData = await response.json()
-    console.log(`Business data for ${businessId}:`, businessData)
-
-    // Try multiple possible locations for photo data
-    let photoAlbum = null
-
-    // Check direct photoAlbum property
-    if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
-      photoAlbum = businessData.photoAlbum
-    }
-    // Check nested media.photoAlbum
-    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
-      photoAlbum = businessData.media.photoAlbum
-    }
-    // Check adDesign.photoAlbum
-    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
-      photoAlbum = businessData.adDesign.photoAlbum
-    }
-
-    if (!photoAlbum || !Array.isArray(photoAlbum)) {
-      console.log(`No photo album found for business ${businessId}`)
-      return []
-    }
-
-    console.log(`Found ${photoAlbum.length} photos in album for business ${businessId}`)
-
-    // Convert Cloudflare image IDs to public URLs
-    const photoUrls = photoAlbum
-      .map((photo: any, index: number) => {
-        // Handle different photo data structures
-        let imageId = null
-
-        if (typeof photo === "string") {
-          // If photo is just a string (image ID)
-          imageId = photo
-        } else if (photo && typeof photo === "object") {
-          // If photo is an object, try to extract the image ID
-          imageId = photo.imageId || photo.id || photo.cloudflareId || photo.url
-
-          // If it's already a full URL, return it as-is
-          if (typeof imageId === "string" && (imageId.startsWith("http") || imageId.startsWith("https"))) {
-            console.log(`Photo ${index} already has full URL: ${imageId}`)
-            return imageId
-          }
-        }
-
-        if (!imageId) {
-          console.warn(`No image ID found for photo ${index}:`, photo)
-          return null
-        }
-
-        // Generate public Cloudflare URL
-        try {
-          const publicUrl = getCloudflareImageUrl(imageId, "public")
-          console.log(`Generated URL for image ${imageId}: ${publicUrl}`)
-          return publicUrl
-        } catch (error) {
-          console.error(`Error generating URL for image ${imageId}:`, error)
-          return null
-        }
-      })
-      .filter(Boolean) // Remove null/undefined URLs
-
-    console.log(`Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
-    return photoUrls
-  } catch (error) {
-    console.error(`Error loading photos for business ${businessId}:`, error)
-    return []
-  }
-}
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { Phone, X, Loader2, MapPin } from "lucide-react"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -211,8 +25,11 @@ interface Business {
   serviceArea?: string[] // Changed from object to string array
   isNationwide?: boolean // Added separate isNationwide flag
   subcategories?: string[]
+  allSubcategories?: any[]
   adDesignData?: any
   photos?: string[] // Add this line
+  rating?: number
+  reviews?: number
 }
 
 // Helper function to extract string from subcategory (handles both string and object formats)
@@ -227,6 +44,7 @@ const getSubcategoryString = (subcategory: any): string => {
 }
 
 export default function MedicalPractitionersPage() {
+  const { toast } = useToast()
   const filterOptions = [
     { id: "medical1", label: "Chiropractors", value: "Chiropractors" },
     { id: "medical2", label: "Dentists", value: "Dentists" },
@@ -252,6 +70,17 @@ export default function MedicalPractitionersPage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allProviders, setAllProviders] = useState<any[]>([])
+  const [filteredProviders, setFilteredProviders] = useState<any[]>([])
+
+  // Photo state
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
+  // State for reviews dialog
+  const [selectedProvider, setSelectedProvider] = useState<any>(null)
+  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+
+  // State for business profile dialog
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -294,6 +123,27 @@ export default function MedicalPractitionersPage() {
     return matches
   }
 
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) {
+      return // Already loaded
+    }
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
+
   useEffect(() => {
     async function fetchProviders() {
       const currentFetchId = ++fetchIdRef.current
@@ -315,24 +165,6 @@ export default function MedicalPractitionersPage() {
           console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
           return
         }
-
-        // Load photos for each business using public Cloudflare URLs
-        const businessesWithPhotos = await Promise.all(
-          result.map(async (business: Business) => {
-            const photos = await loadBusinessPhotos(business.id)
-            return { ...business, photos }
-          }),
-        )
-
-        // Check if this is still the latest request after photo loading
-        if (currentFetchId !== fetchIdRef.current) {
-          console.log(
-            `[${new Date().toISOString()}] Ignoring stale response after photo loading for request #${currentFetchId}`,
-          )
-          return
-        }
-
-        result = businessesWithPhotos
 
         result.forEach((business) => {
           console.log(
@@ -360,15 +192,20 @@ export default function MedicalPractitionersPage() {
           const transformedProviders = result.map((business) => ({
             id: business.id,
             name: business.displayName || business.businessName,
+            displayName: business.displayName || business.businessName,
+            businessName: business.businessName,
             location:
               business.displayLocation ||
               `${business.displayCity || ""}, ${business.displayState || ""}`.trim() ||
               `Zip: ${business.zipCode}`,
-            rating: 0, // Changed from 4.5 to 0 - no demo rating
-            reviews: 0, // Changed from 12 to 0 - no demo reviews
+            displayLocation: business.displayLocation,
+            rating: business.rating || 0,
+            reviews: business.reviews || 0,
             services: business.subcategories || ["General Practice"],
+            allSubcategories: business.allSubcategories || business.subcategories || [],
             // Get phone from ad design data if available, otherwise use registration phone
             phone: business.adDesignData?.businessInfo?.phone || business.phone || "No phone provided",
+            displayPhone: business.adDesignData?.businessInfo?.phone || business.phone || "No phone provided",
             address: business.address,
             adDesignData: business.adDesignData,
             serviceArea: business.serviceArea,
@@ -380,14 +217,19 @@ export default function MedicalPractitionersPage() {
           console.log("Transformed providers with phone numbers:", transformedProviders)
           setProviders(transformedProviders)
           setAllProviders(transformedProviders)
+          setFilteredProviders(transformedProviders)
         } else {
           setProviders([])
+          setAllProviders([])
+          setFilteredProviders([])
         }
       } catch (err) {
         console.error("Error fetching medical practitioners:", err)
         if (currentFetchId === fetchIdRef.current) {
           setError("Failed to load providers")
           setProviders([])
+          setAllProviders([])
+          setFilteredProviders([])
         }
       } finally {
         if (currentFetchId === fetchIdRef.current) {
@@ -399,15 +241,16 @@ export default function MedicalPractitionersPage() {
     fetchProviders()
   }, [userZipCode])
 
-  // State for reviews dialog
-  const [selectedProvider, setSelectedProvider] = useState<any>(null)
-  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-
-  // State for business profile dialog
-  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-
   // Helper function to check if business has exact subcategory match
   const hasExactSubcategoryMatch = (provider: any, filterValue: string): boolean => {
+    // Check allSubcategories array
+    if (provider.allSubcategories && Array.isArray(provider.allSubcategories)) {
+      return provider.allSubcategories.some((sub) => {
+        const subString = getSubcategoryString(sub)
+        return subString === filterValue
+      })
+    }
+
     // Check services array (which comes from subcategories)
     if (provider.services && Array.isArray(provider.services)) {
       return provider.services.some((service) => getSubcategoryString(service) === filterValue)
@@ -426,8 +269,12 @@ export default function MedicalPractitionersPage() {
     console.log("All providers:", allProviders)
 
     if (selectedFilters.length === 0) {
-      setProviders(allProviders)
+      setFilteredProviders(allProviders)
       setAppliedFilters([])
+      toast({
+        title: "Filters cleared",
+        description: `Showing all ${allProviders.length} medical practitioners.`,
+      })
       return
     }
 
@@ -439,14 +286,24 @@ export default function MedicalPractitionersPage() {
     })
 
     console.log("Filtered results:", filtered)
-    setProviders(filtered)
+    setFilteredProviders(filtered)
     setAppliedFilters([...selectedFilters])
+
+    toast({
+      title: "Filters applied",
+      description: `Found ${filtered.length} medical practitioners matching your criteria.`,
+    })
   }
 
   const clearFilters = () => {
     setSelectedFilters([])
     setAppliedFilters([])
-    setProviders(allProviders)
+    setFilteredProviders(allProviders)
+
+    toast({
+      title: "Filters cleared",
+      description: `Showing all ${allProviders.length} medical practitioners.`,
+    })
   }
 
   // Handle opening reviews dialog
@@ -562,7 +419,7 @@ export default function MedicalPractitionersPage() {
             <div>
               <p className="text-sm font-medium text-blue-800">Active filters: {appliedFilters.join(", ")}</p>
               <p className="text-sm text-blue-700">
-                Showing {providers.length} of {allProviders.length} medical practitioners
+                Showing {filteredProviders.length} of {allProviders.length} medical practitioners
               </p>
             </div>
           </div>
@@ -606,149 +463,131 @@ export default function MedicalPractitionersPage() {
         </div>
       )}
 
-      <div className="space-y-6">
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading medical practitioners...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-8">
-            <p className="text-red-600">{error}</p>
-          </div>
-        ) : providers.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="max-w-md mx-auto">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {userZipCode ? `No Medical Practitioners Found in ${userZipCode}` : "No Medical Practitioners Yet"}
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {userZipCode
-                  ? `No medical practitioners found serving ZIP code ${userZipCode}. Try clearing the filter to see all providers.`
-                  : "Be the first healthcare professional to join our platform and connect with patients in your area."}
-              </p>
-              <Button className="bg-green-600 hover:bg-green-700">Register Your Practice</Button>
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <p>Loading medical practitioners...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-8">
+          <p className="text-red-600">{error}</p>
+        </div>
+      ) : filteredProviders.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="max-w-md mx-auto">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
             </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {userZipCode ? `No Medical Practitioners Found in ${userZipCode}` : "No Medical Practitioners Yet"}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {userZipCode
+                ? `No medical practitioners found serving ZIP code ${userZipCode}. Try clearing the filter to see all providers.`
+                : "Be the first healthcare professional to join our platform and connect with patients in your area."}
+            </p>
+            <Button className="bg-green-600 hover:bg-green-700">Register Your Practice</Button>
           </div>
-        ) : (
-          providers.map((provider) => (
-            <div key={provider.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-              <div className="flex flex-col space-y-4">
-                {/* Business Name and Description */}
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{provider.name}</h3>
-                  {provider.businessDescription && (
-                    <p className="text-gray-600 text-sm leading-relaxed">{provider.businessDescription}</p>
-                  )}
-                </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {filteredProviders.map((provider) => (
+            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold">{provider.name}</h3>
 
-                {/* Main content area with contact info, photos, and buttons */}
-                <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                  {/* Left side - Contact and Location Info - Made smaller */}
-                  <div className="lg:w-64 space-y-2 flex-shrink-0">
-                    {/* Phone */}
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">{formatPhoneNumber(provider.phone)}</span>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {provider.displayLocation && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span>{provider.displayLocation}</span>
+                        </div>
+                      )}
+
+                      {provider.displayPhone && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          <a href={`tel:${provider.displayPhone}`} className="hover:text-primary">
+                            {formatPhoneNumber(provider.displayPhone)}
+                          </a>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Location */}
-                    <div className="flex items-center gap-2">
-                      <svg
-                        className="h-4 w-4 text-gray-500 flex-shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                      <span className="text-sm text-gray-700">{provider.location}</span>
-                    </div>
-
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div className="text-xs text-green-600 mt-1">
-                        {provider.isNationwide ? (
-                          <span>✓ Serves nationwide</span>
-                        ) : provider.serviceArea?.includes(userZipCode) ? (
-                          <span>✓ Serves {userZipCode} and surrounding areas</span>
-                        ) : provider.zipCode === userZipCode ? (
-                          <span>✓ Located in {userZipCode}</span>
-                        ) : null}
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
+                          provider.allSubcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : provider.services && provider.services.length > 0 ? (
+                          provider.services.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            General Practice
+                          </span>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
 
-                  {/* Middle - Photo Carousel (desktop only) - Now has more space */}
-                  <div className="flex-1 flex justify-center">
-                    <PhotoCarousel photos={provider.photos || []} businessName={provider.name} />
-                  </div>
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={provider.id}
+                        photos={businessPhotos[provider.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
+                    </div>
 
-                  {/* Right side - Action Buttons */}
-                  <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenReviews(provider)}
-                      className="text-sm min-w-[100px]"
-                    >
-                      Reviews
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleOpenProfile(provider)}
-                      className="text-sm min-w-[100px]"
-                    >
-                      View Profile
-                    </Button>
+                    {/* Action Buttons */}
+                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
+                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(provider)}>
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none lg:w-full bg-transparent"
+                        onClick={() => handleOpenProfile(provider)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
-
-                {/* Services/Specialties */}
-                {provider.services && provider.services.length > 0 && (
-                  <div className="w-full">
-                    <div className="lg:w-64">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
-                    </div>
-                    <div className="flex flex-wrap gap-2 w-full">
-                      {provider.services.map((service, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {getSubcategoryString(service)}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Reviews Dialog */}
       <ReviewsDialog

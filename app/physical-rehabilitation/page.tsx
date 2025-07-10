@@ -438,32 +438,13 @@ export default function PhysicalRehabilitationPage() {
                           </a>
                         </div>
                       )}
-
-                      {/* Service Area Indicator */}
-                      {userZipCode && (provider.serviceArea || provider.isNationwide) && (
-                        <div>
-                          {provider.isNationwide ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              Serves nationwide
-                            </span>
-                          ) : provider.serviceArea && provider.serviceArea.includes(userZipCode) ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Serves {userZipCode}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              Primary: {provider.zipCode}
-                            </span>
-                          )}
-                        </div>
-                      )}
                     </div>
 
                     {/* Services */}
                     {provider.services && provider.services.length > 0 && (
                       <div>
                         <div className="flex flex-wrap gap-2">
-                          {provider.services.slice(0, 4).map((service, idx) => (
+                          {provider.services.map((service, idx) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
@@ -471,11 +452,6 @@ export default function PhysicalRehabilitationPage() {
                               {getSubcategoryString(service)}
                             </span>
                           ))}
-                          {provider.services.length > 4 && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                              +{provider.services.length - 4} more
-                            </span>
-                          )}
                         </div>
                       </div>
                     )}
@@ -498,7 +474,7 @@ export default function PhysicalRehabilitationPage() {
                     {/* Action Buttons */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
                       <Button className="flex-1 lg:flex-none w-full" onClick={() => handleOpenReviews(provider)}>
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"

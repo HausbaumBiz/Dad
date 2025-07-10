@@ -463,32 +463,13 @@ export default function ArtsEntertainmentPage() {
                         </a>
                       </div>
                     )}
-
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div>
-                        {business.isNationwide ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Serves nationwide
-                          </span>
-                        ) : business.serviceArea && business.serviceArea.includes(userZipCode) ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Serves {userZipCode}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            Primary: {business.zipCode}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {/* Services */}
                   {business.subcategories && business.subcategories.length > 0 && (
                     <div>
                       <div className="flex flex-wrap gap-2">
-                        {business.subcategories.slice(0, 4).map((service: any, idx: number) => (
+                        {business.subcategories.map((service: any, idx: number) => (
                           <span
                             key={idx}
                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
@@ -496,11 +477,6 @@ export default function ArtsEntertainmentPage() {
                             {getSubcategoryString(service)}
                           </span>
                         ))}
-                        {business.subcategories.length > 4 && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                            +{business.subcategories.length - 4} more
-                          </span>
-                        )}
                       </div>
                     </div>
                   )}
@@ -523,7 +499,7 @@ export default function ArtsEntertainmentPage() {
                   {/* Action Buttons */}
                   <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
                     <Button className="flex-1 lg:flex-none min-w-[120px]" onClick={() => handleOpenReviews(business)}>
-                      Reviews
+                      Ratings
                     </Button>
                     <Button
                       variant="outline"

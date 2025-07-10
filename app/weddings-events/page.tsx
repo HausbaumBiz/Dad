@@ -413,25 +413,12 @@ export default function WeddingsEventsPage() {
                           </a>
                         </div>
                       )}
-
-                      {/* Service Area Indicator */}
-                      {userZipCode && (
-                        <div className="text-xs text-green-600">
-                          {provider.isNationwide ? (
-                            <span>✓ Serves nationwide</span>
-                          ) : provider.serviceArea?.includes(userZipCode) ? (
-                            <span>✓ Serves {userZipCode} area</span>
-                          ) : provider.zipCode === userZipCode ? (
-                            <span>✓ Located in {userZipCode}</span>
-                          ) : null}
-                        </div>
-                      )}
                     </div>
 
                     {provider.subcategories && provider.subcategories.length > 0 && (
                       <div className="mt-2">
                         <div className="flex flex-wrap gap-1">
-                          {provider.subcategories.slice(0, 4).map((subcategory: any, idx: number) => (
+                          {provider.subcategories.map((subcategory: any, idx: number) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800"
@@ -439,11 +426,6 @@ export default function WeddingsEventsPage() {
                               {getSubcategoryString(subcategory)}
                             </span>
                           ))}
-                          {provider.subcategories.length > 4 && (
-                            <span className="text-xs text-gray-500 px-2 py-0.5">
-                              +{provider.subcategories.length - 4} more
-                            </span>
-                          )}
                         </div>
                       </div>
                     )}
@@ -465,7 +447,7 @@ export default function WeddingsEventsPage() {
                     {/* Action Buttons - fixed width on the right */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32 flex-shrink-0">
                       <Button className="flex-1 lg:w-full" onClick={() => handleOpenReviews(provider)}>
-                        Reviews
+                        Ratings
                       </Button>
                       <Button
                         variant="outline"
