@@ -770,12 +770,12 @@ export default function PhotoAlbumPage() {
   function renderGridView() {
     return (
       <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="photos" direction="horizontal">
+        <Droppable droppableId="photos" direction="vertical">
           {(provided) => (
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 justify-items-center"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
             >
               {filteredPhotos.map((photo, index) => (
                 <Draggable key={photo.id} draggableId={photo.id} index={index} isDragDisabled={!isEditMode}>
@@ -783,14 +783,18 @@ export default function PhotoAlbumPage() {
                     <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
-                      className={`relative group ${snapshot.isDragging ? "z-50" : ""}`}
+                      className={`relative group w-full ${snapshot.isDragging ? "z-50" : ""}`}
+                      style={{
+                        ...provided.draggableProps.style,
+                        position: snapshot.isDragging ? "fixed" : "relative",
+                      }}
                     >
-                      <div className="flex flex-col">
-                        <div className="relative">
+                      <div className="flex flex-col w-full">
+                        <div className="relative w-full aspect-square">
                           {isEditMode && (
                             <div
                               {...provided.dragHandleProps}
-                              className="absolute top-1 left-1 bg-black bg-opacity-50 rounded-full p-1 text-white z-10"
+                              className="absolute top-2 left-2 bg-black bg-opacity-70 rounded-full p-1 text-white z-20 cursor-grab active:cursor-grabbing"
                             >
                               <GripVertical className="h-4 w-4" />
                             </div>
@@ -798,23 +802,23 @@ export default function PhotoAlbumPage() {
                           <img
                             src={photo.url || "/placeholder.svg"}
                             alt={photo.filename}
-                            className={`w-[220px] h-[220px] object-cover rounded-md ${isEditMode ? "cursor-move" : "cursor-pointer"}`}
+                            className={`w-full h-full object-cover rounded-md ${isEditMode ? "cursor-move" : "cursor-pointer"}`}
                             onClick={isEditMode ? undefined : () => openPhotoDetail(photo)}
                           />
                           {!isEditMode && (
                             <button
                               onClick={() => removePhoto(photo.id)}
-                              className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="absolute top-2 right-2 bg-red-500 bg-opacity-80 hover:bg-opacity-100 rounded-full p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity z-10"
                             >
                               <X className="h-4 w-4" />
                             </button>
                           )}
                         </div>
 
-                        <div className="text-xs mt-1">
-                          {photo.label && <p className="font-medium text-sm truncate">{photo.label}</p>}
-                          <p className="truncate">{photo.filename}</p>
-                          <p className="text-gray-500">
+                        <div className="text-xs mt-2 px-1">
+                          {photo.label && <p className="font-medium text-sm truncate mb-1">{photo.label}</p>}
+                          <p className="truncate text-gray-700">{photo.filename}</p>
+                          <p className="text-gray-500 mt-1">
                             {formatFileSize(photo.size)}
                             {photo.originalSize && photo.originalSize > photo.size && (
                               <span className="text-green-600 ml-1">
