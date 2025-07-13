@@ -63,10 +63,10 @@ export function PhotoCarousel({
 
   if (isMobile && showMultiple) {
     // On mobile, make photos smaller to fit 2 properly with gap
-    containerWidthClass = "w-32"
-    imageHeightClass = "h-24"
-    imageWidth = 128
-    imageHeight = 96
+    containerWidthClass = "w-36"
+    imageHeightClass = "h-28"
+    imageWidth = 144
+    imageHeight = 112
   } else if (size === "medium") {
     containerWidthClass = "w-[220px]"
     imageHeightClass = "h-[220px]"
@@ -95,28 +95,24 @@ export function PhotoCarousel({
 
     return (
       <div className={`relative ${className}`}>
-        <div
-          ref={carouselRef}
-          className={`flex gap-2 ${
-            isMobile
-              ? "overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-hide touch-pan-x"
-              : "overflow-hidden"
-          }`}
-          style={
-            isMobile
-              ? {
-                  scrollSnapType: "x mandatory",
-                  WebkitOverflowScrolling: "touch",
-                  scrollbarWidth: "none",
-                  msOverflowStyle: "none",
-                }
-              : {}
-          }
-        >
-          {isMobile ? (
-            // Mobile: Show all photos in scrollable container
-            photos.map((photo, index) => (
-              <div key={index} className={`flex-shrink-0 snap-start ${containerWidthClass} ${imageHeightClass}`}>
+        {isMobile ? (
+          // Mobile: Horizontal scrolling container
+          <div
+            ref={carouselRef}
+            className="flex gap-2 overflow-x-auto pb-2"
+            style={{
+              scrollSnapType: "x mandatory",
+              WebkitOverflowScrolling: "touch",
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+            }}
+          >
+            {photos.map((photo, index) => (
+              <div
+                key={index}
+                className={`flex-shrink-0 ${containerWidthClass} ${imageHeightClass}`}
+                style={{ scrollSnapAlign: "start" }}
+              >
                 <LazyImage
                   src={photo}
                   alt={`Business photo ${index + 1}`}
@@ -126,37 +122,37 @@ export function PhotoCarousel({
                   height={imageHeight}
                 />
               </div>
-            ))
-          ) : (
-            // Desktop: Show paginated photos
-            <>
-              {photos.slice(currentIndex, currentIndex + currentPhotosPerView).map((photo, index) => (
-                <div key={currentIndex + index} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
-                  <LazyImage
-                    src={photo}
-                    alt={`Business photo ${currentIndex + index + 1}`}
-                    className="w-full h-full object-cover rounded-lg"
-                    placeholderSrc="/placeholder.svg"
-                    width={imageWidth}
-                    height={imageHeight}
-                  />
+            ))}
+          </div>
+        ) : (
+          // Desktop: Show paginated photos
+          <div className="flex gap-2 overflow-hidden">
+            {photos.slice(currentIndex, currentIndex + currentPhotosPerView).map((photo, index) => (
+              <div key={currentIndex + index} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
+                <LazyImage
+                  src={photo}
+                  alt={`Business photo ${currentIndex + index + 1}`}
+                  className="w-full h-full object-cover rounded-lg"
+                  placeholderSrc="/placeholder.svg"
+                  width={imageWidth}
+                  height={imageHeight}
+                />
+              </div>
+            ))}
+
+            {/* Fill remaining slots if we have fewer photos than photosPerView */}
+            {photos.slice(currentIndex, currentIndex + currentPhotosPerView).length < currentPhotosPerView &&
+              Array.from({
+                length: currentPhotosPerView - photos.slice(currentIndex, currentIndex + currentPhotosPerView).length,
+              }).map((_, index) => (
+                <div key={`empty-${index}`} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
+                  <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+                    <Camera className="h-6 w-6 text-gray-400" />
+                  </div>
                 </div>
               ))}
-
-              {/* Fill remaining slots if we have fewer photos than photosPerView */}
-              {photos.slice(currentIndex, currentIndex + currentPhotosPerView).length < currentPhotosPerView &&
-                Array.from({
-                  length: currentPhotosPerView - photos.slice(currentIndex, currentIndex + currentPhotosPerView).length,
-                }).map((_, index) => (
-                  <div key={`empty-${index}`} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
-                    <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Camera className="h-6 w-6 text-gray-400" />
-                    </div>
-                  </div>
-                ))}
-            </>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Navigation buttons - only show on desktop when needed */}
         {canNavigate && !isMobile && (

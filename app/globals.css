@@ -63,11 +63,32 @@
   display: none !important;
 }
 
-/* Hide scrollbar for photo carousel */
-.scrollbar-hide {
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
-  scrollbar-width: none; /* Firefox */
+/* Custom scrollbar styles for photo carousel */
+.overflow-x-auto::-webkit-scrollbar {
+  height: 4px;
 }
-.scrollbar-hide::-webkit-scrollbar {
-  display: none; /* Safari and Chrome */
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Hide scrollbar on mobile for cleaner look */
+@media (max-width: 768px) {
+  .overflow-x-auto::-webkit-scrollbar {
+    display: none;
+  }
+
+  .overflow-x-auto {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
