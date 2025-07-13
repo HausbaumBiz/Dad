@@ -55,19 +55,12 @@ export function PhotoCarousel({
     }
   }
 
-  // Mobile-specific sizing for proper fit
   let containerWidthClass = "w-40"
   let imageHeightClass = "h-30"
   let imageWidth = 160
   let imageHeight = 120
 
-  if (isMobile && showMultiple) {
-    // On mobile, make photos smaller to fit 2 properly with gap
-    containerWidthClass = "w-36"
-    imageHeightClass = "h-28"
-    imageWidth = 144
-    imageHeight = 112
-  } else if (size === "medium") {
+  if (size === "medium") {
     containerWidthClass = "w-[220px]"
     imageHeightClass = "h-[220px]"
     imageWidth = 220
@@ -93,69 +86,87 @@ export function PhotoCarousel({
   if (showMultiple) {
     const canNavigate = photos.length > currentPhotosPerView
 
-    return (
-      <div className={`relative ${className}`}>
-        {isMobile ? (
-          // Mobile: Horizontal scrolling container
+    if (isMobile) {
+      // Mobile: Horizontal scrolling with native behavior
+      return (
+        <div className={`relative ${className}`}>
           <div
             ref={carouselRef}
-            className="flex gap-2 overflow-x-auto pb-2"
+            className="flex gap-2 overflow-x-scroll"
             style={{
-              scrollSnapType: "x mandatory",
-              WebkitOverflowScrolling: "touch",
               scrollbarWidth: "none",
               msOverflowStyle: "none",
+              WebkitOverflowScrolling: "touch",
+              touchAction: "pan-x",
+              overscrollBehaviorX: "contain",
+            }}
+            onTouchStart={(e) => {
+              // Prevent parent scroll interference
+              e.stopPropagation()
+            }}
+            onTouchMove={(e) => {
+              // Prevent parent scroll interference
+              e.stopPropagation()
             }}
           >
             {photos.map((photo, index) => (
               <div
                 key={index}
-                className={`flex-shrink-0 ${containerWidthClass} ${imageHeightClass}`}
-                style={{ scrollSnapAlign: "start" }}
+                className="flex-shrink-0"
+                style={{
+                  width: "130px",
+                  height: "100px",
+                }}
               >
                 <LazyImage
                   src={photo}
                   alt={`Business photo ${index + 1}`}
                   className="w-full h-full object-cover rounded-lg"
                   placeholderSrc="/placeholder.svg"
-                  width={imageWidth}
-                  height={imageHeight}
+                  width={130}
+                  height={100}
                 />
               </div>
             ))}
           </div>
-        ) : (
-          // Desktop: Show paginated photos
-          <div className="flex gap-2 overflow-hidden">
-            {photos.slice(currentIndex, currentIndex + currentPhotosPerView).map((photo, index) => (
-              <div key={currentIndex + index} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
-                <LazyImage
-                  src={photo}
-                  alt={`Business photo ${currentIndex + index + 1}`}
-                  className="w-full h-full object-cover rounded-lg"
-                  placeholderSrc="/placeholder.svg"
-                  width={imageWidth}
-                  height={imageHeight}
-                />
-              </div>
-            ))}
 
-            {/* Fill remaining slots if we have fewer photos than photosPerView */}
-            {photos.slice(currentIndex, currentIndex + currentPhotosPerView).length < currentPhotosPerView &&
-              Array.from({
-                length: currentPhotosPerView - photos.slice(currentIndex, currentIndex + currentPhotosPerView).length,
-              }).map((_, index) => (
-                <div key={`empty-${index}`} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
-                  <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Camera className="h-6 w-6 text-gray-400" />
-                  </div>
+          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+            {photos.length} photos
+          </div>
+        </div>
+      )
+    }
+
+    // Desktop: Original pagination behavior (unchanged)
+    return (
+      <div className={`relative ${className}`}>
+        <div className="flex gap-2 overflow-hidden">
+          {photos.slice(currentIndex, currentIndex + currentPhotosPerView).map((photo, index) => (
+            <div key={currentIndex + index} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
+              <LazyImage
+                src={photo}
+                alt={`Business photo ${currentIndex + index + 1}`}
+                className="w-full h-full object-cover rounded-lg"
+                placeholderSrc="/placeholder.svg"
+                width={imageWidth}
+                height={imageHeight}
+              />
+            </div>
+          ))}
+
+          {photos.slice(currentIndex, currentIndex + currentPhotosPerView).length < currentPhotosPerView &&
+            Array.from({
+              length: currentPhotosPerView - photos.slice(currentIndex, currentIndex + currentPhotosPerView).length,
+            }).map((_, index) => (
+              <div key={`empty-${index}`} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
+                <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+                  <Camera className="h-6 w-6 text-gray-400" />
                 </div>
-              ))}
-          </div>
-        )}
+              </div>
+            ))}
+        </div>
 
-        {/* Navigation buttons - only show on desktop when needed */}
-        {canNavigate && !isMobile && (
+        {canNavigate && (
           <>
             <Button
               variant="ghost"
@@ -176,17 +187,14 @@ export function PhotoCarousel({
           </>
         )}
 
-        {/* Photo counter */}
         <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-          {isMobile
-            ? `${photos.length} photos`
-            : `${Math.min(currentIndex + currentPhotosPerView, photos.length)} of ${photos.length}`}
+          {Math.min(currentIndex + currentPhotosPerView, photos.length)} of {photos.length}
         </div>
       </div>
     )
   }
 
-  // Single photo mode (original functionality)
+  // Single photo mode (original functionality - unchanged)
   return (
     <div className={`relative bg-gray-100 rounded-lg overflow-hidden ${className}`}>
       <LazyImage
