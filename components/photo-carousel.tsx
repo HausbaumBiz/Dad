@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { ChevronLeft, ChevronRight, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LazyImage } from "@/components/lazy-image"
@@ -28,6 +28,7 @@ export function PhotoCarousel({
   const [currentIndex, setCurrentIndex] = useState(0)
   const [hasLoadedPhotos, setHasLoadedPhotos] = useState(false)
   const isMobile = useMobile()
+  const carouselRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!hasLoadedPhotos) {
@@ -88,9 +89,16 @@ export function PhotoCarousel({
 
     return (
       <div className={`relative ${className}`}>
-        <div className="flex gap-2 overflow-hidden">
+        <div
+          ref={carouselRef}
+          className="flex gap-2 overflow-x-auto scroll-smooth snap-x snap-mandatory"
+          style={{ scrollSnapType: "x mandatory", overflowScrolling: "touch" }}
+        >
           {visiblePhotos.map((photo, index) => (
-            <div key={currentIndex + index} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
+            <div
+              key={currentIndex + index}
+              className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass} snap-start`}
+            >
               <LazyImage
                 src={photo}
                 alt={`Business photo ${currentIndex + index + 1}`}
@@ -105,7 +113,10 @@ export function PhotoCarousel({
           {/* Fill remaining slots if we have fewer photos than photosPerView */}
           {visiblePhotos.length < currentPhotosPerView &&
             Array.from({ length: currentPhotosPerView - visiblePhotos.length }).map((_, index) => (
-              <div key={`empty-${index}`} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
+              <div
+                key={`empty-${index}`}
+                className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass} snap-start`}
+              >
                 <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
                   <Camera className="h-6 w-6 text-gray-400" />
                 </div>

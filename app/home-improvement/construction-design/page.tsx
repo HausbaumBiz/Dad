@@ -422,7 +422,7 @@ export default function ConstructionDesignPage() {
                   </div>
 
                   {/* Photo Carousel and Buttons Row */}
-                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                  <div className="flex flex-col lg:flex-row gap-4">
                     {/* Photo Carousel */}
                     <div className="flex-1">
                       <PhotoCarousel
@@ -431,18 +431,17 @@ export default function ConstructionDesignPage() {
                         onLoadPhotos={() => loadPhotosForBusiness(business.id)}
                         showMultiple={true}
                         photosPerView={5}
-                        className="w-full"
                       />
                     </div>
 
                     {/* Action Buttons */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
-                      <Button className="flex-1 lg:w-full" onClick={() => handleOpenReviews(business)}>
+                      <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
                         Ratings
                       </Button>
                       <Button
                         variant="outline"
-                        className="flex-1 lg:w-full bg-transparent"
+                        className="flex-1 lg:flex-none bg-transparent"
                         onClick={() => handleViewProfile(business)}
                       >
                         View Profile
