@@ -13,7 +13,7 @@ interface PhotoCarouselProps {
   className?: string
   showMultiple?: boolean
   photosPerView?: number
-  size?: "small" | "medium" // new prop to control size
+  size?: "small" | "medium"
 }
 
 export function PhotoCarousel({
@@ -23,7 +23,7 @@ export function PhotoCarousel({
   className = "",
   showMultiple = false,
   photosPerView = 1,
-  size = "small", // default to small size
+  size = "small",
 }: PhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [hasLoadedPhotos, setHasLoadedPhotos] = useState(false)
@@ -55,12 +55,19 @@ export function PhotoCarousel({
     }
   }
 
-  let containerWidthClass = "w-40" // Default width
-  let imageHeightClass = "h-30" // Default height
-  let imageWidth = 160 // Default width
-  let imageHeight = 120 // Default height
+  // Mobile-specific sizing for proper fit
+  let containerWidthClass = "w-40"
+  let imageHeightClass = "h-30"
+  let imageWidth = 160
+  let imageHeight = 120
 
-  if (size === "medium") {
+  if (isMobile && showMultiple) {
+    // On mobile, make photos smaller to fit 2 properly with gap
+    containerWidthClass = "w-32"
+    imageHeightClass = "h-24"
+    imageWidth = 128
+    imageHeight = 96
+  } else if (size === "medium") {
     containerWidthClass = "w-[220px]"
     imageHeightClass = "h-[220px]"
     imageWidth = 220
@@ -84,47 +91,75 @@ export function PhotoCarousel({
   }
 
   if (showMultiple) {
-    const visiblePhotos = photos.slice(currentIndex, currentIndex + currentPhotosPerView)
     const canNavigate = photos.length > currentPhotosPerView
 
     return (
       <div className={`relative ${className}`}>
         <div
           ref={carouselRef}
-          className="flex gap-2 overflow-x-auto scroll-smooth snap-x snap-mandatory"
-          style={{ scrollSnapType: "x mandatory", overflowScrolling: "touch" }}
+          className={`flex gap-2 ${
+            isMobile
+              ? "overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-hide touch-pan-x"
+              : "overflow-hidden"
+          }`}
+          style={
+            isMobile
+              ? {
+                  scrollSnapType: "x mandatory",
+                  WebkitOverflowScrolling: "touch",
+                  scrollbarWidth: "none",
+                  msOverflowStyle: "none",
+                }
+              : {}
+          }
         >
-          {visiblePhotos.map((photo, index) => (
-            <div
-              key={currentIndex + index}
-              className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass} snap-start`}
-            >
-              <LazyImage
-                src={photo}
-                alt={`Business photo ${currentIndex + index + 1}`}
-                className="w-full h-full object-cover rounded-lg"
-                placeholderSrc="/placeholder.svg"
-                width={imageWidth}
-                height={imageHeight}
-              />
-            </div>
-          ))}
-
-          {/* Fill remaining slots if we have fewer photos than photosPerView */}
-          {visiblePhotos.length < currentPhotosPerView &&
-            Array.from({ length: currentPhotosPerView - visiblePhotos.length }).map((_, index) => (
-              <div
-                key={`empty-${index}`}
-                className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass} snap-start`}
-              >
-                <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Camera className="h-6 w-6 text-gray-400" />
-                </div>
+          {isMobile ? (
+            // Mobile: Show all photos in scrollable container
+            photos.map((photo, index) => (
+              <div key={index} className={`flex-shrink-0 snap-start ${containerWidthClass} ${imageHeightClass}`}>
+                <LazyImage
+                  src={photo}
+                  alt={`Business photo ${index + 1}`}
+                  className="w-full h-full object-cover rounded-lg"
+                  placeholderSrc="/placeholder.svg"
+                  width={imageWidth}
+                  height={imageHeight}
+                />
               </div>
-            ))}
+            ))
+          ) : (
+            // Desktop: Show paginated photos
+            <>
+              {photos.slice(currentIndex, currentIndex + currentPhotosPerView).map((photo, index) => (
+                <div key={currentIndex + index} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
+                  <LazyImage
+                    src={photo}
+                    alt={`Business photo ${currentIndex + index + 1}`}
+                    className="w-full h-full object-cover rounded-lg"
+                    placeholderSrc="/placeholder.svg"
+                    width={imageWidth}
+                    height={imageHeight}
+                  />
+                </div>
+              ))}
+
+              {/* Fill remaining slots if we have fewer photos than photosPerView */}
+              {photos.slice(currentIndex, currentIndex + currentPhotosPerView).length < currentPhotosPerView &&
+                Array.from({
+                  length: currentPhotosPerView - photos.slice(currentIndex, currentIndex + currentPhotosPerView).length,
+                }).map((_, index) => (
+                  <div key={`empty-${index}`} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
+                    <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+                      <Camera className="h-6 w-6 text-gray-400" />
+                    </div>
+                  </div>
+                ))}
+            </>
+          )}
         </div>
 
-        {canNavigate && (
+        {/* Navigation buttons - only show on desktop when needed */}
+        {canNavigate && !isMobile && (
           <>
             <Button
               variant="ghost"
@@ -142,12 +177,15 @@ export function PhotoCarousel({
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-
-            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-              {Math.min(currentIndex + currentPhotosPerView, photos.length)} of {photos.length}
-            </div>
           </>
         )}
+
+        {/* Photo counter */}
+        <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+          {isMobile
+            ? `${photos.length} photos`
+            : `${Math.min(currentIndex + currentPhotosPerView, photos.length)} of ${photos.length}`}
+        </div>
       </div>
     )
   }
