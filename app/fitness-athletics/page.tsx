@@ -84,15 +84,15 @@ const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessNam
       {/* Photos grid */}
       <div className="flex gap-2">
         {displayPhotos.map((photo, index) => (
-          <div key={index} className="w-48 h-36 flex-shrink-0">
+          <div key={index} className="w-[220px] h-[220px] flex-shrink-0">
             {photo ? (
               <Image
                 src={photo || "/placeholder.svg"}
                 alt={`${businessName} photo ${currentIndex * photosPerPage + index + 1}`}
-                width={192}
-                height={144}
+                width={220}
+                height={220}
                 className="w-full h-full object-cover rounded-lg"
-                sizes="192px"
+                sizes="220px"
                 onError={(e) => {
                   console.error(`Failed to load image: ${photo}`)
                   e.currentTarget.src = "/placeholder.svg"
@@ -821,7 +821,7 @@ export default function FitnessAthleticsPage() {
                         businessName={provider.displayName || provider.name}
                       />
                     ) : (
-                      <div className="flex items-center justify-center h-36 bg-gray-100 rounded-lg">
+                      <div className="flex items-center justify-center h-[220px] bg-gray-100 rounded-lg">
                         <div className="text-center">
                           <Camera className="w-8 w-8 mx-auto text-gray-400 mb-2" />
                           <span className="text-gray-500 text-sm">No photos available</span>

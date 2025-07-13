@@ -78,11 +78,21 @@ export async function uploadPhoto(formData: FormData) {
     // Convert Cloudflare image to our MediaItem format
     const newPhoto = cloudflareImageToMediaItem(result.result)
 
+    // Check if this is an award photo (has "award" tag)
+    const isAwardPhoto = tags && JSON.parse(tags).includes("award")
+
     // Get existing media data
     const existingMedia = await getBusinessMedia(businessId)
 
-    // Add the new photo to the album
-    const updatedPhotoAlbum = [...(existingMedia?.photoAlbum || []), newPhoto]
+    // Add the new photo to the album - awards go first
+    let updatedPhotoAlbum
+    if (isAwardPhoto) {
+      // Add award photos at the beginning
+      updatedPhotoAlbum = [newPhoto, ...(existingMedia?.photoAlbum || [])]
+    } else {
+      // Add regular photos at the end
+      updatedPhotoAlbum = [...(existingMedia?.photoAlbum || []), newPhoto]
+    }
 
     // Store in Redis
     await kv.hset(`business:${businessId}:media`, {

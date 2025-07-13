@@ -8,30 +8,6 @@ export default function AwardsExplainedPage() {
   // Array of award data for easy maintenance
   const awards = [
     {
-      id: 1,
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/5-XXbasTPRdhijVULbzWLdhhO5VXLBIl.png",
-      title: "Five 5-Star Reviews",
-      description: "Five 5-Star reviews on all 6 questions.",
-    },
-    {
-      id: 2,
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/10-mCfMVYva2OJFWDVunu4j7xQxDPLI30.png",
-      title: "Ten 5-Star Reviews",
-      description: "Ten 5-Star reviews on all 6 questions.",
-    },
-    {
-      id: 3,
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/25-4-tOMvN86hcimeoIQC4tpVGuo2nqtoJP.png",
-      title: "Twenty-five 5-Star Reviews",
-      description: "Twenty-five 5-Star reviews on all 6 questions.",
-    },
-    {
-      id: 4,
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/50-2-tgvmD4HzJ11m4h3EmJczCHMAyXQKIt.png",
-      title: "Fifty 5-Star Reviews",
-      description: "Fifty 5-Star reviews on all 6 questions.",
-    },
-    {
       id: 5,
       image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/quality-QjhKw0vxK2AcjsXlQ5zH9bUet8u1Fu.png",
       title: "Quality Work",
@@ -43,12 +19,6 @@ export default function AwardsExplainedPage() {
       title: "On Budget",
       description:
         "Five 5-Star Reviews for the question: Was the final cost reflective of the quoted cost or were added charges reasonable and explained?",
-    },
-    {
-      id: 7,
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/Kindness-HJQxl9RBay08M467uuvppCrPPYUww5.png",
-      title: "Professional and Courteous",
-      description: "Five 5-Star Reviews for the question: Was your hire professional and courteous?",
     },
     {
       id: 8,

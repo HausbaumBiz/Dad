@@ -1,129 +1,164 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { CategoryLayout } from "@/components/category-layout"
+import { Suspense } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Toaster } from "@/components/ui/toaster"
-import { useToast } from "@/components/ui/use-toast"
-import Image from "next/image"
+import { Badge } from "@/components/ui/badge"
+import { MapPin, Phone, Globe, Star, Users, Award, Clock } from "lucide-react"
+import { CategoryLayout } from "@/components/category-layout"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { BusinessJobsDialog } from "@/components/business-jobs-dialog"
+import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
+import { BusinessPhotoAlbumDialog } from "@/components/business-photo-album-dialog"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { PhotoCarousel } from "@/components/photo-carousel"
-import { Loader2, MapPin, Phone } from "lucide-react"
-import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { useState } from "react"
 
-interface Business {
-  id: string
-  displayName: string
-  businessName: string
-  displayLocation: string
-  displayPhone: string
-  allSubcategories?: any[] // Changed to any[] to handle both strings and objects
-  subcategory?: string | { category: string; subcategory: string; fullPath: string }
-  rating?: number
-  reviews?: number
-  zipCode?: string
-  serviceArea?: string[]
-  isNationwide?: boolean
-  subcategories?: any[] // Changed to any[] to handle both strings and objects
-}
+const CATEGORY_NAME = "Financial Services"
+const CATEGORY_DESCRIPTION = "Professional financial planning, accounting, tax preparation, and investment services"
 
-// Helper function to extract string value from subcategory (whether it's a string or object)
-function getSubcategoryString(sub: any): string {
-  if (typeof sub === "string") {
-    return sub
-  }
+// Sample businesses for financial services
+const businesses = [
+  {
+    id: "1",
+    name: "Premier Financial Planning",
+    category: "Financial Planning",
+    subcategory: "Investment Advisory",
+    description: "Comprehensive financial planning and investment management services for individuals and families.",
+    address: "123 Main Street, Downtown",
+    city: "Springfield",
+    state: "IL",
+    zipCode: "62701",
+    phone: "(555) 123-4567",
+    website: "https://premierfinancial.com",
+    email: "info@premierfinancial.com",
+    rating: 4.8,
+    reviewCount: 156,
+    isVerified: true,
+    isPremium: true,
+    serviceArea: ["62701", "62702", "62703", "62704", "62705"],
+    keywords: ["financial planning", "investment management", "retirement planning", "wealth management"],
+    businessHours: {
+      monday: "9:00 AM - 5:00 PM",
+      tuesday: "9:00 AM - 5:00 PM",
+      wednesday: "9:00 AM - 5:00 PM",
+      thursday: "9:00 AM - 5:00 PM",
+      friday: "9:00 AM - 5:00 PM",
+      saturday: "By Appointment",
+      sunday: "Closed",
+    },
+    specialties: ["Retirement Planning", "401k Management", "Estate Planning", "Tax Strategy"],
+    certifications: ["CFP", "CFA", "ChFC"],
+    yearsInBusiness: 15,
+    employeeCount: 8,
+  },
+  {
+    id: "2",
+    name: "Springfield Tax & Accounting",
+    category: "Tax Services",
+    subcategory: "Tax Preparation",
+    description: "Professional tax preparation and accounting services for individuals and small businesses.",
+    address: "456 Oak Avenue, Suite 200",
+    city: "Springfield",
+    state: "IL",
+    zipCode: "62702",
+    phone: "(555) 234-5678",
+    website: "https://springfieldtax.com",
+    email: "contact@springfieldtax.com",
+    rating: 4.6,
+    reviewCount: 89,
+    isVerified: true,
+    isPremium: false,
+    serviceArea: ["62701", "62702", "62703", "62704"],
+    keywords: ["tax preparation", "accounting", "bookkeeping", "payroll"],
+    businessHours: {
+      monday: "8:00 AM - 6:00 PM",
+      tuesday: "8:00 AM - 6:00 PM",
+      wednesday: "8:00 AM - 6:00 PM",
+      thursday: "8:00 AM - 6:00 PM",
+      friday: "8:00 AM - 6:00 PM",
+      saturday: "9:00 AM - 3:00 PM",
+      sunday: "Closed",
+    },
+    specialties: ["Individual Tax Returns", "Business Tax Returns", "Bookkeeping", "Payroll Services"],
+    certifications: ["CPA", "EA"],
+    yearsInBusiness: 12,
+    employeeCount: 5,
+  },
+  {
+    id: "3",
+    name: "Capital Investment Group",
+    category: "Investment Services",
+    subcategory: "Portfolio Management",
+    description: "Professional investment management and portfolio advisory services for high-net-worth clients.",
+    address: "789 Business Park Drive",
+    city: "Springfield",
+    state: "IL",
+    zipCode: "62703",
+    phone: "(555) 345-6789",
+    website: "https://capitalinvestmentgroup.com",
+    email: "advisors@capitalinvestmentgroup.com",
+    rating: 4.9,
+    reviewCount: 203,
+    isVerified: true,
+    isPremium: true,
+    serviceArea: ["62701", "62702", "62703", "62704", "62705", "62706"],
+    keywords: ["investment management", "portfolio management", "wealth advisory", "asset allocation"],
+    businessHours: {
+      monday: "8:00 AM - 5:00 PM",
+      tuesday: "8:00 AM - 5:00 PM",
+      wednesday: "8:00 AM - 5:00 PM",
+      thursday: "8:00 AM - 5:00 PM",
+      friday: "8:00 AM - 5:00 PM",
+      saturday: "Closed",
+      sunday: "Closed",
+    },
+    specialties: ["Portfolio Management", "Asset Allocation", "Risk Management", "Estate Planning"],
+    certifications: ["CFA", "CFP", "CIMA"],
+    yearsInBusiness: 20,
+    employeeCount: 12,
+  },
+  {
+    id: "4",
+    name: "Community Credit Union",
+    category: "Banking Services",
+    subcategory: "Credit Union",
+    description: "Full-service credit union offering banking, loans, and financial services to community members.",
+    address: "321 Community Boulevard",
+    city: "Springfield",
+    state: "IL",
+    zipCode: "62704",
+    phone: "(555) 456-7890",
+    website: "https://communitycu.org",
+    email: "info@communitycu.org",
+    rating: 4.7,
+    reviewCount: 312,
+    isVerified: true,
+    isPremium: true,
+    serviceArea: ["62701", "62702", "62703", "62704", "62705"],
+    keywords: ["banking", "loans", "mortgages", "savings", "checking"],
+    businessHours: {
+      monday: "9:00 AM - 5:00 PM",
+      tuesday: "9:00 AM - 5:00 PM",
+      wednesday: "9:00 AM - 5:00 PM",
+      thursday: "9:00 AM - 5:00 PM",
+      friday: "9:00 AM - 6:00 PM",
+      saturday: "9:00 AM - 1:00 PM",
+      sunday: "Closed",
+    },
+    specialties: ["Personal Banking", "Business Banking", "Home Loans", "Auto Loans"],
+    certifications: ["NCUA Insured", "Equal Housing Lender"],
+    yearsInBusiness: 35,
+    employeeCount: 25,
+  },
+]
 
-  if (sub && typeof sub === "object") {
-    // If it's an object with subcategory property, use that
-    if (sub.subcategory) {
-      return sub.subcategory
-    }
-    // Otherwise try fullPath
-    if (sub.fullPath) {
-      return sub.fullPath
-    }
-  }
-
-  // Fallback
-  return "Financial Services"
-}
-
-export default function FinancialServicesPage() {
-  const { toast } = useToast()
-  const filterOptions = [
-    { id: "finance1", label: "Accountants", value: "Accountants" },
-    { id: "finance2", label: "Insurance", value: "Insurance" },
-    { id: "finance3", label: "Advertising", value: "Advertising" },
-    { id: "finance4", label: "Marketing", value: "Marketing" },
-    { id: "finance5", label: "Financial and Investment Advisers", value: "Financial and Investment Advisers" },
-    { id: "finance6", label: "Debt Consolidators", value: "Debt Consolidators" },
-    { id: "finance7", label: "Cryptocurrency", value: "Cryptocurrency" },
-  ]
-
-  const [selectedProvider, setSelectedProvider] = useState<Business | null>(null)
-  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-  const [businesses, setBusinesses] = useState<Business[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
-  const [userZipCode, setUserZipCode] = useState<string | null>(null)
-
-  // Filter state
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
-  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
-  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
-  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
-
-  // Photo state
+function FinancialServicesContent() {
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
-  // Use a ref to track the current fetch request
-  const fetchIdRef = useRef<number>(0)
-
-  // Get user's zip code from localStorage only once on mount
-  useEffect(() => {
-    const savedZipCode = localStorage.getItem("savedZipCode")
-    if (savedZipCode) {
-      setUserZipCode(savedZipCode)
-      console.log(`User zip code loaded: ${savedZipCode}`)
-    } else {
-      console.log("No user zip code found in localStorage")
-    }
-  }, [])
-
-  const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
-    // Check if business is nationwide
-    if (business.isNationwide) {
-      console.log(`  - ${business.displayName}: serves nationwide, matches=true`)
-      return true
-    }
-
-    // Check if target zip code is in the service area (direct array)
-    if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
-      const matches = business.serviceArea.includes(targetZipCode)
-      console.log(
-        `  - ${business.displayName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
-      )
-      return matches
-    }
-
-    // Fall back to checking primary zip code
-    const businessZip = business.zipCode || ""
-    const matches = businessZip === targetZipCode
-    console.log(
-      `  - ${business.displayName}: primaryZip="${businessZip}", userZip="${targetZipCode}", matches=${matches}`,
-    )
-    return matches
-  }
-
-  // Function to load photos for a specific business
   const loadPhotosForBusiness = async (businessId: string) => {
-    if (businessPhotos[businessId]) {
-      return // Already loaded
-    }
+    if (businessPhotos[businessId]) return // Already loaded
 
     try {
       const photos = await loadBusinessPhotos(businessId)
@@ -132,7 +167,7 @@ export default function FinancialServicesPage() {
         [businessId]: photos,
       }))
     } catch (error) {
-      console.error(`Error loading photos for business ${businessId}:`, error)
+      console.error("Error loading photos for business:", businessId, error)
       setBusinessPhotos((prev) => ({
         ...prev,
         [businessId]: [],
@@ -140,417 +175,183 @@ export default function FinancialServicesPage() {
     }
   }
 
-  // Separate useEffect for fetching businesses to avoid race conditions
-  useEffect(() => {
-    // Create a unique ID for this fetch request
-    const fetchId = ++fetchIdRef.current
-
-    async function fetchBusinesses() {
-      // If this isn't the latest fetch request, don't proceed
-      if (fetchId !== fetchIdRef.current) return
-
-      setIsLoading(true)
-      try {
-        const requestTime = new Date().toISOString()
-        console.log(`[${requestTime}] Fetching businesses for /financial-services (request #${fetchId})`)
-
-        const result = await getBusinessesForCategoryPage("/financial-services")
-
-        // If this isn't the latest fetch request, don't update state
-        if (fetchId !== fetchIdRef.current) {
-          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${fetchId}`)
-          return
-        }
-
-        console.log(`[${new Date().toISOString()}] Retrieved ${result.length} total businesses (request #${fetchId})`)
-
-        // Log subcategory types to help debug
-        result.forEach((business) => {
-          if (business.allSubcategories && business.allSubcategories.length > 0) {
-            console.log(
-              `Business ${business.displayName} subcategory types:`,
-              business.allSubcategories.map((sub) => (typeof sub === "object" ? "object" : typeof sub)),
-            )
-          }
-        })
-
-        let filteredResult = result
-
-        if (userZipCode) {
-          console.log(`[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${fetchId})`)
-          filteredResult = result.filter((business) => businessServesZipCode(business, userZipCode))
-          console.log(
-            `[${new Date().toISOString()}] After filtering: ${filteredResult.length} businesses (request #${fetchId})`,
-          )
-        }
-
-        setBusinesses(filteredResult)
-        setAllBusinesses(filteredResult)
-        setFilteredBusinesses(filteredResult)
-      } catch (error) {
-        // Only show error for the latest request
-        if (fetchId === fetchIdRef.current) {
-          console.error(`[${new Date().toISOString()}] Error fetching businesses (request #${fetchId}):`, error)
-          toast({
-            title: "Error loading businesses",
-            description: "There was a problem loading businesses. Please try again later.",
-            variant: "destructive",
-          })
-        }
-      } finally {
-        // Only update loading state for the latest request
-        if (fetchId === fetchIdRef.current) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    fetchBusinesses()
-
-    // Cleanup function to handle component unmount
-    return () => {
-      // This will prevent any in-flight requests from updating state
-      fetchIdRef.current = fetchId + 1
-    }
-  }, [toast, userZipCode]) // Only re-run when toast or userZipCode changes
-
-  // Helper function to check if business has exact subcategory match
-  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
-    // Check allSubcategories array
-    if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
-      return business.allSubcategories.some((sub) => {
-        const subString = getSubcategoryString(sub)
-        return subString === filterValue
-      })
-    }
-
-    // Check subcategories array
-    if (business.subcategories && Array.isArray(business.subcategories)) {
-      return business.subcategories.some((sub) => {
-        const subString = getSubcategoryString(sub)
-        return subString === filterValue
-      })
-    }
-
-    // Check single subcategory field
-    if (business.subcategory) {
-      const subString = getSubcategoryString(business.subcategory)
-      return subString === filterValue
-    }
-
-    return false
-  }
-
-  // Filter functions
-  const handleFilterChange = (value: string) => {
-    setSelectedFilters((prev) => (prev.includes(value) ? prev.filter((f) => f !== value) : [...prev, value]))
-  }
-
-  const applyFilters = () => {
-    console.log("Applying filters:", selectedFilters)
-    console.log("All businesses:", allBusinesses)
-
-    if (selectedFilters.length === 0) {
-      setFilteredBusinesses(allBusinesses)
-      setAppliedFilters([])
-      toast({
-        title: "Filters cleared",
-        description: `Showing all ${allBusinesses.length} financial service providers.`,
-      })
-      return
-    }
-
-    const filtered = allBusinesses.filter((business) => {
-      const hasMatch = selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
-      console.log(
-        `Business ${business.displayName} subcategories:`,
-        business.allSubcategories || business.subcategories || [business.subcategory],
-      )
-      console.log(`Filter "${selectedFilters.join(", ")}" matches business: ${hasMatch}`)
-      return hasMatch
-    })
-
-    console.log("Filtered results:", filtered)
-    setFilteredBusinesses(filtered)
-    setAppliedFilters([...selectedFilters])
-
-    toast({
-      title: "Filters applied",
-      description: `Found ${filtered.length} financial service providers matching your criteria.`,
-    })
-  }
-
-  const clearFilters = () => {
-    setSelectedFilters([])
-    setAppliedFilters([])
-    setFilteredBusinesses(allBusinesses)
-
-    toast({
-      title: "Filters cleared",
-      description: `Showing all ${allBusinesses.length} financial service providers.`,
-    })
-  }
-
-  const handleOpenReviews = (provider: Business) => {
-    setSelectedProvider(provider)
-    setIsReviewsDialogOpen(true)
-  }
-
-  const handleOpenProfile = (provider: Business) => {
-    setSelectedProvider(provider)
-    setIsProfileDialogOpen(true)
-  }
-
   return (
-    <CategoryLayout title="Insurance, Finance, Debt and Sales" backLink="/" backText="Categories">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        <div className="flex justify-center">
-          <Image
-            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/accountant-bVMbHmjmeZbti2lNIRrbCdjJnJJDKX.png"
-            alt="Financial Services"
-            width={500}
-            height={500}
-            className="rounded-lg shadow-lg max-w-full h-auto"
-          />
-        </div>
-
-        <div className="space-y-6">
-          <p className="text-lg text-gray-700">
-            Find qualified financial professionals in your area. Browse services below or use filters to narrow your
-            search.
-          </p>
-
-          <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
-            <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
-            <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Read reviews from other customers</li>
-              <li>View business videos showcasing work and staff</li>
-              <li>Access exclusive coupons directly on each business listing</li>
-              <li>Discover job openings from businesses you'd trust to hire yourself</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Enhanced Filter Controls */}
-      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Filter by Service Type</h3>
-          <span className="text-sm text-gray-500">{selectedFilters.length} selected</span>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
-          {filterOptions.map((option) => (
-            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectedFilters.includes(option.value)}
-                onChange={() => handleFilterChange(option.value)}
-                className="rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <span className="text-sm text-gray-700">{option.label}</span>
-            </label>
-          ))}
-        </div>
-
-        <div className="flex gap-3">
-          <Button
-            onClick={applyFilters}
-            disabled={selectedFilters.length === 0}
-            className="bg-primary hover:bg-primary/90"
-          >
-            Apply Filters ({selectedFilters.length})
-          </Button>
-
-          {appliedFilters.length > 0 && (
-            <Button onClick={clearFilters} variant="outline">
-              Clear Filters
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Active Filters Display */}
-      {appliedFilters.length > 0 && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-800">Active filters: {appliedFilters.join(", ")}</p>
-              <p className="text-sm text-blue-700">
-                Showing {filteredBusinesses.length} of {allBusinesses.length} financial service providers
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Zip Code Status Indicator */}
-      {userZipCode && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              <div>
-                <p className="text-sm font-medium text-green-800">Showing businesses that service: {userZipCode}</p>
-                <p className="text-sm text-green-700">Includes businesses with {userZipCode} in their service area</p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.removeItem("savedZipCode")
-                setUserZipCode(null)
-              }}
-              className="text-green-700 border-green-300 hover:bg-green-50"
-            >
-              Clear Filter
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-          <p>Loading financial service providers...</p>
-        </div>
-      ) : filteredBusinesses.length > 0 ? (
-        <div className="space-y-6">
-          {filteredBusinesses.map((business) => (
-            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  {/* Compact Business Info */}
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-semibold">{business.displayName}</h3>
-
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                      {business.displayLocation && (
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          <span>{business.displayLocation}</span>
-                        </div>
+    <div className="space-y-6">
+      {businesses.map((business) => (
+        <Card key={business.id} className="overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex gap-4">
+              {/* Left Column - Business Info */}
+              <div className="flex-1 min-w-0 space-y-4">
+                {/* Header */}
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-semibold text-gray-900 truncate">{business.name}</h3>
+                      {business.isVerified && (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          <Award className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
                       )}
-
-                      {business.displayPhone && (
-                        <div className="flex items-center">
-                          <Phone className="h-4 w-4 mr-1" />
-                          <a href={`tel:${business.displayPhone}`} className="hover:text-primary">
-                            {business.displayPhone}
-                          </a>
-                        </div>
+                      {business.isPremium && (
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                          Premium
+                        </Badge>
                       )}
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {getSubcategoryString(business.subcategory) || "Financial Services"}
-                          </span>
-                        )}
+                    <p className="text-sm text-gray-600 mb-2">
+                      {business.category} • {business.subcategory}
+                    </p>
+                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
+                      <div className="flex items-center gap-1">
+                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        <span className="font-medium">{business.rating}</span>
+                        <span>({business.reviewCount} reviews)</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Users className="h-4 w-4" />
+                        <span>{business.employeeCount} employees</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        <span>{business.yearsInBusiness} years</span>
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Photo Carousel and Buttons Row */}
-                  <div className="flex flex-col lg:flex-row gap-4 items-start">
-                    {/* Photo Carousel */}
-                    <div className="flex-1">
-                      <PhotoCarousel
-                        businessId={business.id}
-                        photos={businessPhotos[business.id] || []}
-                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
-                        showMultiple={true}
-                        photosPerView={5}
-                        className="w-full"
-                      />
-                    </div>
+                {/* Description */}
+                <p className="text-gray-700 text-sm leading-relaxed">{business.description}</p>
 
-                    {/* Action Buttons */}
-                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
-                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
-                        Ratings
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 lg:flex-none lg:w-full bg-transparent"
-                        onClick={() => handleOpenProfile(business)}
-                      >
-                        View Profile
-                      </Button>
-                    </div>
+                {/* Specialties */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Specialties</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {business.specialties.map((specialty, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {specialty}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-8 max-w-2xl mx-auto">
-            <h3 className="text-xl font-medium text-emerald-800 mb-2">No Financial Service Providers Found</h3>
-            <p className="text-emerald-700 mb-4">
-              {userZipCode
-                ? `We're building our network of licensed financial professionals in the ${userZipCode} area.`
-                : "We're building our network of licensed financial professionals in your area."}
-            </p>
-            <div className="bg-white rounded border border-emerald-100 p-4">
-              <p className="text-gray-700 font-medium">Are you a financial professional?</p>
-              <p className="text-gray-600 mt-1">
-                Join Hausbaum to connect with clients who need your financial expertise and services.
-              </p>
-              <Button className="mt-3" asChild>
-                <a href="/business-register">Register Your Financial Business</a>
-              </Button>
+
+                {/* Certifications */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Certifications</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {business.certifications.map((cert, index) => (
+                      <Badge key={index} variant="secondary" className="text-xs bg-blue-50 text-blue-700">
+                        {cert}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Contact Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <MapPin className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">
+                      {business.address}, {business.city}, {business.state} {business.zipCode}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Phone className="h-4 w-4 flex-shrink-0" />
+                    <span>{business.phone}</span>
+                  </div>
+                  {business.website && (
+                    <div className="flex items-center gap-2 text-gray-600 md:col-span-2">
+                      <Globe className="h-4 w-4 flex-shrink-0" />
+                      <a
+                        href={business.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 truncate"
+                      >
+                        {business.website}
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Service Area */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Service Area</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {business.serviceArea.slice(0, 5).map((zip, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {zip}
+                      </Badge>
+                    ))}
+                    {business.serviceArea.length > 5 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{business.serviceArea.length - 5} more
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Center Column - Photos */}
+              <div className="w-48 flex-shrink-0">
+                <PhotoCarousel
+                  businessId={business.id}
+                  photos={businessPhotos[business.id] || []}
+                  onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                  showMultiple={true}
+                  photosPerView={1}
+                  className="w-full h-32"
+                  size="medium"
+                />
+              </div>
+
+              {/* Right Column - Actions */}
+              <div className="w-32 flex-shrink-0 space-y-2">
+                <BusinessProfileDialog business={business}>
+                  <Button size="sm" className="w-full">
+                    View Profile
+                  </Button>
+                </BusinessProfileDialog>
+
+                <ReviewsDialog businessId={business.id} businessName={business.name}>
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    Reviews
+                  </Button>
+                </ReviewsDialog>
+
+                <BusinessJobsDialog businessId={business.id} businessName={business.name}>
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    Jobs
+                  </Button>
+                </BusinessJobsDialog>
+
+                <BusinessCouponsDialog businessId={business.id} businessName={business.name}>
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    Offers
+                  </Button>
+                </BusinessCouponsDialog>
+
+                <BusinessPhotoAlbumDialog businessId={business.id} businessName={business.name}>
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    Photos
+                  </Button>
+                </BusinessPhotoAlbumDialog>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
 
-      {selectedProvider && (
-        <ReviewsDialog
-          isOpen={isReviewsDialogOpen}
-          onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.displayName || selectedProvider.businessName}
-          businessId={selectedProvider.id}
-          reviews={[]}
-        />
-      )}
-
-      {selectedProvider && (
-        <BusinessProfileDialog
-          isOpen={isProfileDialogOpen}
-          onClose={() => setIsProfileDialogOpen(false)}
-          businessId={selectedProvider.id}
-          businessName={selectedProvider.displayName || selectedProvider.businessName}
-        />
-      )}
-
-      <Toaster />
+export default function FinancialServicesPage() {
+  return (
+    <CategoryLayout title={CATEGORY_NAME} description={CATEGORY_DESCRIPTION} businessCount={businesses.length}>
+      <Suspense fallback={<div>Loading financial services...</div>}>
+        <FinancialServicesContent />
+      </Suspense>
     </CategoryLayout>
   )
 }

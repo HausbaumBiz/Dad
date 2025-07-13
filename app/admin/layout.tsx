@@ -1,41 +1,61 @@
-import type { ReactNode } from "react"
+import type React from "react"
+import type { Metadata } from "next"
 import Link from "next/link"
-import { Users, Building, Home, MapPin, ImageIcon, Database } from "lucide-react"
+import { ArrowLeft, Shield } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
-interface AdminLayoutProps {
-  children: ReactNode
+export const metadata: Metadata = {
+  title: "Admin Dashboard - Hausbaum",
+  description: "Administrative interface for managing the Hausbaum platform",
 }
 
-export default function AdminLayout({ children }: AdminLayoutProps) {
-  const navItems = [
-    { href: "/admin", label: "Dashboard", icon: <Home className="h-4 w-4 mr-2" /> },
-    { href: "/admin/users", label: "Users", icon: <Users className="h-4 w-4 mr-2" /> },
-    { href: "/admin/businesses", label: "Businesses", icon: <Building className="h-4 w-4 mr-2" /> },
-    { href: "/admin/zip-codes", label: "ZIP Codes", icon: <MapPin className="h-4 w-4 mr-2" /> },
-    { href: "/admin/media", label: "Media", icon: <ImageIcon className="h-4 w-4 mr-2" /> },
-    { href: "/admin/redis-structure", label: "Redis Structure", icon: <Database className="h-4 w-4 mr-2" /> },
-  ]
-
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-64 bg-gray-100 border-r">
-        <div className="p-4 border-b">
-          <h1 className="text-xl font-bold">Admin Panel</h1>
+    <div className="min-h-screen bg-gray-50">
+      {/* Admin Header */}
+      <header className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Link href="/">
+                <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Back to Site</span>
+                </Button>
+              </Link>
+              <div className="flex items-center space-x-2">
+                <Shield className="h-6 w-6 text-red-600" />
+                <h1 className="text-xl font-semibold text-gray-900">Admin Panel</h1>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Administrator Access</span>
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            </div>
+          </div>
         </div>
-        <nav className="p-4">
-          <ul className="space-y-2">
-            {navItems.map((item) => (
-              <li key={item.href}>
-                <Link href={item.href} className="flex items-center p-2 rounded-md hover:bg-gray-200 transition-colors">
-                  {item.icon}
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </aside>
-      <main className="flex-1 overflow-auto">{children}</main>
+      </header>
+
+      {/* Admin Content */}
+      <main className="container mx-auto px-4 py-6">{children}</main>
+
+      {/* Admin Footer */}
+      <footer className="bg-white border-t border-gray-200 mt-auto">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <div>
+              <span>Hausbaum Admin Panel</span>
+            </div>
+            <div>
+              <span>Version 1.0.0</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

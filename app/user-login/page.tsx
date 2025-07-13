@@ -72,32 +72,36 @@ export default function UserLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("[handleSubmit] Form submission started")
+
     setIsSubmitting(true)
     setError("") // Clear previous errors
 
     try {
       // Validate form data
       if (!formData.email || !formData.password) {
+        console.log("[handleSubmit] Missing form data")
         setError("Email and password are required")
         setIsSubmitting(false)
         return
       }
 
+      console.log("[handleSubmit] Creating FormData object")
       // Create a FormData object from the form data
       const formDataObj = new FormData()
-      Object.entries(formData).forEach(([key, value]) => {
-        formDataObj.append(key, value)
-      })
-
-      // Add the remember me preference
+      formDataObj.append("email", formData.email)
+      formDataObj.append("password", formData.password)
       formDataObj.append("rememberMe", rememberMe.toString())
 
+      console.log("[handleSubmit] Calling loginUser action")
       // Call the server action
       const result = await loginUser(formDataObj)
+      console.log("[handleSubmit] Login result:", result.success ? "success" : "failed")
 
       // Handle the result
       if (result.success) {
         // Handle successful login
+        console.log("[handleSubmit] Login successful, showing toast")
         toast({
           title: "Login successful",
           description: "You have been logged in successfully",
@@ -115,9 +119,11 @@ export default function UserLoginPage() {
         }
 
         // Navigate to the return URL or home page
+        console.log("[handleSubmit] Redirecting to:", result.redirectTo || returnTo)
         router.push(result.redirectTo || returnTo)
       } else {
         // Handle login failure
+        console.log("[handleSubmit] Login failed:", result.message)
         setError(result.message || "Invalid username or password")
         toast({
           title: "Login failed",
@@ -126,7 +132,7 @@ export default function UserLoginPage() {
         })
       }
     } catch (error) {
-      console.error("Login error:", error)
+      console.error("[handleSubmit] Login error:", error)
       setError("An unexpected error occurred. Please try again.")
       toast({
         title: "An error occurred",

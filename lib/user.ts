@@ -100,31 +100,57 @@ export async function getUserByEmail(email: string) {
 // Verify user credentials
 export async function verifyCredentials(email: string, password: string) {
   try {
+    console.log("[verifyCredentials] Starting credential verification for:", email)
+
     if (!email || !password) {
+      console.log("[verifyCredentials] Missing email or password")
       return { success: false, message: "Email and password are required" }
     }
 
     // Get user by email
+    console.log("[verifyCredentials] Looking up user by email")
     const userId = await kv.get<string>(`user:email:${email}`)
+    console.log("[verifyCredentials] User ID from email lookup:", userId)
+
     if (!userId) {
+      console.log("[verifyCredentials] No user found for email")
       return { success: false, message: "Invalid email or password" }
     }
 
+    // Ensure userId is a string
+    const userIdString = typeof userId === "string" ? userId : String(userId)
+    console.log("[verifyCredentials] Getting user data for ID:", userIdString)
+
     // Get user data
-    const user = await getUserById(userId)
+    const user = await getUserById(userIdString)
+    console.log("[verifyCredentials] User data retrieved:", user ? "found" : "not found")
+
     if (!user) {
+      console.log("[verifyCredentials] User data not found")
       return { success: false, message: "User not found" }
     }
 
     // Verify password
+    console.log("[verifyCredentials] Verifying password")
     const isMatch = await bcrypt.compare(password, user.passwordHash)
+    console.log("[verifyCredentials] Password match:", isMatch)
+
     if (!isMatch) {
+      console.log("[verifyCredentials] Password does not match")
       return { success: false, message: "Invalid email or password" }
     }
 
-    return { success: true, userId, message: "Login successful" }
+    console.log("[verifyCredentials] Credentials verified successfully")
+    return { success: true, userId: userIdString, message: "Login successful" }
   } catch (error) {
-    console.error("Error verifying credentials:", error)
+    console.error("[verifyCredentials] Error verifying credentials:", error)
+
+    // Handle specific error types
+    if (error instanceof Error) {
+      console.error("[verifyCredentials] Error message:", error.message)
+      console.error("[verifyCredentials] Error stack:", error.stack)
+    }
+
     return { success: false, message: "Authentication failed" }
   }
 }
@@ -138,8 +164,8 @@ export async function getAllUsers() {
     try {
       // Try to get user IDs from a set first
       const userIdSet = await kv.smembers("users")
-      if (userIdSet && userIdSet.length > 0) {
-        userIds = userIdSet as string[]
+      if (userIdSet && Array.isArray(userIdSet) && userIdSet.length > 0) {
+        userIds = userIdSet.map((id) => String(id))
       }
     } catch (setError) {
       console.log("No users set found, falling back to keys scan")
@@ -149,10 +175,12 @@ export async function getAllUsers() {
     if (userIds.length === 0) {
       try {
         const allKeys = await kv.keys("user:*")
-        // Filter out email index keys and extract user IDs
-        userIds = allKeys
-          .filter((key) => !key.startsWith("user:email:") && key.startsWith("user:"))
-          .map((key) => key.replace("user:", ""))
+        if (Array.isArray(allKeys)) {
+          // Filter out email index keys and extract user IDs
+          userIds = allKeys
+            .filter((key) => !key.startsWith("user:email:") && key.startsWith("user:"))
+            .map((key) => key.replace("user:", ""))
+        }
       } catch (keysError) {
         console.error("Error scanning keys:", keysError)
         return []

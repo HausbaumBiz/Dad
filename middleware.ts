@@ -55,13 +55,13 @@ export function middleware(request: NextRequest) {
   // Get authentication status from cookies
   const isAuthenticated = request.cookies.has("userId") || request.cookies.has("businessId")
 
-  // For admin paths, we might want to check for admin privileges
-  // This is a simplified example - in a real app, you'd verify the user has admin role
-  const isAdmin = request.cookies.has("userId") && request.cookies.get("userId")?.value === "admin-user-id"
+  // For now, allow admin access if user is authenticated
+  // TODO: Implement proper role-based admin checking
+  const isAdmin = isAuthenticated // Simplified admin check for development
 
   // Redirect logic
   if (isAdminPath && !isAdmin) {
-    // If trying to access admin pages without admin privileges
+    // If trying to access admin pages without authentication
     return NextResponse.redirect(new URL("/user-login", request.url))
   }
 

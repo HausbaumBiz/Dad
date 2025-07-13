@@ -123,14 +123,17 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
         <div className="flex gap-1.5 justify-center w-full">
           {/* Show actual photos - smaller size */}
           {visiblePhotos.map((photo, index) => (
-            <div key={currentIndex + index} className="w-40 h-30 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+            <div
+              key={currentIndex + index}
+              className="w-[220px] h-[220px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
+            >
               <Image
                 src={photo || "/placeholder.svg"}
                 alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={160}
-                height={120}
+                width={220}
+                height={220}
                 className="w-full h-full object-cover"
-                sizes="160px"
+                sizes="220px"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement
                   target.src = "/placeholder.svg"
@@ -143,7 +146,7 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
           {Array.from({ length: emptySlots }).map((_, index) => (
             <div
               key={`empty-${index}`}
-              className="w-40 h-30 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0 flex items-center justify-center"
+              className="w-[220px] h-[220px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0 flex items-center justify-center"
             >
               <span className="text-gray-400 text-xs">No Photo</span>
             </div>

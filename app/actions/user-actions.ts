@@ -6,6 +6,8 @@ import { cookies } from "next/headers"
 // Register a new user
 export async function registerUser(formData: FormData) {
   try {
+    console.log("[registerUser] Starting user registration")
+
     const firstName = formData.get("firstName") as string
     const lastName = formData.get("lastName") as string
     const zipCode = formData.get("zipCode") as string
@@ -13,16 +15,21 @@ export async function registerUser(formData: FormData) {
     const password = formData.get("password") as string
     const confirmPassword = formData.get("confirmPassword") as string
 
+    console.log("[registerUser] Form data extracted for email:", email)
+
     // Validate form data
     if (!firstName || !lastName || !zipCode || !email || !password || !confirmPassword) {
+      console.log("[registerUser] Missing required fields")
       return { success: false, message: "All fields are required" }
     }
 
     if (password !== confirmPassword) {
+      console.log("[registerUser] Passwords do not match")
       return { success: false, message: "Passwords do not match" }
     }
 
     // Create user in database
+    console.log("[registerUser] Creating user in database")
     const result = await createUser({
       firstName,
       lastName,
@@ -31,29 +38,32 @@ export async function registerUser(formData: FormData) {
       password,
     })
 
+    console.log("[registerUser] User creation result:", result.success ? "success" : "failed")
+
     if (result.success && result.userId) {
       // Set a session cookie
-      cookies().set("userId", result.userId, {
+      const cookieStore = await cookies()
+      cookieStore.set("userId", result.userId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         maxAge: 60 * 60 * 24 * 7, // 1 week
         path: "/",
-        sameSite: "lax", // Add this for better security
+        sameSite: "lax",
       })
 
       // Set a registration success cookie for the toast
-      cookies().set("registrationSuccess", "true", {
+      cookieStore.set("registrationSuccess", "true", {
         maxAge: 60, // 1 minute
         path: "/",
       })
 
-      // Return success and let the client handle the redirect
+      console.log("[registerUser] Registration successful, cookies set")
       return { success: true, redirectTo: "/" }
     }
 
     return result
   } catch (error) {
-    console.error("Error in registerUser:", error)
+    console.error("[registerUser] Error in registerUser:", error)
     return {
       success: false,
       message: "An unexpected error occurred during registration. Please try again.",
@@ -64,17 +74,24 @@ export async function registerUser(formData: FormData) {
 // Update the loginUser function to handle the "Remember me" preference
 export async function loginUser(formData: FormData) {
   try {
+    console.log("[loginUser] Starting user login")
+
     const email = formData.get("email") as string
     const password = formData.get("password") as string
     const rememberMe = formData.get("rememberMe") === "true"
 
+    console.log("[loginUser] Login attempt for email:", email, "Remember me:", rememberMe)
+
     // Validate form data
     if (!email || !password) {
+      console.log("[loginUser] Missing email or password")
       return { success: false, message: "Email and password are required" }
     }
 
     // Verify credentials
+    console.log("[loginUser] Verifying credentials")
     const result = await verifyCredentials(email, password)
+    console.log("[loginUser] Credential verification result:", result.success ? "success" : "failed")
 
     if (result.success && result.userId) {
       // Set cookie expiration based on "Remember me" preference
@@ -83,21 +100,23 @@ export async function loginUser(formData: FormData) {
         : 60 * 60 * 24 * 7 // 1 week if not checked
 
       // Set a session cookie
-      cookies().set("userId", result.userId, {
+      const cookieStore = await cookies()
+      cookieStore.set("userId", result.userId, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         maxAge: maxAge,
         path: "/",
-        sameSite: "lax", // Add this for better security
+        sameSite: "lax",
       })
 
-      // Return success and let the client handle the redirect
+      console.log("[loginUser] Login successful, cookie set")
       return { success: true, redirectTo: "/" }
     }
 
+    console.log("[loginUser] Login failed:", result.message)
     return { success: false, message: "Username or password is incorrect. Please try again." }
   } catch (error) {
-    console.error("Error in loginUser:", error)
+    console.error("[loginUser] Error in loginUser:", error)
     return {
       success: false,
       message: "An unexpected error occurred during login. Please try again.",
@@ -108,7 +127,8 @@ export async function loginUser(formData: FormData) {
 // Check if user is logged in
 export async function getUserSession() {
   try {
-    const userId = cookies().get("userId")?.value
+    const cookieStore = await cookies()
+    const userId = cookieStore.get("userId")?.value
 
     if (!userId) {
       return null
@@ -126,7 +146,8 @@ export async function getUserSession() {
 // Logout user
 export async function logoutUser() {
   try {
-    cookies().delete("userId")
+    const cookieStore = await cookies()
+    cookieStore.delete("userId")
     return { success: true }
   } catch (error) {
     console.error("Error in logoutUser:", error)

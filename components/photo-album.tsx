@@ -1,165 +1,177 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import type { MediaItem } from "@/app/actions/media-actions"
-import { useMediaUpload } from "@/hooks/use-media-upload"
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react"
-import { LazyImage } from "@/components/lazy-image"
+import type React from "react"
+import { useState, useCallback } from "react"
+import Image from "next/image"
+import LightBox from "yet-another-react-lightbox"
+import "yet-another-react-lightbox/styles.css"
 
-interface PhotoAlbumProps {
-  businessId: string
-  photos: MediaItem[]
-  onUpdate?: (photos: MediaItem[]) => void
+interface Photo {
+  url: string
+  filename?: string
+  tags?: string[]
 }
 
-export function PhotoAlbum({ businessId, photos, onUpdate }: PhotoAlbumProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const { handleDeletePhoto } = useMediaUpload(businessId)
+interface PhotoAlbumProps {
+  photos: Photo[]
+}
 
-  const handleOpenAlbum = () => {
-    if (photos.length > 0) {
-      setIsOpen(true)
-    }
+const PhotoAlbum: React.FC<PhotoAlbumProps> = ({ photos }) => {
+  const [open, setOpen] = useState(false)
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
+
+  const handlePhotoClick = (index: number) => {
+    setSelectedPhotoIndex(index)
+    setOpen(true)
   }
 
-  const handleNext = () => {
-    if (photos.length > 1) {
-      setCurrentIndex((prev) => (prev + 1) % photos.length)
-    }
-  }
+  const handleClose = useCallback(() => {
+    setOpen(false)
+  }, [])
 
-  const handlePrev = () => {
-    if (photos.length > 1) {
-      setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length)
-    }
-  }
-
-  const handleDelete = async (photoId: string) => {
-    const result = await handleDeletePhoto(photoId)
-
-    if (result && result.success && onUpdate) {
-      onUpdate(result.photoAlbum)
-
-      // Adjust current index if needed
-      if (currentIndex >= result.photoAlbum.length) {
-        setCurrentIndex(Math.max(0, result.photoAlbum.length - 1))
-      }
-    }
-  }
+  const selectedPhoto = photos[selectedPhotoIndex]
 
   return (
-    <>
-      <Card className="p-4">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Photo Album</h3>
-            <p className="text-sm text-gray-500">{photos.length} photos</p>
+    <div className="relative">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {photos.map((photo, index) => (
+          <div
+            key={index}
+            onClick={() => handlePhotoClick(index)}
+            className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden group cursor-pointer"
+          >
+            <Image
+              src={photo.url || "/placeholder.svg"}
+              alt={photo.filename || `Photo ${index + 1}`}
+              fill
+              className={`object-contain transition-transform duration-200 group-hover:scale-105 ${
+                // Make Expert and Dependability awards smaller in grid view
+                photo.tags?.includes("expert") || photo.tags?.includes("dependability") ? "scale-75" : ""
+              }`}
+              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+              onError={(e) => {
+                console.error("Image failed to load:", photo.url)
+                e.currentTarget.src = "/placeholder.svg?height=300&width=300"
+              }}
+            />
           </div>
+        ))}
+      </div>
 
-          {photos.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {photos.map((photo, index) => (
-                <div key={photo.id} className="relative group">
-                  <div
-                    className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer"
-                    onClick={() => {
-                      setCurrentIndex(index)
-                      handleOpenAlbum()
-                    }}
+      <LightBox
+        open={open}
+        close={handleClose}
+        slides={photos.map((photo) => ({ src: photo.url }))}
+        index={selectedPhotoIndex}
+        render={{
+          button: ({ type, disabled, onClick }) => {
+            let ariaLabel = ""
+            let icon = null
+
+            switch (type) {
+              case "close":
+                ariaLabel = "Close"
+                icon = (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth="2"
+                    stroke="currentColor"
+                    className="w-6 h-6"
                   >
-                    <LazyImage
-                      src={photo.url}
-                      alt={photo.filename}
-                      className="w-full h-full"
-                      placeholderSrc="/placeholder.svg"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(photo.id)}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )
+                break
+              case "prev":
+                ariaLabel = "Previous"
+                icon = (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth="2"
+                    stroke="currentColor"
+                    className="w-6 h-6"
                   >
-                    <Trash2 size={14} />
-                  </button>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                )
+                break
+              case "next":
+                ariaLabel = "Next"
+                icon = (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth="2"
+                    stroke="currentColor"
+                    className="w-6 h-6"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                )
+                break
+              default:
+                return null
+            }
+
+            return (
+              <button className="yarl__button" aria-label={ariaLabel} disabled={disabled || false} onClick={onClick}>
+                {icon}
+              </button>
+            )
+          },
+          slide: ({ slide }) => (
+            <div className="relative w-full h-full flex items-center justify-center bg-gray-50">
+              <Image
+                src={selectedPhoto.url || "/placeholder.svg"}
+                alt={selectedPhoto.filename || "Selected photo"}
+                width={800}
+                height={600}
+                className={`max-w-full max-h-full object-contain ${
+                  // Make Expert and Dependability awards smaller in main view
+                  selectedPhoto.tags?.includes("expert") || selectedPhoto.tags?.includes("dependability")
+                    ? "scale-75"
+                    : ""
+                }`}
+                onError={(e) => {
+                  console.error("Image failed to load:", selectedPhoto.url)
+                  e.currentTarget.src = "/placeholder.svg?height=600&width=800"
+                }}
+              />
+            </div>
+          ),
+          thumbnails: () => (
+            <div className="absolute left-0 right-0 bottom-0 h-20 bg-black/50 flex items-center justify-center gap-2">
+              {photos.map((photo, idx) => (
+                <div
+                  key={idx}
+                  className="relative w-20 h-16 cursor-pointer overflow-hidden"
+                  onClick={() => setSelectedPhotoIndex(idx)}
+                >
+                  <Image
+                    src={photo.url || "/placeholder.svg"}
+                    alt={photo.filename || `Photo ${idx + 1}`}
+                    fill
+                    className={`object-contain transition-all duration-200 ${
+                      selectedPhotoIndex === idx ? "ring-2 ring-blue-500" : ""
+                    } ${
+                      // Make Expert and Dependability awards smaller in thumbnails
+                      photo.tags?.includes("expert") || photo.tags?.includes("dependability") ? "scale-75" : ""
+                    }`}
+                    sizes="80px"
+                  />
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <p>No photos in album yet. Upload photos to get started.</p>
-            </div>
-          )}
-
-          {photos.length > 0 && (
-            <Button type="button" variant="outline" className="w-full" onClick={handleOpenAlbum}>
-              View Photo Album
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Photo Album</DialogTitle>
-          </DialogHeader>
-
-          <div className="relative">
-            {photos.length > 0 ? (
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                <img
-                  src={photos[currentIndex]?.url || "/placeholder.svg"}
-                  alt={`Photo ${currentIndex + 1}`}
-                  className="w-full h-full object-contain"
-                />
-
-                <div className="absolute bottom-2 left-0 right-0 text-center text-white text-sm">
-                  {currentIndex + 1} of {photos.length}
-                </div>
-
-                {photos.length > 1 && (
-                  <>
-                    <button
-                      onClick={handlePrev}
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
-                    >
-                      <ChevronLeft size={24} />
-                    </button>
-                    <button
-                      onClick={handleNext}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
-                    >
-                      <ChevronRight size={24} />
-                    </button>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                <p className="text-gray-500">No photos in album</p>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-4 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-24 overflow-y-auto">
-            {photos.map((photo, index) => (
-              <div
-                key={photo.id}
-                className={`aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${
-                  index === currentIndex ? "border-blue-500" : "border-transparent"
-                }`}
-                onClick={() => setCurrentIndex(index)}
-              >
-                <LazyImage src={photo.url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+          ),
+        }}
+      />
+    </div>
   )
 }
+
+export default PhotoAlbum

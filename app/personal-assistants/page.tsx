@@ -582,7 +582,7 @@ export default function PersonalAssistantsPage() {
                   </div>
                 </div>
 
-                {/* Photo Gallery at Bottom - Landscape sized photos */}
+                {/* Photo Gallery at Bottom - Updated to 220px × 220px photos */}
                 <div className="mt-6 pt-4 border-t border-gray-200">
                   <div className="flex items-center space-x-2">
                     <Button
@@ -597,19 +597,19 @@ export default function PersonalAssistantsPage() {
 
                     <div className="flex space-x-2 overflow-hidden flex-1">
                       {loadingPhotos[provider.id] ? (
-                        <div className="flex items-center justify-center w-full h-32">
+                        <div className="flex items-center justify-center w-full h-[220px]">
                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                         </div>
                       ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
                         businessPhotos[provider.id]
                           .slice(carouselIndex[provider.id] || 0, (carouselIndex[provider.id] || 0) + 5)
                           .map((photo, index) => (
-                            <div key={photo.id} className="flex-shrink-0 w-32 h-32">
+                            <div key={photo.id} className="flex-shrink-0 w-[220px] h-[220px]">
                               <Image
                                 src={`https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${photo.cloudflareImageId}/public`}
                                 alt={photo.filename || `Photo ${index + 1}`}
-                                width={128}
-                                height={128}
+                                width={220}
+                                height={220}
                                 className="w-full h-full object-cover rounded-lg"
                                 onError={(e) => {
                                   // Fallback to original URL if Cloudflare fails
@@ -619,7 +619,7 @@ export default function PersonalAssistantsPage() {
                             </div>
                           ))
                       ) : (
-                        <div className="flex items-center justify-center w-full h-32 bg-gray-100 rounded-lg">
+                        <div className="flex items-center justify-center w-full h-[220px] bg-gray-100 rounded-lg">
                           <div className="text-center">
                             <Camera className="w-8 h-8 mx-auto text-gray-400 mb-1" />
                             <span className="text-gray-500 text-sm">No photos available</span>

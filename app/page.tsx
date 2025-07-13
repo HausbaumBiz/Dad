@@ -13,7 +13,6 @@ import { ZipCodeDialog } from "@/components/zip-code-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { UserMenu } from "@/components/user-menu"
 import { CategorySubcategories } from "@/components/category-subcategories"
-import { setCurrentZipCode } from "@/lib/analytics-utils"
 
 export default function HomePage() {
   const { toast } = useToast()
@@ -30,8 +29,6 @@ export default function HomePage() {
     if (savedZip) {
       setSavedZipCode(savedZip)
       setCategoriesActive(true)
-      // Also set this as the current ZIP code for analytics
-      setCurrentZipCode(savedZip)
     }
 
     // Check for registration success cookie
@@ -92,9 +89,6 @@ export default function HomePage() {
       localStorage.setItem("savedZipCode", zipCode)
       setSavedZipCode(zipCode)
 
-      // Set as current ZIP code for analytics tracking
-      setCurrentZipCode(zipCode)
-
       // Enable categories
       setCategoriesActive(true)
 
@@ -103,7 +97,7 @@ export default function HomePage() {
         description: `Now showing businesses in area ${zipCode}`,
       })
 
-      console.log(`✅ ZIP code ${zipCode} saved and set for analytics tracking`)
+      console.log(`✅ ZIP code ${zipCode} saved`)
     } else {
       alert("Please enter a Zip Code.")
     }
@@ -124,9 +118,6 @@ export default function HomePage() {
     localStorage.setItem("savedZipCode", zipCodeValue)
     setSavedZipCode(zipCodeValue)
 
-    // Set as current ZIP code for analytics tracking
-    setCurrentZipCode(zipCodeValue)
-
     setCategoriesActive(true)
 
     // If there was a selected category, navigate to it after setting the zip code
@@ -137,7 +128,7 @@ export default function HomePage() {
       window.location.href = url.toString()
     }
 
-    console.log(`✅ ZIP code ${zipCodeValue} saved and set for analytics tracking`)
+    console.log(`✅ ZIP code ${zipCodeValue} saved`)
   }
 
   const handleSubcategorySelection = (categoryTitle: string, selected: string[]) => {

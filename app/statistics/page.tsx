@@ -3,14 +3,16 @@
 import { useState, useEffect } from "react"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MapPin, RefreshCw } from "lucide-react"
+import { MapPin, RefreshCw, Star } from "lucide-react"
 import { getBusinessAnalytics, resetBusinessAnalytics, type ZipCodeAnalytics } from "@/app/actions/analytics-actions"
+import { getBusinessReviews, type Review } from "@/app/actions/review-actions"
 import { useToast } from "@/components/ui/use-toast"
-import Link from "next/link"
+import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { uploadPhoto } from "@/app/actions/media-actions"
 
 // Mock business data - in real app this would come from auth/session
 const CURRENT_BUSINESS = {
@@ -26,7 +28,7 @@ interface BusinessAnalytics {
   contactClicks: number
   websiteClicks: number
   phoneClicks: number
-  photoAlbumClicks: number
+  photoClicks: number
   couponClicks: number
   jobClicks: number
   zipCodeAnalytics: ZipCodeAnalytics[]
@@ -106,6 +108,36 @@ const getDaysUntilExpirationClient = (expirationDate: string): number => {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 }
 
+// Star rating component
+const StarRating = ({
+  rating,
+  maxStars = 5,
+  fiveStarCount,
+}: { rating: number; maxStars?: number; fiveStarCount?: number }) => {
+  return (
+    <div className="flex items-center gap-1">
+      {[...Array(maxStars)].map((_, index) => (
+        <Star
+          key={index}
+          className={`h-4 w-4 ${
+            index < Math.floor(rating)
+              ? "fill-yellow-400 text-yellow-400"
+              : index < rating
+                ? "fill-yellow-200 text-yellow-400"
+                : "fill-gray-200 text-gray-300"
+          }`}
+        />
+      ))}
+      <span className="ml-2 text-sm font-medium">{rating.toFixed(1)}/5</span>
+      {fiveStarCount !== undefined && (
+        <span className="ml-2 text-xs text-gray-500 bg-yellow-50 px-2 py-1 rounded-full border border-yellow-200">
+          {fiveStarCount} × 5⭐
+        </span>
+      )}
+    </div>
+  )
+}
+
 export default function StatisticsPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("overview")
@@ -144,6 +176,10 @@ export default function StatisticsPage() {
   const [zipCodeAnalytics, setZipCodeAnalytics] = useState<ZipCodeAnalytics[]>([])
   const [isZipCodeAnalyticsLoading, setIsZipCodeAnalyticsLoading] = useState(true)
 
+  // Reviews state
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [isReviewsLoading, setIsReviewsLoading] = useState(true)
+
   // Add these new state variables after the existing state declarations
   const [removingJobs, setRemovingJobs] = useState<Set<string>>(new Set())
   const [removedJobs, setRemovedJobs] = useState<Map<string, JobListing>>(new Map())
@@ -154,6 +190,7 @@ export default function StatisticsPage() {
     categories: number
     willRemoveFrom: string[]
   } | null>(null)
+  const [addingAwardToPhotos, setAddingAwardToPhotos] = useState<string | null>(null)
 
   // Load analytics data
   useEffect(() => {
@@ -196,6 +233,44 @@ export default function StatisticsPage() {
     }
 
     loadAnalytics()
+  }, [businessId, toast])
+
+  // Load reviews data
+  useEffect(() => {
+    async function loadReviews() {
+      setIsReviewsLoading(true)
+      try {
+        // Use the current business ID or a default
+        let currentBusinessId = businessId
+        try {
+          const loggedInBusiness = await getCurrentBusiness()
+          if (loggedInBusiness && loggedInBusiness.id) {
+            currentBusinessId = loggedInBusiness.id
+            setBusinessId(currentBusinessId)
+          }
+        } catch (error) {
+          console.error("Error getting logged-in business:", error)
+        }
+
+        if (!currentBusinessId) {
+          currentBusinessId = "demo-business"
+        }
+
+        const businessReviews = await getBusinessReviews(currentBusinessId)
+        setReviews(businessReviews)
+      } catch (error) {
+        console.error("Error loading reviews:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load reviews data",
+          variant: "destructive",
+        })
+      } finally {
+        setIsReviewsLoading(false)
+      }
+    }
+
+    loadReviews()
   }, [businessId, toast])
 
   // Handle analytics reset
@@ -809,48 +884,49 @@ export default function StatisticsPage() {
     return `${month}/${day}/${year}`
   }
 
-  // Sample data for awards
+  // Calculate 5-star counts for each rating category
+  const calculateFiveStarCounts = () => {
+    const counts = {
+      serviceQuality: 0,
+      costTransparency: 0,
+      communication: 0,
+      expertise: 0,
+      dependability: 0,
+      professionalism: 0,
+    }
+
+    reviews.forEach((review) => {
+      if (review.ratings) {
+        if (review.ratings.serviceQuality === 5) counts.serviceQuality++
+        if (review.ratings.costTransparency === 5) counts.costTransparency++
+        if (review.ratings.communication === 5) counts.communication++
+        if (review.ratings.expertise === 5) counts.expertise++
+        if (review.ratings.dependability === 5) counts.dependability++
+        if (review.ratings.professionalism === 5) counts.professionalism++
+      }
+    })
+
+    return counts
+  }
+
+  const fiveStarCounts = calculateFiveStarCounts()
+
+  // Sample data for awards with silver versions when 5 five-star reviews are reached
   const awards = [
-    {
-      id: 1,
-      name: "5 Reviews",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/5-XXbasTPRdhijVULbzWLdhhO5VXLBIl.png",
-      unlocked: false,
-    },
-    {
-      id: 2,
-      name: "10 Reviews",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/10-mCfMVYva2OJFWDVunu4j7xQxDPLI30.png",
-      unlocked: false,
-    },
-    {
-      id: 3,
-      name: "25 Reviews",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/25-4-tOMvN86hcimeoIQC4tpVGuo2nqtoJP.png",
-      unlocked: false,
-    },
-    {
-      id: 4,
-      name: "50 Reviews",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/50-2-tgvmD4HzJ11m4h3EmJczCHMAyXQKIt.png",
-      unlocked: false,
-    },
     {
       id: 5,
       name: "Quality",
       image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/quality-QjhKw0vxK2AcjsXlQ5zH9bUet8u1Fu.png",
+      silverImage: getCloudflareImageUrl("754573e6-6f05-415f-6cdb-51e905503700"),
+      hiResImage: getCloudflareImageUrl("754573e6-6f05-415f-6cdb-51e905503700", "public"), // Full resolution
       unlocked: false,
     },
     {
       id: 6,
       name: "On Budget",
       image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/onbudget-lT4a3ega5RtBQbrWCP6lhmC7pPe33A.png",
-      unlocked: false,
-    },
-    {
-      id: 7,
-      name: "Kindness",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/Kindness-HJQxl9RBay08M467uuvppCrPPYUww5.png",
+      silverImage: getCloudflareImageUrl("9420a0c8-fbd3-4e9d-262e-72f75ab20800"),
+      hiResImage: getCloudflareImageUrl("9420a0c8-fbd3-4e9d-262e-72f75ab20800", "public"),
       unlocked: false,
     },
     {
@@ -858,18 +934,24 @@ export default function StatisticsPage() {
       name: "Keeping Informed",
       image:
         "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/keepinginformed02-r27QrB4vwJ2IHUtyACOfiLtxnzjnHw.png",
+      silverImage: getCloudflareImageUrl("2f5566e7-8eaa-41b6-d165-0a5065cc9100"),
+      hiResImage: getCloudflareImageUrl("2f5566e7-8eaa-41b6-d165-0a5065cc9100", "public"),
       unlocked: false,
     },
     {
       id: 9,
       name: "Expert",
       image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/Expert-QVOr3upidxlzQ8tODpAEbNyCaHmZkg.png",
+      silverImage: getCloudflareImageUrl("64116b46-cb9e-416d-26bf-08a825b15400"),
+      hiResImage: getCloudflareImageUrl("64116b46-cb9e-416d-26bf-08a825b15400", "public"),
       unlocked: false,
     },
     {
       id: 10,
       name: "Dependability",
       image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/dependability-3uL8ZAla0UzLWdvoQ8nyLH2JI4lPzi.png",
+      silverImage: getCloudflareImageUrl("47db0bd7-4db1-4529-aee9-2d831445c200"),
+      hiResImage: getCloudflareImageUrl("47db0bd7-4db1-4529-aee9-2d831445c200", "public"),
       unlocked: false,
     },
     {
@@ -877,74 +959,126 @@ export default function StatisticsPage() {
       name: "Customer Service",
       image:
         "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/CustomerServic-2-eVctv27m01myFPW9mAhgfHGtoECddh.png",
+      silverImage: getCloudflareImageUrl("4386e640-8479-491a-310f-1b8d7c626300"),
+      hiResImage: getCloudflareImageUrl("4386e640-8479-491a-310f-1b8d7c626300", "public"),
       unlocked: false,
     },
   ]
 
-  // Sample data for customer ratings
+  // Calculate average ratings from reviews
+  const calculateAverageRatings = () => {
+    if (reviews.length === 0) {
+      return {
+        serviceQuality: 0,
+        costTransparency: 0,
+        communication: 0,
+        expertise: 0,
+        dependability: 0,
+        professionalism: 0,
+      }
+    }
+
+    const totals = {
+      serviceQuality: 0,
+      costTransparency: 0,
+      communication: 0,
+      expertise: 0,
+      dependability: 0,
+      professionalism: 0,
+    }
+
+    reviews.forEach((review) => {
+      if (review.ratings) {
+        totals.serviceQuality += review.ratings.serviceQuality || 0
+        totals.costTransparency += review.ratings.costTransparency || 0
+        totals.communication += review.ratings.communication || 0
+        totals.expertise += review.ratings.expertise || 0
+        totals.dependability += review.ratings.dependability || 0
+        totals.professionalism += review.ratings.professionalism || 0
+      }
+    })
+
+    return {
+      serviceQuality: totals.serviceQuality / reviews.length,
+      costTransparency: totals.costTransparency / reviews.length,
+      communication: totals.communication / reviews.length,
+      expertise: totals.expertise / reviews.length,
+      dependability: totals.dependability / reviews.length,
+      professionalism: totals.professionalism / reviews.length,
+    }
+  }
+
+  const averageRatings = calculateAverageRatings()
+
+  // Customer ratings with actual data from reviews
   const ratings = [
     {
       question: "How would you rate the quality of the service you received?",
-      rating: "Not available/5",
+      rating: averageRatings.serviceQuality,
+      key: "serviceQuality",
+      fiveStarCount: fiveStarCounts.serviceQuality,
     },
     {
       question: "Was the final cost reflective of the quoted cost or were added charges reasonable and explained?",
-      rating: "Not available/5",
+      rating: averageRatings.costTransparency,
+      key: "costTransparency",
+      fiveStarCount: fiveStarCounts.costTransparency,
     },
     {
       question: "How would you rate the communication throughout the process?",
-      rating: "Not available/5",
+      rating: averageRatings.communication,
+      key: "communication",
+      fiveStarCount: fiveStarCounts.communication,
     },
     {
       question: "Was your hire an expert in their field?",
-      rating: "Not available/5",
+      rating: averageRatings.expertise,
+      key: "expertise",
+      fiveStarCount: fiveStarCounts.expertise,
     },
     {
       question: "Was your hire dependable and true to their word?",
-      rating: "Not available/5",
+      rating: averageRatings.dependability,
+      key: "dependability",
+      fiveStarCount: fiveStarCounts.dependability,
     },
     {
       question: "Was your hire professional and courteous?",
-      rating: "Not available/5",
+      rating: averageRatings.professionalism,
+      key: "professionalism",
+      fiveStarCount: fiveStarCounts.professionalism,
     },
   ]
 
-  // Updated clicks statistics with real data including photo album views
+  // Updated clicks statistics with real data and category labels
   const clicksStats = [
     {
       title: "Profile Views",
       yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.profileViews?.toString() || "0",
-      competitorStats: "145",
     },
     {
       title: "Video Views",
       yourStats: "0",
-      competitorStats: "124",
     },
     {
       title: "Photo Album Views",
       yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.photoAlbumClicks?.toString() || "0",
-      competitorStats: "89",
     },
     {
       title: "Coupons Clipped",
       yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.couponClicks?.toString() || "0",
-      competitorStats: "37",
     },
     {
       title: "Job Opportunity Views",
       yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.jobClicks?.toString() || "0",
-      competitorStats: "43",
     },
     {
       title: "Phone Number Clicks",
       yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.phoneClicks?.toString() || "0",
-      competitorStats: "56",
     },
     {
       title: "Website Clicks",
       yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.websiteClicks?.toString() || "0",
-      competitorStats: "72",
     },
   ]
 
@@ -1050,6 +1184,63 @@ export default function StatisticsPage() {
         {daysUntilExpiration} days left
       </span>
     )
+  }
+
+  const handleAddAwardToPhotos = async (award: any, isUnlocked: boolean) => {
+    if (!businessId) {
+      toast({
+        title: "Error",
+        description: "No business ID found",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setAddingAwardToPhotos(award.id)
+
+    try {
+      // Use the hi-res image URL for the photo album
+      const imageUrl = isUnlocked ? award.hiResImage : award.image
+
+      // Fetch the image
+      const response = await fetch(imageUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`)
+      }
+
+      const blob = await response.blob()
+
+      // Create a file from the blob
+      const fileName = `${award.name.toLowerCase().replace(/\s+/g, "-")}-award-${isUnlocked ? "silver" : "bronze"}.png`
+      const file = new File([blob], fileName, { type: blob.type })
+
+      // Create form data
+      const formData = new FormData()
+      formData.append("businessId", businessId)
+      formData.append("photo", file)
+      formData.append("tags", JSON.stringify(["award", award.name.toLowerCase(), isUnlocked ? "silver" : "bronze"]))
+
+      // Upload the photo
+      const result = await uploadPhoto(formData)
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `${award.name} award added to your photo album!`,
+        })
+      } else {
+        throw new Error(result.error || "Failed to add award to photos")
+      }
+    } catch (error) {
+      console.error("Error adding award to photos:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add award to photos",
+        variant: "destructive",
+      })
+    } finally {
+      setAddingAwardToPhotos(null)
+    }
   }
 
   return (
@@ -1368,64 +1559,20 @@ export default function StatisticsPage() {
                     <CardTitle className="text-lg">{stat.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Your Stats:</span>
-                        <span className="text-2xl font-bold text-blue-600">{stat.yourStats}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Competitor Average:</span>
-                        <span className="text-lg font-medium text-gray-500">{stat.competitorStats}</span>
-                      </div>
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-blue-600 mb-2">{stat.yourStats}x</div>
+                      <div className="text-sm text-gray-500">Total Clicks</div>
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            {/* Total Events Summary */}
+            {/* ZIP Code Analytics */}
             <Card>
               <CardHeader>
-                <CardTitle>Total Analytics Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {isAnalyticsLoading ? "..." : clickAnalytics?.totalEvents || 0}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Events</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {isAnalyticsLoading ? "..." : clickAnalytics?.profileViews || 0}
-                    </div>
-                    <div className="text-sm text-gray-600">Profile Views</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {isAnalyticsLoading ? "..." : clickAnalytics?.photoAlbumClicks || 0}
-                    </div>
-                    <div className="text-sm text-gray-600">Photo Album Views</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {isAnalyticsLoading
-                        ? "..."
-                        : (clickAnalytics?.phoneClicks || 0) + (clickAnalytics?.websiteClicks || 0)}
-                    </div>
-                    <div className="text-sm text-gray-600">Contact Actions</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Details Tab */}
-          <TabsContent value="details" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>ZIP Code Analytics</CardTitle>
+                <CardTitle>ZIP Code Analytics - Profile Views</CardTitle>
+                <CardDescription>ZIP codes where users have viewed your business profile</CardDescription>
               </CardHeader>
               <CardContent>
                 {isZipCodeAnalyticsLoading ? (
@@ -1434,100 +1581,183 @@ export default function StatisticsPage() {
                     <span className="ml-2">Loading ZIP code analytics...</span>
                   </div>
                 ) : zipCodeAnalytics.length > 0 ? (
-                  <div className="space-y-3">
-                    {zipCodeAnalytics.map((zipData, index) => (
-                      <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <span className="font-mono font-medium">{zipData.zipCode}</span>
-                          {zipData.city && zipData.state && (
-                            <span className="text-sm text-gray-600 ml-2">
-                              ({zipData.city}, {zipData.state})
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium">{zipData.count} views</div>
-                          {zipData.lastViewed && (
-                            <div className="text-xs text-gray-500">
-                              Last: {new Date(zipData.lastViewed).toLocaleDateString()}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {zipCodeAnalytics
+                        .filter((zipData) => zipData.count > 0) // Only show ZIP codes with profile views
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 12)
+                        .map((zipData) => (
+                          <div key={zipData.zipCode} className="p-4 bg-gray-50 rounded-lg">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-mono font-medium">{zipData.zipCode}</span>
+                              <span className="text-sm font-bold text-blue-600">{zipData.count}</span>
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                            <div className="text-xs text-gray-500 space-y-1">
+                              <div>Profile Views: {zipData.count}</div>
+                              {zipData.city && zipData.state && (
+                                <div className="text-xs text-gray-400">
+                                  {zipData.city}, {zipData.state}
+                                </div>
+                              )}
+                              {zipData.lastViewed && (
+                                <div className="text-xs text-gray-400">
+                                  Last viewed: {new Date(zipData.lastViewed).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    {zipCodeAnalytics.filter((zipData) => zipData.count > 0).length > 12 && (
+                      <p className="text-sm text-gray-500 text-center">
+                        Showing top 12 ZIP codes. Total:{" "}
+                        {zipCodeAnalytics.filter((zipData) => zipData.count > 0).length} ZIP codes with profile views.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-gray-500">No ZIP code analytics data available yet.</p>
+                    <p className="text-gray-500">No profile views from any ZIP codes yet.</p>
                     <p className="text-sm text-gray-400 mt-2">
-                      Data will appear here when users view your business profile from different locations.
+                      ZIP codes will appear here when users view your business profile.
                     </p>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Customer Ratings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {ratings.map((rating, index) => (
-                    <div key={index} className="border-b pb-4 last:border-b-0">
-                      <p className="text-sm text-gray-700 mb-2">{rating.question}</p>
-                      <p className="font-medium text-gray-900">{rating.rating}</p>
+          {/* Details Tab */}
+          <TabsContent value="details" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Customer Ratings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Customer Ratings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isReviewsLoading ? (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <span className="ml-2">Loading ratings...</span>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Awards & Achievements</CardTitle>
-                <Link href="/awards-explained" className="text-sm text-blue-600 hover:underline">
-                  How awards work
-                </Link>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {awards.map((award) => (
-                    <div key={award.id} className="text-center">
-                      <div className={`relative ${award.unlocked ? "" : "opacity-30"}`}>
-                        <Image
-                          src={award.image || "/placeholder.svg"}
-                          alt={award.name}
-                          width={80}
-                          height={80}
-                          className="mx-auto mb-2"
-                        />
-                        {!award.unlocked && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="bg-gray-800 bg-opacity-75 text-white text-xs px-2 py-1 rounded">Locked</div>
-                          </div>
-                        )}
+                  ) : (
+                    ratings.map((rating, index) => (
+                      <div key={index} className="space-y-2">
+                        <p className="text-sm text-gray-600">{rating.question}</p>
+                        <StarRating rating={rating.rating} fiveStarCount={rating.fiveStarCount} />
                       </div>
-                      <p className="text-sm font-medium">{award.name}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Awards */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Awards</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    {awards.map((award, index) => {
+                      const fiveStarCount = Object.values(fiveStarCounts)[index] || 0
+                      const isUnlocked = fiveStarCount >= 5
+
+                      return (
+                        <div key={award.id} className="text-center">
+                          <div
+                            className={`relative mx-auto mb-2 ${!isUnlocked ? "opacity-30 grayscale" : ""} ${
+                              award.name === "Expert" ? "w-[72px] h-[72px]" : "w-20 h-20"
+                            }`}
+                          >
+                            <Image
+                              src={isUnlocked ? award.silverImage : award.image}
+                              alt={award.name}
+                              fill
+                              className="object-contain"
+                            />
+                            {!isUnlocked && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                                  Locked
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-sm font-medium">{award.name}</p>
+                          {isUnlocked ? (
+                            <p className="text-xs text-green-600 font-medium">Silver Unlocked!</p>
+                          ) : (
+                            <p className="text-xs text-gray-500">{fiveStarCount}/5 ⭐</p>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAddAwardToPhotos(award, isUnlocked)}
+                            disabled={addingAwardToPhotos === award.id}
+                            className="mt-2 text-xs px-2 py-1 h-auto"
+                          >
+                            {addingAwardToPhotos === award.id ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Adding...
+                              </>
+                            ) : (
+                              "Add to Photos"
+                            )}
+                          </Button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <p className="text-sm text-blue-700">
+                      <strong>Award Tiers:</strong> 5 five-star reviews = Silver • 10 five-star reviews = Bronze • 25
+                      five-star reviews = Gold
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Outreach Tab */}
           <TabsContent value="outreach" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Outreach Opportunities</CardTitle>
+                <CardTitle>Outreach Tools</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <p className="text-gray-500">Outreach features coming soon!</p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    This section will help you connect with potential customers in your area.
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-6 border rounded-lg">
+                    <h3 className="text-lg font-medium mb-2">Email Marketing</h3>
+                    <p className="text-gray-600 mb-4">Send newsletters and promotions to your customers.</p>
+                    <Button variant="outline" className="w-full bg-transparent">
+                      Coming Soon
+                    </Button>
+                  </div>
+                  <div className="p-6 border rounded-lg">
+                    <h3 className="text-lg font-medium mb-2">Social Media</h3>
+                    <p className="text-gray-600 mb-4">Share your business updates on social platforms.</p>
+                    <Button variant="outline" className="w-full bg-transparent">
+                      Coming Soon
+                    </Button>
+                  </div>
+                  <div className="p-6 border rounded-lg">
+                    <h3 className="text-lg font-medium mb-2">Customer Surveys</h3>
+                    <p className="text-gray-600 mb-4">Collect feedback from your customers.</p>
+                    <Button variant="outline" className="w-full bg-transparent">
+                      Coming Soon
+                    </Button>
+                  </div>
+                  <div className="p-6 border rounded-lg">
+                    <h3 className="text-lg font-medium mb-2">Referral Program</h3>
+                    <p className="text-gray-600 mb-4">Encourage customers to refer new business.</p>
+                    <Button variant="outline" className="w-full bg-transparent">
+                      Coming Soon
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1537,7 +1767,7 @@ export default function StatisticsPage() {
 
       <MainFooter />
 
-      {/* Remove Category Confirmation Dialog */}
+      {/* Remove Category Dialog */}
       <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1549,7 +1779,7 @@ export default function StatisticsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRemoveCategory} disabled={isRemoving}>
+            <AlertDialogAction onClick={confirmRemoveCategory} disabled={isRemoving} className="bg-red-600">
               {isRemoving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -12,6 +12,7 @@ interface PhotoCarouselProps {
   className?: string
   showMultiple?: boolean
   photosPerView?: number
+  size?: "small" | "medium" // new prop to control size
 }
 
 export function PhotoCarousel({
@@ -21,6 +22,7 @@ export function PhotoCarousel({
   className = "",
   showMultiple = false,
   photosPerView = 1,
+  size = "small", // default to small size
 }: PhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [hasLoadedPhotos, setHasLoadedPhotos] = useState(false)
@@ -50,6 +52,18 @@ export function PhotoCarousel({
     }
   }
 
+  let containerWidthClass = "w-40" // Default width
+  let imageHeightClass = "h-30" // Default height
+  let imageWidth = 160 // Default width
+  let imageHeight = 120 // Default height
+
+  if (size === "medium") {
+    containerWidthClass = "w-[220px]"
+    imageHeightClass = "h-[220px]"
+    imageWidth = 220
+    imageHeight = 220
+  }
+
   if (!photos || photos.length === 0) {
     return (
       <div
@@ -71,12 +85,14 @@ export function PhotoCarousel({
       <div className={`relative ${className}`}>
         <div className="flex gap-2 overflow-hidden">
           {visiblePhotos.map((photo, index) => (
-            <div key={currentIndex + index} className="flex-1 min-w-0">
+            <div key={currentIndex + index} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
               <LazyImage
                 src={photo}
                 alt={`Business photo ${currentIndex + index + 1}`}
-                className="w-full h-32 object-cover rounded-lg"
+                className="w-full h-full object-cover rounded-lg"
                 placeholderSrc="/placeholder.svg"
+                width={imageWidth}
+                height={imageHeight}
               />
             </div>
           ))}
@@ -84,8 +100,8 @@ export function PhotoCarousel({
           {/* Fill remaining slots if we have fewer photos than photosPerView */}
           {visiblePhotos.length < photosPerView &&
             Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
-              <div key={`empty-${index}`} className="flex-1 min-w-0">
-                <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
+              <div key={`empty-${index}`} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
+                <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
                   <Camera className="h-6 w-6 text-gray-400" />
                 </div>
               </div>
@@ -128,6 +144,8 @@ export function PhotoCarousel({
         alt={`Business photo ${currentIndex + 1}`}
         className="w-full h-full object-cover"
         placeholderSrc="/placeholder.svg"
+        width={imageWidth}
+        height={imageHeight}
       />
 
       {photos.length > 1 && (
