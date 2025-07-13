@@ -498,7 +498,7 @@ export default function PhotoAlbumPage() {
               <p className="text-sm text-gray-500">Upload images to your photo album</p>
               <p className="text-xs text-gray-400">Supported formats: JPEG, PNG, GIF, WebP</p>
             </div>
-            <Button variant="outline" className="mt-4" onClick={() => setShowUploader(true)}>
+            <Button variant="outline" className="mt-4 bg-transparent" onClick={() => setShowUploader(true)}>
               <Upload className="mr-2 h-4 w-4" />
               Upload Photos
             </Button>
@@ -775,7 +775,7 @@ export default function PhotoAlbumPage() {
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 justify-items-center"
             >
               {filteredPhotos.map((photo, index) => (
                 <Draggable key={photo.id} draggableId={photo.id} index={index} isDragDisabled={!isEditMode}>
@@ -798,7 +798,7 @@ export default function PhotoAlbumPage() {
                           <img
                             src={photo.url || "/placeholder.svg"}
                             alt={photo.filename}
-                            className={`w-full h-32 object-cover rounded-md ${isEditMode ? "cursor-move" : "cursor-pointer"}`}
+                            className={`w-[220px] h-[220px] object-cover rounded-md ${isEditMode ? "cursor-move" : "cursor-pointer"}`}
                             onClick={isEditMode ? undefined : () => openPhotoDetail(photo)}
                           />
                           {!isEditMode && (

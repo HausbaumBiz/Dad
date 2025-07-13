@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { ChevronLeft, ChevronRight, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LazyImage } from "@/components/lazy-image"
+import { useMobile } from "@/hooks/use-mobile"
 
 interface PhotoCarouselProps {
   businessId: string
@@ -26,6 +27,7 @@ export function PhotoCarousel({
 }: PhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [hasLoadedPhotos, setHasLoadedPhotos] = useState(false)
+  const isMobile = useMobile()
 
   useEffect(() => {
     if (!hasLoadedPhotos) {
@@ -64,6 +66,9 @@ export function PhotoCarousel({
     imageHeight = 220
   }
 
+  // Determine photos per view based on screen size
+  const currentPhotosPerView = isMobile ? 2 : photosPerView
+
   if (!photos || photos.length === 0) {
     return (
       <div
@@ -78,8 +83,8 @@ export function PhotoCarousel({
   }
 
   if (showMultiple) {
-    const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
-    const canNavigate = photos.length > photosPerView
+    const visiblePhotos = photos.slice(currentIndex, currentIndex + currentPhotosPerView)
+    const canNavigate = photos.length > currentPhotosPerView
 
     return (
       <div className={`relative ${className}`}>
@@ -98,8 +103,8 @@ export function PhotoCarousel({
           ))}
 
           {/* Fill remaining slots if we have fewer photos than photosPerView */}
-          {visiblePhotos.length < photosPerView &&
-            Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
+          {visiblePhotos.length < currentPhotosPerView &&
+            Array.from({ length: currentPhotosPerView - visiblePhotos.length }).map((_, index) => (
               <div key={`empty-${index}`} className={`flex-1 min-w-0 ${containerWidthClass} ${imageHeightClass}`}>
                 <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
                   <Camera className="h-6 w-6 text-gray-400" />
@@ -128,7 +133,7 @@ export function PhotoCarousel({
             </Button>
 
             <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-              {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
+              {Math.min(currentIndex + currentPhotosPerView, photos.length)} of {photos.length}
             </div>
           </>
         )}
