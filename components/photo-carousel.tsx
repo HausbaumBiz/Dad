@@ -55,6 +55,23 @@ export function PhotoCarousel({
     }
   }
 
+  // Mobile-specific navigation functions
+  const mobileNext = () => {
+    if (currentIndex < photos.length - 2) {
+      setCurrentIndex((prev) => prev + 1)
+    } else {
+      setCurrentIndex(0) // Loop back to start
+    }
+  }
+
+  const mobilePrev = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex((prev) => prev - 1)
+    } else {
+      setCurrentIndex(Math.max(0, photos.length - 2)) // Go to last possible position
+    }
+  }
+
   let containerWidthClass = "w-40"
   let imageHeightClass = "h-30"
   let imageWidth = 160
@@ -87,51 +104,62 @@ export function PhotoCarousel({
     const canNavigate = photos.length > currentPhotosPerView
 
     if (isMobile) {
-      // Mobile: Horizontal scrolling with native behavior
+      // Mobile: Show exactly 2 square photos that fill the width
+      const visiblePhotos = photos.slice(currentIndex, currentIndex + 2)
+
+      // Fill with placeholder if we have less than 2 photos
+      while (visiblePhotos.length < 2 && photos.length > 0) {
+        visiblePhotos.push(photos[0]) // Repeat first photo as placeholder
+      }
+
       return (
         <div className={`relative ${className}`}>
-          <div
-            ref={carouselRef}
-            className="flex gap-2 overflow-x-scroll"
-            style={{
-              scrollbarWidth: "none",
-              msOverflowStyle: "none",
-              WebkitOverflowScrolling: "touch",
-              touchAction: "pan-x",
-              overscrollBehaviorX: "contain",
-            }}
-            onTouchStart={(e) => {
-              // Prevent parent scroll interference
-              e.stopPropagation()
-            }}
-            onTouchMove={(e) => {
-              // Prevent parent scroll interference
-              e.stopPropagation()
-            }}
-          >
-            {photos.map((photo, index) => (
+          <div className="flex gap-2 overflow-hidden">
+            {visiblePhotos.map((photo, index) => (
               <div
-                key={index}
-                className="flex-shrink-0"
+                key={`${currentIndex}-${index}`}
+                className="flex-1"
                 style={{
-                  width: "130px",
-                  height: "100px",
+                  width: "calc(50% - 4px)",
+                  height: "160px", // Square aspect ratio for mobile
                 }}
               >
                 <LazyImage
                   src={photo}
-                  alt={`Business photo ${index + 1}`}
+                  alt={`Business photo ${currentIndex + index + 1}`}
                   className="w-full h-full object-cover rounded-lg"
                   placeholderSrc="/placeholder.svg"
-                  width={130}
-                  height={100}
+                  width={160}
+                  height={160}
                 />
               </div>
             ))}
           </div>
 
+          {/* Mobile Navigation Arrows - show when more than 2 photos */}
+          {photos.length > 2 && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/70 text-white hover:bg-black/90 p-1 h-8 w-8 z-10 rounded-full"
+                onClick={mobilePrev}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/70 text-white hover:bg-black/90 p-1 h-8 w-8 z-10 rounded-full"
+                onClick={mobileNext}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+
           <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-            {photos.length} photos
+            {Math.min(currentIndex + 2, photos.length)} of {photos.length}
           </div>
         </div>
       )
