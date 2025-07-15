@@ -93,7 +93,7 @@ function formatPhoneNumber(phoneNumberString: string | undefined | null): string
   return phoneNumberString
 }
 
-// Photo Carousel Component - displays exactly 5 photos in landscape format
+// Photo Carousel Component - displays exactly 5 photos in landscape format with mobile responsiveness
 interface PhotoCarouselProps {
   photos: string[]
   businessName: string
@@ -102,7 +102,16 @@ interface PhotoCarouselProps {
 function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  const photosPerView = 5
+  if (!photos || photos.length === 0) {
+    return (
+      <div className="w-full h-24 lg:h-[200px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center">
+        <span className="text-gray-400 text-sm">No Photos Available</span>
+      </div>
+    )
+  }
+
+  // Responsive photos per view: 2 on mobile, 5 on desktop
+  const photosPerView = window.innerWidth < 1024 ? 2 : 5
   const maxIndex = Math.max(0, photos.length - photosPerView)
 
   const nextPhotos = () => {
@@ -113,27 +122,26 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
     setCurrentIndex((prev) => Math.max(prev - 1, 0))
   }
 
-  // Always show exactly 5 slots - smaller size to fit with buttons
   const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
   const emptySlots = Math.max(0, photosPerView - visiblePhotos.length)
 
   return (
-    <div className="hidden lg:block w-full">
+    <div className="w-full">
       <div className="relative group w-full">
-        <div className="flex gap-1.5 justify-center w-full">
-          {/* Show actual photos - smaller size */}
+        <div className="flex gap-1.5 justify-center lg:justify-start w-full">
+          {/* Show actual photos - responsive sizing */}
           {visiblePhotos.map((photo, index) => (
             <div
               key={currentIndex + index}
-              className="w-[220px] h-[220px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
+              className="w-24 h-24 lg:w-[200px] lg:h-[200px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
             >
               <Image
                 src={photo || "/placeholder.svg"}
                 alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={220}
-                height={220}
+                width={200}
+                height={200}
                 className="w-full h-full object-cover"
-                sizes="220px"
+                sizes="(max-width: 1024px) 96px, 200px"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement
                   target.src = "/placeholder.svg"
@@ -142,18 +150,18 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
             </div>
           ))}
 
-          {/* Fill empty slots to always show 5 total - smaller size */}
+          {/* Fill empty slots - responsive count */}
           {Array.from({ length: emptySlots }).map((_, index) => (
             <div
               key={`empty-${index}`}
-              className="w-[220px] h-[220px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0 flex items-center justify-center"
+              className="w-24 h-24 lg:w-[200px] lg:h-[200px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0 flex items-center justify-center"
             >
               <span className="text-gray-400 text-xs">No Photo</span>
             </div>
           ))}
         </div>
 
-        {/* Navigation arrows - only show if there are more than 5 photos */}
+        {/* Navigation arrows - show if there are more photos than can be displayed */}
         {photos.length > photosPerView && (
           <>
             <button
@@ -181,7 +189,7 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
         )}
       </div>
 
-      {/* Pagination dots - only show if there are more than 5 photos */}
+      {/* Pagination dots - show if there are more photos than can be displayed */}
       {photos.length > photosPerView && (
         <div className="flex justify-center mt-1 space-x-1">
           {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
@@ -211,7 +219,7 @@ export default function EducationTutoringPage() {
     { id: "language5", label: "English as a Second Language", value: "English as a Second Language" },
     { id: "language6", label: "Other Language", value: "Other Language" },
     { id: "language7", label: "Math - Elementary", value: "Math - Elementary" },
-    { id: "language8", label: "Math - High School", value: "Math - High School" },
+    { id: "language8", label: "Math - High School", value: "High School" },
     { id: "language9", label: "Reading Tutors (Adult and Children)", value: "Reading Tutors (Adult and Children)" },
     { id: "language10", label: "Test Prep", value: "Test Prep" },
     { id: "language11", label: "Other Subjects", value: "Other Subjects" },
@@ -478,63 +486,76 @@ export default function EducationTutoringPage() {
           {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex flex-col space-y-4">
-                  {/* Business Name and Description */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {business.displayName || business.businessName}
-                    </h3>
-                    {business.businessDescription && (
-                      <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
-                    )}
-                  </div>
-
-                  {/* Main content area with contact info, photos, and buttons */}
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                    {/* Left side - Contact and Location Info */}
-                    <div className="lg:w-56 space-y-2 flex-shrink-0">
-                      {/* Phone */}
+                <div className="space-y-4">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {business.displayLocation && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span>{business.displayLocation}</span>
+                        </div>
+                      )}
                       {(business.displayPhone || business.phone) && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <a
-                            href={`tel:${business.displayPhone || business.phone}`}
-                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                          >
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          <a href={`tel:${business.displayPhone || business.phone}`} className="hover:text-primary">
                             {formatPhoneNumber(business.displayPhone || business.phone)}
                           </a>
                         </div>
                       )}
-
-                      {/* Location */}
-                      {business.displayLocation && (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="text-gray-700 text-sm">{business.displayLocation}</span>
-                        </div>
-                      )}
-
-                      {/* Service Area Indicator */}
-                      {userZipCode && (
-                        <div className="text-xs text-green-600 mt-1">
-                          {business.isNationwide ? (
-                            <span>✓ Serves nationwide</span>
-                          ) : business.serviceArea?.includes(userZipCode) ? (
-                            <span>✓ Serves {userZipCode} and surrounding areas</span>
-                          ) : business.zipCode === userZipCode ? (
-                            <span>✓ Located in {userZipCode}</span>
-                          ) : null}
-                        </div>
-                      )}
                     </div>
 
-                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
-                    <div className="flex-1 flex justify-center">
+                    {/* Business Description */}
+                    {business.businessDescription && (
+                      <p className="text-gray-700 text-sm leading-relaxed">{business.businessDescription}</p>
+                    )}
+
+                    {/* Service Area Indicator */}
+                    {userZipCode && (
+                      <div className="text-xs text-green-600">
+                        {business.isNationwide ? (
+                          <span>✓ Serves nationwide</span>
+                        ) : business.serviceArea?.includes(userZipCode) ? (
+                          <span>✓ Serves {userZipCode} and surrounding areas</span>
+                        ) : business.zipCode === userZipCode ? (
+                          <span>✓ Located in {userZipCode}</span>
+                        ) : null}
+                      </div>
+                    )}
+
+                    {/* Services */}
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
+                          business.allSubcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            Education & Tutoring
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-center lg:items-start">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
                       {loadingPhotos[business.id] ? (
-                        <div className="hidden lg:flex items-center justify-center w-full h-24 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-center w-full h-24 lg:h-[200px] bg-gray-50 rounded-lg">
                           <div className="flex items-center gap-2 text-gray-500">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            <span className="text-xs">Loading photos...</span>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Loading photos...</span>
                           </div>
                         </div>
                       ) : (
@@ -545,45 +566,20 @@ export default function EducationTutoringPage() {
                       )}
                     </div>
 
-                    {/* Right side - Action Buttons */}
-                    <div className="flex flex-col gap-2 lg:items-end lg:w-28 flex-shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenReviews(business)}
-                        className="text-xs min-w-[110px] h-8"
-                      >
-                        Reviews
+                    {/* Action Buttons - Centered on mobile, right-aligned on desktop */}
+                    <div className="w-full lg:w-32 flex flex-row justify-center lg:flex-col gap-2 lg:justify-start">
+                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
+                        Ratings
                       </Button>
                       <Button
-                        variant="default"
-                        size="sm"
+                        variant="outline"
+                        className="flex-1 lg:flex-none lg:w-full bg-transparent"
                         onClick={() => handleOpenProfile(business)}
-                        className="text-xs min-w-[110px] h-8"
                       >
                         View Profile
                       </Button>
                     </div>
                   </div>
-
-                  {/* Subcategories/Services */}
-                  {business.allSubcategories && business.allSubcategories.length > 0 && (
-                    <div className="w-full">
-                      <div className="lg:w-64">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
-                      </div>
-                      <div className="flex flex-wrap gap-2 w-full">
-                        {business.allSubcategories.map((service: any, idx: number) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {getSubcategoryString(service)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>

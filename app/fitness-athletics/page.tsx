@@ -10,10 +10,11 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useState } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useEffect } from "react"
-import { MapPin, Phone, Camera, ChevronLeft, ChevronRight } from "lucide-react"
+import { MapPin, Phone, Loader2 } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
-import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -27,103 +28,6 @@ const getSubcategoryString = (subcategory: any): string => {
   }
 
   return "Unknown Service"
-}
-
-// Photo Carousel Component
-const PhotoCarousel = ({ photos, businessName }: { photos: string[]; businessName: string }) => {
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const photosPerPage = 5
-  const totalPages = Math.ceil(photos.length / photosPerPage)
-
-  const handlePrevious = () => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : totalPages - 1))
-  }
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => (prev < totalPages - 1 ? prev + 1 : 0))
-  }
-
-  const currentPhotos = photos.slice(currentIndex * photosPerPage, (currentIndex + 1) * photosPerPage)
-
-  // Fill empty slots to always show 5 slots
-  const displayPhotos = [...currentPhotos]
-  while (displayPhotos.length < photosPerPage) {
-    displayPhotos.push(null)
-  }
-
-  return (
-    <div className="relative group">
-      {/* Navigation arrows */}
-      {photos.length > photosPerPage && (
-        <>
-          <button
-            onClick={handlePrevious}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="Previous photos"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            onClick={handleNext}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="Next photos"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </>
-      )}
-
-      {/* Photo counter */}
-      {photos.length > photosPerPage && (
-        <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded z-10">
-          {currentIndex * photosPerPage + 1}-{Math.min((currentIndex + 1) * photosPerPage, photos.length)} of{" "}
-          {photos.length}
-        </div>
-      )}
-
-      {/* Photos grid */}
-      <div className="flex gap-2">
-        {displayPhotos.map((photo, index) => (
-          <div key={index} className="w-[220px] h-[220px] flex-shrink-0">
-            {photo ? (
-              <Image
-                src={photo || "/placeholder.svg"}
-                alt={`${businessName} photo ${currentIndex * photosPerPage + index + 1}`}
-                width={220}
-                height={220}
-                className="w-full h-full object-cover rounded-lg"
-                sizes="220px"
-                onError={(e) => {
-                  console.error(`Failed to load image: ${photo}`)
-                  e.currentTarget.src = "/placeholder.svg"
-                }}
-              />
-            ) : (
-              <div className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                <Camera className="h-8 w-8 text-gray-400" />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Pagination dots */}
-      {photos.length > photosPerPage && totalPages > 1 && (
-        <div className="flex justify-center mt-3 gap-1">
-          {Array.from({ length: totalPages }).map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                index === currentIndex ? "bg-primary" : "bg-gray-300"
-              }`}
-              aria-label={`Go to page ${index + 1}`}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function FitnessAthleticsPage() {
@@ -397,6 +301,8 @@ export default function FitnessAthleticsPage() {
     allSubcategories?: any[]
     zipCode?: string
     serviceArea?: string[]
+    isNationwide?: boolean
+    displayLocation?: string
     adDesignData?: {
       businessInfo?: {
         phone?: string
@@ -416,133 +322,46 @@ export default function FitnessAthleticsPage() {
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
-    // If business has no service area defined, fall back to primary zip code
-    if (!business.serviceArea || business.serviceArea.length === 0) {
-      return business.zipCode === zipCode
-    }
-
-    // Check if business serves nationwide (indicated by having "nationwide" in service area)
-    if (business.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))) {
+    // Check if business is nationwide
+    if (business.isNationwide) {
+      console.log(`  - ${business.displayName}: serves nationwide, matches=true`)
       return true
     }
 
-    // Check if the zip code is in the business's service area
-    return business.serviceArea.includes(zipCode)
+    // Check if target zip code is in the service area (direct array)
+    if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
+      const matches = business.serviceArea.includes(zipCode)
+      console.log(
+        `  - ${business.displayName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${zipCode}", matches=${matches}`,
+      )
+      return matches
+    }
+
+    // Fall back to checking primary zip code
+    const businessZip = business.zipCode || ""
+    const matches = businessZip === zipCode
+    console.log(`  - ${business.displayName}: primaryZip="${businessZip}", userZip="${zipCode}", matches=${matches}`)
+    return matches
   }
 
-  // IMPROVED: Function to load photos with better error handling
-  const loadBusinessPhotos = async (businesses: Business[]) => {
-    console.log("[Fitness Athletics] Loading photos for businesses:", businesses.length)
-
-    const photoPromises = businesses.map(async (business) => {
-      try {
-        console.log(`[Fitness Athletics] Processing business ${business.displayName || business.name}:`, {
-          id: business.id,
-        })
-
-        let photoUrls: string[] = []
-
-        try {
-          // Method 1: Try to get photos from the photo album API endpoint
-          const response = await fetch(`/api/businesses/${business.id}/photos`)
-
-          if (response.ok) {
-            const photoData = await response.json()
-            console.log(`[Fitness Athletics] Got photos from API for ${business.id}:`, photoData)
-
-            if (photoData.success && photoData.photos && Array.isArray(photoData.photos)) {
-              photoUrls = photoData.photos
-                .map((photoId: string) => {
-                  try {
-                    // If it's already a full URL, use it
-                    if (photoId.startsWith("http")) return photoId
-                    // Otherwise, generate Cloudflare URL
-                    return getCloudflareImageUrl(photoId, "public")
-                  } catch (error) {
-                    console.error(`[Fitness Athletics] Error generating URL for photo ${photoId}:`, error)
-                    return null
-                  }
-                })
-                .filter((url: string | null): url is string => url !== null)
-            }
-          } else {
-            console.log(
-              `[Fitness Athletics] API response not OK for ${business.id}:`,
-              response.status,
-              response.statusText,
-            )
-          }
-        } catch (apiError) {
-          console.log(`[Fitness Athletics] API fetch failed for ${business.id}:`, apiError)
-        }
-
-        // Method 2: If API failed or returned no photos, try direct data access
-        if (photoUrls.length === 0) {
-          console.log(`[Fitness Athletics] Trying direct data access for ${business.id}`)
-
-          const allPhotoSources = [
-            ...(business.photoAlbum || []),
-            ...(business.media?.photoAlbum || []),
-            ...(business.adDesign?.photoAlbum || []),
-            ...(business.adDesignData?.photoAlbum || []),
-          ]
-
-          console.log(`[Fitness Athletics] Direct photo sources for ${business.id}:`, allPhotoSources)
-
-          photoUrls = allPhotoSources
-            .map((photo) => {
-              try {
-                let photoId = null
-                if (typeof photo === "string") {
-                  photoId = photo
-                } else if (photo && typeof photo === "object") {
-                  photoId = photo.id || photo.imageId || photo.url || photo.cloudflareId
-                }
-
-                if (!photoId) {
-                  return null
-                }
-
-                // If it's already a full URL, use it
-                if (typeof photoId === "string" && photoId.startsWith("http")) {
-                  return photoId
-                }
-
-                // Generate Cloudflare public URL
-                return getCloudflareImageUrl(photoId, "public")
-              } catch (error) {
-                console.error(`[Fitness Athletics] Error processing photo:`, photo, error)
-                return null
-              }
-            })
-            .filter((url): url is string => url !== null)
-        }
-
-        console.log(`[Fitness Athletics] Final photo URLs for ${business.displayName || business.name}:`, photoUrls)
-
-        return { businessId: business.id, photos: photoUrls }
-      } catch (error) {
-        console.error(`[Fitness Athletics] Error loading photos for business ${business.id}:`, error)
-        return { businessId: business.id, photos: [] }
-      }
-    })
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) {
+      return // Already loaded
+    }
 
     try {
-      const results = await Promise.all(photoPromises)
-      const photosMap = results.reduce(
-        (acc, { businessId, photos }) => {
-          acc[businessId] = photos
-          return acc
-        },
-        {} as Record<string, string[]>,
-      )
-
-      console.log("[Fitness Athletics] Final photos map:", photosMap)
-      setBusinessPhotos(photosMap)
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
     } catch (error) {
-      console.error("[Fitness Athletics] Error in Promise.all for photo loading:", error)
-      // Set empty photos map on error
-      setBusinessPhotos({})
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
     }
   }
 
@@ -589,9 +408,6 @@ export default function FitnessAthleticsPage() {
         // Use businesses as-is without adding default subcategories
         setAllProviders(filteredBusinesses)
         setFilteredProviders(filteredBusinesses)
-
-        // Load photos for businesses
-        await loadBusinessPhotos(filteredBusinesses)
       } catch (err) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -654,67 +470,78 @@ export default function FitnessAthleticsPage() {
       </div>
 
       {/* Enhanced Filter Controls */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-        <div className="flex flex-wrap gap-4 mb-4">
+      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Filter by Service Type</h3>
+          <span className="text-sm text-gray-500">{selectedFilters.length} selected</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
           {filterOptions.map((option) => (
             <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
-                id={option.id}
                 checked={selectedFilters.includes(option.value)}
                 onChange={(e) => handleFilterChange(option.id, e.target.checked)}
                 className="rounded border-gray-300 text-primary focus:ring-primary"
               />
-              <span className="text-sm font-medium text-gray-700">{option.label}</span>
+              <span className="text-sm text-gray-700">{option.label}</span>
             </label>
           ))}
         </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} size="sm">
-              Apply Filters ({selectedFilters.length})
+        <div className="flex gap-3">
+          <Button
+            onClick={applyFilters}
+            disabled={selectedFilters.length === 0}
+            className="bg-primary hover:bg-primary/90"
+          >
+            Apply Filters ({selectedFilters.length})
+          </Button>
+          {appliedFilters.length > 0 && (
+            <Button onClick={clearFilters} variant="outline">
+              Clear Filters
             </Button>
-            {appliedFilters.length > 0 && (
-              <Button variant="outline" onClick={clearFilters} size="sm">
-                Clear Filters
-              </Button>
-            )}
-          </div>
-          {selectedFilters.length > 0 && (
-            <span className="text-sm text-gray-600">
-              {selectedFilters.length} filter{selectedFilters.length !== 1 ? "s" : ""} selected
-            </span>
           )}
         </div>
       </div>
 
       {/* Active Filters Display */}
       {appliedFilters.length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-sm font-medium text-blue-800">Active filters: {appliedFilters.join(", ")}</p>
               <p className="text-sm text-blue-700">
-                <span className="font-medium">Active filters:</span> {appliedFilters.join(", ")}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Showing {filteredProviders.length} of {allProviders.length} businesses
+                Showing {filteredProviders.length} of {allProviders.length} fitness & athletics providers
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs bg-transparent">
-              Clear
-            </Button>
           </div>
         </div>
       )}
 
+      {/* Zip Code Status Indicator */}
       {userZipCode && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-blue-700">
-              <span className="font-medium">Showing fitness & athletics for zip code:</span> {userZipCode}
-              <span className="text-xs block mt-1">(Includes businesses with {userZipCode} in their service area)</span>
-            </p>
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-green-800">Showing businesses that service: {userZipCode}</p>
+                <p className="text-sm text-green-700">Includes businesses with {userZipCode} in their service area</p>
+              </div>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -722,7 +549,7 @@ export default function FitnessAthleticsPage() {
                 localStorage.removeItem("savedZipCode")
                 setUserZipCode(null)
               }}
-              className="text-xs"
+              className="text-green-700 border-green-300 hover:bg-green-50"
             >
               Clear Filter
             </Button>
@@ -731,156 +558,125 @@ export default function FitnessAthleticsPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading fitness & athletics businesses...</p>
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <p>Loading fitness & athletics providers...</p>
         </div>
-      ) : error ? (
-        <div className="text-center py-8">
-          <p className="text-red-600">{error}</p>
-        </div>
-      ) : filteredProviders.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="max-w-md mx-auto">
-            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {appliedFilters.length > 0
-                ? "No Fitness & Athletics Businesses Match Your Filters"
-                : userZipCode
-                  ? `No Fitness & Athletics Businesses in ${userZipCode} Area`
-                  : "No Fitness & Athletics Businesses Yet"}
-            </h3>
-            <p className="text-gray-600 mb-4">
-              {appliedFilters.length > 0
-                ? `No businesses found matching: ${appliedFilters.join(", ")}. Try adjusting your filters.`
-                : userZipCode
-                  ? `We're building our network of fitness and athletics businesses in the ${userZipCode} area.`
-                  : "Be the first fitness business to join our platform and connect with clients in your area."}
-            </p>
-            {appliedFilters.length > 0 ? (
-              <Button onClick={clearFilters} className="bg-indigo-600 hover:bg-indigo-700">
-                Clear Filters
-              </Button>
-            ) : (
-              <Button className="bg-indigo-600 hover:bg-indigo-700">Register Your Business</Button>
-            )}
-          </div>
-        </div>
-      ) : (
+      ) : filteredProviders.length > 0 ? (
         <div className="space-y-6">
-          {filteredProviders.map((provider) => (
-            <Card
-              key={provider.id}
-              className="bg-white shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
-            >
+          {filteredProviders.map((business) => (
+            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex gap-6">
-                  {/* Left: Contact Info */}
-                  <div className="w-64 flex-shrink-0">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                      {provider.displayName || provider.name}
-                    </h3>
-
-                    <div className="space-y-2 mb-4">
-                      {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Phone className="w-4 h-4 mr-2 flex-shrink-0" />
-                          <span>
-                            {formatPhoneNumber(
-                              provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
-                            )}
-                          </span>
+                <div className="space-y-4">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold">{business.displayName || business.name}</h3>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {business.displayLocation && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span>{business.displayLocation}</span>
                         </div>
                       )}
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
-                        <span>
-                          {provider.adDesignData?.businessInfo?.city && provider.adDesignData?.businessInfo?.state
-                            ? `${provider.adDesignData.businessInfo.city}, ${provider.adDesignData.businessInfo.state}`
-                            : provider.displayCity && provider.displayState
-                              ? `${provider.displayCity}, ${provider.displayState}`
-                              : provider.city && provider.state
-                                ? `${provider.city}, ${provider.state}`
-                                : provider.zipCode
-                                  ? `ZIP: ${provider.zipCode}`
-                                  : "Location not specified"}
-                        </span>
+                      {(business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone) && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          <a
+                            href={`tel:${business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone}`}
+                            className="hover:text-primary"
+                          >
+                            {formatPhoneNumber(
+                              business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone,
+                            )}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
+                          business.allSubcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : business.subcategories && business.subcategories.length > 0 ? (
+                          business.subcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            Fitness Services
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Center: Photo Carousel */}
-                  <div className="hidden lg:block flex-1">
-                    {businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
                       <PhotoCarousel
-                        photos={businessPhotos[provider.id]}
-                        businessName={provider.displayName || provider.name}
+                        businessId={business.id}
+                        photos={businessPhotos[business.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
                       />
-                    ) : (
-                      <div className="flex items-center justify-center h-[220px] bg-gray-100 rounded-lg">
-                        <div className="text-center">
-                          <Camera className="w-8 w-8 mx-auto text-gray-400 mb-2" />
-                          <span className="text-gray-500 text-sm">No photos available</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Right: Action Buttons */}
-                  <div className="w-32 flex flex-col justify-start space-y-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs px-3 py-2 h-8 w-full bg-transparent"
-                      onClick={() => handleOpenReviews(provider.displayName || provider.name)}
-                    >
-                      Ratings
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="text-xs px-3 py-2 h-8 w-full"
-                      onClick={() => handleOpenProfile(provider)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Services - Display ALL services */}
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <div className="flex flex-wrap gap-2">
-                    {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
-                      provider.allSubcategories.map((service: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {getSubcategoryString(service)}
-                        </span>
-                      ))
-                    ) : provider.subcategories && provider.subcategories.length > 0 ? (
-                      provider.subcategories.map((service: string, idx: number) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {getSubcategoryString(service)}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                        Fitness Services
-                      </span>
-                    )}
+                    {/* Action Buttons */}
+                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
+                      <Button
+                        className="flex-1 lg:flex-none lg:w-full"
+                        onClick={() => handleOpenReviews(business.displayName || business.name)}
+                      >
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none lg:w-full bg-transparent"
+                        onClick={() => handleOpenProfile(business)}
+                      >
+                        View Profile
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-8 max-w-2xl mx-auto">
+            <h3 className="text-xl font-medium text-emerald-800 mb-2">No Fitness & Athletics Providers Found</h3>
+            <p className="text-emerald-700 mb-4">
+              {userZipCode
+                ? `We're building our network of fitness and athletics providers in the ${userZipCode} area.`
+                : "We're building our network of fitness and athletics providers in your area."}
+            </p>
+            <div className="bg-white rounded border border-emerald-100 p-4">
+              <p className="text-gray-700 font-medium">Are you a fitness professional?</p>
+              <p className="text-gray-600 mt-1">
+                Join Hausbaum to connect with clients who need your fitness and athletic services.
+              </p>
+              <Button className="mt-3" asChild>
+                <a href="/business-register">Register Your Fitness Business</a>
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -889,6 +685,7 @@ export default function FitnessAthleticsPage() {
           isOpen={isReviewsOpen}
           onClose={() => setIsReviewsOpen(false)}
           providerName={selectedProvider || ""}
+          businessId=""
           reviews={selectedProvider ? mockReviews[selectedProvider] || [] : []}
         />
       )}

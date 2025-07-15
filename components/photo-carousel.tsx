@@ -104,7 +104,7 @@ export function PhotoCarousel({
     const canNavigate = photos.length > currentPhotosPerView
 
     if (isMobile) {
-      // Mobile: Show exactly 2 square photos that fill the width
+      // Mobile: Show exactly 2 responsive square photos that fill the width
       const visiblePhotos = photos.slice(currentIndex, currentIndex + 2)
 
       // Fill with placeholder if we have less than 2 photos
@@ -114,51 +114,49 @@ export function PhotoCarousel({
 
       return (
         <div className={`relative ${className}`}>
-          <div className="flex gap-2 overflow-hidden">
+          <div className="flex gap-2 px-8">
+            {" "}
+            {/* Added horizontal padding for arrow space */}
             {visiblePhotos.map((photo, index) => (
               <div
                 key={`${currentIndex}-${index}`}
-                className="flex-1"
-                style={{
-                  width: "calc(50% - 4px)",
-                  height: "160px", // Square aspect ratio for mobile
-                }}
+                className="flex-1 aspect-square" // Use aspect-square for responsive square photos
               >
                 <LazyImage
                   src={photo}
                   alt={`Business photo ${currentIndex + index + 1}`}
                   className="w-full h-full object-cover rounded-lg"
                   placeholderSrc="/placeholder.svg"
-                  width={160}
-                  height={160}
+                  width={200}
+                  height={200}
                 />
               </div>
             ))}
           </div>
 
-          {/* Mobile Navigation Arrows - show when more than 2 photos */}
+          {/* Mobile Navigation Arrows - positioned outside photo area */}
           {photos.length > 2 && (
             <>
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/70 text-white hover:bg-black/90 p-1 h-8 w-8 z-10 rounded-full"
+                className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg"
                 onClick={mobilePrev}
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-5 w-5" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/70 text-white hover:bg-black/90 p-1 h-8 w-8 z-10 rounded-full"
+                className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg"
                 onClick={mobileNext}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-5 w-5" />
               </Button>
             </>
           )}
 
-          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full">
             {Math.min(currentIndex + 2, photos.length)} of {photos.length}
           </div>
         </div>

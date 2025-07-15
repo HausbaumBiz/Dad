@@ -1,355 +1,679 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { MapPin, Phone, Globe, Star, Users, Award, Clock } from "lucide-react"
 import { CategoryLayout } from "@/components/category-layout"
-import { PhotoCarousel } from "@/components/photo-carousel"
-import { BusinessJobsDialog } from "@/components/business-jobs-dialog"
-import { BusinessCouponsDialog } from "@/components/business-coupons-dialog"
-import { BusinessPhotoAlbumDialog } from "@/components/business-photo-album-dialog"
+import { Toaster } from "@/components/ui/toaster"
+import { useState, useEffect, useRef } from "react"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { Phone, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 
-const CATEGORY_NAME = "Pet Care Services"
-const CATEGORY_DESCRIPTION = "Professional pet care, veterinary services, grooming, boarding, and pet supplies"
+// Enhanced Business interface
+interface Business {
+  id: string
+  displayName?: string
+  businessName?: string
+  businessDescription?: string
+  displayLocation?: string
+  displayPhone?: string
+  rating?: number
+  reviewCount?: number
+  subcategories?: any[]
+  zipCode?: string
+  serviceArea?: string[]
+  isNationwide?: boolean
+  photos?: string[]
+}
 
-// Sample businesses for pet care
-const businesses = [
-  {
-    id: "1",
-    name: "Happy Paws Veterinary Clinic",
-    category: "Veterinary Services",
-    subcategory: "General Practice",
-    description:
-      "Full-service veterinary clinic providing comprehensive medical care for dogs, cats, and small animals.",
-    address: "123 Pet Lane, Suite A",
-    city: "Springfield",
-    state: "IL",
-    zipCode: "62701",
-    phone: "(555) 123-4567",
-    website: "https://happypawsvet.com",
-    email: "info@happypawsvet.com",
-    rating: 4.8,
-    reviewCount: 156,
-    isVerified: true,
-    isPremium: true,
-    serviceArea: ["62701", "62702", "62703", "62704", "62705"],
-    keywords: ["veterinary", "pet care", "animal hospital", "vaccinations"],
-    businessHours: {
-      monday: "8:00 AM - 6:00 PM",
-      tuesday: "8:00 AM - 6:00 PM",
-      wednesday: "8:00 AM - 6:00 PM",
-      thursday: "8:00 AM - 6:00 PM",
-      friday: "8:00 AM - 6:00 PM",
-      saturday: "9:00 AM - 4:00 PM",
-      sunday: "Emergency Only",
-    },
-    specialties: ["General Medicine", "Surgery", "Dental Care", "Emergency Care"],
-    certifications: ["AAHA Accredited", "Fear Free Certified"],
-    yearsInBusiness: 15,
-    employeeCount: 8,
-  },
-  {
-    id: "2",
-    name: "Pampered Pets Grooming",
-    category: "Pet Grooming",
-    subcategory: "Full Service Grooming",
-    description: "Professional pet grooming services including baths, haircuts, nail trimming, and spa treatments.",
-    address: "456 Grooming Way",
-    city: "Springfield",
-    state: "IL",
-    zipCode: "62702",
-    phone: "(555) 234-5678",
-    website: "https://pamperedpetsgrooming.com",
-    email: "book@pamperedpetsgrooming.com",
-    rating: 4.6,
-    reviewCount: 89,
-    isVerified: true,
-    isPremium: false,
-    serviceArea: ["62701", "62702", "62703", "62704"],
-    keywords: ["pet grooming", "dog grooming", "cat grooming", "nail trimming"],
-    businessHours: {
-      monday: "Closed",
-      tuesday: "9:00 AM - 5:00 PM",
-      wednesday: "9:00 AM - 5:00 PM",
-      thursday: "9:00 AM - 5:00 PM",
-      friday: "9:00 AM - 5:00 PM",
-      saturday: "8:00 AM - 4:00 PM",
-      sunday: "10:00 AM - 3:00 PM",
-    },
-    specialties: ["Full Service Grooming", "Nail Care", "Flea Treatments", "De-shedding"],
-    certifications: ["Certified Master Groomer", "Pet First Aid"],
-    yearsInBusiness: 8,
-    employeeCount: 4,
-  },
-  {
-    id: "3",
-    name: "Cozy Critters Pet Boarding",
-    category: "Pet Boarding",
-    subcategory: "Overnight Care",
-    description: "Safe and comfortable pet boarding facility with individual suites and 24/7 supervision.",
-    address: "789 Boarding Boulevard",
-    city: "Springfield",
-    state: "IL",
-    zipCode: "62703",
-    phone: "(555) 345-6789",
-    website: "https://cozycritters.com",
-    email: "reservations@cozycritters.com",
-    rating: 4.9,
-    reviewCount: 203,
-    isVerified: true,
-    isPremium: true,
-    serviceArea: ["62701", "62702", "62703", "62704", "62705", "62706"],
-    keywords: ["pet boarding", "dog boarding", "cat boarding", "pet hotel"],
-    businessHours: {
-      monday: "7:00 AM - 7:00 PM",
-      tuesday: "7:00 AM - 7:00 PM",
-      wednesday: "7:00 AM - 7:00 PM",
-      thursday: "7:00 AM - 7:00 PM",
-      friday: "7:00 AM - 7:00 PM",
-      saturday: "8:00 AM - 6:00 PM",
-      sunday: "8:00 AM - 6:00 PM",
-    },
-    specialties: ["Overnight Boarding", "Daycare", "Exercise Programs", "Special Needs Care"],
-    certifications: ["Licensed Pet Care Facility", "Bonded & Insured"],
-    yearsInBusiness: 12,
-    employeeCount: 10,
-  },
-  {
-    id: "4",
-    name: "Tail Waggers Dog Training",
-    category: "Pet Training",
-    subcategory: "Dog Training",
-    description: "Professional dog training services including obedience, behavioral modification, and puppy classes.",
-    address: "321 Training Trail",
-    city: "Springfield",
-    state: "IL",
-    zipCode: "62704",
-    phone: "(555) 456-7890",
-    website: "https://tailwaggers.com",
-    email: "train@tailwaggers.com",
-    rating: 4.7,
-    reviewCount: 124,
-    isVerified: true,
-    isPremium: false,
-    serviceArea: ["62701", "62702", "62703", "62704", "62705"],
-    keywords: ["dog training", "obedience training", "puppy training", "behavioral training"],
-    businessHours: {
-      monday: "9:00 AM - 7:00 PM",
-      tuesday: "9:00 AM - 7:00 PM",
-      wednesday: "9:00 AM - 7:00 PM",
-      thursday: "9:00 AM - 7:00 PM",
-      friday: "9:00 AM - 7:00 PM",
-      saturday: "9:00 AM - 5:00 PM",
-      sunday: "12:00 PM - 5:00 PM",
-    },
-    specialties: ["Basic Obedience", "Advanced Training", "Puppy Classes", "Behavioral Issues"],
-    certifications: ["CCPDT Certified", "AKC CGC Evaluator"],
-    yearsInBusiness: 6,
-    employeeCount: 3,
-  },
-]
+// Helper function to extract string from subcategory data
+const getSubcategoryString = (subcategory: any): string => {
+  if (typeof subcategory === "string") {
+    return subcategory
+  }
+  if (subcategory && typeof subcategory === "object") {
+    // Try to get the subcategory field first, then category, then fullPath
+    return subcategory.subcategory || subcategory.category || subcategory.fullPath || "Unknown Service"
+  }
+  return "Unknown Service"
+}
 
-function PetCareContent() {
-  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+// Photo Carousel Component - displays 5 photos in landscape format
+interface PhotoCarouselProps {
+  photos: string[]
+  businessName: string
+}
 
-  const loadPhotosForBusiness = async (businessId: string) => {
-    if (businessPhotos[businessId]) return // Already loaded
+function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+  const [currentIndex, setCurrentIndex] = useState(0)
 
-    try {
-      const photos = await loadBusinessPhotos(businessId)
-      setBusinessPhotos((prev) => ({
-        ...prev,
-        [businessId]: photos,
-      }))
-    } catch (error) {
-      console.error("Error loading photos for business:", businessId, error)
-      setBusinessPhotos((prev) => ({
-        ...prev,
-        [businessId]: [],
-      }))
-    }
+  if (!photos || photos.length === 0) {
+    return null // Don't show anything if no photos
   }
 
+  const photosPerView = 5
+  const maxIndex = Math.max(0, photos.length - photosPerView)
+
+  const nextPhotos = () => {
+    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
+  }
+
+  const prevPhotos = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0))
+  }
+
+  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
+
   return (
-    <div className="space-y-6">
-      {businesses.map((business) => (
-        <Card key={business.id} className="overflow-hidden">
-          <CardContent className="p-6">
-            <div className="flex gap-4">
-              {/* Left Column - Business Info */}
-              <div className="flex-1 min-w-0 space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold text-gray-900 truncate">{business.name}</h3>
-                      {business.isVerified && (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
-                          <Award className="h-3 w-3 mr-1" />
-                          Verified
-                        </Badge>
-                      )}
-                      {business.isPremium && (
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                          Premium
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">
-                      {business.category} • {business.subcategory}
-                    </p>
-                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-medium">{business.rating}</span>
-                        <span>({business.reviewCount} reviews)</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        <span>{business.employeeCount} employees</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{business.yearsInBusiness} years</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <p className="text-gray-700 text-sm leading-relaxed">{business.description}</p>
-
-                {/* Specialties */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Specialties</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {business.specialties.map((specialty, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {specialty}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Certifications */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Certifications</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {business.certifications.map((cert, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs bg-blue-50 text-blue-700">
-                        {cert}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Contact Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <MapPin className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">
-                      {business.address}, {business.city}, {business.state} {business.zipCode}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Phone className="h-4 w-4 flex-shrink-0" />
-                    <span>{business.phone}</span>
-                  </div>
-                  {business.website && (
-                    <div className="flex items-center gap-2 text-gray-600 md:col-span-2">
-                      <Globe className="h-4 w-4 flex-shrink-0" />
-                      <a
-                        href={business.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 truncate"
-                      >
-                        {business.website}
-                      </a>
-                    </div>
-                  )}
-                </div>
-
-                {/* Service Area */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Service Area</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {business.serviceArea.slice(0, 5).map((zip, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {zip}
-                      </Badge>
-                    ))}
-                    {business.serviceArea.length > 5 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{business.serviceArea.length - 5} more
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Center Column - Photos */}
-              <div className="w-48 flex-shrink-0">
-                <PhotoCarousel
-                  businessId={business.id}
-                  photos={businessPhotos[business.id] || []}
-                  onLoadPhotos={() => loadPhotosForBusiness(business.id)}
-                  showMultiple={true}
-                  photosPerView={1}
-                  className="w-full h-32"
-                  size="medium"
-                />
-              </div>
-
-              {/* Right Column - Actions */}
-              <div className="w-32 flex-shrink-0 space-y-2">
-                <BusinessProfileDialog business={business}>
-                  <Button size="sm" className="w-full">
-                    View Profile
-                  </Button>
-                </BusinessProfileDialog>
-
-                <ReviewsDialog businessId={business.id} businessName={business.name}>
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
-                    Reviews
-                  </Button>
-                </ReviewsDialog>
-
-                <BusinessJobsDialog businessId={business.id} businessName={business.name}>
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
-                    Jobs
-                  </Button>
-                </BusinessJobsDialog>
-
-                <BusinessCouponsDialog businessId={business.id} businessName={business.name}>
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
-                    Offers
-                  </Button>
-                </BusinessCouponsDialog>
-
-                <BusinessPhotoAlbumDialog businessId={business.id} businessName={business.name}>
-                  <Button variant="outline" size="sm" className="w-full bg-transparent">
-                    Photos
-                  </Button>
-                </BusinessPhotoAlbumDialog>
-              </div>
+    <div className="hidden lg:block w-full">
+      <div className="relative group w-full">
+        <div className="flex gap-2 justify-center w-full">
+          {visiblePhotos.map((photo, index) => (
+            <div key={currentIndex + index} className="w-48 h-36 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+              <Image
+                src={photo || "/placeholder.svg"}
+                alt={`${businessName} photo ${currentIndex + index + 1}`}
+                width={192}
+                height={144}
+                className="w-full h-full object-cover"
+                sizes="192px"
+              />
             </div>
-          </CardContent>
-        </Card>
-      ))}
+          ))}
+          {/* Fill empty slots if less than 5 photos visible */}
+          {visiblePhotos.length < photosPerView && (
+            <>
+              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
+                <div
+                  key={`empty-${index}`}
+                  className="w-48 h-36 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                ></div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Navigation arrows - only show if there are more than 5 photos */}
+        {photos.length > photosPerView && (
+          <>
+            <button
+              onClick={prevPhotos}
+              disabled={currentIndex === 0}
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={nextPhotos}
+              disabled={currentIndex >= maxIndex}
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </>
+        )}
+
+        {/* Photo counter */}
+        {photos.length > photosPerView && (
+          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination dots - only show if there are more than 5 photos */}
+      {photos.length > photosPerView && (
+        <div className="flex justify-center mt-2 space-x-1">
+          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
+            const pageStartIndex = index * photosPerView
+            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
+            return (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(pageStartIndex)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
+              />
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
 
+// Enhanced function to load business photos with better error handling
+const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
+  try {
+    console.log(`[loadBusinessPhotos] Loading photos for business ${businessId}`)
+
+    // Fetch business media data from the updated API
+    const response = await fetch(`/api/businesses/${businessId}`)
+    if (!response.ok) {
+      console.error(`[loadBusinessPhotos] Failed to fetch business data: ${response.status} ${response.statusText}`)
+      return []
+    }
+
+    const businessData = await response.json()
+    console.log(`[loadBusinessPhotos] Business data for ${businessId}:`, businessData)
+
+    // Try multiple possible locations for photo data
+    let photoAlbum = null
+
+    // Check direct photoAlbum property
+    if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
+      photoAlbum = businessData.photoAlbum
+      console.log(`[loadBusinessPhotos] Found photoAlbum directly with ${photoAlbum.length} photos`)
+    }
+    // Check nested media.photoAlbum
+    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
+      photoAlbum = businessData.media.photoAlbum
+      console.log(`[loadBusinessPhotos] Found media.photoAlbum with ${photoAlbum.length} photos`)
+    }
+    // Check adDesign.photoAlbum
+    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
+      photoAlbum = businessData.adDesign.photoAlbum
+      console.log(`[loadBusinessPhotos] Found adDesign.photoAlbum with ${photoAlbum.length} photos`)
+    }
+
+    if (!photoAlbum || !Array.isArray(photoAlbum)) {
+      console.log(`[loadBusinessPhotos] No photo album found for business ${businessId}`)
+      return []
+    }
+
+    console.log(`[loadBusinessPhotos] Processing ${photoAlbum.length} photos for business ${businessId}`)
+
+    // Convert Cloudflare image IDs to public URLs
+    const photoUrls = photoAlbum
+      .map((photo: any, index: number) => {
+        try {
+          // Handle different photo data structures
+          let imageId = null
+
+          if (typeof photo === "string") {
+            // If photo is just a string (image ID)
+            imageId = photo
+          } else if (photo && typeof photo === "object") {
+            // If photo is an object, try to extract the image ID
+            imageId = photo.imageId || photo.id || photo.cloudflareId || photo.url
+
+            // If it's already a full URL, return it as-is
+            if (typeof imageId === "string" && (imageId.startsWith("http") || imageId.startsWith("https"))) {
+              console.log(`[loadBusinessPhotos] Photo ${index} already has full URL: ${imageId}`)
+              return imageId
+            }
+          }
+
+          if (!imageId) {
+            console.warn(`[loadBusinessPhotos] No image ID found for photo ${index}:`, photo)
+            return null
+          }
+
+          // Generate public Cloudflare URL
+          const publicUrl = getCloudflareImageUrl(imageId, "public")
+          console.log(`[loadBusinessPhotos] Generated URL for image ${imageId}: ${publicUrl}`)
+          return publicUrl
+        } catch (error) {
+          console.error(`[loadBusinessPhotos] Error processing photo ${index}:`, error)
+          return null
+        }
+      })
+      .filter(Boolean) // Remove null/undefined URLs
+
+    console.log(`[loadBusinessPhotos] Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
+    return photoUrls
+  } catch (error) {
+    console.error(`[loadBusinessPhotos] Error loading photos for business ${businessId}:`, error)
+    return []
+  }
+}
+
 export default function PetCarePage() {
+  // Add fetchIdRef for race condition prevention
+  const fetchIdRef = useRef(0)
+
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState<{
+    id: number
+    name: string
+    rating: number
+    reviews: number
+  } | null>(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
+
+  const filterOptions = [
+    { id: "pet1", label: "Veterinarians", value: "Veterinarians" },
+    { id: "pet2", label: "Pet Hospitals", value: "Pet Hospitals" },
+    { id: "pet3", label: "Dog Fencing/Invisible Fence", value: "Dog Fencing/Invisible Fence" },
+    { id: "pet4", label: "Pet Groomers", value: "Pet Groomers" },
+    { id: "pet5", label: "Pet Trainers", value: "Pet Trainers" },
+    { id: "pet6", label: "Pet Walkers", value: "Pet Walkers" },
+    { id: "pet7", label: "Pet Sitters", value: "Pet Sitters" },
+    { id: "pet8", label: "Pet Boarders", value: "Pet Boarders" },
+    { id: "pet9", label: "Pet Breeders", value: "Pet Breeders" },
+    { id: "pet10", label: "Pet Shops", value: "Pet Shops" },
+    { id: "pet11", label: "Pet Rescues", value: "Pet Rescues" },
+    { id: "pet12", label: "Aquariums/Pet Enclosures", value: "Aquariums/Pet Enclosures" },
+    { id: "pet13", label: "Pet Poop Pickup", value: "Pet Poop Pickup" },
+    { id: "pet14", label: "Other Pet Care", value: "Other Pet Care" },
+  ]
+
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+    }
+  }, [])
+
+  // Helper function to check if business serves the zip code
+  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+    console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
+      isNationwide: business.isNationwide,
+      serviceArea: business.serviceArea,
+      primaryZip: business.zipCode,
+    })
+
+    // Check if business serves nationwide
+    if (business.isNationwide) {
+      console.log(`✓ Business serves nationwide`)
+      return true
+    }
+
+    // Check if zip code is in service area
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
+      const serves = business.serviceArea.includes(zipCode)
+      console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
+      return serves
+    }
+
+    // Fallback to primary zip code
+    const matches = business.zipCode === zipCode
+    console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
+    return matches
+  }
+
+  // Helper function for exact subcategory matching
+  const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
+    if (filters.length === 0) return true
+
+    console.log(`Checking business ${business.displayName || business.businessName} subcategories:`, {
+      subcategories: business.subcategories,
+      filters,
+    })
+
+    // Check subcategories array
+    if (business.subcategories && Array.isArray(business.subcategories)) {
+      const hasMatch = filters.some((filter) =>
+        business.subcategories!.some((subcat) => getSubcategoryString(subcat) === filter),
+      )
+      if (hasMatch) return true
+    }
+
+    return false
+  }
+
+  // Filter handlers
+  const handleFilterChange = (filterValue: string, checked: boolean) => {
+    setSelectedFilters((prev) => (checked ? [...prev, filterValue] : prev.filter((f) => f !== filterValue)))
+  }
+
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+    console.log("All businesses:", allBusinesses)
+
+    if (selectedFilters.length === 0) {
+      setFilteredBusinesses(allBusinesses)
+      setAppliedFilters([])
+    } else {
+      const filtered = allBusinesses.filter((business) => hasExactSubcategoryMatch(business, selectedFilters))
+      console.log("Filtered results:", filtered)
+      setFilteredBusinesses(filtered)
+      setAppliedFilters([...selectedFilters])
+    }
+  }
+
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredBusinesses(allBusinesses)
+  }
+
+  // Fetch businesses with race condition prevention and enhanced error handling
+  useEffect(() => {
+    async function loadBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[PetCare] Starting fetch ${currentFetchId} for zip code:`, userZipCode)
+
+      try {
+        setLoading(true)
+        const fetchedBusinesses = await getBusinessesForCategoryPage("/pet-care")
+
+        // Load photos for each business using public Cloudflare URLs with enhanced error handling
+        const businessesWithPhotos = await Promise.all(
+          fetchedBusinesses.map(async (business: Business) => {
+            try {
+              const photos = await loadBusinessPhotos(business.id)
+              return { ...business, photos }
+            } catch (photoError) {
+              console.error(`[PetCare] Error loading photos for business ${business.id}:`, photoError)
+              return { ...business, photos: [] }
+            }
+          }),
+        )
+
+        // Only update if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[PetCare] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[PetCare] Fetch ${currentFetchId} got ${fetchedBusinesses.length} businesses`)
+
+        // Filter businesses by zip code if userZipCode is available
+        if (userZipCode) {
+          const originalCount = businessesWithPhotos.length
+          const filteredBusinesses = businessesWithPhotos.filter((business: Business) =>
+            businessServesZipCode(business, userZipCode),
+          )
+          console.log(
+            `[PetCare] Filtered from ${originalCount} to ${filteredBusinesses.length} businesses for zip ${userZipCode}`,
+          )
+          setBusinesses(filteredBusinesses)
+          setAllBusinesses(filteredBusinesses)
+          setFilteredBusinesses(filteredBusinesses)
+        } else {
+          setBusinesses(businessesWithPhotos)
+          setAllBusinesses(businessesWithPhotos)
+          setFilteredBusinesses(businessesWithPhotos)
+        }
+      } catch (error) {
+        // Only update error if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error(`[PetCare] Fetch ${currentFetchId} error:`, error)
+        }
+      } finally {
+        // Only update loading if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadBusinesses()
+  }, [userZipCode])
+
+  const handleViewReviews = (business: Business) => {
+    setSelectedProvider({
+      id: Number.parseInt(business.id || "0"),
+      name: business.displayName || business.businessName || "Pet Care Provider",
+      rating: business.rating || 0,
+      reviews: business.reviewCount || 0,
+    })
+    setIsReviewsDialogOpen(true)
+  }
+
+  const handleViewProfile = (business: Business) => {
+    console.log("Opening profile for business:", business.id, business.businessName)
+    setSelectedBusinessId(business.id || "")
+    setSelectedBusinessName(business.displayName || business.businessName || "Pet Care Provider")
+    setIsProfileDialogOpen(true)
+  }
+
   return (
-    <CategoryLayout title={CATEGORY_NAME} description={CATEGORY_DESCRIPTION} businessCount={businesses.length}>
-      <PetCareContent />
+    <CategoryLayout title="Pet Care Services" backLink="/" backText="Categories">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <div className="flex justify-center">
+          <Image
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/cat%20and%20dog-7hvR8Ytt6JBV7PFG8N6uigZg80K6xP.png"
+            alt="Pet Care Services"
+            width={500}
+            height={500}
+            className="rounded-lg shadow-lg max-w-full h-auto"
+          />
+        </div>
+        <div className="space-y-6">
+          <p className="text-lg text-gray-700">
+            Find qualified pet care professionals in your area. Browse services below or use filters to narrow your
+            search.
+          </p>
+          <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
+            <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
+            <ul className="list-disc list-inside space-y-1 text-sm">
+              <li>Read reviews from other customers</li>
+              <li>View business videos showcasing work and staff</li>
+              <li>Access exclusive coupons directly on each business listing</li>
+              <li>Discover job openings from businesses you'd trust to hire yourself</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Zip Code Status Indicator */}
+      {userZipCode && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Showing businesses that serve zip code:</span> {userZipCode}
+            <span className="text-xs block mt-1">Includes businesses with {userZipCode} in their service area</span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem("savedZipCode")
+              setUserZipCode(null)
+            }}
+            className="text-blue-700 border-blue-300 hover:bg-blue-100"
+          >
+            Clear Filter
+          </Button>
+        </div>
+      )}
+
+      {/* Enhanced Filter Controls */}
+      <div className="mb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Filter by Service Type</h3>
+          <div className="text-sm text-gray-600">
+            {selectedFilters.length > 0 &&
+              `${selectedFilters.length} filter${selectedFilters.length > 1 ? "s" : ""} selected`}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filterOptions.map((option) => (
+            <label
+              key={option.id}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:border-primary/50 cursor-pointer transition-colors"
+            >
+              <Checkbox
+                checked={selectedFilters.includes(option.value)}
+                onCheckedChange={(checked) => handleFilterChange(option.value, checked as boolean)}
+              />
+              <span className="text-sm font-medium">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <Button onClick={applyFilters} disabled={selectedFilters.length === 0} className="min-w-[120px]">
+            Apply Filters
+          </Button>
+          {appliedFilters.length > 0 && (
+            <Button variant="outline" onClick={clearFilters} className="min-w-[120px] bg-transparent">
+              Clear Filters
+            </Button>
+          )}
+        </div>
+
+        {appliedFilters.length > 0 && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Active filters:</strong> {appliedFilters.join(", ")}
+              <br />
+              <span className="text-blue-600">
+                Showing {filteredBusinesses.length} of {allBusinesses.length} businesses
+              </span>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="mt-8 p-8 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading pet care providers...</p>
+        </div>
+      ) : filteredBusinesses.length > 0 ? (
+        <div className="mt-8 space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900">Pet Care Providers ({filteredBusinesses.length})</h2>
+          <div className="grid gap-6">
+            {filteredBusinesses.map((business: Business) => (
+              <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                <div className="flex flex-col space-y-4">
+                  {/* Business Name and Description */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {business.displayName || business.businessName || "Pet Care Provider"}
+                    </h3>
+                    {business.businessDescription && (
+                      <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
+                    )}
+                  </div>
+
+                  {/* Main content area with contact info, photos, and buttons */}
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                    {/* Left side - Contact and Location Info - Made smaller */}
+                    <div className="lg:w-64 space-y-2 flex-shrink-0">
+                      {/* Phone */}
+                      {business.displayPhone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <a
+                            href={`tel:${business.displayPhone}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                          >
+                            {business.displayPhone}
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Location */}
+                      {business.displayLocation && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <span className="text-gray-700 text-sm">{business.displayLocation}</span>
+                        </div>
+                      )}
+
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {business.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : business.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} and surrounding areas</span>
+                          ) : business.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
+                    <div className="flex-1 flex justify-center">
+                      <PhotoCarousel
+                        photos={business.photos || []}
+                        businessName={business.displayName || business.businessName || "Pet Care Provider"}
+                      />
+                    </div>
+
+                    {/* Right side - Action Buttons */}
+                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewReviews(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleViewProfile(business)}
+                        className="text-sm min-w-[100px]"
+                      >
+                        View Profile
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Subcategories/Specialties */}
+                  {business.subcategories && business.subcategories.length > 0 && (
+                    <div className="w-full">
+                      <div className="lg:w-64">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2 w-full">
+                        {business.subcategories.map((subcategory: any, index: number) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                          >
+                            {getSubcategoryString(subcategory)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
+          <h3 className="text-xl font-medium text-gray-700 mb-2">No Pet Care Providers Found</h3>
+          <p className="text-gray-600">
+            {userZipCode
+              ? `No pet care providers found that serve the ${userZipCode} area.`
+              : "Enter your zip code to find pet care providers in your area."}
+          </p>
+        </div>
+      )}
+
+      {/* Reviews Dialog */}
+      <ReviewsDialog
+        isOpen={isReviewsDialogOpen}
+        onClose={() => setIsReviewsDialogOpen(false)}
+        providerName={selectedProvider?.name || ""}
+        businessId={selectedProvider?.id.toString() || ""}
+        reviews={[]}
+      />
+
+      {/* Business Profile Dialog */}
+      <BusinessProfileDialog
+        isOpen={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        businessId={selectedBusinessId}
+        businessName={selectedBusinessName}
+      />
+
+      <Toaster />
     </CategoryLayout>
   )
 }
