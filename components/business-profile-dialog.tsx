@@ -573,7 +573,7 @@ export function BusinessProfileDialog({
                 <Card className="w-full h-full flex flex-col animate-in fade-in duration-1000">
                   <div className="flex-shrink-0">
                     <div
-                      className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
+                      className={`p-3 ${colorValues.textColor ? "text-black" : "text-white"}`}
                       style={{
                         backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
                         backgroundImage:
@@ -586,9 +586,11 @@ export function BusinessProfileDialog({
                           textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
                       }}
                     >
-                      <h3 className="text-2xl font-bold">{adDesign.businessInfo?.businessName || businessName}</h3>
+                      <h3 className="text-lg font-bold leading-tight">
+                        {adDesign.businessInfo?.businessName || businessName}
+                      </h3>
                       {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
-                        <p className="text-base mt-1 opacity-90">{adDesign.businessInfo.freeText}</p>
+                        <p className="text-sm mt-1 opacity-90 leading-tight">{adDesign.businessInfo.freeText}</p>
                       )}
                     </div>
                   </div>
