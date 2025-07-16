@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { PhotoCarousel } from "@/components/photo-carousel"
 
 // Photo Carousel Component - displays 5 photos in landscape format
 interface PhotoCarouselProps {
@@ -21,7 +22,7 @@ interface PhotoCarouselProps {
   businessName: string
 }
 
-function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+function OldPhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
   if (!photos || photos.length === 0) {
@@ -438,6 +439,8 @@ export default function CareServicesPage() {
     })
   }
 
+  const [currentIndex, setCurrentIndex] = useState(0) // Moved useState to top level
+
   useEffect(() => {
     async function fetchBusinesses() {
       const currentFetchId = ++fetchIdRef.current
@@ -645,6 +648,19 @@ export default function CareServicesPage() {
     setIsProfileDialogOpen(true)
   }
 
+  const photosPerView = 5
+  const maxIndex = Math.max(0, (businesses[0]?.photos?.length || 0) - photosPerView)
+
+  const nextPhotos = () => {
+    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
+  }
+
+  const prevPhotos = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0))
+  }
+
+  const visiblePhotos = (businesses[0]?.photos || []).slice(currentIndex, currentIndex + photosPerView)
+
   return (
     <CategoryLayout title="Elder and Child Care Services" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -766,100 +782,272 @@ export default function CareServicesPage() {
             </h2>
 
             <div className="grid gap-6">
-              {filteredBusinesses.map((business) => (
-                <Card key={business.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col space-y-4">
-                      {/* Business Name and Description */}
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                          {business.displayName || business.businessName}
-                        </h3>
-                        {business.description && (
-                          <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
-                        )}
-                      </div>
+              {filteredBusinesses.map((business) => {
+                const photosPerView = 5
+                const maxIndex = Math.max(0, (business.photos?.length || 0) - photosPerView)
 
-                      {/* Main content area with contact info, photos, and buttons */}
-                      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                        {/* Left side - Contact and Location Info - Made smaller */}
-                        <div className="lg:w-56 space-y-2 flex-shrink-0">
-                          {/* Phone */}
-                          {getPhoneNumber(business) && (
-                            <div className="flex items-center text-sm text-gray-600">
-                              <Phone className="h-4 w-4 mr-2 text-primary" />
-                              <a href={`tel:${getPhoneNumber(business)}`} className="text-blue-600 hover:underline">
-                                {formatPhoneNumber(getPhoneNumber(business))}
-                              </a>
-                            </div>
+                const nextPhotos = () => {
+                  setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
+                }
+
+                const prevPhotos = () => {
+                  setCurrentIndex((prev) => Math.max(prev - 1, 0))
+                }
+
+                const visiblePhotos = (business.photos || []).slice(currentIndex, currentIndex + photosPerView)
+
+                return (
+                  <Card key={business.id} className="hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex flex-col space-y-4">
+                        {/* Business Name and Description */}
+                        <div>
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            {business.displayName || business.businessName}
+                          </h3>
+                          {business.description && (
+                            <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
                           )}
+                        </div>
 
-                          {/* Location */}
-                          {getLocation(business) && (
-                            <div className="flex items-center text-sm text-gray-600">
-                              <MapPin className="h-4 w-4 mr-2 text-primary" />
-                              <span>{getLocation(business)}</span>
+                        {/* Main content area with contact info, photos, and buttons */}
+                        <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                          {/* Mobile Layout */}
+                          <div className="lg:hidden space-y-4">
+                            {/* Contact and Location Info */}
+                            <div className="space-y-2">
+                              {/* Phone */}
+                              {getPhoneNumber(business) && (
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <Phone className="h-4 w-4 mr-2 text-primary" />
+                                  <a href={`tel:${getPhoneNumber(business)}`} className="text-blue-600 hover:underline">
+                                    {formatPhoneNumber(getPhoneNumber(business))}
+                                  </a>
+                                </div>
+                              )}
+
+                              {/* Location */}
+                              {getLocation(business) && (
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <MapPin className="h-4 w-4 mr-2 text-primary" />
+                                  <span>{getLocation(business)}</span>
+                                </div>
+                              )}
+
+                              {/* Service Area Indicator */}
+                              {business.isNationwide ? (
+                                <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
+                              ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
+                                <div className="text-xs text-green-600 font-medium mb-1">
+                                  ✓ Serves {userZipCode} and surrounding areas
+                                </div>
+                              ) : null}
                             </div>
-                          )}
 
-                          {/* Service Area Indicator */}
-                          {business.isNationwide ? (
-                            <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
-                          ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
-                            <div className="text-xs text-green-600 font-medium mb-1">
-                              ✓ Serves {userZipCode} and surrounding areas
-                            </div>
-                          ) : null}
-                        </div>
+                            {/* Services List - Mobile */}
+                            {getSubcategories(business).length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {getSubcategories(business).map((subcategory, index) => (
+                                    <span
+                                      key={index}
+                                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                    >
+                                      {subcategory}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
 
-                        {/* Middle - Photo Carousel (desktop only) - Now has more space */}
-                        <div className="flex-1 flex justify-center">
-                          <PhotoCarousel
-                            photos={business.photos || []}
-                            businessName={business.displayName || business.businessName || "Care Service Provider"}
-                          />
-                        </div>
+                            {/* Photo Carousel - Mobile */}
+                            <PhotoCarousel
+                              businessId={business.id || ""}
+                              photos={business.photos || []}
+                              onLoadPhotos={() => {}} // No-op since photos are already loaded
+                              showMultiple={true}
+                              photosPerView={2}
+                              size="small"
+                              className="w-full"
+                            />
 
-                        {/* Right side - Action Buttons */}
-                        <div className="mt-4 lg:mt-0 lg:ml-6 flex flex-col items-start lg:items-end justify-start space-y-2 lg:w-28 flex-shrink-0">
-                          <Button
-                            className="w-full lg:w-auto min-w-[110px]"
-                            onClick={() => handleViewReviews(business)}
-                          >
-                            Reviews
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="w-full lg:w-auto min-w-[110px] bg-transparent"
-                            onClick={() => handleViewProfile(business)}
-                          >
-                            View Profile
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Subcategories/Specialties */}
-                      {getSubcategories(business).length > 0 && (
-                        <div className="mb-4">
-                          <div className="lg:w-56">
-                            <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
-                          </div>
-                          <div className="flex flex-wrap gap-2 w-full">
-                            {getSubcategories(business).map((subcategory, index) => (
-                              <span
-                                key={index}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            {/* Action Buttons - Mobile */}
+                            <div className="flex justify-center space-x-4">
+                              <Button className="min-w-[110px]" onClick={() => handleViewReviews(business)}>
+                                Reviews
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="min-w-[110px] bg-transparent"
+                                onClick={() => handleViewProfile(business)}
                               >
-                                {subcategory}
-                              </span>
-                            ))}
+                                View Profile
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Desktop Layout */}
+                          <div className="hidden lg:block w-full">
+                            <div className="flex flex-col space-y-4">
+                              {/* Contact and Location Info */}
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-2">
+                                  {/* Phone */}
+                                  {getPhoneNumber(business) && (
+                                    <div className="flex items-center text-sm text-gray-600">
+                                      <Phone className="h-4 w-4 mr-2 text-primary" />
+                                      <a
+                                        href={`tel:${getPhoneNumber(business)}`}
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        {formatPhoneNumber(getPhoneNumber(business))}
+                                      </a>
+                                    </div>
+                                  )}
+
+                                  {/* Location */}
+                                  {getLocation(business) && (
+                                    <div className="flex items-center text-sm text-gray-600">
+                                      <MapPin className="h-4 w-4 mr-2 text-primary" />
+                                      <span>{getLocation(business)}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Service Area Indicator */}
+                                  {business.isNationwide ? (
+                                    <div className="text-xs text-green-600 font-medium">✓ Serves nationwide</div>
+                                  ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
+                                    <div className="text-xs text-green-600 font-medium">
+                                      ✓ Serves {userZipCode} and surrounding areas
+                                    </div>
+                                  ) : null}
+                                </div>
+
+                                {/* Action Buttons - Desktop */}
+                                <div className="flex space-x-2">
+                                  <Button className="min-w-[110px]" onClick={() => handleViewReviews(business)}>
+                                    Reviews
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="min-w-[110px] bg-transparent"
+                                    onClick={() => handleViewProfile(business)}
+                                  >
+                                    View Profile
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Services List - Desktop */}
+                              {getSubcategories(business).length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                                  <div className="flex flex-wrap gap-2">
+                                    {getSubcategories(business).map((subcategory, index) => (
+                                      <span
+                                        key={index}
+                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                      >
+                                        {subcategory}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Photo Carousel - Desktop */}
+                              <div className="w-full">
+                                <div className="relative group w-full">
+                                  <div className="flex gap-2 justify-center w-full">
+                                    {visiblePhotos.map((photo, index) => (
+                                      <div
+                                        key={currentIndex + index}
+                                        className="w-[220px] h-[220px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
+                                      >
+                                        <Image
+                                          src={photo || "/placeholder.svg"}
+                                          alt={`${business.displayName || business.businessName} photo ${currentIndex + index + 1}`}
+                                          width={220}
+                                          height={220}
+                                          className="w-full h-full object-cover"
+                                          sizes="220px"
+                                        />
+                                      </div>
+                                    ))}
+
+                                    {/* Fill empty slots if less than 5 photos visible */}
+                                    {visiblePhotos.length < photosPerView && (
+                                      <>
+                                        {Array.from({ length: photosPerView - visiblePhotos.length }).map(
+                                          (_, index) => (
+                                            <div
+                                              key={`empty-${index}`}
+                                              className="w-[220px] h-[220px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                                            ></div>
+                                          ),
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* Navigation arrows - only show if there are more than 5 photos */}
+                                  {(business.photos?.length || 0) > photosPerView && (
+                                    <>
+                                      <button
+                                        onClick={prevPhotos}
+                                        disabled={currentIndex === 0}
+                                        className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+                                      >
+                                        <ChevronLeft size={16} />
+                                      </button>
+                                      <button
+                                        onClick={nextPhotos}
+                                        disabled={currentIndex >= maxIndex}
+                                        className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+                                      >
+                                        <ChevronRight size={16} />
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {/* Photo counter */}
+                                  {(business.photos?.length || 0) > photosPerView && (
+                                    <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+                                      {Math.min(currentIndex + photosPerView, business.photos?.length || 0)} of{" "}
+                                      {business.photos?.length || 0}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Pagination dots - only show if there are more than 5 photos */}
+                                {(business.photos?.length || 0) > photosPerView && (
+                                  <div className="flex justify-center mt-2 space-x-1">
+                                    {Array.from({
+                                      length: Math.ceil((business.photos?.length || 0) / photosPerView),
+                                    }).map((_, index) => {
+                                      const pageStartIndex = index * photosPerView
+                                      const isActive =
+                                        currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
+                                      return (
+                                        <button
+                                          key={index}
+                                          onClick={() => setCurrentIndex(pageStartIndex)}
+                                          className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
+                                        />
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           </div>
         ) : (

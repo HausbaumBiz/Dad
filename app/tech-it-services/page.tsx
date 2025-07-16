@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, MapPin, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Phone, MapPin, Loader2 } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
@@ -44,113 +44,6 @@ interface Business {
   businessDescription?: string
   displayLocation?: string
   reviewCount?: number
-}
-
-// Photo Carousel Component - displays 5 photos in landscape format
-interface PhotoCarouselProps {
-  photos: string[]
-  businessName: string
-}
-
-function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-
-  if (!photos || photos.length === 0) {
-    return null // Don't show anything if no photos
-  }
-
-  const photosPerView = 5
-  const maxIndex = Math.max(0, photos.length - photosPerView)
-
-  const nextPhotos = () => {
-    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
-  }
-
-  const prevPhotos = () => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0))
-  }
-
-  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
-
-  return (
-    <div className="hidden lg:block w-full">
-      <div className="relative group w-full">
-        <div className="flex gap-2 justify-center w-full">
-          {visiblePhotos.map((photo, index) => (
-            <div
-              key={currentIndex + index}
-              className="w-[220px] h-[220px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
-            >
-              <Image
-                src={photo || "/placeholder.svg"}
-                alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={220}
-                height={220}
-                className="w-full h-full object-cover"
-                sizes="220px"
-              />
-            </div>
-          ))}
-
-          {/* Fill empty slots if less than 5 photos visible */}
-          {visiblePhotos.length < photosPerView && (
-            <>
-              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  className="w-[220px] h-[220px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
-                ></div>
-              ))}
-            </>
-          )}
-        </div>
-
-        {/* Navigation arrows - only show if there are more than 5 photos */}
-        {photos.length > photosPerView && (
-          <>
-            <button
-              onClick={prevPhotos}
-              disabled={currentIndex === 0}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={nextPhotos}
-              disabled={currentIndex >= maxIndex}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </>
-        )}
-
-        {/* Photo counter */}
-        {photos.length > photosPerView && (
-          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination dots - only show if there are more than 5 photos */}
-      {photos.length > photosPerView && (
-        <div className="flex justify-center mt-2 space-x-1">
-          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
-            const pageStartIndex = index * photosPerView
-            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
-            return (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(pageStartIndex)}
-                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
-              />
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
 }
 
 // Function to load business photos from Cloudflare using public URLs
@@ -264,6 +157,7 @@ export default function TechITServicesPage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
   const [showFiltered, setShowFiltered] = useState(false)
+  const [photoIndices, setPhotoIndices] = useState<Record<string, number>>({})
 
   // Helper function to extract string value from subcategory object or string
   const getSubcategoryString = (subcategory: any): string => {
@@ -363,6 +257,45 @@ export default function TechITServicesPage() {
   const clearZipCodeFilter = () => {
     setUserZipCode(null)
     localStorage.removeItem("savedZipCode")
+  }
+
+  // Photo navigation functions
+  const getPhotoIndex = (providerId: string): number => {
+    return photoIndices[providerId] || 0
+  }
+
+  const setPhotoIndex = (providerId: string, index: number) => {
+    setPhotoIndices((prev) => ({
+      ...prev,
+      [providerId]: index,
+    }))
+  }
+
+  const goToPreviousPhoto = (providerId: string, totalPhotos: number) => {
+    const currentIndex = getPhotoIndex(providerId)
+    const newIndex = currentIndex === 0 ? totalPhotos - 2 : currentIndex - 2
+    setPhotoIndex(providerId, Math.max(0, newIndex))
+  }
+
+  const goToNextPhoto = (providerId: string, totalPhotos: number) => {
+    const currentIndex = getPhotoIndex(providerId)
+    const maxIndex = totalPhotos - 2
+    const newIndex = currentIndex + 2
+    setPhotoIndex(providerId, Math.min(maxIndex, newIndex))
+  }
+
+  // Desktop photo navigation functions
+  const goToPreviousPhotoDesktop = (providerId: string, totalPhotos: number) => {
+    const currentIndex = getPhotoIndex(providerId)
+    const newIndex = currentIndex === 0 ? Math.max(0, totalPhotos - 5) : Math.max(0, currentIndex - 1)
+    setPhotoIndex(providerId, newIndex)
+  }
+
+  const goToNextPhotoDesktop = (providerId: string, totalPhotos: number) => {
+    const currentIndex = getPhotoIndex(providerId)
+    const maxIndex = Math.max(0, totalPhotos - 5)
+    const newIndex = Math.min(maxIndex, currentIndex + 1)
+    setPhotoIndex(providerId, newIndex)
   }
 
   useEffect(() => {
@@ -684,7 +617,7 @@ export default function TechITServicesPage() {
                         )}
                       </div>
 
-                      {/* Main content area with contact info, photos, and buttons */}
+                      {/* Main content area with contact info and buttons */}
                       <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                         {/* Left side - Contact and Location Info */}
                         <div className="lg:w-64 space-y-2 flex-shrink-0">
@@ -710,16 +643,8 @@ export default function TechITServicesPage() {
                           )}
                         </div>
 
-                        {/* Middle - Photo Carousel (desktop only) */}
-                        <div className="flex-1 flex justify-center">
-                          <PhotoCarousel
-                            photos={provider.photos || []}
-                            businessName={provider.displayName || provider.businessName}
-                          />
-                        </div>
-
                         {/* Right side - Action Buttons */}
-                        <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                        <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0 lg:ml-auto">
                           <Button
                             variant="outline"
                             size="sm"
@@ -756,6 +681,191 @@ export default function TechITServicesPage() {
                             <span className="text-xs text-gray-500">No services listed</span>
                           )}
                         </div>
+                      </div>
+
+                      {/* Mobile Photo Carousel - only visible on small screens */}
+                      <div className="block lg:hidden mt-4">
+                        {provider.photos && provider.photos.length > 0 && (
+                          <div className="relative">
+                            <div className="flex gap-2 px-8">
+                              {provider.photos
+                                .slice(getPhotoIndex(provider.id), getPhotoIndex(provider.id) + 2)
+                                .map((photo, index) => (
+                                  <div key={getPhotoIndex(provider.id) + index} className="flex-1 aspect-square">
+                                    <Image
+                                      src={photo || "/placeholder.svg"}
+                                      alt={`${provider.displayName || provider.businessName} photo ${getPhotoIndex(provider.id) + index + 1}`}
+                                      width={200}
+                                      height={200}
+                                      className="w-full h-full object-cover rounded-lg"
+                                    />
+                                  </div>
+                                ))}
+                              {provider.photos.slice(getPhotoIndex(provider.id), getPhotoIndex(provider.id) + 2)
+                                .length === 1 && (
+                                <div className="flex-1 aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
+                                  <div className="text-center text-gray-400">
+                                    <svg
+                                      className="h-8 w-8 mx-auto mb-2"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                      />
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                                      />
+                                    </svg>
+                                    <p className="text-xs">No More Photos</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Mobile Navigation Arrows - only show if more than 2 photos */}
+                            {provider.photos.length > 2 && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg disabled:opacity-50"
+                                  onClick={() => goToPreviousPhoto(provider.id, provider.photos.length)}
+                                  disabled={getPhotoIndex(provider.id) === 0}
+                                >
+                                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M15 19l-7-7 7-7"
+                                    />
+                                  </svg>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg disabled:opacity-50"
+                                  onClick={() => goToNextPhoto(provider.id, provider.photos.length)}
+                                  disabled={getPhotoIndex(provider.id) >= provider.photos.length - 2}
+                                >
+                                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M9 5l7 7-7 7"
+                                    />
+                                  </svg>
+                                </Button>
+                              </>
+                            )}
+
+                            {provider.photos.length > 2 && (
+                              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full">
+                                {Math.min(getPhotoIndex(provider.id) + 2, provider.photos.length)} of{" "}
+                                {provider.photos.length}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Photo Carousel (desktop only) */}
+                      <div className="hidden lg:block mt-4">
+                        {provider.photos && provider.photos.length > 0 && (
+                          <div className="relative group w-full">
+                            <div className="flex gap-2 justify-center w-full">
+                              {provider.photos
+                                .slice(getPhotoIndex(provider.id), getPhotoIndex(provider.id) + 5)
+                                .map((photo, index) => (
+                                  <div
+                                    key={getPhotoIndex(provider.id) + index}
+                                    className="w-[220px] h-[220px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
+                                  >
+                                    <Image
+                                      src={photo || "/placeholder.svg"}
+                                      alt={`${provider.displayName || provider.businessName} photo ${getPhotoIndex(provider.id) + index + 1}`}
+                                      width={220}
+                                      height={220}
+                                      className="w-full h-full object-cover"
+                                      sizes="220px"
+                                    />
+                                  </div>
+                                ))}
+
+                              {/* Fill empty slots if less than 5 photos visible */}
+                              {provider.photos.slice(getPhotoIndex(provider.id), getPhotoIndex(provider.id) + 5)
+                                .length < 5 && (
+                                <>
+                                  {Array.from({
+                                    length:
+                                      5 -
+                                      provider.photos.slice(getPhotoIndex(provider.id), getPhotoIndex(provider.id) + 5)
+                                        .length,
+                                  }).map((_, index) => (
+                                    <div
+                                      key={`empty-${index}`}
+                                      className="w-[220px] h-[220px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
+                                    ></div>
+                                  ))}
+                                </>
+                              )}
+                            </div>
+
+                            {/* Desktop Navigation Arrows - only show if more than 5 photos */}
+                            {provider.photos.length > 5 && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-12 w-12 z-10 rounded-full shadow-lg disabled:opacity-50"
+                                  onClick={() => goToPreviousPhotoDesktop(provider.id, provider.photos.length)}
+                                  disabled={getPhotoIndex(provider.id) === 0}
+                                >
+                                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M15 19l-7-7 7-7"
+                                    />
+                                  </svg>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-12 w-12 z-10 rounded-full shadow-lg disabled:opacity-50"
+                                  onClick={() => goToNextPhotoDesktop(provider.id, provider.photos.length)}
+                                  disabled={getPhotoIndex(provider.id) >= provider.photos.length - 5}
+                                >
+                                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M9 5l7 7-7 7"
+                                    />
+                                  </svg>
+                                </Button>
+                              </>
+                            )}
+
+                            {provider.photos.length > 5 && (
+                              <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+                                {Math.min(getPhotoIndex(provider.id) + 5, provider.photos.length)} of{" "}
+                                {provider.photos.length}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>

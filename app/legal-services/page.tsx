@@ -3,7 +3,7 @@
 import { CategoryLayout } from "@/components/category-layout"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
 import { Phone, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
@@ -11,6 +11,7 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { useToast } from "@/hooks/use-toast"
+import { PhotoCarousel } from "@/components/photo-carousel"
 
 // Enhanced Business interface
 interface Business {
@@ -59,7 +60,7 @@ interface PhotoCarouselProps {
   businessName: string
 }
 
-function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+function PhotoCarouselOld({ photos, businessName }: PhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
   if (!photos || photos.length === 0) {
@@ -319,6 +320,11 @@ export default function LegalServicesPage() {
   const { toast } = useToast()
 
   const fetchIdRef = useRef(0)
+
+  // Use useCallback to create a stable function reference
+  const handleLoadPhotos = useCallback(() => {
+    // No-op function since photos are already loaded in useEffect
+  }, [])
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -593,7 +599,104 @@ export default function LegalServicesPage() {
         <div className="space-y-6">
           {businesses.map((provider: any) => (
             <div key={provider.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-              <div className="flex flex-col space-y-4">
+              {/* Mobile Layout */}
+              <div className="lg:hidden">
+                <div className="space-y-4">
+                  {/* Business Name and Description */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {provider.displayName || provider.businessName || "Legal Professional"}
+                    </h3>
+                    {provider.businessDescription && (
+                      <p className="text-gray-600 text-sm leading-relaxed">{provider.businessDescription}</p>
+                    )}
+                  </div>
+
+                  {/* Contact Info */}
+                  <div className="space-y-2">
+                    {provider.displayPhone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <a
+                          href={`tel:${provider.displayPhone}`}
+                          className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                        >
+                          {provider.displayPhone}
+                        </a>
+                      </div>
+                    )}
+
+                    {provider.displayLocation && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <span className="text-gray-700 text-sm">{provider.displayLocation}</span>
+                      </div>
+                    )}
+
+                    {userZipCode && (
+                      <div className="text-xs text-green-600 mt-1">
+                        {provider.isNationwide ? (
+                          <span>✓ Serves nationwide</span>
+                        ) : provider.serviceArea?.includes(userZipCode) ? (
+                          <span>✓ Serves {userZipCode} and surrounding areas</span>
+                        ) : provider.zipCode === userZipCode ? (
+                          <span>✓ Located in {userZipCode}</span>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Specialties */}
+                  {provider.subcategories && provider.subcategories.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {provider.subcategories.map((subcategory: any, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                          >
+                            {getSubcategoryString(subcategory)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mobile Photo Carousel */}
+                  <PhotoCarousel
+                    businessId={provider.id}
+                    photos={provider.photos || []}
+                    onLoadPhotos={handleLoadPhotos}
+                    showMultiple={true}
+                    photosPerView={2}
+                    size="small"
+                  />
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenReviews(provider)}
+                      className="text-sm min-w-[100px]"
+                    >
+                      Reviews
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleViewProfile(provider)}
+                      className="text-sm min-w-[100px]"
+                    >
+                      View Profile
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop Layout */}
+              <div className="hidden lg:flex flex-col space-y-4">
                 {/* Business Name and Description */}
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -641,16 +744,6 @@ export default function LegalServicesPage() {
                         ) : null}
                       </div>
                     )}
-
-                    {/* Rating */}
-                  </div>
-
-                  {/* Middle - Photo Carousel (desktop only) */}
-                  <div className="flex-1 flex justify-center">
-                    <PhotoCarousel
-                      photos={provider.photos || []}
-                      businessName={provider.displayName || provider.businessName || "Legal Professional"}
-                    />
                   </div>
 
                   {/* Right side - Action Buttons */}
@@ -692,6 +785,12 @@ export default function LegalServicesPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Desktop Photo Carousel */}
+                <PhotoCarouselOld
+                  photos={provider.photos || []}
+                  businessName={provider.displayName || provider.businessName || "Legal Professional"}
+                />
               </div>
             </div>
           ))}

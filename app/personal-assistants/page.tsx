@@ -14,6 +14,7 @@ import { MapPin, Phone, Camera, ChevronLeft, ChevronRight } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
 import { getBusinessMedia, type MediaItem } from "@/app/actions/media-actions"
+import { PhotoCarousel } from "@/components/photo-carousel"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -584,74 +585,109 @@ export default function PersonalAssistantsPage() {
 
                 {/* Photo Gallery at Bottom - Updated to 220px × 220px photos */}
                 <div className="mt-6 pt-4 border-t border-gray-200">
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePrevious(provider.id)}
-                      disabled={!businessPhotos[provider.id] || businessPhotos[provider.id].length <= 5}
-                      className="h-8 w-8 p-0 flex-shrink-0 bg-transparent"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-
-                    <div className="flex space-x-2 overflow-hidden flex-1">
-                      {loadingPhotos[provider.id] ? (
-                        <div className="flex items-center justify-center w-full h-[220px]">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  {/* Mobile: Use PhotoCarousel component */}
+                  <div className="block md:hidden">
+                    {businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
+                      <PhotoCarousel
+                        businessId={provider.id}
+                        photos={businessPhotos[provider.id].map((photo) => {
+                          // Handle both cloudflare and regular URLs
+                          if (photo.cloudflareImageId) {
+                            return `https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${photo.cloudflareImageId}/public`
+                          }
+                          return photo.url || "/placeholder.svg"
+                        })}
+                        onLoadPhotos={() => loadBusinessPhotos(provider.id)}
+                        showMultiple={true}
+                        photosPerView={2}
+                        size="medium"
+                        className="h-48"
+                      />
+                    ) : loadingPhotos[provider.id] ? (
+                      <div className="flex items-center justify-center w-full h-48 bg-gray-100 rounded-lg">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-48 bg-gray-100 rounded-lg">
+                        <div className="text-center">
+                          <Camera className="w-8 h-8 mx-auto text-gray-400 mb-1" />
+                          <span className="text-gray-500 text-sm">No photos available</span>
                         </div>
-                      ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
-                        businessPhotos[provider.id]
-                          .slice(carouselIndex[provider.id] || 0, (carouselIndex[provider.id] || 0) + 5)
-                          .map((photo, index) => (
-                            <div key={photo.id} className="flex-shrink-0 w-[220px] h-[220px]">
-                              <Image
-                                src={`https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${photo.cloudflareImageId}/public`}
-                                alt={photo.filename || `Photo ${index + 1}`}
-                                width={220}
-                                height={220}
-                                className="w-full h-full object-cover rounded-lg"
-                                onError={(e) => {
-                                  // Fallback to original URL if Cloudflare fails
-                                  e.currentTarget.src = photo.url || "/placeholder.svg"
-                                }}
-                              />
-                            </div>
-                          ))
-                      ) : (
-                        <div className="flex items-center justify-center w-full h-[220px] bg-gray-100 rounded-lg">
-                          <div className="text-center">
-                            <Camera className="w-8 h-8 mx-auto text-gray-400 mb-1" />
-                            <span className="text-gray-500 text-sm">No photos available</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleNext(provider.id)}
-                      disabled={
-                        !businessPhotos[provider.id] ||
-                        businessPhotos[provider.id].length <= 5 ||
-                        (carouselIndex[provider.id] || 0) >= businessPhotos[provider.id].length - 5
-                      }
-                      className="h-8 w-8 p-0 flex-shrink-0"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                      </div>
+                    )}
                   </div>
 
-                  {businessPhotos[provider.id] && businessPhotos[provider.id].length > 5 && (
-                    <div className="text-center mt-2">
-                      <span className="text-xs text-gray-500">
-                        {(carouselIndex[provider.id] || 0) + 1}-
-                        {Math.min((carouselIndex[provider.id] || 0) + 5, businessPhotos[provider.id].length)} of{" "}
-                        {businessPhotos[provider.id].length} photos
-                      </span>
+                  {/* Desktop: Keep existing carousel */}
+                  <div className="hidden md:block">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePrevious(provider.id)}
+                        disabled={!businessPhotos[provider.id] || businessPhotos[provider.id].length <= 5}
+                        className="h-8 w-8 p-0 flex-shrink-0 bg-transparent"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+
+                      <div className="flex space-x-2 overflow-hidden flex-1">
+                        {loadingPhotos[provider.id] ? (
+                          <div className="flex items-center justify-center w-full h-[220px]">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          </div>
+                        ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
+                          businessPhotos[provider.id]
+                            .slice(carouselIndex[provider.id] || 0, (carouselIndex[provider.id] || 0) + 5)
+                            .map((photo, index) => (
+                              <div key={photo.id} className="flex-shrink-0 w-[220px] h-[220px]">
+                                <Image
+                                  src={`https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${photo.cloudflareImageId}/public`}
+                                  alt={photo.filename || `Photo ${index + 1}`}
+                                  width={220}
+                                  height={220}
+                                  className="w-full h-full object-cover rounded-lg"
+                                  onError={(e) => {
+                                    // Fallback to original URL if Cloudflare fails
+                                    e.currentTarget.src = photo.url || "/placeholder.svg"
+                                  }}
+                                />
+                              </div>
+                            ))
+                        ) : (
+                          <div className="flex items-center justify-center w-full h-[220px] bg-gray-100 rounded-lg">
+                            <div className="text-center">
+                              <Camera className="w-8 h-8 mx-auto text-gray-400 mb-1" />
+                              <span className="text-gray-500 text-sm">No photos available</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleNext(provider.id)}
+                        disabled={
+                          !businessPhotos[provider.id] ||
+                          businessPhotos[provider.id].length <= 5 ||
+                          (carouselIndex[provider.id] || 0) >= businessPhotos[provider.id].length - 5
+                        }
+                        className="h-8 w-8 p-0 flex-shrink-0"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </div>
-                  )}
+
+                    {businessPhotos[provider.id] && businessPhotos[provider.id].length > 5 && (
+                      <div className="text-center mt-2">
+                        <span className="text-xs text-gray-500">
+                          {(carouselIndex[provider.id] || 0) + 1}-
+                          {Math.min((carouselIndex[provider.id] || 0) + 5, businessPhotos[provider.id].length)} of{" "}
+                          {businessPhotos[provider.id].length} photos
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

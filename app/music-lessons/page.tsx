@@ -13,6 +13,7 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { Checkbox } from "@/components/ui/checkbox"
+import { PhotoCarousel } from "@/components/photo-carousel"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -57,13 +58,13 @@ interface Business {
   photos?: string[]
 }
 
-// Photo Carousel Component - displays 5 photos in square format
-interface PhotoCarouselProps {
+// Photo Carousel Component - displays 5 photos in square format for desktop
+interface DesktopPhotoCarouselProps {
   photos: string[]
   businessName: string
 }
 
-function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+function DesktopPhotoCarousel({ photos, businessName }: DesktopPhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
   if (!photos || photos.length === 0) {
@@ -84,7 +85,7 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
   const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
 
   return (
-    <div className="hidden lg:block w-full">
+    <div className="w-full">
       <div className="relative group w-full">
         <div className="flex gap-2 justify-center w-full">
           {visiblePhotos.map((photo, index) => (
@@ -609,11 +610,10 @@ export default function MusicLessonsPage() {
                     )}
                   </div>
 
-                  {/* Main content area with contact info, photos, and buttons */}
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                    {/* Left side - Contact and Location Info */}
-                    <div className="lg:w-56 space-y-2 flex-shrink-0">
-                      {/* Phone */}
+                  {/* Mobile Layout */}
+                  <div className="lg:hidden space-y-4">
+                    {/* Contact Info */}
+                    <div className="space-y-2">
                       {business.displayPhone && (
                         <div className="flex items-center gap-2">
                           <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
@@ -626,7 +626,6 @@ export default function MusicLessonsPage() {
                         </div>
                       )}
 
-                      {/* Location */}
                       {business.displayLocation && (
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
@@ -634,7 +633,6 @@ export default function MusicLessonsPage() {
                         </div>
                       )}
 
-                      {/* Service Area Indicator */}
                       {userZipCode && (
                         <div className="text-xs text-green-600 mt-1">
                           {business.isNationwide ? (
@@ -648,16 +646,35 @@ export default function MusicLessonsPage() {
                       )}
                     </div>
 
-                    {/* Middle - Photo Carousel (desktop only) */}
-                    <div className="flex-1 flex justify-center">
-                      <PhotoCarousel
-                        photos={business.photos || []}
-                        businessName={business.displayName || business.businessName || "Music Instructor"}
-                      />
-                    </div>
+                    {/* Services */}
+                    {business.subcategories && business.subcategories.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {business.subcategories.map((subcategory: any, index: number) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {getSubcategoryString(subcategory)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                    {/* Right side - Action Buttons */}
-                    <div className="flex flex-col gap-2 lg:items-end lg:w-28 flex-shrink-0">
+                    {/* Photo Carousel */}
+                    <PhotoCarousel
+                      businessId={business.id}
+                      photos={business.photos || []}
+                      onLoadPhotos={() => {}}
+                      showMultiple={true}
+                      photosPerView={2}
+                      size="small"
+                    />
+
+                    {/* Action Buttons */}
+                    <div className="flex justify-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -677,24 +694,92 @@ export default function MusicLessonsPage() {
                     </div>
                   </div>
 
-                  {/* Subcategories/Specialties */}
-                  {business.subcategories && business.subcategories.length > 0 && (
-                    <div className="w-full">
-                      <div className="lg:w-56">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
+                  {/* Desktop Layout */}
+                  <div className="hidden lg:flex lg:flex-col lg:space-y-4">
+                    {/* Main content area with contact info and buttons */}
+                    <div className="flex lg:items-start gap-4">
+                      {/* Left side - Contact and Location Info */}
+                      <div className="lg:w-56 space-y-2 flex-shrink-0">
+                        {business.displayPhone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                            <a
+                              href={`tel:${business.displayPhone}`}
+                              className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                            >
+                              {business.displayPhone}
+                            </a>
+                          </div>
+                        )}
+
+                        {business.displayLocation && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                            <span className="text-gray-700 text-sm">{business.displayLocation}</span>
+                          </div>
+                        )}
+
+                        {userZipCode && (
+                          <div className="text-xs text-green-600 mt-1">
+                            {business.isNationwide ? (
+                              <span>✓ Serves nationwide</span>
+                            ) : business.serviceArea?.includes(userZipCode) ? (
+                              <span>✓ Serves {userZipCode} and surrounding areas</span>
+                            ) : business.zipCode === userZipCode ? (
+                              <span>✓ Located in {userZipCode}</span>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex flex-wrap gap-2 w-full">
-                        {business.subcategories.map((subcategory: any, index: number) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                          >
-                            {getSubcategoryString(subcategory)}
-                          </span>
-                        ))}
+
+                      {/* Right side - Action Buttons */}
+                      <div className="flex flex-col gap-2 lg:items-end lg:w-28 flex-shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewReviews(business)}
+                          className="text-sm min-w-[110px] bg-transparent"
+                        >
+                          Reviews
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleViewProfile(business)}
+                          className="text-sm min-w-[110px]"
+                        >
+                          View Profile
+                        </Button>
                       </div>
                     </div>
-                  )}
+
+                    {/* Subcategories/Specialties */}
+                    {business.subcategories && business.subcategories.length > 0 && (
+                      <div className="w-full">
+                        <div className="lg:w-56">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
+                        </div>
+                        <div className="flex flex-wrap gap-2 w-full mb-4">
+                          {business.subcategories.map((subcategory: any, index: number) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {getSubcategoryString(subcategory)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Desktop Photo Carousel - moved below specialties */}
+                    <div className="w-full flex justify-center">
+                      <DesktopPhotoCarousel
+                        photos={business.photos || []}
+                        businessName={business.displayName || business.businessName || "Music Instructor"}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}

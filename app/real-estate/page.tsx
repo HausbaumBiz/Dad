@@ -11,6 +11,7 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { PhotoCarousel } from "@/components/photo-carousel"
 
 // Enhanced Business interface
 interface Business {
@@ -44,13 +45,13 @@ interface Business {
   }
 }
 
-// Photo Carousel Component - displays 5 photos in landscape format
-interface PhotoCarouselProps {
+// Desktop Photo Carousel Component - displays 5 photos in landscape format
+interface DesktopPhotoCarouselProps {
   photos: string[]
   businessName: string
 }
 
-function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
+function DesktopPhotoCarousel({ photos, businessName }: DesktopPhotoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
   if (!photos || photos.length === 0) {
@@ -557,6 +558,10 @@ export default function RealEstatePage() {
     setUserZipCode(null)
   }
 
+  const handleLoadPhotos = () => {
+    // No-op function since photos are already loaded in useEffect
+  }
+
   return (
     <CategoryLayout title="Home Buying and Selling" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -679,11 +684,10 @@ export default function RealEstatePage() {
                     )}
                   </div>
 
-                  {/* Main content area with contact info, photos, and buttons */}
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                    {/* Left side - Contact and Location Info - Made smaller */}
-                    <div className="lg:w-64 space-y-2 flex-shrink-0">
-                      {/* Phone Number */}
+                  {/* Mobile Layout */}
+                  <div className="lg:hidden space-y-4">
+                    {/* Contact info */}
+                    <div className="space-y-2">
                       {getPhoneNumber(business) && (
                         <div className="flex items-center gap-2">
                           <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
@@ -695,29 +699,41 @@ export default function RealEstatePage() {
                           </a>
                         </div>
                       )}
-
-                      {/* Location */}
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
                         <span className="text-gray-700 text-sm">{getLocation(business)}</span>
                       </div>
                     </div>
 
-                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
-                    <div className="flex-1 flex justify-center">
-                      <PhotoCarousel
-                        photos={business.photos || []}
-                        businessName={
-                          business.displayName ||
-                          business.adDesignData?.businessInfo?.businessName ||
-                          business.businessName ||
-                          "Real Estate Professional"
-                        }
-                      />
-                    </div>
+                    {/* Services */}
+                    {getSubcategories(business).length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {getSubcategories(business).map((subcategory: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {typeof subcategory === "string" ? subcategory : subcategory.name || "Unknown"}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                    {/* Right side - Action Buttons */}
-                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                    {/* Mobile Photo Carousel */}
+                    <PhotoCarousel
+                      businessId={business.id}
+                      photos={business.photos || []}
+                      onLoadPhotos={handleLoadPhotos}
+                      showMultiple={true}
+                      photosPerView={2}
+                      size="small"
+                    />
+
+                    {/* Mobile Action Buttons */}
+                    <div className="flex justify-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -737,24 +753,81 @@ export default function RealEstatePage() {
                     </div>
                   </div>
 
-                  {/* Services - Display ALL services without truncation */}
-                  {getSubcategories(business).length > 0 && (
-                    <div className="w-full">
-                      <div className="lg:w-64">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                  {/* Desktop Layout */}
+                  <div className="hidden lg:flex flex-col space-y-4">
+                    {/* Contact info and action buttons */}
+                    <div className="flex items-start justify-between">
+                      {/* Left side - Contact and Location Info */}
+                      <div className="space-y-2">
+                        {/* Phone Number */}
+                        {getPhoneNumber(business) && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                            <a
+                              href={`tel:${getPhoneNumber(business)}`}
+                              className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                            >
+                              {formatPhoneNumber(getPhoneNumber(business)!)}
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Location */}
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <span className="text-gray-700 text-sm">{getLocation(business)}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-2 w-full">
-                        {getSubcategories(business).map((subcategory: any, idx: number) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {typeof subcategory === "string" ? subcategory : subcategory.name || "Unknown"}
-                          </span>
-                        ))}
+
+                      {/* Right side - Action Buttons */}
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleReviewsClick(business)}
+                          className="text-sm min-w-[100px]"
+                        >
+                          Ratings
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleProfileClick(business)}
+                          className="text-sm min-w-[100px]"
+                        >
+                          View Profile
+                        </Button>
                       </div>
                     </div>
-                  )}
+
+                    {/* Services - Display ALL services without truncation */}
+                    {getSubcategories(business).length > 0 && (
+                      <div className="w-full">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                        <div className="flex flex-wrap gap-2 w-full">
+                          {getSubcategories(business).map((subcategory: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {typeof subcategory === "string" ? subcategory : subcategory.name || "Unknown"}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Desktop Photo Carousel - Now below services */}
+                    <DesktopPhotoCarousel
+                      photos={business.photos || []}
+                      businessName={
+                        business.displayName ||
+                        business.adDesignData?.businessInfo?.businessName ||
+                        business.businessName ||
+                        "Real Estate Professional"
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             ))}

@@ -161,6 +161,87 @@ function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
   )
 }
 
+// Mobile Photo Carousel Component - displays 2 photos side by side
+interface MobilePhotoCarouselProps {
+  photos: string[]
+  businessName: string
+}
+
+function MobilePhotoCarousel({ photos, businessName }: MobilePhotoCarouselProps) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (!photos || photos.length === 0) {
+    return null
+  }
+
+  const mobileNext = () => {
+    if (currentIndex < photos.length - 2) {
+      setCurrentIndex((prev) => prev + 1)
+    } else {
+      setCurrentIndex(0) // Loop back to start
+    }
+  }
+
+  const mobilePrev = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex((prev) => prev - 1)
+    } else {
+      setCurrentIndex(Math.max(0, photos.length - 2)) // Go to last possible position
+    }
+  }
+
+  const visiblePhotos = photos.slice(currentIndex, currentIndex + 2)
+
+  // Fill with placeholder if we have less than 2 photos
+  while (visiblePhotos.length < 2 && photos.length > 0) {
+    visiblePhotos.push(photos[0]) // Repeat first photo as placeholder
+  }
+
+  return (
+    <div className="relative">
+      <div className="flex gap-2 px-8">
+        {visiblePhotos.map((photo, index) => (
+          <div key={`${currentIndex}-${index}`} className="flex-1 aspect-square">
+            <Image
+              src={photo || "/placeholder.svg"}
+              alt={`${businessName} photo ${currentIndex + index + 1}`}
+              className="w-full h-full object-cover rounded-lg"
+              width={200}
+              height={200}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile Navigation Arrows - positioned outside photo area */}
+      {photos.length > 2 && (
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg"
+            onClick={mobilePrev}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg"
+            onClick={mobileNext}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </>
+      )}
+
+      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full">
+        {Math.min(currentIndex + 2, photos.length)} of {photos.length}
+      </div>
+    </div>
+  )
+}
+
 // Function to load business photos from Cloudflare using public URLs
 const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
   try {
@@ -617,7 +698,7 @@ export default function FuneralServicesPage() {
                     )}
                   </div>
 
-                  {/* Main content area with contact info, photos, and buttons */}
+                  {/* Main content area with contact info and buttons */}
                   <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                     {/* Left side - Contact and Location Info - Made smaller */}
                     <div className="lg:w-64 space-y-2 flex-shrink-0">
@@ -656,16 +737,8 @@ export default function FuneralServicesPage() {
                       )}
                     </div>
 
-                    {/* Middle - Photo Carousel (desktop only) - Now has more space */}
-                    <div className="flex-1 flex justify-center">
-                      <PhotoCarousel
-                        photos={business.photos || []}
-                        businessName={business.displayName || business.businessName || "Funeral Service Provider"}
-                      />
-                    </div>
-
                     {/* Right side - Action Buttons */}
-                    <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                    <div className="flex flex-col gap-2 lg:items-end lg:ml-auto lg:w-24 flex-shrink-0">
                       <Button
                         variant="outline"
                         size="sm"
@@ -703,6 +776,26 @@ export default function FuneralServicesPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Photo Carousel - Desktop version (unchanged) */}
+                  <div className="hidden lg:block w-full">
+                    <PhotoCarousel
+                      photos={business.photos || []}
+                      businessName={business.displayName || business.businessName || "Funeral Service Provider"}
+                    />
+                  </div>
+
+                  {/* Photo Carousel - Mobile version (new) */}
+                  <div className="lg:hidden w-full">
+                    {business.photos && business.photos.length > 0 && (
+                      <div className="mb-4">
+                        <MobilePhotoCarousel
+                          photos={business.photos}
+                          businessName={business.displayName || business.businessName || "Funeral Service Provider"}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
