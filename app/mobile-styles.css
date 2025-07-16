@@ -445,6 +445,46 @@
     background-color: white !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
   }
+
+  /* Center photo carousel on mobile screens */
+  .flex.flex-col.lg\\:flex-row {
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  .flex.flex-col.lg\\:flex-row .flex-1 {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+
+  /* Center photo carousel container specifically */
+  .photo-carousel-container {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  /* Ensure photo carousel is centered in its parent */
+  .lg\\:w-32 {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    margin-top: 1rem !important;
+  }
+
+  .lg\\:w-32.flex.flex-row.lg\\:flex-col {
+    flex-direction: row !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Center the entire photo and button section */
+  .flex.flex-col.lg\\:flex-row.gap-4.items-start {
+    align-items: center !important;
+  }
 }
 
 /* Photo album dialog specific fixes */
