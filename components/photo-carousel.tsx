@@ -113,21 +113,46 @@ export function PhotoCarousel({
       }
 
       return (
-        <div className={`relative ${className}`}>
-          <div className="flex gap-2 px-8 w-full">
-            {" "}
-            {/* Added w-full */}
+        <div className={`relative ${className}`} style={{ width: "100%", minHeight: "120px" }}>
+          <div
+            className="flex gap-2 px-8 w-full"
+            style={{
+              width: "100%",
+              display: "flex",
+              minHeight: "120px",
+            }}
+          >
             {visiblePhotos.map((photo, index) => (
               <div
-                key={`${currentIndex}-${index}`}
-                className="flex-1 aspect-square min-w-0" // Added min-w-0 to prevent flex overflow
+                key={`mobile-${currentIndex}-${index}`}
+                className="flex-1 min-w-0"
+                style={{
+                  flex: "1",
+                  minWidth: "0",
+                  aspectRatio: "1 / 1",
+                  minHeight: "120px",
+                  maxHeight: "200px",
+                }}
               >
                 <img
                   src={photo || "/placeholder.svg"}
                   alt={`Business photo ${currentIndex + index + 1}`}
-                  className="w-full h-full object-cover rounded-lg"
-                  loading="lazy"
-                  style={{ minHeight: "120px" }} // Ensure minimum height on mobile
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    borderRadius: "0.5rem",
+                    display: "block",
+                    minHeight: "120px",
+                  }}
+                  loading="eager"
+                  onError={(e) => {
+                    console.error("Image failed to load:", photo)
+                    e.currentTarget.src = "/placeholder.svg"
+                  }}
+                  onLoad={() => {
+                    console.log("Image loaded successfully:", photo)
+                  }}
                 />
               </div>
             ))}
@@ -140,7 +165,12 @@ export function PhotoCarousel({
                 variant="ghost"
                 size="sm"
                 className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg"
-                onClick={mobilePrev}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  mobilePrev()
+                }}
+                style={{ position: "absolute", zIndex: 20 }}
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
@@ -148,14 +178,22 @@ export function PhotoCarousel({
                 variant="ghost"
                 size="sm"
                 className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg"
-                onClick={mobileNext}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  mobileNext()
+                }}
+                style={{ position: "absolute", zIndex: 20 }}
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
             </>
           )}
 
-          <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full">
+          <div
+            className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full"
+            style={{ position: "absolute", zIndex: 15 }}
+          >
             {Math.min(currentIndex + 2, photos.length)} of {photos.length}
           </div>
         </div>

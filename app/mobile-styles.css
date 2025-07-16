@@ -778,3 +778,89 @@
     min-width: 0 !important;
   }
 }
+
+/* Mobile photo carousel specific fixes */
+@media (max-width: 640px) {
+  .photo-carousel-mobile {
+    width: 100% !important;
+    min-height: 120px !important;
+    position: relative !important;
+    overflow: visible !important;
+  }
+
+  .photo-carousel-mobile .flex {
+    width: 100% !important;
+    display: flex !important;
+    min-height: 120px !important;
+    gap: 0.5rem !important;
+  }
+
+  .photo-carousel-mobile img {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 120px !important;
+    max-height: 200px !important;
+    object-fit: cover !important;
+    border-radius: 0.5rem !important;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  /* Force image containers to maintain size */
+  .photo-carousel-mobile .flex > div {
+    flex: 1 !important;
+    min-width: 0 !important;
+    aspect-ratio: 1 / 1 !important;
+    min-height: 120px !important;
+    max-height: 200px !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  /* Prevent any transforms or animations that might hide images */
+  .photo-carousel-mobile * {
+    backface-visibility: visible !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+
+  /* Ensure navigation buttons don't interfere */
+  .photo-carousel-mobile button {
+    position: absolute !important;
+    z-index: 20 !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+  }
+}
+
+/* Landscape mode fixes */
+@media (max-width: 640px) and (orientation: landscape) {
+  .photo-carousel-mobile {
+    min-height: 100px !important;
+  }
+
+  .photo-carousel-mobile img {
+    min-height: 100px !important;
+    max-height: 150px !important;
+  }
+
+  .photo-carousel-mobile .flex > div {
+    min-height: 100px !important;
+    max-height: 150px !important;
+  }
+}
+
+/* Force hardware acceleration and prevent disappearing */
+@media (max-width: 640px) {
+  .photo-carousel-mobile img {
+    -webkit-transform: translateZ(0) !important;
+    transform: translateZ(0) !important;
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    -webkit-perspective: 1000 !important;
+    perspective: 1000 !important;
+  }
+}
