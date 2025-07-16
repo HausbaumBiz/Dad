@@ -540,21 +540,23 @@ export default function TravelVacationPage() {
                   </div>
 
                   {/* Photo Carousel and Buttons Row */}
-                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                  <div className="flex flex-col lg:flex-row gap-4 items-center lg:items-start">
                     {/* Photo Carousel */}
-                    <div className="flex-1">
-                      <PhotoCarousel
-                        businessId={provider.id}
-                        photos={businessPhotos[provider.id] || []}
-                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
-                        showMultiple={true}
-                        photosPerView={5}
-                        className="w-full"
-                      />
+                    <div className="flex-1 flex justify-center lg:justify-start">
+                      <div className="w-full max-w-md lg:max-w-none">
+                        <PhotoCarousel
+                          businessId={provider.id}
+                          photos={businessPhotos[provider.id] || []}
+                          onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                          showMultiple={true}
+                          photosPerView={5}
+                          className="w-full"
+                        />
+                      </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32 justify-center lg:justify-start w-full lg:w-auto">
                       <Button
                         className="flex-1 lg:flex-none lg:w-full"
                         onClick={() => handleOpenReviews(provider.displayName || provider.businessName || "Business")}

@@ -544,9 +544,9 @@ export default function MentalHealthPage() {
                   </div>
 
                   {/* Photo Carousel and Buttons Row */}
-                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                  <div className="flex flex-col lg:flex-row gap-4 items-center lg:items-start">
                     {/* Photo Carousel */}
-                    <div className="flex-1">
+                    <div className="flex-1 flex justify-center lg:justify-start max-w-md lg:max-w-none">
                       <PhotoCarousel
                         businessId={provider.id}
                         photos={businessPhotos[provider.id] || []}
@@ -558,7 +558,7 @@ export default function MentalHealthPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
+                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 justify-center lg:justify-start w-full lg:w-auto">
                       <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(provider)}>
                         Ratings
                       </Button>

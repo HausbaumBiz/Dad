@@ -51,24 +51,11 @@ function getSubcategoryString(sub: any): string {
 
 export default function FinancialServicesPage() {
   const { toast } = useToast()
-
-  const filterOptions = [
-    { id: "finance1", label: "Accountants", value: "Accountants" },
-    { id: "finance2", label: "Insurance", value: "Insurance" },
-    { id: "finance3", label: "Advertising", value: "Advertising" },
-    { id: "finance4", label: "Marketing", value: "Marketing" },
-    { id: "finance5", label: "Financial and Investment Advisers", value: "Financial and Investment Advisers" },
-    { id: "finance6", label: "Debt Consolidators", value: "Debt Consolidators" },
-    { id: "finance7", label: "Cryptocurrency", value: "Cryptocurrency" },
-  ]
-
-  const [selectedProvider, setSelectedProvider] = useState<Business | null>(null)
-  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [businesses, setBusinesses] = useState<Business[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const fetchIdRef = useRef(0)
 
   // Filter state
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
@@ -79,10 +66,24 @@ export default function FinancialServicesPage() {
   // Photo state
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
-  // Use a ref to track the current fetch request
-  const fetchIdRef = useRef<number>(0)
+  // Dialog state
+  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null)
+  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
-  // Get user's zip code from localStorage only once on mount
+  const filterOptions = [
+    { id: "financial1", label: "Accountants", value: "Accountants" },
+    { id: "financial2", label: "Tax Preparers", value: "Tax Preparers" },
+    { id: "financial3", label: "Bookkeepers", value: "Bookkeepers" },
+    { id: "financial4", label: "Financial Advisors", value: "Financial Advisors" },
+    { id: "financial5", label: "Insurance Agents", value: "Insurance Agents" },
+    { id: "financial6", label: "Loan Officers", value: "Loan Officers" },
+    { id: "financial7", label: "Investment Advisors", value: "Investment Advisors" },
+    { id: "financial8", label: "Estate Planners", value: "Estate Planners" },
+    { id: "financial9", label: "Credit Counselors", value: "Credit Counselors" },
+    { id: "financial10", label: "Mortgage Brokers", value: "Mortgage Brokers" },
+  ]
+
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
@@ -93,27 +94,33 @@ export default function FinancialServicesPage() {
     }
   }, [])
 
+  // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
+    console.log(`Checking if business serves ZIP ${targetZipCode}:`)
+    console.log(`  Business: ${business.displayName || business.businessName}`)
+    console.log(`  Primary ZIP: ${business.zipCode}`)
+    console.log(`  Is Nationwide: ${business.isNationwide}`)
+    console.log(`  Service Area: ${business.serviceArea ? JSON.stringify(business.serviceArea) : "none"}`)
+
     // Check if business is nationwide
     if (business.isNationwide) {
-      console.log(`  - ${business.displayName}: serves nationwide, matches=true`)
+      console.log(`  - ${business.displayName || business.businessName}: nationwide=true, matches=true`)
       return true
     }
 
-    // Check if target zip code is in the service area (direct array)
-    if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
+    // Check if zip code is in service area
+    if (business.serviceArea && Array.isArray(business.serviceArea)) {
       const matches = business.serviceArea.includes(targetZipCode)
       console.log(
-        `  - ${business.displayName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
+        `  - ${business.displayName || business.businessName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
       )
       return matches
     }
 
-    // Fall back to checking primary zip code
-    const businessZip = business.zipCode || ""
-    const matches = businessZip === targetZipCode
+    // Fall back to primary zip code
+    const matches = business.zipCode === targetZipCode
     console.log(
-      `  - ${business.displayName}: primaryZip="${businessZip}", userZip="${targetZipCode}", matches=${matches}`,
+      `  - ${business.displayName || business.businessName}: primaryZip="${business.zipCode}", userZip="${targetZipCode}", matches=${matches}`,
     )
     return matches
   }
@@ -139,80 +146,68 @@ export default function FinancialServicesPage() {
     }
   }
 
-  // Separate useEffect for fetching businesses to avoid race conditions
   useEffect(() => {
-    // Create a unique ID for this fetch request
-    const fetchId = ++fetchIdRef.current
-
     async function fetchBusinesses() {
-      // If this isn't the latest fetch request, don't proceed
-      if (fetchId !== fetchIdRef.current) return
-
-      setIsLoading(true)
+      const currentFetchId = ++fetchIdRef.current
+      console.log(
+        `[${new Date().toISOString()}] Fetching businesses for /financial-services (request #${currentFetchId})`,
+      )
 
       try {
-        const requestTime = new Date().toISOString()
-        console.log(`[${requestTime}] Fetching businesses for /financial-services (request #${fetchId})`)
+        setLoading(true)
 
-        const result = await getBusinessesForCategoryPage("/financial-services")
+        let result = await getBusinessesForCategoryPage("/financial-services")
+        console.log(
+          `[${new Date().toISOString()}] Retrieved ${result.length} total businesses (request #${currentFetchId})`,
+        )
 
-        // If this isn't the latest fetch request, don't update state
-        if (fetchId !== fetchIdRef.current) {
-          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${fetchId}`)
+        // Check if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
           return
         }
 
-        console.log(`[${new Date().toISOString()}] Retrieved ${result.length} total businesses (request #${fetchId})`)
-
-        // Log subcategory types to help debug
         result.forEach((business) => {
-          if (business.allSubcategories && business.allSubcategories.length > 0) {
+          console.log(
+            `  - ${business.id}: "${business.displayName || business.businessName}" (zipCode: ${business.zipCode})`,
+          )
+          if (business.serviceArea) {
             console.log(
-              `Business ${business.displayName} subcategory types:`,
-              business.allSubcategories.map((sub) => (typeof sub === "object" ? "object" : typeof sub)),
+              `    Service area: ${Array.isArray(business.serviceArea) ? business.serviceArea.join(", ") : "unknown format"}`,
             )
           }
         })
 
-        let filteredResult = result
-
         if (userZipCode) {
-          console.log(`[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${fetchId})`)
-          filteredResult = result.filter((business) => businessServesZipCode(business, userZipCode))
           console.log(
-            `[${new Date().toISOString()}] After filtering: ${filteredResult.length} businesses (request #${fetchId})`,
+            `[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${currentFetchId})`,
+          )
+          result = result.filter((business) => businessServesZipCode(business, userZipCode))
+          console.log(
+            `[${new Date().toISOString()}] After filtering: ${result.length} businesses (request #${currentFetchId})`,
           )
         }
 
-        setBusinesses(filteredResult)
-        setAllBusinesses(filteredResult)
-        setFilteredBusinesses(filteredResult)
-      } catch (error) {
-        // Only show error for the latest request
-        if (fetchId === fetchIdRef.current) {
-          console.error(`[${new Date().toISOString()}] Error fetching businesses (request #${fetchId}):`, error)
-          toast({
-            title: "Error loading businesses",
-            description: "There was a problem loading businesses. Please try again later.",
-            variant: "destructive",
-          })
+        setBusinesses(result)
+        setAllBusinesses(result)
+        setFilteredBusinesses(result)
+      } catch (err) {
+        console.error("Error fetching financial services:", err)
+        if (currentFetchId === fetchIdRef.current) {
+          setError("Failed to load financial services")
+          setBusinesses([])
+          setAllBusinesses([])
+          setFilteredBusinesses([])
         }
       } finally {
-        // Only update loading state for the latest request
-        if (fetchId === fetchIdRef.current) {
-          setIsLoading(false)
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false)
         }
       }
     }
 
     fetchBusinesses()
-
-    // Cleanup function to handle component unmount
-    return () => {
-      // This will prevent any in-flight requests from updating state
-      fetchIdRef.current = fetchId + 1
-    }
-  }, [toast, userZipCode]) // Only re-run when toast or userZipCode changes
+  }, [userZipCode])
 
   // Helper function to check if business has exact subcategory match
   const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
@@ -226,10 +221,7 @@ export default function FinancialServicesPage() {
 
     // Check subcategories array
     if (business.subcategories && Array.isArray(business.subcategories)) {
-      return business.subcategories.some((sub) => {
-        const subString = getSubcategoryString(sub)
-        return subString === filterValue
-      })
+      return business.subcategories.some((sub) => getSubcategoryString(sub) === filterValue)
     }
 
     // Check single subcategory field
@@ -255,31 +247,25 @@ export default function FinancialServicesPage() {
       setAppliedFilters([])
       toast({
         title: "Filters cleared",
-        description: `Showing all ${allBusinesses.length} financial service providers.`,
+        description: `Showing all ${allBusinesses.length} financial services.`,
       })
       return
     }
 
     const filtered = allBusinesses.filter((business) => {
       const hasMatch = selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
-
-      console.log(
-        `Business ${business.displayName} subcategories:`,
-        business.allSubcategories || business.subcategories || [business.subcategory],
-      )
+      console.log(`Business ${business.displayName} services:`, business.allSubcategories)
       console.log(`Filter "${selectedFilters.join(", ")}" matches business: ${hasMatch}`)
-
       return hasMatch
     })
 
     console.log("Filtered results:", filtered)
-
     setFilteredBusinesses(filtered)
     setAppliedFilters([...selectedFilters])
 
     toast({
       title: "Filters applied",
-      description: `Found ${filtered.length} financial service providers matching your criteria.`,
+      description: `Found ${filtered.length} financial services matching your criteria.`,
     })
   }
 
@@ -287,39 +273,44 @@ export default function FinancialServicesPage() {
     setSelectedFilters([])
     setAppliedFilters([])
     setFilteredBusinesses(allBusinesses)
+
     toast({
       title: "Filters cleared",
-      description: `Showing all ${allBusinesses.length} financial service providers.`,
+      description: `Showing all ${allBusinesses.length} financial services.`,
     })
   }
 
-  const handleOpenReviews = (provider: Business) => {
-    setSelectedProvider(provider)
+  // Handle opening reviews dialog
+  const handleOpenReviews = (business: Business) => {
+    setSelectedBusiness(business)
     setIsReviewsDialogOpen(true)
   }
 
-  const handleOpenProfile = (provider: Business) => {
-    setSelectedProvider(provider)
+  // Handle opening profile dialog
+  const handleOpenProfile = (business: Business) => {
+    setSelectedBusiness(business)
     setIsProfileDialogOpen(true)
   }
 
   return (
-    <CategoryLayout title="Insurance, Finance, Debt and Sales" backLink="/" backText="Categories">
+    <CategoryLayout title="Financial Services" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/accountant-bVMbHmjmeZbti2lNIRrbCdjJnJJDKX.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/financial-services-Yk2J0P7JAsffashXwMR6wGx202Gf6v.png"
             alt="Financial Services"
             width={500}
             height={500}
             className="rounded-lg shadow-lg max-w-full h-auto"
           />
         </div>
+
         <div className="space-y-6">
           <p className="text-lg text-gray-700">
-            Find qualified financial professionals in your area. Browse services below or use filters to narrow your
+            Find trusted financial professionals in your area. Browse services below or use filters to narrow your
             search.
           </p>
+
           <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
@@ -338,6 +329,7 @@ export default function FinancialServicesPage() {
           <h3 className="text-lg font-medium text-gray-900">Filter by Service Type</h3>
           <span className="text-sm text-gray-500">{selectedFilters.length} selected</span>
         </div>
+
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
           {filterOptions.map((option) => (
             <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
@@ -351,6 +343,7 @@ export default function FinancialServicesPage() {
             </label>
           ))}
         </div>
+
         <div className="flex gap-3">
           <Button
             onClick={applyFilters}
@@ -359,6 +352,7 @@ export default function FinancialServicesPage() {
           >
             Apply Filters ({selectedFilters.length})
           </Button>
+
           {appliedFilters.length > 0 && (
             <Button onClick={clearFilters} variant="outline">
               Clear Filters
@@ -374,58 +368,43 @@ export default function FinancialServicesPage() {
             <div>
               <p className="text-sm font-medium text-blue-800">Active filters: {appliedFilters.join(", ")}</p>
               <p className="text-sm text-blue-700">
-                Showing {filteredBusinesses.length} of {allBusinesses.length} financial service providers
+                Showing {filteredBusinesses.length} of {allBusinesses.length} financial services
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Zip Code Status Indicator */}
-      {userZipCode && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              <div>
-                <p className="text-sm font-medium text-green-800">Showing businesses that service: {userZipCode}</p>
-                <p className="text-sm text-green-700">Includes businesses with {userZipCode} in their service area</p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.removeItem("savedZipCode")
-                setUserZipCode(null)
-              }}
-              className="text-green-700 border-green-300 hover:bg-green-50"
-            >
-              Clear Filter
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {isLoading ? (
+      {loading ? (
         <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-          <p>Loading financial service providers...</p>
+          <p>Loading financial services...</p>
         </div>
-      ) : filteredBusinesses.length > 0 ? (
+      ) : error ? (
+        <div className="text-center py-8">
+          <p className="text-red-600">{error}</p>
+        </div>
+      ) : filteredBusinesses.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="max-w-md mx-auto">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Financial Services Found</h3>
+            <p className="text-gray-600 mb-4">
+              Be the first financial professional to join our platform and connect with clients in your area.
+            </p>
+            <Button className="bg-green-600 hover:bg-green-700">Register Your Business</Button>
+          </div>
+        </div>
+      ) : (
         <div className="space-y-6">
           {filteredBusinesses.map((business) => (
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
@@ -434,6 +413,7 @@ export default function FinancialServicesPage() {
                   {/* Compact Business Info */}
                   <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
+
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                       {business.displayLocation && (
                         <div className="flex items-center">
@@ -441,6 +421,7 @@ export default function FinancialServicesPage() {
                           <span>{business.displayLocation}</span>
                         </div>
                       )}
+
                       {business.displayPhone && (
                         <div className="flex items-center">
                           <Phone className="h-4 w-4 mr-1" />
@@ -450,11 +431,21 @@ export default function FinancialServicesPage() {
                         </div>
                       )}
                     </div>
+
                     <div>
                       <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
                       <div className="flex flex-wrap gap-1">
                         {business.allSubcategories && business.allSubcategories.length > 0 ? (
                           business.allSubcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : business.subcategories && business.subcategories.length > 0 ? (
+                          business.subcategories.map((service, idx) => (
                             <span
                               key={idx}
                               className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
@@ -472,9 +463,9 @@ export default function FinancialServicesPage() {
                   </div>
 
                   {/* Photo Carousel and Buttons Row */}
-                  <div className="flex flex-col lg:flex-row gap-4 items-start">
+                  <div className="flex flex-col lg:flex-row gap-4 items-center lg:items-start">
                     {/* Photo Carousel */}
-                    <div className="flex-1">
+                    <div className="flex-1 flex justify-center lg:justify-start max-w-md lg:max-w-none">
                       <PhotoCarousel
                         businessId={business.id}
                         photos={businessPhotos[business.id] || []}
@@ -486,7 +477,7 @@ export default function FinancialServicesPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start">
+                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 justify-center lg:justify-start w-full lg:w-auto">
                       <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
                         Ratings
                       </Button>
@@ -504,44 +495,24 @@ export default function FinancialServicesPage() {
             </Card>
           ))}
         </div>
-      ) : (
-        <div className="text-center py-12">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-8 max-w-2xl mx-auto">
-            <h3 className="text-xl font-medium text-emerald-800 mb-2">No Financial Service Providers Found</h3>
-            <p className="text-emerald-700 mb-4">
-              {userZipCode
-                ? `We're building our network of licensed financial professionals in the ${userZipCode} area.`
-                : "We're building our network of licensed financial professionals in your area."}
-            </p>
-            <div className="bg-white rounded border border-emerald-100 p-4">
-              <p className="text-gray-700 font-medium">Are you a financial professional?</p>
-              <p className="text-gray-600 mt-1">
-                Join Hausbaum to connect with clients who need your financial expertise and services.
-              </p>
-              <Button className="mt-3" asChild>
-                <a href="/business-register">Register Your Financial Business</a>
-              </Button>
-            </div>
-          </div>
-        </div>
       )}
 
-      {selectedProvider && (
-        <ReviewsDialog
-          isOpen={isReviewsDialogOpen}
-          onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.displayName || selectedProvider.businessName}
-          businessId={selectedProvider.id}
-          reviews={[]}
-        />
-      )}
+      {/* Reviews Dialog */}
+      <ReviewsDialog
+        isOpen={isReviewsDialogOpen}
+        onClose={() => setIsReviewsDialogOpen(false)}
+        providerName={selectedBusiness?.displayName}
+        businessId={selectedBusiness?.id}
+        reviews={selectedBusiness?.reviews || []}
+      />
 
-      {selectedProvider && (
+      {/* Business Profile Dialog */}
+      {selectedBusiness && (
         <BusinessProfileDialog
           isOpen={isProfileDialogOpen}
           onClose={() => setIsProfileDialogOpen(false)}
-          businessId={selectedProvider.id}
-          businessName={selectedProvider.displayName || selectedProvider.businessName}
+          businessId={selectedBusiness.id}
+          businessName={selectedBusiness.displayName}
         />
       )}
 
