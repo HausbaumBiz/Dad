@@ -114,21 +114,20 @@ export function PhotoCarousel({
 
       return (
         <div className={`relative ${className}`}>
-          <div className="flex gap-2 px-8">
+          <div className="flex gap-2 px-8 w-full">
             {" "}
-            {/* Added horizontal padding for arrow space */}
+            {/* Added w-full */}
             {visiblePhotos.map((photo, index) => (
               <div
                 key={`${currentIndex}-${index}`}
-                className="flex-1 aspect-square" // Use aspect-square for responsive square photos
+                className="flex-1 aspect-square min-w-0" // Added min-w-0 to prevent flex overflow
               >
-                <LazyImage
-                  src={photo}
+                <img
+                  src={photo || "/placeholder.svg"}
                   alt={`Business photo ${currentIndex + index + 1}`}
                   className="w-full h-full object-cover rounded-lg"
-                  placeholderSrc="/placeholder.svg"
-                  width={200}
-                  height={200}
+                  loading="lazy"
+                  style={{ minHeight: "120px" }} // Ensure minimum height on mobile
                 />
               </div>
             ))}
