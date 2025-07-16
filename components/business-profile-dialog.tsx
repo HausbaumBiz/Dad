@@ -569,130 +569,134 @@ export function BusinessProfileDialog({
           ) : adDesign ? (
             <div className="overflow-hidden">
               {/* Mobile Layout */}
-              <div className="block md:hidden">
-                <Card className="w-full animate-in fade-in duration-1000">
-                  <div
-                    className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
-                    style={{
-                      backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
-                      backgroundImage:
-                        adDesign.texture === "gradient"
-                          ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                          : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
-                      backgroundSize:
-                        textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
-                      backgroundRepeat:
-                        textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
-                    }}
-                  >
-                    <h3 className="text-2xl font-bold">{adDesign.businessInfo?.businessName || businessName}</h3>
-                    {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
-                      <p className="text-base mt-1 opacity-90">{adDesign.businessInfo.freeText}</p>
-                    )}
+              <div className="block md:hidden h-full flex flex-col">
+                <Card className="w-full h-full flex flex-col animate-in fade-in duration-1000">
+                  <div className="flex-shrink-0">
+                    <div
+                      className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
+                      style={{
+                        backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
+                        backgroundImage:
+                          adDesign.texture === "gradient"
+                            ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                            : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
+                        backgroundSize:
+                          textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                        backgroundRepeat:
+                          textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
+                      }}
+                    >
+                      <h3 className="text-2xl font-bold">{adDesign.businessInfo?.businessName || businessName}</h3>
+                      {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
+                        <p className="text-base mt-1 opacity-90">{adDesign.businessInfo.freeText}</p>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="pt-6 px-6 space-y-4">
-                    {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="h-5 w-5 mt-0.5 flex-shrink-0"
-                          style={{
-                            color: colorValues.textColor ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <Phone className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Phone</p>
-                          <button
-                            onClick={() => handlePhoneCall(getPhoneNumber())}
-                            className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="pt-6 px-6 space-y-4">
+                      {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="h-5 w-5 mt-0.5 flex-shrink-0"
+                            style={{
+                              color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            }}
                           >
-                            {formatPhone(getPhoneNumber())}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {!adDesign.hiddenFields?.email && getEmail() && (
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="h-5 w-5 mt-0.5 flex-shrink-0"
-                          style={{
-                            color: colorValues.textColor ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <Mail className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Email</p>
-                          <button
-                            onClick={() => handleEmail(getEmail())}
-                            className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
-                          >
-                            {formatEmail(getEmail())}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {!adDesign.hiddenFields?.address && (
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="h-5 w-5 mt-0.5 flex-shrink-0"
-                          style={{
-                            color: colorValues.textColor ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <MapPin className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Address</p>
-                          <button
-                            onClick={() => handleGetDirections(formatAddress(adDesign.businessInfo))}
-                            className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative text-left"
-                          >
-                            {formatAddress(adDesign.businessInfo)}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {!adDesign.hiddenFields?.hours && (
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="h-5 w-5 mt-0.5 flex-shrink-0"
-                          style={{
-                            color: colorValues.textColor ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Hours of Operation</p>
-                          <div className="space-y-1">
-                            {formatHours(adDesign.businessInfo?.hours).map((line, i) => (
-                              <p key={i} className="text-sm">
-                                {line}
-                              </p>
-                            ))}
+                            <Phone className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Phone</p>
+                            <button
+                              onClick={() => handlePhoneCall(getPhoneNumber())}
+                              className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
+                            >
+                              {formatPhone(getPhoneNumber())}
+                            </button>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+
+                      {!adDesign.hiddenFields?.email && getEmail() && (
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="h-5 w-5 mt-0.5 flex-shrink-0"
+                            style={{
+                              color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            }}
+                          >
+                            <Mail className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Email</p>
+                            <button
+                              onClick={() => handleEmail(getEmail())}
+                              className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
+                            >
+                              {formatEmail(getEmail())}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!adDesign.hiddenFields?.address && (
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="h-5 w-5 mt-0.5 flex-shrink-0"
+                            style={{
+                              color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            }}
+                          >
+                            <MapPin className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Address</p>
+                            <button
+                              onClick={() => handleGetDirections(formatAddress(adDesign.businessInfo))}
+                              className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative text-left"
+                            >
+                              {formatAddress(adDesign.businessInfo)}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!adDesign.hiddenFields?.hours && (
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="h-5 w-5 mt-0.5 flex-shrink-0"
+                            style={{
+                              color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            }}
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Hours of Operation</p>
+                            <div className="space-y-1">
+                              {formatHours(adDesign.businessInfo?.hours).map((line, i) => (
+                                <p key={i} className="text-sm">
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Mobile Video Section */}
