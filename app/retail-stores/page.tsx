@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, X } from "lucide-react"
+import { Phone } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
@@ -308,207 +308,171 @@ export default function RetailStoresPage() {
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
               <li>Read reviews from other customers</li>
-              <li>View business videos showcasing work and staff</li>
-              <li>Access exclusive coupons directly on each business listing</li>
-              <li>Discover job openings from businesses you frequent yourself</li>
+              <li>View store videos and product showcases</li>
+              <li>Access exclusive coupons and deals</li>
+              <li>Discover job openings at local retailers</li>
             </ul>
           </div>
         </div>
       </div>
 
-      {/* Enhanced Filter Interface */}
-      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <h3 className="text-lg font-semibold mb-4">Filter by Store Type</h3>
+      {/* Filter Section */}
+      <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="text-lg font-semibold">Filter by Store Type:</h4>
+          <div className="flex gap-2">
+            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} size="sm" className="min-w-[100px]">
+              Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
+            </Button>
+            {appliedFilters.length > 0 && (
+              <Button onClick={clearFilters} variant="outline" size="sm" className="min-w-[100px] bg-transparent">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+        {appliedFilters.length > 0 && (
+          <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-700 font-medium">Active Filters: {appliedFilters.join(", ")}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {filterOptions.map((option) => (
-            <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+            <label
+              key={option.id}
+              className="flex items-center space-x-2 bg-white rounded-md shadow-sm p-2 border border-gray-200 hover:border-primary-300 transition-colors cursor-pointer"
+            >
               <input
                 type="checkbox"
                 checked={selectedFilters.includes(option.value)}
                 onChange={(e) => handleFilterChange(option.id, option.value, e.target.checked)}
                 className="rounded border-gray-300 text-primary focus:ring-primary"
               />
-              <span className="text-sm text-gray-700">{option.label}</span>
+              <span className="text-sm font-medium text-gray-700">{option.label}</span>
             </label>
           ))}
         </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              onClick={applyFilters}
-              disabled={selectedFilters.length === 0}
-              className="bg-primary hover:bg-primary/90"
-            >
-              Apply Filters ({selectedFilters.length})
-            </Button>
-
-            {appliedFilters.length > 0 && (
-              <Button
-                onClick={clearFilters}
-                variant="outline"
-                className="text-gray-600 hover:text-gray-800 bg-transparent"
-              >
-                Clear Filters
-              </Button>
-            )}
-          </div>
-
-          {appliedFilters.length > 0 && (
-            <div className="text-sm text-gray-600">
-              Showing {providers.length} of {allProviders.length} stores
-            </div>
-          )}
-        </div>
-
-        {/* Active Filters Display */}
-        {appliedFilters.length > 0 && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm font-medium text-blue-800 mb-2">Active Filters:</p>
-            <div className="flex flex-wrap gap-2">
-              {appliedFilters.map((filter, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                >
-                  {filter}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Zip Code Status Indicator */}
+      {/* Zip Code Filter Status */}
       {userZipCode && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              <div>
-                <p className="text-sm font-medium text-blue-800">Showing businesses that service: {userZipCode}</p>
-                <p className="text-sm text-blue-700">Including businesses with this ZIP code in their service area</p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearZipCode}
-              className="text-blue-700 hover:text-blue-900 hover:bg-blue-100"
-            >
-              <X className="w-4 h-4 mr-1" />
-              Clear Filter
-            </Button>
-          </div>
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Showing stores that serve zip code:</span> {userZipCode}
+            <span className="text-xs block mt-1">Includes stores with {userZipCode} in their service area</span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClearZipCode}
+            className="text-blue-700 border-blue-300 hover:bg-blue-100 bg-transparent"
+          >
+            Clear Filter
+          </Button>
         </div>
       )}
 
       {loading ? (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading retail stores...</p>
-        </div>
-      ) : error ? (
-        <div className="text-center py-8">
-          <p className="text-red-600">{error}</p>
+          <p className="text-gray-600">Loading retail stores...</p>
         </div>
       ) : providers.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="max-w-md mx-auto">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {userZipCode ? `No Retail Stores Found in ${userZipCode}` : "No Retail Stores Yet"}
-            </h3>
-            <p className="text-gray-600 mb-4">
-              {userZipCode
-                ? `No retail stores found serving ZIP code ${userZipCode}. Try clearing the filter to see all stores.`
-                : "Be the first retail store to join our platform and connect with local customers in your area."}
-            </p>
-            <Button className="bg-purple-600 hover:bg-purple-700">Register Your Store</Button>
-          </div>
+        <div className="mt-8 p-8 text-center border border-dashed border-gray-300 rounded-lg bg-gray-50">
+          <h3 className="text-xl font-medium text-gray-700 mb-2">No Retail Stores Found</h3>
+          <p className="text-gray-600">
+            {userZipCode
+              ? `No retail stores found that serve the ${userZipCode} area.`
+              : "Enter your zip code to find retail stores in your area."}
+          </p>
         </div>
       ) : (
         <div className="space-y-6">
-          {providers.map((provider: Business) => (
+          {providers.map((provider) => (
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="space-y-4">
                   {/* Compact Business Info */}
                   <div className="space-y-2">
-                    <h3 className="text-xl font-semibold">
-                      {provider.displayName || provider.businessName || "Retail Store"}
+                    <h3 className="text-xl font-semibold text-gray-900 leading-tight">
+                      {provider.displayName || provider.businessName}
                     </h3>
 
-                    {/* Combined location and phone in one row */}
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                      {provider.displayLocation && <span>{provider.displayLocation}</span>}
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                      {/* Location Display */}
+                      <div className="flex items-center">
+                        <svg
+                          className="h-4 w-4 mr-1 text-primary"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                        <span className="truncate">{provider.displayLocation || "Location not specified"}</span>
+                      </div>
+
+                      {/* Phone Display */}
                       {provider.displayPhone && (
                         <div className="flex items-center">
-                          <Phone className="w-4 h-4 mr-1" />
-                          <a href={`tel:${provider.displayPhone}`} className="hover:text-blue-600 hover:underline">
+                          <Phone className="h-4 w-4 mr-1 text-primary" />
+                          <a href={`tel:${provider.displayPhone}`} className="hover:text-primary transition-colors">
                             {provider.displayPhone}
                           </a>
                         </div>
                       )}
                     </div>
 
-                    {/* Store Type Tags - Display ALL services */}
-                    {provider.subcategories && provider.subcategories.length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Store Type:</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {provider.subcategories.map((subcategory: any, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(subcategory)}
-                            </span>
-                          ))}
+                    {/* Subcategories */}
+                    {(provider.subcategories || provider.allSubcategories) && (
+                      <div className="mt-2">
+                        <div className="flex flex-wrap gap-1">
+                          {(provider.subcategories || provider.allSubcategories || []).map(
+                            (subcategory: any, idx: number) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                              >
+                                {getSubcategoryString(subcategory)}
+                              </span>
+                            ),
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Photo Carousel and Buttons Row */}
-                  <div className="flex flex-col lg:flex-row gap-4 items-start">
-                    {/* Photo Carousel */}
-                    <div className="flex-1">
-                      <PhotoCarousel
-                        businessId={provider.id}
-                        photos={businessPhotos[provider.id] || []}
-                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
-                        showMultiple={true}
-                        photosPerView={5}
-                        className="w-full"
-                      />
+                  {/* Photo Carousel and Buttons Row - Updated for mobile centering */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-center lg:items-start">
+                    {/* Photo Carousel - Centered on mobile */}
+                    <div className="flex-1 flex justify-center lg:justify-start">
+                      <div className="w-full max-w-md lg:max-w-none">
+                        <PhotoCarousel
+                          businessId={provider.id}
+                          photos={businessPhotos[provider.id] || []}
+                          onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                          showMultiple={true}
+                          photosPerView={5}
+                          size="medium"
+                          className="w-full"
+                        />
+                      </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32 w-full">
+                    {/* Action Buttons - Centered on mobile */}
+                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start justify-center w-full lg:w-auto">
                       <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(provider)}>
                         Ratings
                       </Button>
@@ -528,15 +492,18 @@ export default function RetailStoresPage() {
         </div>
       )}
 
+      {/* Reviews Dialog */}
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.name}
+          businessId={selectedProvider.id.toString()}
           reviews={selectedProvider.reviews}
         />
       )}
 
+      {/* Business Profile Dialog */}
       {selectedBusiness && (
         <BusinessProfileDialog
           isOpen={isProfileDialogOpen}

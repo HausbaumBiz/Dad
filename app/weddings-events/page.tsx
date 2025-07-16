@@ -431,21 +431,23 @@ export default function WeddingsEventsPage() {
                     )}
                   </div>
 
-                  {/* Photos and Buttons on same line */}
-                  <div className="flex flex-col lg:flex-row gap-4 items-start">
-                    {/* Photo Carousel - takes most of the width */}
-                    <div className="flex-1 min-w-0">
-                      <PhotoCarousel
-                        businessId={provider.id}
-                        photos={businessPhotos[provider.id] || []}
-                        onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
-                        showMultiple={true}
-                        photosPerView={5}
-                      />
+                  {/* Photos and Buttons on same line - Updated for mobile centering */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-center lg:items-start">
+                    {/* Photo Carousel - takes most of the width - Centered on mobile */}
+                    <div className="flex-1 min-w-0 flex justify-center lg:justify-start">
+                      <div className="w-full max-w-md lg:max-w-none">
+                        <PhotoCarousel
+                          businessId={provider.id}
+                          photos={businessPhotos[provider.id] || []}
+                          onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
+                          showMultiple={true}
+                          photosPerView={5}
+                        />
+                      </div>
                     </div>
 
-                    {/* Action Buttons - fixed width on the right */}
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32 flex-shrink-0">
+                    {/* Action Buttons - fixed width on the right - Centered on mobile */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32 flex-shrink-0 justify-center lg:justify-start w-full lg:w-auto">
                       <Button className="flex-1 lg:w-full" onClick={() => handleOpenReviews(provider)}>
                         Ratings
                       </Button>
