@@ -9,10 +9,11 @@ import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, Phone, ChevronLeft, ChevronRight, MapPin } from "lucide-react"
+import { Loader2, Phone, MapPin } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { Checkbox } from "@/components/ui/checkbox"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { PhotoCarousel } from "@/components/photo-carousel"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -91,122 +92,6 @@ function formatPhoneNumber(phoneNumberString: string | undefined | null): string
 
   // Return original if not 10 digits
   return phoneNumberString
-}
-
-// Photo Carousel Component - displays exactly 5 photos in landscape format with mobile responsiveness
-interface PhotoCarouselProps {
-  photos: string[]
-  businessName: string
-}
-
-function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-
-  if (!photos || photos.length === 0) {
-    return (
-      <div className="w-full h-24 lg:h-[200px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center">
-        <span className="text-gray-400 text-sm">No Photos Available</span>
-      </div>
-    )
-  }
-
-  // Responsive photos per view: 2 on mobile, 5 on desktop
-  const photosPerView = window.innerWidth < 1024 ? 2 : 5
-  const maxIndex = Math.max(0, photos.length - photosPerView)
-
-  const nextPhotos = () => {
-    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
-  }
-
-  const prevPhotos = () => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0))
-  }
-
-  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
-  const emptySlots = Math.max(0, photosPerView - visiblePhotos.length)
-
-  return (
-    <div className="w-full">
-      <div className="relative group w-full">
-        <div className="flex gap-1.5 justify-center lg:justify-start w-full">
-          {/* Show actual photos - responsive sizing */}
-          {visiblePhotos.map((photo, index) => (
-            <div
-              key={currentIndex + index}
-              className="w-24 h-24 lg:w-[200px] lg:h-[200px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
-            >
-              <Image
-                src={photo || "/placeholder.svg"}
-                alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={200}
-                height={200}
-                className="w-full h-full object-cover"
-                sizes="(max-width: 1024px) 96px, 200px"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = "/placeholder.svg"
-                }}
-              />
-            </div>
-          ))}
-
-          {/* Fill empty slots - responsive count */}
-          {Array.from({ length: emptySlots }).map((_, index) => (
-            <div
-              key={`empty-${index}`}
-              className="w-24 h-24 lg:w-[200px] lg:h-[200px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0 flex items-center justify-center"
-            >
-              <span className="text-gray-400 text-xs">No Photo</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Navigation arrows - show if there are more photos than can be displayed */}
-        {photos.length > photosPerView && (
-          <>
-            <button
-              onClick={prevPhotos}
-              disabled={currentIndex === 0}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <button
-              onClick={nextPhotos}
-              disabled={currentIndex >= maxIndex}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </>
-        )}
-
-        {/* Photo counter */}
-        {photos.length > 0 && (
-          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1 py-0.5 rounded">
-            {Math.min(currentIndex + Math.min(visiblePhotos.length, photosPerView), photos.length)} of {photos.length}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination dots - show if there are more photos than can be displayed */}
-      {photos.length > photosPerView && (
-        <div className="flex justify-center mt-1 space-x-1">
-          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
-            const pageStartIndex = index * photosPerView
-            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
-            return (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(pageStartIndex)}
-                className={`w-1 h-1 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
-              />
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function EducationTutoringPage() {
@@ -560,8 +445,12 @@ export default function EducationTutoringPage() {
                         </div>
                       ) : (
                         <PhotoCarousel
+                          businessId={business.id}
                           photos={businessPhotos[business.id] || []}
-                          businessName={business.displayName || business.businessName || "Education Provider"}
+                          onLoadPhotos={() => {}}
+                          showMultiple={true}
+                          photosPerView={2}
+                          size="small"
                         />
                       )}
                     </div>
