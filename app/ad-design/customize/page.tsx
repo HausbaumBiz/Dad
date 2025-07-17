@@ -1197,7 +1197,7 @@ export default function CustomizeAdDesignPage() {
                 {!hiddenFields.photoAlbum && (
                   <Button
                     variant="outline"
-                    className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
                     onClick={handleOpenPhotoAlbum}
                   >
                     <ImageIcon
@@ -1213,7 +1213,7 @@ export default function CustomizeAdDesignPage() {
                 {!hiddenFields.savingsButton && (
                   <Button
                     variant="outline"
-                    className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
                     onClick={() => setIsSavingsDialogOpen(true)}
                   >
                     <Ticket
@@ -1229,7 +1229,7 @@ export default function CustomizeAdDesignPage() {
                 {!hiddenFields.jobsButton && (
                   <Button
                     variant="outline"
-                    className="flex flex-col items-center justify-center gap-1 h-auto py-3"
+                    className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
                     onClick={() => setIsJobsDialogOpen(true)}
                   >
                     <Briefcase
@@ -1243,11 +1243,11 @@ export default function CustomizeAdDesignPage() {
                 )}
               </div>
 
-              {/* Custom Button */}
-              {!hiddenFields.customButton && (
+              {/* Custom Button or Colored Rectangle */}
+              {!hiddenFields.customButton ? (
                 <Button
                   variant="outline"
-                  className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2"
+                  className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2 bg-transparent"
                   onClick={() => setIsDocumentsOpen(true)}
                 >
                   {(() => {
@@ -1263,6 +1263,21 @@ export default function CustomizeAdDesignPage() {
                   })()}
                   <span className="text-xs">{customButtonName}</span>
                 </Button>
+              ) : (
+                <div
+                  className="h-12 mt-2 rounded-md"
+                  style={{
+                    backgroundColor: selectedTexture === "gradient" ? "" : colorValues.primary,
+                    backgroundImage:
+                      selectedTexture === "gradient"
+                        ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                        : textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundImage || "none",
+                    backgroundSize:
+                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundSize || "auto",
+                    backgroundRepeat:
+                      textureOptions.find((t) => t.value === selectedTexture)?.style.backgroundRepeat || "repeat",
+                  }}
+                />
               )}
 
               {/* Website button/footer */}
