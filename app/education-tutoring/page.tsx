@@ -449,8 +449,9 @@ export default function EducationTutoringPage() {
                           photos={businessPhotos[business.id] || []}
                           onLoadPhotos={() => {}}
                           showMultiple={true}
-                          photosPerView={2}
+                          photosPerView={5}
                           size="small"
+                          className="w-full lg:[&_img]:!w-[200px] lg:[&_img]:!h-[200px] [&_img]:object-cover"
                         />
                       )}
                     </div>
