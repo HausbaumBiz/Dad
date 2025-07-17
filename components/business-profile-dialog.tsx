@@ -782,7 +782,8 @@ export function BusinessProfileDialog({
                       )}
                     </div>
 
-                    {!adDesign.hiddenFields?.customButton && (
+                    {/* Custom Button or Colored Rectangle - Mobile */}
+                    {!adDesign.hiddenFields?.customButton ? (
                       <Button
                         variant="outline"
                         className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2 bg-transparent"
@@ -801,6 +802,23 @@ export function BusinessProfileDialog({
                         })()}
                         <span className="text-xs">{adDesign.customButton?.name || "Menu"}</span>
                       </Button>
+                    ) : (
+                      <div
+                        className="h-12 mt-2 rounded-md"
+                        style={{
+                          backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
+                          backgroundImage:
+                            adDesign.texture === "gradient"
+                              ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage ||
+                                "none",
+                          backgroundSize:
+                            textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                          backgroundRepeat:
+                            textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat ||
+                            "repeat",
+                        }}
+                      />
                     )}
 
                     {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
@@ -1112,7 +1130,7 @@ export function BusinessProfileDialog({
                                 })()}
                               </div>
 
-                              {/* Conditionally render either the website button or the custom button */}
+                              {/* Conditionally render either the website button or the custom button or colored rectangle */}
                               {adDesign.hiddenFields?.customButton &&
                               !adDesign.hiddenFields?.website &&
                               adDesign.businessInfo?.website ? (
@@ -1159,40 +1177,63 @@ export function BusinessProfileDialog({
                                     <span>Visit Our Full Website</span>
                                   </button>
                                 </div>
+                              ) : !adDesign.hiddenFields?.customButton ? (
+                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                  <button
+                                    onClick={() => setIsDocumentsOpen(true)}
+                                    className="flex items-center justify-center gap-2 w-full text-white p-3 rounded-md transition-colors hover:opacity-90"
+                                    style={{
+                                      backgroundColor:
+                                        adDesign.texture === "gradient"
+                                          ? ""
+                                          : colorValues.textColor
+                                            ? "#000000"
+                                            : colorValues.primary,
+                                      backgroundImage:
+                                        adDesign.texture === "gradient"
+                                          ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                                          : textureOptions.find((t) => t.value === adDesign.texture)?.style
+                                              .backgroundImage || "none",
+                                      backgroundSize:
+                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
+                                          .backgroundSize || "auto",
+                                      backgroundRepeat:
+                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
+                                          .backgroundRepeat || "repeat",
+                                    }}
+                                  >
+                                    {(() => {
+                                      const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
+                                      return <IconComponent className="h-5 w-5 text-white" />
+                                    })()}
+                                    <span>{adDesign.customButton?.name || "Menu"}</span>
+                                  </button>
+                                </div>
                               ) : (
-                                !adDesign.hiddenFields?.customButton && (
-                                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                    <button
-                                      onClick={() => setIsDocumentsOpen(true)}
-                                      className="flex items-center justify-center gap-2 w-full text-white p-3 rounded-md transition-colors hover:opacity-90"
-                                      style={{
-                                        backgroundColor:
-                                          adDesign.texture === "gradient"
-                                            ? ""
-                                            : colorValues.textColor
-                                              ? "#000000"
-                                              : colorValues.primary,
-                                        backgroundImage:
-                                          adDesign.texture === "gradient"
-                                            ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                                            : textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                                .backgroundImage || "none",
-                                        backgroundSize:
-                                          textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                            .backgroundSize || "auto",
-                                        backgroundRepeat:
-                                          textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                            .backgroundRepeat || "repeat",
-                                      }}
-                                    >
-                                      {(() => {
-                                        const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
-                                        return <IconComponent className="h-5 w-5 text-white" />
-                                      })()}
-                                      <span>{adDesign.customButton?.name || "Menu"}</span>
-                                    </button>
-                                  </div>
-                                )
+                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                  <div
+                                    className="w-full h-12 rounded-md"
+                                    style={{
+                                      backgroundColor:
+                                        adDesign.texture === "gradient"
+                                          ? ""
+                                          : colorValues.textColor
+                                            ? "#000000"
+                                            : colorValues.primary,
+                                      backgroundImage:
+                                        adDesign.texture === "gradient"
+                                          ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                                          : textureOptions.find((t) => t.value === adDesign.texture)?.style
+                                              .backgroundImage || "none",
+                                      backgroundSize:
+                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
+                                          .backgroundSize || "auto",
+                                      backgroundRepeat:
+                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
+                                          .backgroundRepeat || "repeat",
+                                    }}
+                                  />
+                                </div>
                               )}
                             </div>
                           </CardContent>
