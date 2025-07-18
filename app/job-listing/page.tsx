@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Check, X, Upload, Eye, Info, Edit, MapPin, Search } from "lucide-react"
+import { Check, Eye, Info, Edit, MapPin, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
@@ -28,8 +28,6 @@ export default function JobListingPage() {
   const [benefits, setBenefits] = useState<Record<string, boolean>>({})
   const [benefitDetails, setBenefitDetail] = useState<Record<string, string>>({})
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [logoFile, setLogoFile] = useState<File | null>(null)
-  const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   // Add state for confirmation dialog
@@ -125,26 +123,6 @@ export default function JobListingPage() {
       ...prev,
       [benefit]: detail,
     }))
-  }
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setLogoFile(file)
-
-      // Create preview URL
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        setLogoPreview(event.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  // Add this new function to remove the logo
-  const handleRemoveLogo = () => {
-    setLogoFile(null)
-    setLogoPreview(null)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -380,11 +358,6 @@ export default function JobListingPage() {
       }
 
       formData.append("jobData", JSON.stringify(jobData))
-
-      // Add logo file if available
-      if (logoFile) {
-        formData.append("logo", logoFile)
-      }
 
       // Call the server action with the current business ID
       const result = await saveJobListing(formData, currentBusinessId)
@@ -628,61 +601,6 @@ export default function JobListingPage() {
                     onChange={handleInputChange}
                     className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
                   />
-                </div>
-
-                <div className="mt-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo (Optional)</label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                    {logoPreview ? (
-                      <div className="relative">
-                        <div className="flex justify-center mb-2">
-                          <div className="relative h-40 max-w-xs mx-auto">
-                            <img
-                              src={logoPreview || "/placeholder.svg"}
-                              alt="Company logo preview"
-                              className="h-full mx-auto object-contain"
-                            />
-                          </div>
-                        </div>
-                        <p className="text-sm text-center text-gray-500 mb-2">
-                          {logoFile?.name} ({Math.round(logoFile?.size / 1024)} KB)
-                        </p>
-                        <div className="flex justify-center">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleRemoveLogo}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Remove Logo
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                        <div className="mt-2">
-                          <label htmlFor="logo-upload" className="cursor-pointer">
-                            <span className="mt-2 block text-sm font-medium text-primary hover:text-primary/90">
-                              Click to upload a logo
-                            </span>
-                            <input
-                              id="logo-upload"
-                              name="logo"
-                              type="file"
-                              className="sr-only"
-                              accept="image/*"
-                              onChange={handleLogoUpload}
-                            />
-                            <p className="mt-1 text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
-                          </label>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <p className="mt-2 text-sm text-gray-500">This logo will appear at the top of your job listing.</p>
                 </div>
 
                 <div>
@@ -1417,7 +1335,12 @@ export default function JobListingPage() {
                             </div>
 
                             <div className="flex items-end">
-                              <Button type="button" variant="outline" onClick={addIndividualZipCode} className="w-full">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={addIndividualZipCode}
+                                className="w-full bg-transparent"
+                              >
                                 Add Individual ZIP
                               </Button>
                             </div>
@@ -1669,17 +1592,6 @@ export default function JobListingPage() {
               {/* Company Header with Logo */}
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 border-b border-gray-200">
                 <div className="flex items-center">
-                  {logoPreview ? (
-                    <div className="mr-6 flex-shrink-0">
-                      <div className="relative h-20 w-20">
-                        <img
-                          src={logoPreview || "/placeholder.svg"}
-                          alt="Company logo"
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-                    </div>
-                  ) : null}
                   <div>
                     <h1 className="text-2xl font-bold text-gray-800">{formValues.businessName}</h1>
                     <p className="text-gray-600">{formValues.businessAddress}</p>
