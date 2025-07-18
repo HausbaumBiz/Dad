@@ -52,7 +52,7 @@ export default function PetCarePage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
-    id: number
+    id: string // Change from number to string
     name: string
     rating: number
     reviews: number
@@ -252,7 +252,7 @@ export default function PetCarePage() {
 
   const handleViewReviews = (business: Business) => {
     setSelectedProvider({
-      id: Number.parseInt(business.id || "0"),
+      id: business.id || "0", // Keep as string, don't parse as number
       name: business.displayName || business.businessName || "Pet Care Provider",
       rating: business.rating || 0,
       reviews: business.reviewCount || 0,
@@ -476,7 +476,7 @@ export default function PetCarePage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.name || ""}
-        businessId={selectedProvider?.id.toString() || ""}
+        businessId={selectedProvider?.id || ""} // Remove .toString() since it's already a string
         reviews={[]}
       />
 

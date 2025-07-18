@@ -54,20 +54,39 @@ export function ReviewsDialog({ isOpen, onClose, providerName, businessId, revie
       if (businessId && isOpen) {
         console.log("Fetching reviews for business:", businessId)
         setIsLoading(true)
-        try {
-          const fetchedReviews = await getBusinessReviews(businessId)
-          console.log("Fetched reviews:", fetchedReviews)
-          setBusinessReviews(fetchedReviews)
-        } catch (error) {
-          console.error("Error fetching reviews:", error)
-          toast({
-            title: "Error fetching reviews",
-            description: "There was a problem loading reviews.",
-            variant: "destructive",
-          })
-          setBusinessReviews([]) // Set empty array on error
-        } finally {
-          setIsLoading(false)
+
+        // Retry logic for rate limiting
+        const maxRetries = 3
+        let retryCount = 0
+
+        while (retryCount < maxRetries) {
+          try {
+            const fetchedReviews = await getBusinessReviews(businessId)
+            console.log("Fetched reviews:", fetchedReviews)
+            setBusinessReviews(fetchedReviews)
+            break // Success, exit retry loop
+          } catch (error) {
+            console.error("Error fetching reviews:", error)
+
+            // Check if it's a rate limiting error
+            if (error.message?.includes("429") || error.message?.includes("Too Many Requests")) {
+              retryCount++
+              if (retryCount < maxRetries) {
+                console.log(`Rate limited, retrying in ${retryCount * 1000}ms... (attempt ${retryCount}/${maxRetries})`)
+                await new Promise((resolve) => setTimeout(resolve, retryCount * 1000)) // Exponential backoff
+                continue
+              }
+            }
+
+            // If not rate limiting or max retries reached, show error
+            toast({
+              title: "Error fetching reviews",
+              description: "There was a problem loading reviews. Please try again later.",
+              variant: "destructive",
+            })
+            setBusinessReviews([]) // Set empty array on error
+            break
+          }
         }
       } else {
         setIsLoading(false)
