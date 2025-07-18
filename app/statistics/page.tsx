@@ -31,6 +31,7 @@ interface BusinessAnalytics {
   photoClicks: number
   couponClicks: number
   jobClicks: number
+  videoViews: number
   zipCodeAnalytics: ZipCodeAnalytics[]
   lastUpdated: number
 }
@@ -291,6 +292,7 @@ export default function StatisticsPage() {
         photoAlbumClicks: 0,
         couponClicks: 0,
         jobClicks: 0,
+        videoViews: 0,
         zipCodeAnalytics: [],
         lastUpdated: 0,
       })
@@ -1058,7 +1060,7 @@ export default function StatisticsPage() {
     },
     {
       title: "Video Views",
-      yourStats: "0",
+      yourStats: isAnalyticsLoading ? "Loading..." : clickAnalytics?.videoViews?.toString() || "0",
     },
     {
       title: "Photo Album Views",

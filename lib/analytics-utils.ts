@@ -75,6 +75,7 @@ export const trackCouponClick = createDebouncedTracker("coupon_click")
 export const trackJobClick = createDebouncedTracker("job_click")
 export const trackPhoneClick = createDebouncedTracker("phone_click")
 export const trackWebsiteClick = createDebouncedTracker("website_click")
+export const trackVideoView = createDebouncedTracker("video_view")
 
 // Helper function to get current zip code from various sources
 export function getCurrentZipCode(): string | undefined {
@@ -298,6 +299,9 @@ export function trackBusinessInteraction(
       break
     case "photo_album_click":
       trackPhotoAlbumClick(businessId, finalZipCode, metadata)
+      break
+    case "video_view":
+      trackVideoView(businessId, finalZipCode, metadata)
       break
     default:
       console.warn("⚠️ Unknown event type:", eventType)

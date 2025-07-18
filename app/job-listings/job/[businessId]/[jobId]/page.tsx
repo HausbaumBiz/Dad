@@ -12,7 +12,6 @@ import {
   Calendar,
   DollarSign,
   Clock,
-  Briefcase,
   Building,
   Mail,
   User,
@@ -150,18 +149,7 @@ export default function JobDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center">
-                    {job.logoUrl ? (
-                      <img
-                        src={job.logoUrl || "/placeholder.svg"}
-                        alt={`${job.businessName} logo`}
-                        className="max-w-full max-h-full p-2"
-                      />
-                    ) : (
-                      <Briefcase className="h-8 w-8 text-gray-400" />
-                    )}
-                  </div>
+                <div className="items-start gap-4">
                   <div>
                     <h1 className="text-2xl font-bold">{job.jobTitle}</h1>
                     <p className="text-primary font-medium">{job.businessName}</p>

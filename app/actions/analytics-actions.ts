@@ -12,6 +12,7 @@ export interface AnalyticsEvent {
     | "photo_album_click"
     | "coupon_click"
     | "job_click"
+    | "video_view"
   zipCode?: string
   timestamp: number
   metadata?: Record<string, any>
@@ -181,6 +182,7 @@ export async function getBusinessAnalytics(businessId: string) {
       photoAlbumClicks: Number.parseInt(eventsData?.photo_album_click?.toString() || "0"),
       couponClicks: Number.parseInt(eventsData?.coupon_click?.toString() || "0"),
       jobClicks: Number.parseInt(eventsData?.job_click?.toString() || "0"),
+      videoViews: Number.parseInt(eventsData?.video_view?.toString() || "0"),
       zipCodeAnalytics,
       lastUpdated: Date.now(),
     }
@@ -199,6 +201,7 @@ export async function getBusinessAnalytics(businessId: string) {
       photoAlbumClicks: 0,
       couponClicks: 0,
       jobClicks: 0,
+      videoViews: 0,
       zipCodeAnalytics: [],
       lastUpdated: Date.now(),
     }

@@ -54,6 +54,7 @@ import {
   trackJobClick,
   trackPhoneClick,
   trackWebsiteClick,
+  trackVideoView,
   getCurrentZipCode,
 } from "@/lib/analytics-utils"
 
@@ -530,6 +531,16 @@ export function BusinessProfileDialog({
     setIsJobsOpen(true)
   }
 
+  // Function to handle video view tracking
+  const handleVideoView = () => {
+    console.log(`🎥 Tracking video view for business ${businessId} from ZIP ${currentZipCode}`)
+    trackVideoView(businessId, currentZipCode, {
+      businessName,
+      timestamp: Date.now(),
+      source: "profile_dialog",
+    })
+  }
+
   return (
     <>
       {/* Add style to hide default close button */}
@@ -711,6 +722,10 @@ export function BusinessProfileDialog({
                                   allowFullScreen
                                   title={`${businessName} video`}
                                   style={{ border: "none" }}
+                                  onLoad={() => {
+                                    // Track video view when iframe loads
+                                    handleVideoView()
+                                  }}
                                 />
                               </div>
                             )
@@ -1116,6 +1131,10 @@ export function BusinessProfileDialog({
                                         allowFullScreen
                                         title={`${businessName} video`}
                                         style={{ border: "none" }}
+                                        onLoad={() => {
+                                          // Track video view when iframe loads
+                                          handleVideoView()
+                                        }}
                                       />
                                     )
                                   } else {
