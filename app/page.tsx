@@ -263,31 +263,6 @@ export default function HomePage() {
     },
   ]
 
-  // Add a featured categories array with the new images
-  const featuredCategories = [
-    {
-      title: "Home Improvement",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/roofer-mDgCeFLINbuMG9UdWRFSiCFxIBFOjc.png",
-      href: "/home-improvement",
-    },
-    {
-      title: "Automotive Services",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/auto-mQWtZXyRogQgO5qlNVcR1OYcyDqe59.png",
-      href: "/automotive-services",
-    },
-    {
-      title: "Pet Care",
-      image:
-        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/cat%20and%20dog-UHW1HU5Xs0PMdXJLC66zBYViQu0jx9.png",
-      href: "/pet-care",
-    },
-    {
-      title: "Tech & IT Services",
-      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/computer-lox6P5znlsextHA6c7vUkXZNkr2d3q.png",
-      href: "/tech-it-services",
-    },
-  ]
-
   // Hero section images
   const heroImages = [
     {
@@ -496,68 +471,39 @@ export default function HomePage() {
           </div>
         </div>
 
-        {categoriesActive && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-center mb-6">Featured Businesses</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-              {featuredCategories.map((category, index) => (
-                <div
-                  key={index}
-                  className="relative overflow-hidden rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105"
-                >
-                  <a
-                    href={`${category.href}${savedZipCode ? `?zip=${savedZipCode}` : ""}`}
-                    onClick={(e) => handleCategoryClick(category.href, e)}
-                  >
-                    <div className="aspect-[4/3] relative">
-                      <Image
-                        src={category.image || "/placeholder.svg"}
-                        alt={category.title}
-                        fill
-                        className="object-cover"
-                        unoptimized={true}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                      <h3 className="absolute bottom-4 left-4 text-white font-bold text-xl">{category.title}</h3>
-                    </div>
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <h2 className="text-2xl font-bold text-center mb-8">Select a Category</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-12">
           {categories.map((category, index) => (
             <Card key={index} className="overflow-hidden transition-all duration-200 hover:shadow-lg">
-              <div className="aspect-square relative overflow-hidden rounded-t-lg">
-                <Image
-                  src={category.image || "/placeholder.svg"}
-                  alt={category.title}
-                  fill
-                  className="object-cover"
-                  unoptimized={true}
-                />
-              </div>
-              <CardContent className="p-4">
-                <a
-                  href={`${category.href}${savedZipCode ? `?zip=${savedZipCode}` : ""}`}
-                  onClick={(e) => handleCategoryClick(category.href, e)}
-                  className="block"
-                >
+              <a
+                href={`${category.href}${savedZipCode ? `?zip=${savedZipCode}` : ""}`}
+                onClick={(e) => handleCategoryClick(category.href, e)}
+                className="block"
+              >
+                <div className="aspect-square relative overflow-hidden rounded-t-lg">
+                  <Image
+                    src={category.image || "/placeholder.svg"}
+                    alt={category.title}
+                    fill
+                    className="object-cover"
+                    unoptimized={true}
+                  />
+                </div>
+                <CardContent className="p-4">
                   <h3 className="text-lg font-medium text-center mb-2">{category.title}</h3>
-                </a>
+                </CardContent>
+              </a>
 
-                {category.subcategories && (
+              {category.subcategories && (
+                <div className="px-4 pb-4">
                   <CategorySubcategories
                     categoryTitle={category.title}
                     subcategories={category.subcategories}
                     onSelectionChange={(selected) => handleSubcategorySelection(category.title, selected)}
                   />
-                )}
-              </CardContent>
+                </div>
+              )}
             </Card>
           ))}
         </div>
