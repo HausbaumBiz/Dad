@@ -918,51 +918,49 @@ export default function StatisticsPage() {
     {
       id: 5,
       name: "Quality",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/quality-QjhKw0vxK2AcjsXlQ5zH9bUet8u1Fu.png",
-      silverImage: getCloudflareImageUrl("754573e6-6f05-415f-6cdb-51e905503700"),
-      hiResImage: getCloudflareImageUrl("754573e6-6f05-415f-6cdb-51e905503700", "public"), // Full resolution
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/quality%20-%20resize.png",
+      silverImage: getCloudflareImageUrl("6f7d4858-6a8b-4177-b43e-eb8275b13c00"),
+      hiResImage: getCloudflareImageUrl("6f7d4858-6a8b-4177-b43e-eb8275b13c00", "public"), // Full resolution
       unlocked: false,
     },
     {
       id: 6,
       name: "On Budget",
       image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/onbudget-lT4a3ega5RtBQbrWCP6lhmC7pPe33A.png",
-      silverImage: getCloudflareImageUrl("9420a0c8-fbd3-4e9d-262e-72f75ab20800"),
-      hiResImage: getCloudflareImageUrl("9420a0c8-fbd3-4e9d-262e-72f75ab20800", "public"),
+      silverImage: getCloudflareImageUrl("d2d20713-efd8-4040-087b-e60f158e1d00"),
+      hiResImage: getCloudflareImageUrl("d2d20713-efd8-4040-087b-e60f158e1d00", "public"),
       unlocked: false,
     },
     {
       id: 8,
       name: "Keeping Informed",
-      image:
-        "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/keepinginformed02-r27QrB4vwJ2IHUtyACOfiLtxnzjnHw.png",
-      silverImage: getCloudflareImageUrl("2f5566e7-8eaa-41b6-d165-0a5065cc9100"),
-      hiResImage: getCloudflareImageUrl("2f5566e7-8eaa-41b6-d165-0a5065cc9100", "public"),
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/keeping%20inform%20resize.png",
+      silverImage: getCloudflareImageUrl("0621d360-6a80-456f-43d9-376200337500"),
+      hiResImage: getCloudflareImageUrl("0621d360-6a80-456f-43d9-376200337500", "public"),
       unlocked: false,
     },
     {
       id: 9,
       name: "Expert",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/Expert-QVOr3upidxlzQ8tODpAEbNyCaHmZkg.png",
-      silverImage: getCloudflareImageUrl("64116b46-cb9e-416d-26bf-08a825b15400"),
-      hiResImage: getCloudflareImageUrl("64116b46-cb9e-416d-26bf-08a825b15400", "public"),
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/expert%20resize.png",
+      silverImage: getCloudflareImageUrl("a11349d9-cfc2-49d9-7511-a9556b9a4600"),
+      hiResImage: getCloudflareImageUrl("a11349d9-cfc2-49d9-7511-a9556b9a4600", "public"),
       unlocked: false,
     },
     {
       id: 10,
       name: "Dependability",
-      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/dependability-3uL8ZAla0UzLWdvoQ8nyLH2JI4lPzi.png",
-      silverImage: getCloudflareImageUrl("47db0bd7-4db1-4529-aee9-2d831445c200"),
-      hiResImage: getCloudflareImageUrl("47db0bd7-4db1-4529-aee9-2d831445c200", "public"),
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/depend%20resize.png",
+      silverImage: getCloudflareImageUrl("f2975f2d-5811-4c68-2f1d-fb79ea70e300"),
+      hiResImage: getCloudflareImageUrl("f2975f2d-5811-4c68-2f1d-fb79ea70e300", "public"),
       unlocked: false,
     },
     {
       id: 11,
       name: "Customer Service",
-      image:
-        "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/CustomerServic-2-eVctv27m01myFPW9mAhgfHGtoECddh.png",
-      silverImage: getCloudflareImageUrl("4386e640-8479-491a-310f-1b8d7c626300"),
-      hiResImage: getCloudflareImageUrl("4386e640-8479-491a-310f-1b8d7c626300", "public"),
+      image: "https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/customer%20resize.png",
+      silverImage: getCloudflareImageUrl("4e3c7ee3-86c8-4d46-2201-836e04e11c00"),
+      hiResImage: getCloudflareImageUrl("4e3c7ee3-86c8-4d46-2201-836e04e11c00", "public"),
       unlocked: false,
     },
   ]
@@ -1268,7 +1266,7 @@ export default function StatisticsPage() {
           <TabsList className="grid grid-cols-4 w-full max-w-3xl mx-auto mb-8">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="clicks">Clicks</TabsTrigger>
-            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="details">Ratings</TabsTrigger>
             <TabsTrigger value="outreach">Outreach</TabsTrigger>
           </TabsList>
 
@@ -1737,7 +1735,7 @@ export default function StatisticsPage() {
                           </div>
                           <p className="text-sm font-medium">{award.name}</p>
                           {isUnlocked ? (
-                            <p className="text-xs text-green-600 font-medium">Silver Unlocked!</p>
+                            <p className="text-xs text-green-600 font-medium">Award Unlocked!</p>
                           ) : (
                             <p className="text-xs text-gray-500">{fiveStarCount}/5 ⭐</p>
                           )}
@@ -1762,9 +1760,8 @@ export default function StatisticsPage() {
                     })}
                   </div>
                   <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-700">
-                      <strong>Award Tiers:</strong> 5 five-star reviews = Silver • 10 five-star reviews = Bronze • 25
-                      five-star reviews = Gold
+                    <p className="text-sm text-blue-700 text-center">
+                      <strong>5 Five-Star Reviews will Unlock the Award</strong>
                     </p>
                   </div>
                 </CardContent>
