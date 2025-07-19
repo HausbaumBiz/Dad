@@ -1632,7 +1632,55 @@ export default function StatisticsPage() {
 
           {/* Details Tab */}
           <TabsContent value="details" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Overall Rating Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Overall Rating Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isReviewsLoading ? (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <span className="ml-2">Loading rating summary...</span>
+                    </div>
+                  ) : reviews.length > 0 ? (
+                    <div className="text-center">
+                      <div className="text-6xl font-bold text-blue-600 mb-2">
+                        {(
+                          reviews.reduce((sum, review) => sum + (review.overallRating || 0), 0) / reviews.length
+                        ).toFixed(1)}
+                      </div>
+                      <div className="flex justify-center items-center gap-2 mb-2">
+                        {[...Array(5)].map((_, index) => (
+                          <Star
+                            key={index}
+                            className={`h-6 w-6 ${
+                              index <
+                              Math.floor(
+                                reviews.reduce((sum, review) => sum + (review.overallRating || 0), 0) / reviews.length,
+                              )
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "fill-gray-200 text-gray-300"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <div className="text-lg text-gray-600">
+                        Based on {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No reviews yet</p>
+                      <p className="text-sm text-gray-400 mt-2">
+                        Reviews will appear here when customers leave feedback.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Customer Ratings */}
               <Card>
                 <CardHeader>
