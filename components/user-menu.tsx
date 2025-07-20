@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -10,73 +9,95 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { User, LogOut, Settings, Users } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { User, LogOut, Heart } from "lucide-react"
 import { logoutUser } from "@/app/actions/user-actions"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import Link from "next/link"
 
 interface UserMenuProps {
-  userName?: string
+  userName?: string | null
 }
 
 export function UserMenu({ userName }: UserMenuProps) {
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const router = useRouter()
-  const [isClient, setIsClient] = useState(false)
 
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true)
+      const result = await logoutUser()
 
-  if (!isClient) return null
+      if (result.success) {
+        toast.success("Logged out successfully")
+        router.push("/")
+        router.refresh()
+      } else {
+        toast.error("Failed to logout")
+      }
+    } catch (error) {
+      console.error("Logout error:", error)
+      toast.error("Failed to logout")
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
 
-  // If no user is logged in, show login/register buttons
   if (!userName) {
     return (
-      <div className="flex items-center space-x-2">
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/user-login">Login</Link>
-        </Button>
-        <Button size="sm" asChild>
-          <Link href="/user-register">Register</Link>
-        </Button>
+      <div className="flex items-center gap-2">
+        <Link href="/user-login">
+          <Button variant="outline" size="sm">
+            Login
+          </Button>
+        </Link>
+        <Link href="/user-register">
+          <Button size="sm">Register</Button>
+        </Link>
       </div>
     )
   }
 
-  // If user is logged in, show user menu
+  const initials = userName
+    .split(" ")
+    .map((name) => name[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="flex items-center gap-2">
-          <User className="h-4 w-4" />
-          <span>{userName}</span>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+          </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent className="w-56" align="end" forceMount>
+        <div className="flex items-center justify-start gap-2 p-2">
+          <div className="flex flex-col space-y-1 leading-none">
+            <p className="font-medium">{userName}</p>
+          </div>
+        </div>
+        <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/user-profile" className="flex items-center">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Profile</span>
+            <User className="mr-2 h-4 w-4" />
+            Profile
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/admin" className="flex items-center">
-            <Users className="mr-2 h-4 w-4" />
-            <span>Admin Dashboard</span>
+          <Link href="/favorites" className="flex items-center">
+            <Heart className="mr-2 h-4 w-4" />
+            Favorites
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-red-600 focus:text-red-600"
-          onSelect={async (e) => {
-            e.preventDefault()
-            await logoutUser()
-
-            // Force a hard refresh to the home page
-            window.location.href = "/"
-          }}
-        >
+        <DropdownMenuItem className="cursor-pointer" onSelect={handleLogout} disabled={isLoggingOut}>
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Logout</span>
+          {isLoggingOut ? "Logging out..." : "Log out"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -8,12 +8,14 @@ import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
-import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, MapPin, Phone, X } from "lucide-react"
+import { Loader2, MapPin, Phone, X, Heart, HeartHandshake, LogIn } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -23,6 +25,7 @@ interface Business {
   displayLocation?: string
   displayPhone?: string
   zipCode: string
+  email?: string
   serviceArea?: string[] // Array of ZIP codes the business serves
   isNationwide?: boolean // Whether the business serves nationwide
   subcategories?: any[] // Changed from string[] to any[] to handle objects
@@ -79,6 +82,9 @@ export default function ArtsEntertainmentPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
 
   // Filter state
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
@@ -106,6 +112,45 @@ export default function ArtsEntertainmentPage() {
       }))
     }
   }
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        if (session?.user) {
+          setCurrentUser(session.user)
+        }
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load favorite businesses for current user
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser) return
+
+      try {
+        const favoriteIds = new Set<string>()
+        for (const business of businesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favoriteIds.add(business.id)
+          }
+        }
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (businesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, businesses])
 
   // Get user's zip code from localStorage
   useEffect(() => {
@@ -218,8 +263,55 @@ export default function ArtsEntertainmentPage() {
   }
 
   const handleOpenProfile = (provider: any) => {
+    console.log("Opening profile for business:", provider.id, provider.businessName)
     setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
+  }
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    // Set loading state
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: business.displayPhone,
+        email: business.email,
+        address: business.displayLocation,
+        zipCode: business.zipCode,
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   // Handle clearing zip code filter
@@ -439,80 +531,112 @@ export default function ArtsEntertainmentPage() {
         </div>
       ) : businesses.length > 0 ? (
         <div className="space-y-6">
-          {businesses.map((business) => (
-            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                {/* Compact Business Info */}
-                <div className="space-y-2">
-                  <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
+          {businesses.map((business) => {
+            const isFavorite = favoriteBusinesses.has(business.id)
+            const isSaving = savingStates[business.id]
 
-                  {/* Contact Info Row */}
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                    {/* Location */}
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-1 text-primary" />
-                      <span>{business.displayLocation}</span>
+            return (
+              <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
+
+                    {/* Contact Info Row */}
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {/* Location */}
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 mr-1 text-primary" />
+                        <span>{business.displayLocation}</span>
+                      </div>
+
+                      {/* Phone */}
+                      {business.displayPhone && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1 text-primary" />
+                          <a href={`tel:${business.displayPhone}`} className="hover:text-primary transition-colors">
+                            {business.displayPhone}
+                          </a>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Phone */}
-                    {business.displayPhone && (
-                      <div className="flex items-center">
-                        <Phone className="h-4 w-4 mr-1 text-primary" />
-                        <a href={`tel:${business.displayPhone}`} className="hover:text-primary transition-colors">
-                          {business.displayPhone}
-                        </a>
+                    {/* Services */}
+                    {business.subcategories && business.subcategories.length > 0 && (
+                      <div>
+                        <div className="flex flex-wrap gap-2">
+                          {business.subcategories.map((service: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Services */}
-                  {business.subcategories && business.subcategories.length > 0 && (
-                    <div>
-                      <div className="flex flex-wrap gap-2">
-                        {business.subcategories.map((service: any, idx: number) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                          >
-                            {getSubcategoryString(service)}
-                          </span>
-                        ))}
-                      </div>
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="mt-4 flex flex-col lg:flex-row gap-4">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={business.id}
+                        photos={businessPhotos[business.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
                     </div>
-                  )}
-                </div>
 
-                {/* Photo Carousel and Buttons Row */}
-                <div className="mt-4 flex flex-col lg:flex-row gap-4">
-                  {/* Photo Carousel */}
-                  <div className="flex-1">
-                    <PhotoCarousel
-                      businessId={business.id}
-                      photos={businessPhotos[business.id] || []}
-                      onLoadPhotos={() => loadPhotosForBusiness(business.id)}
-                      showMultiple={true}
-                      photosPerView={5}
-                      className="w-full"
-                    />
+                    {/* Action Buttons */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-40">
+                      <Button className="flex-1 lg:flex-none min-w-[120px]" onClick={() => handleOpenReviews(business)}>
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none min-w-[120px] bg-transparent"
+                        onClick={() => handleOpenProfile(business)}
+                      >
+                        View Profile
+                      </Button>
+                      <Button
+                        variant={isFavorite ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none min-w-[120px] ${
+                          isFavorite
+                            ? "bg-red-500 hover:bg-red-600 text-white"
+                            : "bg-transparent border-red-500 text-red-500 hover:bg-red-50"
+                        }`}
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={isFavorite || isSaving}
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : isFavorite ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
-                    <Button className="flex-1 lg:flex-none min-w-[120px]" onClick={() => handleOpenReviews(business)}>
-                      Ratings
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 lg:flex-none min-w-[120px] bg-transparent"
-                      onClick={() => handleOpenProfile(business)}
-                    >
-                      View Profile
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       ) : (
         <div className="text-center py-12">
@@ -540,6 +664,28 @@ export default function ArtsEntertainmentPage() {
         </div>
       )}
 
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LogIn className="h-5 w-5" />
+              Login Required
+            </DialogTitle>
+            <DialogDescription>You need to be logged in to save business cards to your favorites.</DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 mt-4">
+            <Button asChild className="flex-1">
+              <a href="/user-login">Login</a>
+            </Button>
+            <Button variant="outline" asChild className="flex-1 bg-transparent">
+              <a href="/user-register">Sign Up</a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reviews Dialog */}
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
@@ -550,6 +696,7 @@ export default function ArtsEntertainmentPage() {
         />
       )}
 
+      {/* Business Profile Dialog */}
       {selectedProvider && (
         <BusinessProfileDialog
           isOpen={isProfileDialogOpen}
@@ -557,8 +704,6 @@ export default function ArtsEntertainmentPage() {
           businessId={selectedProvider.id}
         />
       )}
-
-      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>

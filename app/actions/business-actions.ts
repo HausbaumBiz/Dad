@@ -838,7 +838,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
   }
 }
 
-// Update the getBusinessAdDesign function to ensure proper data retrieval
+// Update the getBusinessAdDesign function to ensure proper data retrieval and fix the .map error
 export async function getBusinessAdDesign(businessId: string) {
   try {
     if (!businessId) {
@@ -868,6 +868,17 @@ export async function getBusinessAdDesign(businessId: string) {
           customButton: { type: "Menu", name: "Menu", icon: "Menu" },
         })
         console.log("Parsed design data:", designData)
+
+        // Ensure designData is an object, not an array
+        if (Array.isArray(designData)) {
+          console.error("Design data is unexpectedly an array, using default object")
+          designData = {
+            designId: 5,
+            colorScheme: "blue",
+            texture: "gradient",
+            customButton: { type: "Menu", name: "Menu", icon: "Menu" },
+          }
+        }
       }
     } catch (error) {
       console.error("Error getting main design data:", getErrorMessage(error))
@@ -900,6 +911,11 @@ export async function getBusinessAdDesign(businessId: string) {
 
       if (businessInfoStr) {
         businessInfo = safeJsonParse(businessInfoStr, {})
+        // Ensure businessInfo is an object, not an array
+        if (Array.isArray(businessInfo)) {
+          console.warn("Business info is unexpectedly an array, converting to object")
+          businessInfo = {}
+        }
       }
     } catch (error) {
       console.error("Error getting business info:", getErrorMessage(error))
@@ -913,6 +929,11 @@ export async function getBusinessAdDesign(businessId: string) {
 
       if (hiddenFieldsStr) {
         hiddenFields = safeJsonParse(hiddenFieldsStr, {})
+        // Ensure hiddenFields is an object, not an array
+        if (Array.isArray(hiddenFields)) {
+          console.warn("Hidden fields is unexpectedly an array, converting to object")
+          hiddenFields = {}
+        }
       }
     } catch (error) {
       console.error("Error getting hidden fields:", getErrorMessage(error))
@@ -928,7 +949,7 @@ export async function getBusinessAdDesign(businessId: string) {
         if (oldFormatData) {
           const parsedData = safeJsonParse(oldFormatData, {})
 
-          if (parsedData && typeof parsedData === "object") {
+          if (parsedData && typeof parsedData === "object" && !Array.isArray(parsedData)) {
             // Extract the components from the old format
             designData = {
               designId: parsedData.designId || 5,
@@ -969,15 +990,33 @@ export async function getBusinessAdDesign(businessId: string) {
       freeText: "",
     }
 
+    // Ensure all data is objects, not arrays, to prevent .map errors
+    const safeDesignData =
+      designData && typeof designData === "object" && !Array.isArray(designData)
+        ? designData
+        : {
+            designId: 5,
+            colorScheme: "blue",
+            texture: "gradient",
+            customButton: { type: "Menu", name: "Menu", icon: "Menu" },
+          }
+
+    const safeColorValues =
+      colorValues && typeof colorValues === "object" && !Array.isArray(colorValues) ? colorValues : {}
+    const safeBusinessInfo =
+      businessInfo && typeof businessInfo === "object" && !Array.isArray(businessInfo) ? businessInfo : {}
+    const safeHiddenFields =
+      hiddenFields && typeof hiddenFields === "object" && !Array.isArray(hiddenFields) ? hiddenFields : {}
+
     // Ensure customButton is included in the returned data
     const result = {
-      ...designData,
-      colorValues: colorValues || {},
-      businessInfo: { ...defaultBusinessInfo, ...(businessInfo || {}) },
-      hiddenFields: hiddenFields || {},
-      customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
-      texture: designData.texture || "gradient", // Ensure texture is included with default
-      customColors: designData.customColors || null, // Include custom colors
+      ...safeDesignData,
+      colorValues: safeColorValues,
+      businessInfo: { ...defaultBusinessInfo, ...safeBusinessInfo },
+      hiddenFields: safeHiddenFields,
+      customButton: safeDesignData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
+      texture: safeDesignData.texture || "gradient", // Ensure texture is included with default
+      customColors: safeDesignData.customColors || null, // Include custom colors
     }
 
     console.log("Final combined ad design data with colors:", {
