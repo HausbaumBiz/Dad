@@ -12,6 +12,11 @@ import { PhotoCarousel } from "@/components/photo-carousel"
 import { MapPin, Phone, X } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { toast } from "@/hooks/use-toast"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -52,6 +57,13 @@ export default function PhysicalRehabilitationPage() {
   // Photo state management
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
+  // Favorites functionality state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const [allProviders, setAllProviders] = useState<any[]>([]) // Declaration moved here
+
   const loadPhotosForBusiness = async (businessId: string) => {
     if (businessPhotos[businessId]) return // Already loaded
 
@@ -79,6 +91,46 @@ export default function PhysicalRehabilitationPage() {
       console.log("No user zip code found in localStorage")
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        const favoriteIds = new Set<string>()
+
+        // Check each provider to see if it's favorited
+        for (const provider of allProviders) {
+          const isFavorite = await checkIfBusinessIsFavorite(provider.id)
+          if (isFavorite) {
+            favoriteIds.add(provider.id)
+          }
+        }
+
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (currentUser && allProviders.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allProviders])
 
   // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
@@ -110,7 +162,6 @@ export default function PhysicalRehabilitationPage() {
   // Filter state
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
-  const [allProviders, setAllProviders] = useState<any[]>([])
 
   useEffect(() => {
     async function fetchProviders() {
@@ -255,6 +306,60 @@ export default function PhysicalRehabilitationPage() {
     setSelectedFilters([])
     setAppliedFilters([])
     setProviders(allProviders)
+  }
+
+  const handleAddToFavorites = async (provider: any) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(provider.id)) {
+      toast({
+        title: "Already Saved",
+        description: `${provider.name} is already in your favorites.`,
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: provider.id,
+        businessName: provider.name,
+        displayName: provider.name,
+        phone: provider.phone || "",
+        email: "",
+        address: provider.location || "",
+        zipCode: "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+    }
   }
 
   return (
@@ -472,7 +577,7 @@ export default function PhysicalRehabilitationPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-40">
                       <Button className="flex-1 lg:flex-none w-full" onClick={() => handleOpenReviews(provider)}>
                         Ratings
                       </Button>
@@ -482,6 +587,33 @@ export default function PhysicalRehabilitationPage() {
                         onClick={() => handleOpenProfile(provider)}
                       >
                         View Profile
+                      </Button>
+                      <Button
+                        variant={favoriteBusinesses.has(provider.id) ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none w-full ${
+                          favoriteBusinesses.has(provider.id)
+                            ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "border-red-600 text-red-600 hover:bg-red-50"
+                        }`}
+                        onClick={() => handleAddToFavorites(provider)}
+                        disabled={savingStates[provider.id]}
+                      >
+                        {savingStates[provider.id] ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(provider.id) ? (
+                          <>
+                            <HeartHandshake className="w-4 h-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="w-4 h-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -509,6 +641,9 @@ export default function PhysicalRehabilitationPage() {
           businessName={selectedBusiness.name}
         />
       )}
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>

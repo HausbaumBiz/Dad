@@ -12,7 +12,11 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
-import { Phone, X, Loader2, MapPin } from "lucide-react"
+import { Phone, X, MapPin } from "lucide-react"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake } from "lucide-react"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -82,6 +86,12 @@ export default function MedicalPractitionersPage() {
   // State for business profile dialog
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
@@ -91,6 +101,52 @@ export default function MedicalPractitionersPage() {
       console.log("No user zip code found in localStorage")
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) {
+        setFavoriteBusinesses(new Set())
+        return
+      }
+
+      try {
+        const favoriteIds = new Set<string>()
+
+        // Check each provider to see if it's favorited
+        for (const provider of allProviders) {
+          const isFavorite = await checkIfBusinessIsFavorite(provider.id)
+          if (isFavorite) {
+            favoriteIds.add(provider.id)
+          }
+        }
+
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+        setFavoriteBusinesses(new Set())
+      }
+    }
+
+    if (allProviders.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allProviders])
 
   // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
@@ -327,6 +383,59 @@ export default function MedicalPractitionersPage() {
     setUserZipCode(null)
   }
 
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (provider: any) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(provider.id)) {
+      toast({
+        title: "Already saved",
+        description: `${provider.displayName || provider.businessName} is already in your favorites.`,
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: provider.id,
+        businessName: provider.businessName,
+        displayName: provider.displayName,
+        phone: provider.displayPhone,
+        email: provider.email,
+        address: provider.displayLocation,
+        zipCode: provider.zipCode,
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+        toast({
+          title: "Business card saved!",
+          description: result.message,
+        })
+      } else {
+        toast({
+          title: "Failed to save",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+    }
+  }
+
   // Format phone number for display
   const formatPhoneNumber = (phone: string) => {
     if (!phone) return "No phone provided"
@@ -465,7 +574,7 @@ export default function MedicalPractitionersPage() {
 
       {loading ? (
         <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <div className="h-8 w-8 animate-spin text-primary mr-2"></div>
           <p>Loading medical practitioners...</p>
         </div>
       ) : error ? (
@@ -580,6 +689,33 @@ export default function MedicalPractitionersPage() {
                       >
                         View Profile
                       </Button>
+                      <Button
+                        variant={favoriteBusinesses.has(provider.id) ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none lg:w-full ${
+                          favoriteBusinesses.has(provider.id)
+                            ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "border-red-600 text-red-600 hover:bg-red-50"
+                        }`}
+                        onClick={() => handleAddToFavorites(provider)}
+                        disabled={savingStates[provider.id]}
+                      >
+                        {savingStates[provider.id] ? (
+                          <>
+                            <div className="h-4 w-4 mr-1 animate-spin"></div>
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(provider.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -606,6 +742,9 @@ export default function MedicalPractitionersPage() {
           businessName={selectedProvider.name}
         />
       )}
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>

@@ -13,6 +13,11 @@ import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { Card, CardContent } from "@/components/ui/card"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
 
 // Enhanced Business interface
 interface Business {
@@ -29,6 +34,7 @@ interface Business {
   serviceArea?: string[]
   isNationwide?: boolean
   photos?: string[]
+  email?: string
 }
 
 // Helper function to extract string from subcategory data
@@ -68,6 +74,13 @@ export default function PetCarePage() {
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
   const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<{ [businessId: string]: boolean }>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const { toast } = useToast()
+
   const filterOptions = [
     { id: "pet1", label: "Veterinarians", value: "Veterinarians" },
     { id: "pet2", label: "Pet Hospitals", value: "Pet Hospitals" },
@@ -92,6 +105,50 @@ export default function PetCarePage() {
       setUserZipCode(savedZipCode)
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        const favoriteChecks = await Promise.all(
+          allBusinesses.map(async (business: Business) => {
+            const isFavorite = await checkIfBusinessIsFavorite(business.id)
+            return { businessId: business.id, isFavorite }
+          }),
+        )
+
+        const favoriteSet = new Set<string>()
+        favoriteChecks.forEach(({ businessId, isFavorite }) => {
+          if (isFavorite) {
+            favoriteSet.add(businessId)
+          }
+        })
+
+        setFavoriteBusinesses(favoriteSet)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (allBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allBusinesses])
 
   // Helper function to check if business serves the zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -183,6 +240,61 @@ export default function PetCarePage() {
         ...prev,
         [businessId]: [],
       }))
+    }
+  }
+
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    // Prevent duplicate saves
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName || "",
+        displayName: business.displayName || business.businessName || "",
+        phone: business.displayPhone || "",
+        email: business.email || "",
+        address: business.displayLocation || "",
+        zipCode: business.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to save business card",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
     }
   }
 
@@ -452,6 +564,34 @@ export default function PetCarePage() {
 
                     {/* Action Buttons */}
                     <div className="lg:w-32 flex flex-row lg:flex-col gap-2 justify-center lg:justify-start w-full lg:w-auto">
+                      {/* Save Card Button */}
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        className={
+                          favoriteBusinesses.has(business.id)
+                            ? "flex-1 lg:flex-none lg:w-full bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "flex-1 lg:flex-none lg:w-full bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                        }
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                       <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleViewReviews(business)}>
                         Ratings
                       </Button>
@@ -487,6 +627,9 @@ export default function PetCarePage() {
         businessId={selectedBusinessId}
         businessName={selectedBusinessName}
       />
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>

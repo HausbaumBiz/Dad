@@ -13,6 +13,10 @@ import { PhotoCarousel } from "@/components/photo-carousel"
 import { Loader2, MapPin, Phone } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Heart, HeartHandshake, LogIn } from "lucide-react"
 
 interface Business {
   id: string
@@ -28,6 +32,7 @@ interface Business {
   serviceArea?: string[]
   isNationwide?: boolean
   subcategories?: any[] // Changed to any[] to handle both strings and objects
+  email?: string
 }
 
 // Helper function to extract string value from subcategory (whether it's a string or object)
@@ -71,6 +76,11 @@ export default function FinancialServicesPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   const filterOptions = [
     { id: "financial1", label: "Accountants", value: "Accountants" },
     { id: "financial2", label: "Tax Preparers", value: "Tax Preparers" },
@@ -93,6 +103,45 @@ export default function FinancialServicesPage() {
       console.log("No user zip code found in localStorage")
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        if (session?.user) {
+          setCurrentUser(session.user)
+        }
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load favorite businesses for current user
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser) return
+
+      try {
+        const favoriteIds = new Set<string>()
+        for (const business of businesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favoriteIds.add(business.id)
+          }
+        }
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (businesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, businesses])
 
   // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
@@ -278,6 +327,52 @@ export default function FinancialServicesPage() {
       title: "Filters cleared",
       description: `Showing all ${allBusinesses.length} financial services.`,
     })
+  }
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    // Set loading state
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: business.displayPhone,
+        email: business.email,
+        address: business.displayLocation,
+        zipCode: business.zipCode,
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   // Handle opening reviews dialog
@@ -488,6 +583,33 @@ export default function FinancialServicesPage() {
                       >
                         View Profile
                       </Button>
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none lg:w-full ${
+                          favoriteBusinesses.has(business.id)
+                            ? "bg-red-500 hover:bg-red-600 text-white"
+                            : "bg-transparent border-red-500 text-red-500 hover:bg-red-50"
+                        }`}
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={favoriteBusinesses.has(business.id) || savingStates[business.id]}
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -515,6 +637,27 @@ export default function FinancialServicesPage() {
           businessName={selectedBusiness.displayName}
         />
       )}
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LogIn className="h-5 w-5" />
+              Login Required
+            </DialogTitle>
+            <DialogDescription>You need to be logged in to save business cards to your favorites.</DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 mt-4">
+            <Button asChild className="flex-1">
+              <a href="/user-login">Login</a>
+            </Button>
+            <Button variant="outline" asChild className="flex-1 bg-transparent">
+              <a href="/user-register">Sign Up</a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

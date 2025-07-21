@@ -10,11 +10,15 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useState } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useEffect } from "react"
-import { MapPin, Phone, Loader2 } from "lucide-react"
+import { MapPin, Phone } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -283,6 +287,12 @@ export default function FitnessAthleticsPage() {
   // Add after existing state declarations:
   const fetchIdRef = useRef(0)
 
+  // State for favorites functionality
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   // Enhanced Business interface
   interface Business {
     id: string
@@ -433,9 +443,107 @@ export default function FitnessAthleticsPage() {
     }
   }, [])
 
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser) return
+
+      try {
+        const favoriteIds = new Set<string>()
+
+        // Check each business to see if it's favorited
+        for (const business of allProviders) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favoriteIds.add(business.id)
+          }
+        }
+
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (currentUser && allProviders.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allProviders])
+
   const handleOpenReviewsOld = (provider: any) => {
     setSelectedProvider(provider)
     setIsReviewsDialogOpen(true)
+  }
+
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    // Prevent duplicate saves
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: `${business.displayName || business.name} is already in your favorites`,
+        duration: 3000,
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.name || "",
+        displayName: business.displayName || business.name || "",
+        phone: business.displayPhone || business.phone || "",
+        email: business.email || "",
+        address: business.displayLocation || "",
+        zipCode: business.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          duration: 3000,
+        })
+      } else {
+        toast({
+          title: "Save Failed",
+          description: result.message,
+          variant: "destructive",
+          duration: 3000,
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+        duration: 3000,
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   return (
@@ -559,7 +667,7 @@ export default function FitnessAthleticsPage() {
 
       {loading ? (
         <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <div className="h-8 w-8 animate-spin text-primary mr-2"></div>
           <p>Loading fitness & athletics providers...</p>
         </div>
       ) : filteredProviders.length > 0 ? (
@@ -653,6 +761,33 @@ export default function FitnessAthleticsPage() {
                       >
                         View Profile
                       </Button>
+                      <Button
+                        variant="outline"
+                        className={`flex-1 lg:flex-none lg:w-full ${
+                          favoriteBusinesses.has(business.id)
+                            ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
+                            : "border-red-600 text-red-600 hover:bg-red-50"
+                        }`}
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <div className="h-4 w-4 mr-1 animate-spin"></div>
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -700,6 +835,24 @@ export default function FitnessAthleticsPage() {
           businessName={selectedBusinessProfile.name}
         />
       )}
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+            <DialogDescription>You need to be logged in to save business cards to your favorites.</DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-4 mt-4">
+            <Button asChild className="flex-1">
+              <a href="/user-login">Login</a>
+            </Button>
+            <Button variant="outline" asChild className="flex-1 bg-transparent">
+              <a href="/user-register">Sign Up</a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

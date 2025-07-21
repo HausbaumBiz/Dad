@@ -15,6 +15,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 // Photo Carousel Component - displays 5 photos in landscape format
 interface PhotoCarouselProps {
@@ -234,6 +238,7 @@ interface Business {
   isNationwide?: boolean
   allSubcategories?: any[]
   photos?: string[] // Add this line
+  email?: string
 }
 
 export default function CareServicesPage() {
@@ -259,6 +264,12 @@ export default function CareServicesPage() {
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
   const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
+
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
   const filterOptions = [
     { id: "homecare1", label: "Non-Medical Elder Care", value: "Non-Medical Elder Care" },
@@ -510,6 +521,45 @@ export default function CareServicesPage() {
     fetchBusinesses()
   }, [userZipCode])
 
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        const favorites = new Set<string>()
+        for (const business of allBusinesses) {
+          if (business.id) {
+            const isFavorite = await checkIfBusinessIsFavorite(business.id)
+            if (isFavorite) {
+              favorites.add(business.id)
+            }
+          }
+        }
+        setFavoriteBusinesses(favorites)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (allBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allBusinesses])
+
   // Helper function to get phone number from business data
   const getPhoneNumber = (business: Business) => {
     // First try to get phone from ad design data
@@ -646,6 +696,66 @@ export default function CareServicesPage() {
     setSelectedBusinessId(business.id || "")
     setSelectedBusinessName(business.displayName || business.businessName)
     setIsProfileDialogOpen(true)
+  }
+
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (!business.id) {
+      toast({
+        title: "Error",
+        description: "Unable to save business card - missing business ID",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Check if already saved
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id!]: true }))
+
+    try {
+      const businessData = {
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: getPhoneNumber(business),
+        email: business.email,
+        address: getLocation(business),
+        zipCode: business.zipCode || "",
+      }
+
+      const result = await addFavoriteBusiness(businessData)
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id!]))
+        toast({
+          title: "Business Card Saved!",
+          description: `${business.displayName || business.businessName} has been added to your favorites`,
+        })
+      } else {
+        throw new Error(result.error || "Failed to save business card")
+      }
+    } catch (error) {
+      console.error("Error adding favorite business:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id!]: false }))
+    }
   }
 
   const photosPerView = 5
@@ -884,6 +994,33 @@ export default function CareServicesPage() {
                               >
                                 View Profile
                               </Button>
+                              <Button
+                                variant="outline"
+                                className={`min-w-[110px] ${
+                                  favoriteBusinesses.has(business.id || "")
+                                    ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
+                                    : "border-red-500 text-red-500 hover:bg-red-50 bg-transparent"
+                                }`}
+                                onClick={() => handleAddToFavorites(business)}
+                                disabled={savingStates[business.id || ""]}
+                              >
+                                {savingStates[business.id || ""] ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Saving...
+                                  </>
+                                ) : favoriteBusinesses.has(business.id || "") ? (
+                                  <>
+                                    <HeartHandshake className="h-4 w-4 mr-2" />
+                                    Saved
+                                  </>
+                                ) : (
+                                  <>
+                                    <Heart className="h-4 w-4 mr-2" />
+                                    Save Card
+                                  </>
+                                )}
+                              </Button>
                             </div>
                           </div>
 
@@ -935,6 +1072,33 @@ export default function CareServicesPage() {
                                     onClick={() => handleViewProfile(business)}
                                   >
                                     View Profile
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className={`min-w-[110px] ${
+                                      favoriteBusinesses.has(business.id || "")
+                                        ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
+                                        : "border-red-500 text-red-500 hover:bg-red-50 bg-transparent"
+                                    }`}
+                                    onClick={() => handleAddToFavorites(business)}
+                                    disabled={savingStates[business.id || ""]}
+                                  >
+                                    {savingStates[business.id || ""] ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Saving...
+                                      </>
+                                    ) : favoriteBusinesses.has(business.id || "") ? (
+                                      <>
+                                        <HeartHandshake className="h-4 w-4 mr-2" />
+                                        Saved
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Heart className="h-4 w-4 mr-2" />
+                                        Save Card
+                                      </>
+                                    )}
                                   </Button>
                                 </div>
                               </div>
@@ -1091,6 +1255,24 @@ export default function CareServicesPage() {
         businessId={selectedBusinessId}
         businessName={selectedBusinessName}
       />
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+            <DialogDescription>You need to be logged in to save business cards to your favorites.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button variant="outline" onClick={() => setIsLoginDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button asChild>
+              <a href="/user-login">Login</a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

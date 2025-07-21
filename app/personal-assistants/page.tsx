@@ -15,6 +15,10 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
 import { getBusinessMedia, type MediaItem } from "@/app/actions/media-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -65,6 +69,12 @@ export default function PersonalAssistantsPage() {
   // Add after existing state declarations:
   const fetchIdRef = useRef(0)
 
+  // State for favorites functionality
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   // Enhanced Business interface
   interface Business {
     id: string
@@ -90,6 +100,8 @@ export default function PersonalAssistantsPage() {
         state?: string
       }
     }
+    email?: string
+    displayLocation?: string
   }
 
   // Helper function to check if business serves a zip code
@@ -325,6 +337,48 @@ export default function PersonalAssistantsPage() {
     }
   }, [])
 
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) {
+        setFavoriteBusinesses(new Set())
+        return
+      }
+
+      try {
+        const favoriteChecks = await Promise.all(
+          filteredProviders.map(async (provider: Business) => {
+            const isFavorite = await checkIfBusinessIsFavorite(provider.id)
+            return { id: provider.id, isFavorite }
+          }),
+        )
+
+        const favoriteIds = favoriteChecks.filter((check) => check.isFavorite).map((check) => check.id)
+        setFavoriteBusinesses(new Set(favoriteIds))
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (filteredProviders.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, filteredProviders])
+
   const handleOpenReviews = (provider: string) => {
     setSelectedProvider(provider)
     setIsReviewsOpen(true)
@@ -333,6 +387,62 @@ export default function PersonalAssistantsPage() {
   const handleOpenProfile = (provider: Business) => {
     setSelectedBusinessProfile({ id: provider.id, name: provider.displayName || provider.name })
     setIsProfileDialogOpen(true)
+  }
+
+  const handleAddToFavorites = async (provider: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(provider.id)) {
+      toast({
+        title: "Already Saved",
+        description: `${provider.displayName || provider.name} is already in your favorites`,
+        duration: 3000,
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: provider.id,
+        businessName: provider.name || "",
+        displayName: provider.displayName || provider.name || "",
+        phone: provider.displayPhone || provider.phone || "",
+        email: provider.email || "",
+        address: provider.displayLocation || "",
+        zipCode: provider.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          duration: 3000,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+          duration: 3000,
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+        duration: 3000,
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+    }
   }
 
   const mockReviews = {
@@ -580,6 +690,34 @@ export default function PersonalAssistantsPage() {
                     <Button size="sm" className="text-xs px-3 py-1 h-7" onClick={() => handleOpenProfile(provider)}>
                       View Profile
                     </Button>
+                    <Button
+                      variant={favoriteBusinesses.has(provider.id) ? "default" : "outline"}
+                      size="sm"
+                      className={`text-xs px-3 py-1 h-7 ${
+                        favoriteBusinesses.has(provider.id)
+                          ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                          : "bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                      }`}
+                      onClick={() => handleAddToFavorites(provider)}
+                      disabled={savingStates[provider.id]}
+                    >
+                      {savingStates[provider.id] ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Saving...
+                        </>
+                      ) : favoriteBusinesses.has(provider.id) ? (
+                        <>
+                          <HeartHandshake className="w-3 h-3 mr-1" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <Heart className="w-3 h-3 mr-1" />
+                          Save Card
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
 
@@ -712,6 +850,37 @@ export default function PersonalAssistantsPage() {
           businessName={selectedBusinessProfile.name}
         />
       )}
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+            <DialogDescription>You need to be logged in to save business cards to your favorites.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-4">
+            <Button
+              onClick={() => {
+                setIsLoginDialogOpen(false)
+                window.location.href = "/user-login"
+              }}
+              className="w-full"
+            >
+              Login to Your Account
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsLoginDialogOpen(false)
+                window.location.href = "/user-register"
+              }}
+              className="w-full"
+            >
+              Create New Account
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

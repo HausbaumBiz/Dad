@@ -12,7 +12,11 @@ import { Phone, X, Tag } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { PhotoCarousel } from "@/components/photo-carousel"
-import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions" // Declare the variable here
 
 // Enhanced Business interface with service area
 interface Business {
@@ -34,6 +38,7 @@ interface Business {
   subcategories?: any[]
   allSubcategories?: any[]
   subcategory?: string
+  email?: string
 }
 
 function formatPhoneNumber(phone: string): string {
@@ -90,6 +95,12 @@ export default function TravelVacationPage() {
   // Add photo state management
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
+  // Add state for favorites functionality
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   const loadPhotosForBusiness = async (businessId: string) => {
     if (!businessPhotos[businessId]) {
       try {
@@ -118,6 +129,48 @@ export default function TravelVacationPage() {
       console.log("No user zip code found in localStorage")
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) {
+        setFavoriteBusinesses(new Set())
+        return
+      }
+
+      try {
+        const favoriteChecks = await Promise.all(
+          providers.map(async (provider) => {
+            const isFavorite = await checkIfBusinessIsFavorite(provider.id)
+            return { id: provider.id, isFavorite }
+          }),
+        )
+
+        const favoriteIds = favoriteChecks.filter((check) => check.isFavorite).map((check) => check.id)
+        setFavoriteBusinesses(new Set(favoriteIds))
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (providers.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, providers])
 
   // FIXED: Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
@@ -309,6 +362,61 @@ export default function TravelVacationPage() {
       title: "Filters Cleared",
       description: `Showing all ${allProviders.length} travel services`,
     })
+  }
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (provider: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(provider.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: provider.id,
+        businessName: provider.businessName,
+        displayName: provider.displayName,
+        phone: provider.displayPhone,
+        email: provider.email,
+        address: provider.displayLocation,
+        zipCode: provider.zipCode,
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+    }
   }
 
   return (
@@ -557,6 +665,35 @@ export default function TravelVacationPage() {
 
                     {/* Action Buttons */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32 justify-center lg:justify-start w-full lg:w-auto">
+                      {/* Save Card Button */}
+                      <Button
+                        variant={favoriteBusinesses.has(provider.id) ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none lg:w-full ${
+                          favoriteBusinesses.has(provider.id)
+                            ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "border-red-600 text-red-600 hover:bg-red-50 bg-transparent"
+                        }`}
+                        onClick={() => handleAddToFavorites(provider)}
+                        disabled={savingStates[provider.id]}
+                      >
+                        {savingStates[provider.id] ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(provider.id) ? (
+                          <>
+                            <HeartHandshake className="w-4 h-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="w-4 h-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
+
                       <Button
                         className="flex-1 lg:flex-none lg:w-full"
                         onClick={() => handleOpenReviews(provider.displayName || provider.businessName || "Business")}
@@ -592,6 +729,19 @@ export default function TravelVacationPage() {
         onClose={() => setIsProfileDialogOpen(false)}
         businessId={selectedBusinessProfile.id}
         businessName={selectedBusinessProfile.name}
+      />
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog
+        isOpen={isLoginDialogOpen}
+        onClose={() => setIsLoginDialogOpen(false)}
+        onSuccess={() => {
+          setIsLoginDialogOpen(false)
+          // Refresh user session after successful login
+          getUserSession().then((session) => {
+            setCurrentUser(session?.user || null)
+          })
+        }}
       />
 
       <Toaster />

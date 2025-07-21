@@ -12,6 +12,10 @@ import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { useToast } from "@/hooks/use-toast"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
 
 // Enhanced Business interface
 interface Business {
@@ -317,6 +321,12 @@ export default function LegalServicesPage() {
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
 
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   const { toast } = useToast()
 
   const fetchIdRef = useRef(0)
@@ -332,6 +342,35 @@ export default function LegalServicesPage() {
       setUserZipCode(savedZipCode)
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      const session = await getUserSession()
+      setCurrentUser(session?.user || null)
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser) return
+
+      const favoriteIds = new Set<string>()
+      for (const business of allBusinesses) {
+        const isFavorite = await checkIfBusinessIsFavorite(business.id)
+        if (isFavorite) {
+          favoriteIds.add(business.id)
+        }
+      }
+      setFavoriteBusinesses(favoriteIds)
+    }
+
+    if (currentUser && allBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allBusinesses])
 
   useEffect(() => {
     async function fetchBusinesses() {
@@ -456,6 +495,60 @@ export default function LegalServicesPage() {
       title: "Filters cleared",
       description: `Showing all ${allBusinesses.length} legal professionals`,
     })
+  }
+
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already saved",
+        description: "This business card is already in your favorites",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName || "",
+        displayName: business.displayName || business.businessName || "",
+        phone: business.displayPhone || "",
+        email: business.email || "",
+        address: business.displayLocation || "",
+        zipCode: business.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business card saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to save business card",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving business card:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   return (
@@ -691,6 +784,34 @@ export default function LegalServicesPage() {
                     >
                       View Profile
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAddToFavorites(provider)}
+                      disabled={savingStates[provider.id]}
+                      className={`text-sm min-w-[100px] ${
+                        favoriteBusinesses.has(provider.id)
+                          ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
+                          : "border-red-500 text-red-500 hover:bg-red-50"
+                      }`}
+                    >
+                      {savingStates[provider.id] ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Saving...
+                        </>
+                      ) : favoriteBusinesses.has(provider.id) ? (
+                        <>
+                          <HeartHandshake className="h-4 w-4 mr-1" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <Heart className="h-4 w-4 mr-1" />
+                          Save Card
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -747,7 +868,7 @@ export default function LegalServicesPage() {
                   </div>
 
                   {/* Right side - Action Buttons */}
-                  <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0">
+                  <div className="flex flex-col gap-2 lg:items-end lg:w-32 flex-shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
@@ -763,6 +884,34 @@ export default function LegalServicesPage() {
                       className="text-sm min-w-[100px]"
                     >
                       View Profile
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAddToFavorites(provider)}
+                      disabled={savingStates[provider.id]}
+                      className={`text-sm min-w-[100px] ${
+                        favoriteBusinesses.has(provider.id)
+                          ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
+                          : "border-red-500 text-red-500 hover:bg-red-50"
+                      }`}
+                    >
+                      {savingStates[provider.id] ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Saving...
+                        </>
+                      ) : favoriteBusinesses.has(provider.id) ? (
+                        <>
+                          <HeartHandshake className="h-4 w-4 mr-1" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <Heart className="h-4 w-4 mr-1" />
+                          Save Card
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -815,6 +964,9 @@ export default function LegalServicesPage() {
           businessName={selectedBusiness.name}
         />
       )}
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>

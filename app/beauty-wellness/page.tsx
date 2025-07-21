@@ -14,6 +14,10 @@ import { MapPin } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake } from "lucide-react"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -45,6 +49,7 @@ interface Business {
   serviceArea?: string[]
   isNationwide?: boolean
   photos?: string[]
+  email?: string
 }
 
 // Format phone number to (XXX) XXX-XXXX
@@ -139,6 +144,12 @@ export default function BeautyWellnessPage() {
 
   // Photo state
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
   // Function to load business photos from Cloudflare using public URLs
   const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
@@ -273,12 +284,107 @@ export default function BeautyWellnessPage() {
     localStorage.removeItem("savedZipCode")
   }
 
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName || business.businessName,
+        phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone || "",
+        email: business.email || "",
+        address: business.displayLocation || "",
+        zipCode: business.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Save Failed",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving business:", error)
+      toast({
+        title: "Save Failed",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
+  }
+
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
       setUserZipCode(savedZipCode)
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        const favorites = new Set<string>()
+
+        // Check each business to see if it's favorited
+        for (const business of allBusinesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favorites.add(business.id)
+          }
+        }
+
+        setFavoriteBusinesses(favorites)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (currentUser && allBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allBusinesses])
 
   useEffect(() => {
     async function fetchBusinesses() {
@@ -639,6 +745,33 @@ export default function BeautyWellnessPage() {
                       >
                         View Profile
                       </Button>
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none lg:w-full ${
+                          favoriteBusinesses.has(business.id)
+                            ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "border-red-600 text-red-600 hover:bg-red-50 bg-transparent"
+                        }`}
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -689,6 +822,19 @@ export default function BeautyWellnessPage() {
           businessId={selectedProvider.id}
         />
       )}
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog
+        isOpen={isLoginDialogOpen}
+        onClose={() => setIsLoginDialogOpen(false)}
+        onSuccess={() => {
+          setIsLoginDialogOpen(false)
+          // Refresh user session
+          getUserSession().then((session) => {
+            setCurrentUser(session?.user || null)
+          })
+        }}
+      />
 
       <Toaster />
     </CategoryLayout>

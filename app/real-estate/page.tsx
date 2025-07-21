@@ -6,12 +6,16 @@ import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, MapPin, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { Phone, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 // Enhanced Business interface
 interface Business {
@@ -43,6 +47,7 @@ interface Business {
       state?: string
     }
   }
+  email?: string
 }
 
 // Desktop Photo Carousel Component - displays 5 photos in landscape format
@@ -303,6 +308,10 @@ export default function RealEstatePage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -310,6 +319,44 @@ export default function RealEstatePage() {
       setUserZipCode(savedZipCode)
     }
   }, [])
+
+  // Check user session on component mount
+  useEffect(() => {
+    const checkUserSession = async () => {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses when user is available
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (!currentUser?.id) return
+
+      try {
+        const favoriteChecks = await Promise.all(
+          businesses.map(async (business) => {
+            const isFavorite = await checkIfBusinessIsFavorite(business.id)
+            return { businessId: business.id, isFavorite }
+          }),
+        )
+
+        const favoriteIds = new Set(favoriteChecks.filter((check) => check.isFavorite).map((check) => check.businessId))
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (businesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, businesses])
 
   const fetchBusinesses = async () => {
     const currentFetchId = ++fetchIdRef.current
@@ -558,6 +605,57 @@ export default function RealEstatePage() {
     setUserZipCode(null)
   }
 
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already saved",
+        description: "This business is already in your favorites.",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const businessData = {
+        id: business.id,
+        businessName: business.businessName || "",
+        displayName:
+          business.displayName || business.adDesignData?.businessInfo?.businessName || business.businessName || "",
+        phone: getPhoneNumber(business) || "",
+        email: business.email || "",
+        address: getLocation(business) || "",
+        zipCode: business.zipCode || "",
+      }
+
+      const result = await addFavoriteBusiness(businessData)
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business saved!",
+          description: `${businessData.displayName} has been added to your favorites.`,
+        })
+      } else {
+        throw new Error(result.error || "Failed to save business")
+      }
+    } catch (error) {
+      console.error("Error adding favorite business:", error)
+      toast({
+        title: "Error saving business",
+        description: "There was a problem saving this business. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
+  }
+
   const handleLoadPhotos = () => {
     // No-op function since photos are already loaded in useEffect
   }
@@ -662,7 +760,7 @@ export default function RealEstatePage() {
 
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <Image src="/loader.svg" alt="Loading..." width={32} height={32} className="mr-2" />
           <p>Loading real estate professionals...</p>
         </div>
       ) : filteredBusinesses.length > 0 ? (
@@ -733,6 +831,34 @@ export default function RealEstatePage() {
                     />
 
                     {/* Mobile Action Buttons */}
+                    <Button
+                      variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleAddToFavorites(business)}
+                      disabled={savingStates[business.id]}
+                      className={
+                        favoriteBusinesses.has(business.id)
+                          ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 border-red-600"
+                          : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
+                      }
+                    >
+                      {savingStates[business.id] ? (
+                        <>
+                          <Image src="/loader.svg" alt="Saving..." width={16} height={16} className="mr-1" />
+                          Saving...
+                        </>
+                      ) : favoriteBusinesses.has(business.id) ? (
+                        <>
+                          <HeartHandshake className="h-4 w-4 mr-1" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <Heart className="h-4 w-4 mr-1" />
+                          Save Card
+                        </>
+                      )}
+                    </Button>
                     <div className="flex justify-center gap-2">
                       <Button
                         variant="outline"
@@ -781,6 +907,34 @@ export default function RealEstatePage() {
 
                       {/* Right side - Action Buttons */}
                       <div className="flex flex-col gap-2">
+                        <Button
+                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleAddToFavorites(business)}
+                          disabled={savingStates[business.id]}
+                          className={
+                            favoriteBusinesses.has(business.id)
+                              ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 border-red-600"
+                              : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
+                          }
+                        >
+                          {savingStates[business.id] ? (
+                            <>
+                              <Image src="/loader.svg" alt="Saving..." width={16} height={16} className="mr-1" />
+                              Saving...
+                            </>
+                          ) : favoriteBusinesses.has(business.id) ? (
+                            <>
+                              <HeartHandshake className="h-4 w-4 mr-1" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="h-4 w-4 mr-1" />
+                              Save Card
+                            </>
+                          )}
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -858,6 +1012,26 @@ export default function RealEstatePage() {
           </div>
         </div>
       )}
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+            <DialogDescription>
+              You need to be logged in to save businesses to your favorites. Please log in to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setIsLoginDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button asChild>
+              <a href="/user-login">Login</a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {selectedProvider && (
         <ReviewsDialog

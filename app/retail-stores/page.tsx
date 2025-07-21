@@ -12,6 +12,11 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -100,6 +105,15 @@ export default function RetailStoresPage() {
 
   // State for business photos
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
+  // Add toast hook
+  const { toast } = useToast()
 
   // Function to load photos for a specific business
   const loadPhotosForBusiness = async (businessId: string) => {
@@ -215,6 +229,40 @@ export default function RetailStoresPage() {
     fetchBusinesses()
   }, [userZipCode])
 
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (currentUser?.id) {
+        try {
+          const favorites = new Set<string>()
+          for (const provider of providers) {
+            const isFavorite = await checkIfBusinessIsFavorite(provider.id)
+            if (isFavorite) {
+              favorites.add(provider.id)
+            }
+          }
+          setFavoriteBusinesses(favorites)
+        } catch (error) {
+          console.error("Error loading favorites:", error)
+        }
+      }
+    }
+    loadFavorites()
+  }, [currentUser, providers])
+
   const handleOpenReviews = (provider: Business) => {
     setSelectedProvider({
       id: Number.parseInt(provider.id),
@@ -284,6 +332,61 @@ export default function RetailStoresPage() {
     setSelectedFilters([])
     setAppliedFilters([])
     setProviders(allProviders)
+  }
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (provider: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(provider.id)) {
+      toast({
+        title: "Already saved",
+        description: "This business is already in your favorites.",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+
+    try {
+      const businessData = {
+        id: provider.id,
+        businessName: provider.businessName,
+        displayName: provider.displayName,
+        phone: provider.displayPhone,
+        email: (provider as any).email,
+        address: provider.displayLocation,
+        zipCode: provider.zipCode,
+      }
+
+      const result = await addFavoriteBusiness(businessData)
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+        toast({
+          title: "Business saved!",
+          description: "Added to your favorites successfully.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to save business.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding favorite business:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+    }
   }
 
   return (
@@ -483,6 +586,33 @@ export default function RetailStoresPage() {
                       >
                         View Profile
                       </Button>
+                      <Button
+                        variant="outline"
+                        className={`flex-1 lg:flex-none lg:w-full ${
+                          favoriteBusinesses.has(provider.id)
+                            ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
+                            : "border-red-500 text-red-500 hover:bg-red-50 bg-transparent"
+                        }`}
+                        onClick={() => handleAddToFavorites(provider)}
+                        disabled={savingStates[provider.id]}
+                      >
+                        {savingStates[provider.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(provider.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -512,6 +642,31 @@ export default function RetailStoresPage() {
           businessName={selectedBusiness.name}
         />
       )}
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+            <DialogDescription>
+              You need to be logged in to save businesses to your favorites. Please log in to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setIsLoginDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setIsLoginDialogOpen(false)
+                window.location.href = "/user-login"
+              }}
+            >
+              Go to Login
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

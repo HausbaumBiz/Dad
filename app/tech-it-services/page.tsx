@@ -13,6 +13,9 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { Card, CardContent } from "@/components/ui/card"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake } from "lucide-react"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -44,6 +47,7 @@ interface Business {
   businessDescription?: string
   displayLocation?: string
   reviewCount?: number
+  email?: string
 }
 
 // Function to load business photos from Cloudflare using public URLs
@@ -146,7 +150,6 @@ export default function TechITServicesPage() {
   ]
 
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{ id: string; name: string } | null>(null)
@@ -158,6 +161,10 @@ export default function TechITServicesPage() {
   const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
   const [showFiltered, setShowFiltered] = useState(false)
   const [photoIndices, setPhotoIndices] = useState<Record<string, number>>({})
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
   // Helper function to extract string value from subcategory object or string
   const getSubcategoryString = (subcategory: any): string => {
@@ -305,6 +312,49 @@ export default function TechITServicesPage() {
     }
   }, [])
 
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) {
+        setFavoriteBusinesses(new Set())
+        return
+      }
+
+      try {
+        const favoriteChecks = await Promise.all(
+          providers.map(async (provider) => {
+            const isFavorite = await checkIfBusinessIsFavorite(provider.id)
+            return { id: provider.id, isFavorite }
+          }),
+        )
+
+        const favoriteIds = favoriteChecks.filter(({ isFavorite }) => isFavorite).map(({ id }) => id)
+
+        setFavoriteBusinesses(new Set(favoriteIds))
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (providers.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, providers])
+
   useEffect(() => {
     async function fetchProviders() {
       const currentFetchId = ++fetchIdRef.current
@@ -395,6 +445,60 @@ export default function TechITServicesPage() {
       name: provider.displayName || provider.name,
     })
     setIsProfileDialogOpen(true)
+  }
+
+  const handleAddToFavorites = async (provider: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(provider.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: provider.id,
+        businessName: provider.businessName,
+        displayName: provider.displayName || provider.businessName,
+        phone: provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone || "",
+        email: provider.email || "",
+        address: getLocation(provider),
+        zipCode: provider.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+    }
   }
 
   // Custom filter component with apply functionality
@@ -645,6 +749,34 @@ export default function TechITServicesPage() {
 
                         {/* Right side - Action Buttons */}
                         <div className="flex flex-col gap-2 lg:items-end lg:w-24 flex-shrink-0 lg:ml-auto">
+                          <Button
+                            variant={favoriteBusinesses.has(provider.id) ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handleAddToFavorites(provider)}
+                            disabled={savingStates[provider.id]}
+                            className={
+                              favoriteBusinesses.has(provider.id)
+                                ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 text-white"
+                                : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
+                            }
+                          >
+                            {savingStates[provider.id] ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                Saving...
+                              </>
+                            ) : favoriteBusinesses.has(provider.id) ? (
+                              <>
+                                <HeartHandshake className="w-4 h-4 mr-1" />
+                                Saved
+                              </>
+                            ) : (
+                              <>
+                                <Heart className="w-4 h-4 mr-1" />
+                                Save Card
+                              </>
+                            )}
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"

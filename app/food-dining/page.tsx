@@ -9,9 +9,12 @@ import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { PhotoCarousel } from "@/components/photo-carousel"
-import { Loader2, Phone, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
+import { Loader2, Phone, MapPin, ChevronLeft, ChevronRight, Heart, HeartHandshake } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
 
 // Enhanced Business interface
 interface Business {
@@ -43,6 +46,7 @@ interface Business {
       state?: string
     }
   }
+  email?: string
 }
 
 // Desktop Photo Carousel Component - displays 5 photos in square format
@@ -330,6 +334,10 @@ export default function FoodDiningPage() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -406,6 +414,52 @@ export default function FoodDiningPage() {
   useEffect(() => {
     fetchBusinesses()
   }, [userZipCode])
+
+  // Check user session
+  useEffect(() => {
+    const checkUserSession = async () => {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (!currentUser?.id) {
+        setFavoriteBusinesses(new Set())
+        return
+      }
+
+      try {
+        const favoriteIds = new Set<string>()
+
+        // Check each business to see if it's favorited
+        for (const business of allBusinesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favoriteIds.add(business.id)
+          }
+        }
+
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+        setFavoriteBusinesses(new Set())
+      }
+    }
+
+    if (currentUser && allBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allBusinesses])
 
   // Helper function to check if a business has a specific subcategory
   const hasExactSubcategoryMatch = (business: Business, subcategory: string): boolean => {
@@ -588,6 +642,65 @@ export default function FoodDiningPage() {
   // Handle photo loading for mobile PhotoCarousel
   const handleLoadPhotos = () => {
     // Photos are already loaded in the useEffect hook
+  }
+
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    // Prevent duplicate saves
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName || "Restaurant",
+        displayName:
+          business.displayName ||
+          business.adDesignData?.businessInfo?.businessName ||
+          business.businessName ||
+          "Restaurant",
+        phone: getPhoneNumber(business) || "",
+        email: business.email || "",
+        address: getLocation(business),
+        zipCode: business.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business card saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to save business card",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   return (
@@ -790,6 +903,34 @@ export default function FoodDiningPage() {
                       >
                         View Profile
                       </Button>
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                        className={
+                          favoriteBusinesses.has(business.id)
+                            ? "text-sm bg-red-600 hover:bg-red-700 border-red-600"
+                            : "text-sm border-red-600 text-red-600 hover:bg-red-50"
+                        }
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
 
@@ -849,6 +990,34 @@ export default function FoodDiningPage() {
                           className="text-sm min-w-[100px]"
                         >
                           View Profile
+                        </Button>
+                        <Button
+                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleAddToFavorites(business)}
+                          disabled={savingStates[business.id]}
+                          className={
+                            favoriteBusinesses.has(business.id)
+                              ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 border-red-600"
+                              : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
+                          }
+                        >
+                          {savingStates[business.id] ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Saving...
+                            </>
+                          ) : favoriteBusinesses.has(business.id) ? (
+                            <>
+                              <HeartHandshake className="h-4 w-4 mr-1" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="h-4 w-4 mr-1" />
+                              Save Card
+                            </>
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -936,6 +1105,8 @@ export default function FoodDiningPage() {
           }
         />
       )}
+
+      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>

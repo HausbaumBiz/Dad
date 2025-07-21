@@ -5,15 +5,18 @@ import { CategoryLayout } from "@/components/category-layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { Loader2, Phone, MapPin } from "lucide-react"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { Loader2, Phone, MapPin, Heart, HeartHandshake } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { Checkbox } from "@/components/ui/checkbox"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -127,12 +130,57 @@ export default function EducationTutoringPage() {
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
   const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
 
+  // Favorites functionality state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
       setUserZipCode(savedZipCode)
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        if (session?.user) {
+          setCurrentUser(session.user)
+        }
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load favorites when user is available
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser) return
+
+      try {
+        const favoriteIds = new Set<string>()
+        for (const business of filteredBusinesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favoriteIds.add(business.id)
+          }
+        }
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (filteredBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, filteredBusinesses])
 
   useEffect(() => {
     async function fetchBusinesses() {
@@ -268,6 +316,60 @@ export default function EducationTutoringPage() {
       setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
     } finally {
       setLoadingPhotos((prev) => ({ ...prev, [businessId]: false }))
+    }
+  }
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName || "",
+        displayName: business.displayName || business.businessName || "",
+        phone: business.displayPhone || business.phone || "",
+        email: "", // Not available in this context
+        address: business.displayLocation || "",
+        zipCode: business.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
     }
   }
 
@@ -468,6 +570,34 @@ export default function EducationTutoringPage() {
                       >
                         View Profile
                       </Button>
+                      {/* Save Card Button */}
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        className={
+                          favoriteBusinesses.has(business.id)
+                            ? "flex-1 lg:flex-none lg:w-full bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "flex-1 lg:flex-none lg:w-full text-red-600 border-red-600 hover:bg-red-50"
+                        }
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -514,6 +644,21 @@ export default function EducationTutoringPage() {
           businessId={selectedProvider.id}
         />
       )}
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog
+        isOpen={isLoginDialogOpen}
+        onClose={() => setIsLoginDialogOpen(false)}
+        onSuccess={() => {
+          setIsLoginDialogOpen(false)
+          // Refresh user session after successful login
+          getUserSession().then((session) => {
+            if (session?.user) {
+              setCurrentUser(session.user)
+            }
+          })
+        }}
+      />
 
       <Toaster />
     </CategoryLayout>

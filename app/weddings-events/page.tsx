@@ -14,6 +14,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 // Helper function to safely extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -53,7 +57,13 @@ export default function WeddingsEventsPage() {
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
   const [filteredProviders, setFilteredProviders] = useState([])
 
-  // Add toast hook after the existing state declarations:
+  // Add favorites functionality state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
+  // Add toast hook
   const { toast } = useToast()
 
   // Add fetchIdRef for race condition prevention
@@ -165,6 +175,61 @@ export default function WeddingsEventsPage() {
     )
   }
 
+  const handleAddToFavorites = async (provider: any) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(provider.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+
+    try {
+      const businessData = {
+        id: provider.id,
+        businessName: provider.businessName,
+        displayName: provider.displayName,
+        phone: provider.displayPhone,
+        email: provider.email,
+        address: provider.displayLocation,
+        zipCode: provider.zipCode,
+      }
+
+      const result = await addFavoriteBusiness(businessData)
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+        toast({
+          title: "Business Saved!",
+          description: "Business card has been added to your favorites.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to save business card.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding favorite business:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+    }
+  }
+
   // Replace the useEffect for fetching businesses:
   useEffect(() => {
     const fetchProviders = async () => {
@@ -233,6 +298,41 @@ export default function WeddingsEventsPage() {
       setUserZipCode(savedZipCode)
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    const checkUserSession = async () => {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (currentUser?.id && filteredProviders.length > 0) {
+        try {
+          const favoriteChecks = await Promise.all(
+            filteredProviders.map(async (provider: any) => {
+              const isFavorite = await checkIfBusinessIsFavorite(provider.id)
+              return { id: provider.id, isFavorite }
+            }),
+          )
+
+          const favoriteIds = new Set(favoriteChecks.filter((check) => check.isFavorite).map((check) => check.id))
+          setFavoriteBusinesses(favoriteIds)
+        } catch (error) {
+          console.error("Error loading favorites:", error)
+        }
+      }
+    }
+    loadFavorites()
+  }, [currentUser, filteredProviders])
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
@@ -458,6 +558,33 @@ export default function WeddingsEventsPage() {
                       >
                         View Profile
                       </Button>
+                      <Button
+                        onClick={() => handleAddToFavorites(provider)}
+                        disabled={savingStates[provider.id]}
+                        variant="outline"
+                        className={
+                          favoriteBusinesses.has(provider.id)
+                            ? "flex-1 lg:w-full bg-red-500 text-white border-red-500 hover:bg-red-600"
+                            : "flex-1 lg:w-full border-red-500 text-red-500 hover:bg-red-50 bg-transparent"
+                        }
+                      >
+                        {savingStates[provider.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(provider.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -485,6 +612,30 @@ export default function WeddingsEventsPage() {
           businessName={selectedBusiness.name}
         />
       )}
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+            <DialogDescription>You need to be logged in to save business cards to your favorites.</DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-4 mt-4">
+            <Button
+              onClick={() => {
+                setIsLoginDialogOpen(false)
+                window.location.href = "/user-login"
+              }}
+              className="flex-1"
+            >
+              Login
+            </Button>
+            <Button variant="outline" onClick={() => setIsLoginDialogOpen(false)} className="flex-1 bg-transparent">
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

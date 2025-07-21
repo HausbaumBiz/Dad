@@ -10,10 +10,14 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
-import { Phone, Loader2, MapPin } from "lucide-react"
+import { Phone, MapPin } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -50,6 +54,7 @@ interface Business {
   businessDescription?: string
   description?: string
   displayLocation?: string
+  email?: string
 }
 
 // Function to load business photos from Cloudflare using public URLs
@@ -299,6 +304,12 @@ export default function AutomotiveServicesPage() {
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
   const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
+  // Favorites functionality state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   // Filter handlers
   const handleFilterChange = (filterValue: string, checked: boolean) => {
     setSelectedFilters((prev) => (checked ? [...prev, filterValue] : prev.filter((f) => f !== filterValue)))
@@ -454,6 +465,43 @@ export default function AutomotiveServicesPage() {
     fetchBusinesses()
   }, [userZipCode])
 
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        const favorites = new Set<string>()
+        for (const business of allBusinesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favorites.add(business.id)
+          }
+        }
+        setFavoriteBusinesses(favorites)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (currentUser && allBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allBusinesses])
+
   // Helper function to get phone number from business data
   const getPhoneNumber = (business: Business) => {
     // First try to get phone from ad design data
@@ -558,6 +606,61 @@ export default function AutomotiveServicesPage() {
     )
 
     return uniqueSubcategories.length > 0 ? uniqueSubcategories : ["Automotive Services"]
+  }
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business is already in your favorites.",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const businessData = {
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: getPhoneNumber(business),
+        email: business.email,
+        address: getLocation(business),
+        zipCode: business.zipCode || "",
+      }
+
+      const result = await addFavoriteBusiness(businessData)
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Saved!",
+          description: `${business.displayName || business.businessName} has been added to your favorites.`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to save business card.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding favorite business:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   const handleViewReviews = (business: Business) => {
@@ -688,7 +791,7 @@ export default function AutomotiveServicesPage() {
       <div className="mt-8">
         {loading ? (
           <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="h-8 w-8 animate-spin text-primary"></div>
             <span className="ml-2">Loading automotive service providers...</span>
           </div>
         ) : error ? (
@@ -781,6 +884,33 @@ export default function AutomotiveServicesPage() {
 
                         {/* Action Buttons - Desktop */}
                         <div className="flex flex-col items-end justify-start space-y-2 w-28 flex-shrink-0">
+                          <Button
+                            variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                            className={
+                              favoriteBusinesses.has(business.id)
+                                ? "w-full min-w-[110px] bg-red-600 hover:bg-red-700 text-white"
+                                : "w-full min-w-[110px] bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                            }
+                            onClick={() => handleAddToFavorites(business)}
+                            disabled={savingStates[business.id]}
+                          >
+                            {savingStates[business.id] ? (
+                              <>
+                                <div className="h-4 w-4 mr-2 animate-spin"></div>
+                                Saving...
+                              </>
+                            ) : favoriteBusinesses.has(business.id) ? (
+                              <>
+                                <HeartHandshake className="h-4 w-4 mr-2" />
+                                Saved
+                              </>
+                            ) : (
+                              <>
+                                <Heart className="h-4 w-4 mr-2" />
+                                Save Card
+                              </>
+                            )}
+                          </Button>
                           <Button className="w-full min-w-[110px]" onClick={() => handleViewReviews(business)}>
                             Reviews
                           </Button>
@@ -812,6 +942,33 @@ export default function AutomotiveServicesPage() {
 
                         {/* Action Buttons - Mobile */}
                         <div className="flex flex-col sm:flex-row gap-2">
+                          <Button
+                            variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                            className={
+                              favoriteBusinesses.has(business.id)
+                                ? "flex-1 bg-red-600 hover:bg-red-700 text-white"
+                                : "flex-1 bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                            }
+                            onClick={() => handleAddToFavorites(business)}
+                            disabled={savingStates[business.id]}
+                          >
+                            {savingStates[business.id] ? (
+                              <>
+                                <div className="h-4 w-4 mr-2 animate-spin"></div>
+                                Saving...
+                              </>
+                            ) : favoriteBusinesses.has(business.id) ? (
+                              <>
+                                <HeartHandshake className="h-4 w-4 mr-2" />
+                                Saved
+                              </>
+                            ) : (
+                              <>
+                                <Heart className="h-4 w-4 mr-2" />
+                                Save Card
+                              </>
+                            )}
+                          </Button>
                           <Button className="flex-1" onClick={() => handleViewReviews(business)}>
                             Reviews
                           </Button>
@@ -871,6 +1028,26 @@ export default function AutomotiveServicesPage() {
         businessId={selectedBusinessId}
         businessName={selectedBusinessName}
       />
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+            <DialogDescription>
+              You need to be logged in to save business cards to your favorites. Please log in to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 mt-4">
+            <Button asChild className="flex-1">
+              <a href="/user-login">Login</a>
+            </Button>
+            <Button variant="outline" className="flex-1 bg-transparent" asChild>
+              <a href="/user-register">Sign Up</a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

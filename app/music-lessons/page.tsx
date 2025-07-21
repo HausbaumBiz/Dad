@@ -7,13 +7,17 @@ import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { Phone, MapPin, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Phone, MapPin, LoaderIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake } from "lucide-react"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -56,6 +60,7 @@ interface Business {
   serviceArea?: string[]
   isNationwide?: boolean
   photos?: string[]
+  email?: string
 }
 
 // Photo Carousel Component - displays 5 photos in square format for desktop
@@ -283,6 +288,12 @@ export default function MusicLessonsPage() {
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
 
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   // Filter state management
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [appliedFilters, setAppliedFilters] = useState<string[]>([])
@@ -328,6 +339,60 @@ export default function MusicLessonsPage() {
   const clearZipCodeFilter = () => {
     setUserZipCode(null)
     localStorage.removeItem("savedZipCode")
+  }
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    // Prevent duplicate saves
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: business.displayPhone,
+        email: business.email || "",
+        address: business.displayLocation,
+        zipCode: business.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to save business card",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   // Function to check if business has exact subcategory match
@@ -383,6 +448,50 @@ export default function MusicLessonsPage() {
       setUserZipCode(savedZipCode)
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) {
+        setFavoriteBusinesses(new Set())
+        return
+      }
+
+      try {
+        const favoriteChecks = await Promise.all(
+          allProviders.map(async (business) => {
+            const isFavorite = await checkIfBusinessIsFavorite(business.id)
+            return { businessId: business.id, isFavorite }
+          }),
+        )
+
+        const favoriteIds = favoriteChecks.filter(({ isFavorite }) => isFavorite).map(({ businessId }) => businessId)
+
+        setFavoriteBusinesses(new Set(favoriteIds))
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (allProviders.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allProviders])
 
   useEffect(() => {
     async function fetchProviders() {
@@ -562,7 +671,7 @@ export default function MusicLessonsPage() {
       <div className="space-y-6">
         {loading ? (
           <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+            <LoaderIcon className="h-8 w-8 animate-spin text-primary mr-2" />
             <p>Loading music lesson providers...</p>
           </div>
         ) : error ? (
@@ -675,6 +784,35 @@ export default function MusicLessonsPage() {
 
                     {/* Action Buttons */}
                     <div className="flex justify-center gap-2">
+                      {/* Save Card Button */}
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                        className={
+                          favoriteBusinesses.has(business.id)
+                            ? "text-sm min-w-[110px] bg-red-600 hover:bg-red-700 border-red-600"
+                            : "text-sm min-w-[110px] bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                        }
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <LoaderIcon className="h-4 w-4 animate-spin mr-1" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -734,6 +872,35 @@ export default function MusicLessonsPage() {
 
                       {/* Right side - Action Buttons */}
                       <div className="flex flex-col gap-2 lg:items-end lg:w-28 flex-shrink-0">
+                        {/* Save Card Button */}
+                        <Button
+                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleAddToFavorites(business)}
+                          disabled={savingStates[business.id]}
+                          className={
+                            favoriteBusinesses.has(business.id)
+                              ? "text-sm min-w-[110px] bg-red-600 hover:bg-red-700 border-red-600"
+                              : "text-sm min-w-[110px] bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                          }
+                        >
+                          {savingStates[business.id] ? (
+                            <>
+                              <LoaderIcon className="h-4 w-4 animate-spin mr-1" />
+                              Saving...
+                            </>
+                          ) : favoriteBusinesses.has(business.id) ? (
+                            <>
+                              <HeartHandshake className="h-4 w-4 mr-1" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="h-4 w-4 mr-1" />
+                              Save Card
+                            </>
+                          )}
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -805,6 +972,9 @@ export default function MusicLessonsPage() {
           onClose={() => setIsBusinessProfileOpen(false)}
         />
       )}
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>

@@ -11,7 +11,12 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
-import { toast } from "@/components/ui/use-toast"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useToast } from "@/components/ui/use-toast"
+import { getUserSession } from "@/app/actions/user-actions"
+import { checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { addFavoriteBusiness } from "@/app/actions/favorite-actions"
 
 // Helper function to extract string from subcategory (handles both string and object formats)
 const getSubcategoryString = (subcategory: any): string => {
@@ -52,6 +57,7 @@ interface Business {
   }
   allSubcategories?: any[]
   subcategory?: string
+  email?: string
 }
 
 // Photo Carousel Component - displays 5 photos in 220px × 220px format
@@ -354,6 +360,7 @@ const businessServesZipCode = (business: Business, zipCode: string): boolean => 
 
 export default function FuneralServicesPage() {
   const fetchIdRef = useRef(0)
+  const { toast } = useToast()
 
   const filterOptions = [
     { id: "funeral1", label: "Funeral Homes", value: "Funeral Homes" },
@@ -394,12 +401,55 @@ export default function FuneralServicesPage() {
   const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
   const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
 
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
     if (savedZipCode) {
       setUserZipCode(savedZipCode)
     }
   }, [])
+
+  // Check user session on component mount
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (currentUser?.id) {
+        try {
+          const favorites = new Set<string>()
+          for (const business of allBusinesses) {
+            const isFavorite = await checkIfBusinessIsFavorite(business.id)
+            if (isFavorite) {
+              favorites.add(business.id)
+            }
+          }
+          setFavoriteBusinesses(favorites)
+        } catch (error) {
+          console.error("Error loading favorites:", error)
+        }
+      }
+    }
+
+    if (allBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allBusinesses])
 
   // Helper function for exact subcategory matching
   const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
@@ -457,6 +507,62 @@ export default function FuneralServicesPage() {
       title: "Filters cleared",
       description: `Showing all ${allBusinesses.length} funeral service providers`,
     })
+  }
+
+  const handleAddToFavorites = async (business: Business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already saved",
+        description: "This business is already in your favorites",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const businessCard = {
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: business.displayPhone,
+        email: business.email,
+        address: business.displayLocation,
+        zipCode: business.zipCode,
+      }
+
+      const result = await addFavoriteBusiness(businessCard)
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business saved!",
+          description:
+            result.message || `${business.displayName || business.businessName} has been added to your favorites`,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to save business to favorites",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business to favorites",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   // Fetch businesses with race condition prevention
@@ -740,6 +846,34 @@ export default function FuneralServicesPage() {
                     {/* Right side - Action Buttons */}
                     <div className="flex flex-col gap-2 lg:items-end lg:ml-auto lg:w-24 flex-shrink-0">
                       <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                        className={
+                          favoriteBusinesses.has(business.id)
+                            ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 text-white"
+                            : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
+                        }
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
+                      <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenReviews(business)}
@@ -819,6 +953,32 @@ export default function FuneralServicesPage() {
         businessId={selectedBusinessId}
         businessName={selectedBusinessName}
       />
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+            <DialogDescription>
+              You need to be logged in to save businesses to your favorites. Please log in to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-4 mt-4">
+            <Button
+              onClick={() => {
+                setIsLoginDialogOpen(false)
+                window.location.href = "/user-login"
+              }}
+              className="flex-1"
+            >
+              Login
+            </Button>
+            <Button variant="outline" onClick={() => setIsLoginDialogOpen(false)} className="flex-1">
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

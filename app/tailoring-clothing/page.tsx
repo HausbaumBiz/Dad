@@ -4,6 +4,7 @@ import { CategoryLayout } from "@/components/category-layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
+import { useToast } from "@/hooks/use-toast"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
@@ -14,6 +15,10 @@ import type { Business } from "@/lib/definitions"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
 
 // Enhanced Business interface with service area
 interface EnhancedBusiness extends Business {
@@ -53,6 +58,14 @@ export default function TailoringClothingPage() {
 
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
+  const { toast } = useToast()
+
   const loadPhotosForBusiness = async (businessId: string) => {
     if (!businessPhotos[businessId]) {
       try {
@@ -81,6 +94,49 @@ export default function TailoringClothingPage() {
       console.log("No user zip code found in localStorage")
     }
   }, [])
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) {
+        setFavoriteBusinesses(new Set())
+        return
+      }
+
+      try {
+        const favoriteChecks = await Promise.all(businesses.map((business) => checkIfBusinessIsFavorite(business.id)))
+
+        const favoriteIds = new Set<string>()
+        businesses.forEach((business, index) => {
+          if (favoriteChecks[index]) {
+            favoriteIds.add(business.id)
+          }
+        })
+
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (businesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, businesses])
 
   // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: EnhancedBusiness, targetZipCode: string): boolean => {
@@ -204,6 +260,54 @@ export default function TailoringClothingPage() {
   const handleClearZipCode = () => {
     localStorage.removeItem("savedZipCode")
     setUserZipCode(null)
+  }
+
+  const handleAddToFavorites = async (business: EnhancedBusiness) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      return // Already saved
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName || business.businessName,
+        phone: business.displayPhone || business.phone || "",
+        email: business.email || "",
+        address: business.displayLocation || "",
+        zipCode: business.zipCode,
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving business card:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   // Function to check if business has exact subcategory match
@@ -493,6 +597,34 @@ export default function TailoringClothingPage() {
 
                     {/* Action Buttons */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32 w-full justify-center lg:justify-start lg:w-auto">
+                      {/* Save Card Button */}
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        className={
+                          favoriteBusinesses.has(business.id)
+                            ? "flex-1 lg:flex-none lg:w-full bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "flex-1 lg:flex-none lg:w-full text-red-600 border-red-600 hover:bg-red-50 bg-transparent"
+                        }
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id] || favoriteBusinesses.has(business.id)}
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                       <Button
                         className="flex-1 lg:flex-none lg:w-full"
                         onClick={() => handleOpenReviews(business.displayName || business.businessName)}
@@ -532,6 +664,9 @@ export default function TailoringClothingPage() {
           businessName={selectedBusiness.displayName || selectedBusiness.businessName}
         />
       )}
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>
