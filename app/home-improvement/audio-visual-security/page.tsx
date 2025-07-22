@@ -11,8 +11,15 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function AudioVisualSecurityPage() {
+  const { toast } = useToast()
+
   const filterOptions = [
     { id: "audiovisual1", label: "Smart Home Setup", value: "Smart Home Setup" },
     { id: "audiovisual2", label: "Home Security Solutions", value: "Home Security Solutions" },
@@ -44,6 +51,12 @@ export default function AudioVisualSecurityPage() {
   // State for business photos
   const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: string[] }>({})
 
+  // State for favorites functionality
+  const [currentUser, setCurrentUser] = useState(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   // Function to load photos for a specific business
   const loadPhotosForBusiness = async (businessId: string) => {
     if (businessPhotos[businessId]) return // Already loaded
@@ -60,6 +73,98 @@ export default function AudioVisualSecurityPage() {
         ...prev,
         [businessId]: [],
       }))
+    }
+  }
+
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        // Check which businesses are favorites for this user
+        const favoriteIds = new Set<string>()
+
+        for (const business of businesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(currentUser.id, business.id)
+          if (isFavorite) {
+            favoriteIds.add(business.id)
+          }
+        }
+
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (businesses.length > 0 && currentUser?.id) {
+      loadFavorites()
+    }
+  }, [businesses, currentUser])
+
+  // Function to handle adding business to favorites
+  const handleAddToFavorites = async (business: any) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    // Check if already saved
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const businessData = {
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: business.displayPhone,
+        email: business.email,
+        address: business.displayLocation,
+        zipCode: business.zipCode,
+      }
+
+      await addFavoriteBusiness(currentUser.id, businessData)
+
+      setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+
+      toast({
+        title: "Business Card Saved!",
+        description: `${business.displayName} has been added to your favorites.`,
+        variant: "default",
+      })
+    } catch (error) {
+      console.error("Error saving business to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
     }
   }
 
@@ -307,6 +412,9 @@ export default function AudioVisualSecurityPage() {
         ) : (
           filteredBusinesses.map((business) => {
             const allServices = getAllTerminalSubcategories(business.subcategories)
+            const isFavorite = favoriteBusinesses.has(business.id)
+            const isSaving = savingStates[business.id] || false
+
             return (
               <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
@@ -395,6 +503,33 @@ export default function AudioVisualSecurityPage() {
                         >
                           View Profile
                         </Button>
+                        <Button
+                          variant={isFavorite ? "default" : "outline"}
+                          className={`flex-1 lg:w-full ${
+                            isFavorite
+                              ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                              : "border-red-600 text-red-600 hover:bg-red-50"
+                          }`}
+                          onClick={() => handleAddToFavorites(business)}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : isFavorite ? (
+                            <>
+                              <HeartHandshake className="w-4 h-4 mr-2" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="w-4 h-4 mr-2" />
+                              Save Card
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -419,6 +554,16 @@ export default function AudioVisualSecurityPage() {
         onClose={() => setIsProfileDialogOpen(false)}
         businessId={selectedBusiness?.id}
         businessName={selectedBusiness?.displayName}
+      />
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog
+        isOpen={isLoginDialogOpen}
+        onClose={() => setIsLoginDialogOpen(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user)
+          setIsLoginDialogOpen(false)
+        }}
       />
 
       <Toaster />

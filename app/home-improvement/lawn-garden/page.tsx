@@ -11,6 +11,11 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 export default function LawnGardenPage() {
   const filterOptions = [
@@ -37,6 +42,15 @@ export default function LawnGardenPage() {
   // State for category filters
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
 
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
+  // Toast hook
+  const { toast } = useToast()
+
   // Get user's zip code from localStorage
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -47,6 +61,49 @@ export default function LawnGardenPage() {
       console.log("No user zip code found in localStorage")
     }
   }, [])
+
+  // Check user session on component mount
+  useEffect(() => {
+    const checkUserSession = async () => {
+      try {
+        const session = await getUserSession()
+        if (session?.user) {
+          setCurrentUser(session.user)
+        }
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses when user is available
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (!currentUser?.id) return
+
+      try {
+        const favoriteIds = new Set<string>()
+
+        // Check each provider to see if it's favorited
+        for (const provider of providers) {
+          const isFavorite = await checkIfBusinessIsFavorite(provider.id)
+          if (isFavorite) {
+            favoriteIds.add(provider.id)
+          }
+        }
+
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (providers.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, providers])
 
   // Handler for filter changes
   const handleFilterChange = (filterId: string, checked: boolean) => {
@@ -223,6 +280,73 @@ export default function LawnGardenPage() {
   const handleViewProfile = (provider: any) => {
     setSelectedBusiness(provider)
     setIsProfileDialogOpen(true)
+  }
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (provider: any) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    const businessId = provider.id
+
+    // Check if already saving
+    if (savingStates[businessId]) return
+
+    // Check if already favorited
+    if (favoriteBusinesses.has(businessId)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    try {
+      // Set saving state
+      setSavingStates((prev) => ({ ...prev, [businessId]: true }))
+
+      const businessData = {
+        id: provider.id,
+        businessName: provider.businessName,
+        displayName: provider.displayName,
+        phone: provider.displayPhone,
+        email: provider.email,
+        address: provider.displayLocation,
+        zipCode: provider.zipCode,
+      }
+
+      const result = await addFavoriteBusiness(businessData)
+
+      if (result.success) {
+        // Add to local favorites set
+        setFavoriteBusinesses((prev) => new Set([...prev, businessId]))
+
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to save business card",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      // Clear saving state
+      setSavingStates((prev) => ({ ...prev, [businessId]: false }))
+    }
   }
 
   return (
@@ -448,6 +572,33 @@ export default function LawnGardenPage() {
                           >
                             View Profile
                           </Button>
+                          <Button
+                            className={`flex-1 lg:flex-none ${
+                              favoriteBusinesses.has(provider.id)
+                                ? "bg-red-600 text-white hover:bg-red-700 border-red-600"
+                                : "border-red-600 text-red-600 hover:bg-red-50"
+                            }`}
+                            variant={favoriteBusinesses.has(provider.id) ? "default" : "outline"}
+                            onClick={() => handleAddToFavorites(provider)}
+                            disabled={savingStates[provider.id]}
+                          >
+                            {savingStates[provider.id] ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : favoriteBusinesses.has(provider.id) ? (
+                              <>
+                                <HeartHandshake className="w-4 h-4 mr-2" />
+                                Saved
+                              </>
+                            ) : (
+                              <>
+                                <Heart className="w-4 h-4 mr-2" />
+                                Save Card
+                              </>
+                            )}
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -473,6 +624,27 @@ export default function LawnGardenPage() {
         businessId={selectedBusiness?.id || ""}
         businessName={selectedBusiness?.displayName || ""}
       />
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+            <DialogDescription>
+              You need to be logged in to save business cards to your favorites. Please log in or create an account to
+              continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-4 mt-4">
+            <Button asChild className="flex-1">
+              <a href="/user-login">Login</a>
+            </Button>
+            <Button variant="outline" asChild className="flex-1 bg-transparent">
+              <a href="/user-register">Sign Up</a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

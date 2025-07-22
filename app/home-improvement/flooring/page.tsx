@@ -11,8 +11,15 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function FlooringPage() {
+  const { toast } = useToast()
+
   const filterOptions = [
     { id: "floor1", label: "Carpet Installation", value: "Carpet Installation" },
     { id: "floor2", label: "Hardwood Floor Installation", value: "Hardwood Floor Installation" },
@@ -45,6 +52,12 @@ export default function FlooringPage() {
 
   // Photo state
   const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: string[] }>({})
+
+  // Favorites state
+  const [currentUser, setCurrentUser] = useState(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
   const subcategoryPath = "Home, Lawn, and Manual Labor > Floor/Carpet Care and Installation"
 
@@ -134,6 +147,102 @@ export default function FlooringPage() {
 
   console.log(`Applied filters:`, selectedFilters)
   console.log(`Showing ${filteredBusinesses.length} of ${businesses.length} businesses`)
+
+  // Check user session and load favorites
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+        console.log("Current user:", user)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+      }
+    }
+
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        const favorites = new Set<string>()
+
+        // Check each business to see if it's favorited
+        for (const business of businesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(currentUser.id, business.id)
+          if (isFavorite) {
+            favorites.add(business.id)
+          }
+        }
+
+        setFavoriteBusinesses(favorites)
+        console.log(`Loaded ${favorites.size} favorite businesses for user ${currentUser.id}`)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (businesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, businesses])
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: any) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const businessData = {
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: business.displayPhone,
+        email: business.email,
+        address: business.displayLocation,
+        zipCode: business.zipCode,
+      }
+
+      await addFavoriteBusiness(currentUser.id, businessData)
+
+      setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+
+      toast({
+        title: "Business Card Saved!",
+        description: `${business.displayName} has been added to your favorites.`,
+        variant: "default",
+      })
+
+      console.log(`Added business ${business.displayName} to favorites for user ${currentUser.id}`)
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
+  }
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -399,6 +508,33 @@ export default function FlooringPage() {
                       >
                         View Profile
                       </Button>
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none ${
+                          favoriteBusinesses.has(business.id)
+                            ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "border-red-600 text-red-600 hover:bg-red-50 bg-transparent"
+                        }`}
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="w-4 h-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="w-4 h-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -422,6 +558,16 @@ export default function FlooringPage() {
         onClose={() => setIsProfileDialogOpen(false)}
         businessId={selectedBusiness?.id}
         businessName={selectedBusiness?.displayName}
+      />
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog
+        isOpen={isLoginDialogOpen}
+        onClose={() => setIsLoginDialogOpen(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user)
+          setIsLoginDialogOpen(false)
+        }}
       />
 
       <Toaster />

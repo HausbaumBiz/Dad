@@ -13,6 +13,11 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getZipCode } from "@/lib/zip-code-db"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 const filterOptions = [
   { id: "handymen1", label: "Odd Jobs and Repairs", value: "Odd Jobs and Repairs" },
@@ -41,6 +46,13 @@ export default function HandymenPage() {
 
   // Add photo state management
   const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: string[] }>({})
+
+  // Add favorites state management
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const { toast } = useToast()
 
   // Function to load photos for a specific business
   const loadPhotosForBusiness = async (businessId: string) => {
@@ -90,6 +102,108 @@ export default function HandymenPage() {
 
   const clearFilters = () => {
     setSelectedFilters([])
+  }
+
+  // Check user session on component mount
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        if (session?.user) {
+          setCurrentUser(session.user)
+          console.log("User session found:", session.user.email)
+        } else {
+          console.log("No user session found")
+        }
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+
+    checkUserSession()
+  }, [])
+
+  // Load favorites when user is available
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser) return
+
+      try {
+        // Check favorites for all businesses
+        const favoriteChecks = await Promise.all(
+          allBusinesses.map(async (business) => {
+            const isFavorite = await checkIfBusinessIsFavorite(business.id)
+            return { businessId: business.id, isFavorite }
+          }),
+        )
+
+        const favoriteIds = favoriteChecks.filter((check) => check.isFavorite).map((check) => check.businessId)
+
+        setFavoriteBusinesses(new Set(favoriteIds))
+        console.log("Loaded favorites:", favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (allBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, allBusinesses])
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: any) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.name,
+        displayName: business.name,
+        phone: business.phone || "",
+        email: "",
+        address: business.location || "",
+        zipCode: business.zipCode || "",
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   // Load user zip code from localStorage
@@ -221,6 +335,7 @@ export default function HandymenPage() {
                 reviews: business.reviewCount || 0,
                 services: business.subcategories,
                 phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
+                zipCode: business.zipCode,
               }
             }),
           )
@@ -273,6 +388,7 @@ export default function HandymenPage() {
                 reviews: business.reviewCount || 0,
                 services: business.subcategories,
                 phone: business.displayPhone || business.adDesignData?.businessInfo?.phone || business.phone,
+                zipCode: business.zipCode,
               }
             }),
           )
@@ -478,6 +594,33 @@ export default function HandymenPage() {
                       >
                         View Profile
                       </Button>
+                      <Button
+                        variant={favoriteBusinesses.has(provider.id) ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none ${
+                          favoriteBusinesses.has(provider.id)
+                            ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "border-red-600 text-red-600 hover:bg-red-50"
+                        }`}
+                        onClick={() => handleAddToFavorites(provider)}
+                        disabled={savingStates[provider.id]}
+                      >
+                        {savingStates[provider.id] ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(provider.id) ? (
+                          <>
+                            <HeartHandshake className="w-4 h-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="w-4 h-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -502,6 +645,9 @@ export default function HandymenPage() {
         businessId={selectedBusinessId}
         businessName={selectedBusinessName}
       />
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>

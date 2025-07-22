@@ -11,6 +11,11 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function WindowsDoorsPage() {
   // State for reviews dialog
@@ -27,6 +32,14 @@ export default function WindowsDoorsPage() {
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, any[]>>({})
+
+  // Favorites functionality state
+  const [currentUser, setCurrentUser] = useState(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
+  const { toast } = useToast()
 
   // Function to load photos for a specific business
   const loadPhotosForBusiness = async (businessId: string) => {
@@ -124,6 +137,98 @@ export default function WindowsDoorsPage() {
   console.log(`Showing ${filteredBusinesses.length} of ${businesses.length} businesses`)
 
   const subcategoryPath = "Home, Lawn, and Manual Labor > Windows and Doors"
+
+  // Check user session and load favorites
+  useEffect(() => {
+    async function checkUserAndFavorites() {
+      try {
+        const session = await getUserSession()
+        if (session?.user) {
+          setCurrentUser(session.user)
+          console.log("User session found:", session.user.email)
+
+          // Load user's favorite businesses
+          const favoriteChecks = await Promise.all(
+            businesses.map(async (business) => {
+              const isFavorite = await checkIfBusinessIsFavorite(business.id)
+              return { businessId: business.id, isFavorite }
+            }),
+          )
+
+          const favoriteIds = favoriteChecks.filter((check) => check.isFavorite).map((check) => check.businessId)
+          setFavoriteBusinesses(new Set(favoriteIds))
+          console.log(`Loaded ${favoriteIds.length} favorite businesses`)
+        } else {
+          console.log("No user session found")
+          setCurrentUser(null)
+          setFavoriteBusinesses(new Set())
+        }
+      } catch (error) {
+        console.error("Error checking user session:", error)
+        setCurrentUser(null)
+        setFavoriteBusinesses(new Set())
+      }
+    }
+
+    if (businesses.length > 0) {
+      checkUserAndFavorites()
+    }
+  }, [businesses])
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: any) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const result = await addFavoriteBusiness({
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: business.displayPhone,
+        email: business.email,
+        address: business.displayLocation,
+        zipCode: business.zipCode,
+      })
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Card Saved!",
+          description: result.message,
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Save Failed",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving business to favorites:", error)
+      toast({
+        title: "Save Failed",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
+  }
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -404,6 +509,34 @@ export default function WindowsDoorsPage() {
                       >
                         View Profile
                       </Button>
+                      {/* Save Card Button */}
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none ${
+                          favoriteBusinesses.has(business.id)
+                            ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "border-red-600 text-red-600 hover:bg-red-50 bg-transparent"
+                        }`}
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="w-4 h-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="w-4 h-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -428,6 +561,9 @@ export default function WindowsDoorsPage() {
         businessId={selectedBusiness?.id}
         businessName={selectedBusiness?.displayName}
       />
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
 
       <Toaster />
     </CategoryLayout>

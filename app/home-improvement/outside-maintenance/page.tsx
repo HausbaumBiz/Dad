@@ -11,6 +11,11 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForSubcategory } from "@/lib/business-category-service"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export default function OutsideMaintenancePage() {
   const filterOptions = [
@@ -47,6 +52,13 @@ export default function OutsideMaintenancePage() {
   // State for photos
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, any[]>>({})
 
+  // User and favorites state
+  const [currentUser, setCurrentUser] = useState(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState(new Set())
+  const [savingStates, setSavingStates] = useState({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const { toast } = useToast()
+
   // Function to load photos for a specific business
   const loadPhotosForBusiness = async (businessId: string) => {
     if (businessPhotos[businessId]) return // Already loaded
@@ -80,6 +92,43 @@ export default function OutsideMaintenancePage() {
     }
   }, [])
 
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        const favoriteIds = new Set()
+        for (const business of businesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favoriteIds.add(business.id)
+          }
+        }
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (businesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, businesses])
+
   // Handler for filter changes
   const handleFilterChange = (filterId: string, checked: boolean) => {
     console.log(`Filter change: ${filterId} = ${checked}`)
@@ -93,6 +142,63 @@ export default function OutsideMaintenancePage() {
   // Clear all filters
   const clearFilters = () => {
     setSelectedFilters([])
+  }
+
+  // Handler for adding business to favorites
+  const handleAddToFavorites = async (business) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(business.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
+
+    try {
+      const businessData = {
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: business.displayPhone,
+        email: business.email,
+        address: business.displayLocation,
+        zipCode: business.zipCode,
+      }
+
+      const result = await addFavoriteBusiness(businessData)
+
+      if (result.success) {
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
+        toast({
+          title: "Business Saved!",
+          description: "Business card has been added to your favorites.",
+          variant: "default",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to save business card.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding favorite business:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
+    }
   }
 
   useEffect(() => {
@@ -411,6 +517,33 @@ export default function OutsideMaintenancePage() {
 
                     {/* Action Buttons */}
                     <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        className={
+                          favoriteBusinesses.has(business.id)
+                            ? "flex-1 lg:flex-none bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "flex-1 lg:flex-none border-red-600 text-red-600 hover:bg-red-50"
+                        }
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="w-4 h-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="w-4 h-4 mr-2" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                       <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
                         Ratings
                       </Button>
@@ -445,6 +578,26 @@ export default function OutsideMaintenancePage() {
         businessId={selectedBusinessId}
         businessName={selectedBusinessName}
       />
+
+      {/* Login Dialog */}
+      <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Login Required</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>Please log in to save business cards to your favorites.</p>
+            <div className="flex gap-2">
+              <Button asChild className="flex-1">
+                <a href="/user-login">Login</a>
+              </Button>
+              <Button variant="outline" asChild className="flex-1 bg-transparent">
+                <a href="/user-register">Sign Up</a>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Toaster />
     </CategoryLayout>

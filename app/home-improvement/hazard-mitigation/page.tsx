@@ -9,10 +9,17 @@ import { useState, useEffect, useMemo } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function HazardMitigationPage() {
+  const { toast } = useToast()
+
   const filterOptions = [
     { id: "hazard1", label: "Lead-Based Paint Abatement", value: "Lead-Based Paint Abatement" },
     { id: "hazard2", label: "Radon Mitigation", value: "Radon Mitigation" },
@@ -33,12 +40,106 @@ export default function HazardMitigationPage() {
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedBusiness, setSelectedBusiness] = useState(null)
 
+  // Favorites functionality state
+  const [currentUser, setCurrentUser] = useState(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState(new Set())
+  const [savingStates, setSavingStates] = useState({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
   const [providers, setProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userZipCode, setUserZipCode] = useState<string | null | undefined>(undefined)
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: any[] }>({})
+
+  // Load user session
+  useEffect(() => {
+    async function loadUserSession() {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error loading user session:", error)
+        setCurrentUser(null)
+      }
+    }
+    loadUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        const favorites = new Set()
+        for (const provider of providers) {
+          const isFavorite = await checkIfBusinessIsFavorite(currentUser.id, provider.id)
+          if (isFavorite) {
+            favorites.add(provider.id)
+          }
+        }
+        setFavoriteBusinesses(favorites)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (providers.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, providers])
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (provider) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(provider.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+
+    try {
+      const businessData = {
+        id: provider.id,
+        businessName: provider.businessData.businessName,
+        displayName: provider.businessData.displayName,
+        phone: provider.businessData.displayPhone,
+        email: provider.businessData.email,
+        address: provider.businessData.displayLocation,
+        zipCode: provider.businessData.zipCode,
+      }
+
+      await addFavoriteBusiness(currentUser.id, businessData)
+
+      setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+
+      toast({
+        title: "Business Card Saved!",
+        description: `${provider.name} has been added to your favorites.`,
+        variant: "default",
+      })
+    } catch (error) {
+      console.error("Error saving business to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+    }
+  }
 
   // Load user zip code from localStorage
   useEffect(() => {
@@ -368,6 +469,9 @@ export default function HazardMitigationPage() {
         ) : (
           filteredBusinesses.map((provider) => {
             const allServices = getAllTerminalSubcategories(provider.businessData.subcategories)
+            const isFavorite = favoriteBusinesses.has(provider.id)
+            const isSaving = savingStates[provider.id]
+
             return (
               <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
@@ -452,6 +556,33 @@ export default function HazardMitigationPage() {
                         >
                           View Profile
                         </Button>
+                        <Button
+                          variant={isFavorite ? "default" : "outline"}
+                          className={`flex-1 lg:flex-none ${
+                            isFavorite
+                              ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                              : "border-red-600 text-red-600 hover:bg-red-50"
+                          }`}
+                          onClick={() => handleAddToFavorites(provider)}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : isFavorite ? (
+                            <>
+                              <HeartHandshake className="w-4 h-4 mr-2" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="w-4 h-4 mr-2" />
+                              Save Card
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -476,6 +607,16 @@ export default function HazardMitigationPage() {
         onClose={() => setIsProfileDialogOpen(false)}
         businessId={selectedBusiness?.id}
         businessName={selectedBusiness?.displayName || selectedBusiness?.businessName}
+      />
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog
+        isOpen={isLoginDialogOpen}
+        onClose={() => setIsLoginDialogOpen(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user)
+          setIsLoginDialogOpen(false)
+        }}
       />
 
       <Toaster />

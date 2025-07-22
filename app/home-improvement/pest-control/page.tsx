@@ -8,11 +8,18 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
+import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function PestControlPage() {
+  const { toast } = useToast()
+
   const filterOptions = [
     { id: "pest1", label: "Rodent/Small Animal Infestations", value: "Rodent/ Small Animal Infestations" },
     { id: "pest2", label: "Wildlife Removal", value: "Wildlife Removal" },
@@ -34,6 +41,99 @@ export default function PestControlPage() {
 
   // Photo state
   const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: string[] }>({})
+
+  // Favorites functionality state
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
+  // Load user session
+  useEffect(() => {
+    async function loadUserSession() {
+      try {
+        const user = await getUserSession()
+        setCurrentUser(user)
+      } catch (error) {
+        console.error("Error loading user session:", error)
+      }
+    }
+    loadUserSession()
+  }, [])
+
+  // Load user's favorite businesses
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser?.id) return
+
+      try {
+        const favorites = new Set<string>()
+        for (const provider of providers) {
+          const isFavorite = await checkIfBusinessIsFavorite(currentUser.id, provider.id)
+          if (isFavorite) {
+            favorites.add(provider.id)
+          }
+        }
+        setFavoriteBusinesses(favorites)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
+    }
+
+    if (providers.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, providers])
+
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (provider: any) => {
+    if (!currentUser) {
+      setIsLoginDialogOpen(true)
+      return
+    }
+
+    if (favoriteBusinesses.has(provider.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This business card is already in your favorites.",
+        variant: "default",
+      })
+      return
+    }
+
+    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+
+    try {
+      const businessData = {
+        id: provider.id,
+        businessName: provider.businessData.businessName,
+        displayName: provider.businessData.displayName,
+        phone: provider.businessData.displayPhone,
+        email: provider.businessData.email,
+        address: provider.businessData.displayLocation,
+        zipCode: provider.businessData.zipCode,
+      }
+
+      await addFavoriteBusiness(currentUser.id, businessData)
+
+      setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+
+      toast({
+        title: "Business Card Saved!",
+        description: `${provider.name} has been added to your favorites.`,
+        variant: "default",
+      })
+    } catch (error) {
+      console.error("Error adding to favorites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save business card. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+    }
+  }
 
   // Load user zip code from localStorage
   useEffect(() => {
@@ -341,6 +441,9 @@ export default function PestControlPage() {
         ) : (
           filteredBusinesses.map((provider) => {
             const allServices = getAllTerminalSubcategories(provider.businessData.subcategories)
+            const isFavorite = favoriteBusinesses.has(provider.id)
+            const isSaving = savingStates[provider.id]
+
             return (
               <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
@@ -413,6 +516,33 @@ export default function PestControlPage() {
                         >
                           View Profile
                         </Button>
+                        <Button
+                          variant={isFavorite ? "default" : "outline"}
+                          className={`flex-1 lg:flex-none ${
+                            isFavorite
+                              ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                              : "border-red-600 text-red-600 hover:bg-red-50"
+                          }`}
+                          onClick={() => handleAddToFavorites(provider)}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : isFavorite ? (
+                            <>
+                              <HeartHandshake className="w-4 h-4 mr-2" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="w-4 h-4 mr-2" />
+                              Save Card
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -437,6 +567,16 @@ export default function PestControlPage() {
         onClose={() => setIsProfileDialogOpen(false)}
         businessId={selectedBusiness?.id}
         businessName={selectedBusiness?.displayName || selectedBusiness?.businessName}
+      />
+
+      {/* Login Dialog */}
+      <ReviewLoginDialog
+        isOpen={isLoginDialogOpen}
+        onClose={() => setIsLoginDialogOpen(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user)
+          setIsLoginDialogOpen(false)
+        }}
       />
 
       <Toaster />
