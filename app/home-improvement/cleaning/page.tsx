@@ -15,7 +15,9 @@ import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
-import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
+import { Heart, HeartHandshake, Loader2, MapPin, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 const filterOptions = [
@@ -66,6 +68,10 @@ export default function CleaningPage() {
   // Photo state
   const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: any[] }>({})
 
+  // State for ratings and reviews
+  const [businessRatings, setBusinessRatings] = useState<{ [key: string]: number }>({})
+  const [businessReviews, setBusinessReviews] = useState<{ [key: string]: any[] }>({})
+
   // Favorites state
   const [currentUser, setCurrentUser] = useState(null)
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
@@ -86,6 +92,35 @@ export default function CleaningPage() {
     } catch (error) {
       console.error(`Error loading photos for business ${businessId}:`, error)
       setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
+
+  // Function to load reviews and calculate rating for a business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessReviews[businessId]) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: averageRating,
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessReviews((prev) => ({
         ...prev,
         [businessId]: [],
       }))
@@ -339,6 +374,11 @@ export default function CleaningPage() {
 
           setAllBusinesses(transformedProviders)
           setProviders(transformedProviders)
+
+          // Load reviews for each business
+          transformedProviders.forEach((provider) => {
+            loadBusinessReviews(provider.id)
+          })
         } else {
           console.log("No user zip code available, showing all businesses")
 
@@ -362,6 +402,11 @@ export default function CleaningPage() {
 
           setAllBusinesses(transformedProviders)
           setProviders(transformedProviders)
+
+          // Load reviews for each business
+          transformedProviders.forEach((provider) => {
+            loadBusinessReviews(provider.id)
+          })
         }
       } catch (error) {
         console.error("Error fetching businesses:", error)
@@ -410,7 +455,11 @@ export default function CleaningPage() {
 
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
-    setSelectedProvider(provider)
+    setSelectedProvider({
+      ...provider,
+      reviews: businessReviews[provider.id] || [],
+      rating: businessRatings[provider.id] || 0,
+    })
     setIsReviewsDialogOpen(true)
   }
 
@@ -524,18 +573,37 @@ export default function CleaningPage() {
                   <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{provider.name}</h3>
 
+                    {/* Contact Info Row */}
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {/* Location */}
                       {provider.location && (
                         <div className="flex items-center">
-                          <span>📍 {provider.location}</span>
+                          <MapPin className="h-4 w-4 mr-1 text-primary" />
+                          <span>{provider.location}</span>
                         </div>
                       )}
+
+                      {/* Phone */}
                       {provider.phone && (
                         <div className="flex items-center">
-                          <span>📞 {provider.phone}</span>
+                          <Phone className="h-4 w-4 mr-1 text-primary" />
+                          <a href={`tel:${provider.phone}`} className="hover:text-primary transition-colors">
+                            {provider.phone}
+                          </a>
                         </div>
                       )}
                     </div>
+
+                    {/* Rating Display */}
+                    {businessRatings[provider.id] && (
+                      <div className="flex items-center gap-2">
+                        <StarRating rating={businessRatings[provider.id]} />
+                        <span className="text-sm text-gray-600">
+                          {businessRatings[provider.id].toFixed(1)} ({businessReviews[provider.id]?.length || 0}{" "}
+                          reviews)
+                        </span>
+                      </div>
+                    )}
 
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700">
@@ -632,6 +700,7 @@ export default function CleaningPage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.name}
+        businessId={selectedProvider?.id}
         reviews={selectedProvider?.reviews || []}
       />
 

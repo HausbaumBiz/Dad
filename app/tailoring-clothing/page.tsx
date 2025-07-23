@@ -19,6 +19,8 @@ import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/fa
 import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake, Loader2 } from "lucide-react"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Enhanced Business interface with service area
 interface EnhancedBusiness extends Business {
@@ -43,6 +45,7 @@ const getSubcategoryString = (subcategory: any): string => {
 export default function TailoringClothingPage() {
   const fetchIdRef = useRef(0)
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
   const [isReviewsOpen, setIsReviewsOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [selectedBusiness, setSelectedBusiness] = useState<EnhancedBusiness | null>(null)
@@ -64,6 +67,9 @@ export default function TailoringClothingPage() {
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
+
   const { toast } = useToast()
 
   const loadPhotosForBusiness = async (businessId: string) => {
@@ -81,6 +87,46 @@ export default function TailoringClothingPage() {
           [businessId]: [],
         }))
       }
+    }
+  }
+
+  // Function to load reviews and calculate rating for a specific business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessRatings[businessId] !== undefined) {
+      return // Already loaded
+    }
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: Math.round(averageRating * 10) / 10, // Round to 1 decimal place
+        }))
+      } else {
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: 0,
+        }))
+      }
+    } catch (error) {
+      console.error(`Error loading reviews for business ${businessId}:`, error)
+      setBusinessRatings((prev) => ({
+        ...prev,
+        [businessId]: 0,
+      }))
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
     }
   }
 
@@ -137,6 +183,15 @@ export default function TailoringClothingPage() {
       loadFavorites()
     }
   }, [currentUser, businesses])
+
+  // Load reviews for all businesses when businesses change
+  useEffect(() => {
+    if (businesses.length > 0) {
+      businesses.forEach((business) => {
+        loadBusinessReviews(business.id)
+      })
+    }
+  }, [businesses])
 
   // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: EnhancedBusiness, targetZipCode: string): boolean => {
@@ -246,9 +301,14 @@ export default function TailoringClothingPage() {
     },
   ]
 
-  const handleOpenReviews = (businessName: string) => {
-    setSelectedProvider(businessName)
+  const handleOpenReviews = (business: EnhancedBusiness) => {
+    setSelectedProvider(business.displayName || business.businessName)
+    setSelectedBusinessId(business.id)
     setIsReviewsOpen(true)
+    // Load reviews if not already loaded
+    if (!businessReviews[business.id]) {
+      loadBusinessReviews(business.id)
+    }
   }
 
   const handleOpenProfile = (business: EnhancedBusiness) => {
@@ -561,6 +621,22 @@ export default function TailoringClothingPage() {
                         </div>
                       )}
 
+                      {/* Rating Display */}
+                      <div className="flex items-center gap-2">
+                        <StarRating
+                          rating={businessRatings[business.id] || 0}
+                          size="sm"
+                          showNumber={true}
+                          onLoadReviews={() => loadBusinessReviews(business.id)}
+                        />
+                        {businessReviews[business.id] && businessReviews[business.id].length > 0 && (
+                          <span className="text-sm text-gray-600">
+                            ({businessReviews[business.id].length} review
+                            {businessReviews[business.id].length !== 1 ? "s" : ""})
+                          </span>
+                        )}
+                      </div>
+
                       {business.subcategories && business.subcategories.length > 0 && (
                         <div>
                           <p className="text-sm font-medium text-gray-700">Services:</p>
@@ -625,10 +701,7 @@ export default function TailoringClothingPage() {
                           </>
                         )}
                       </Button>
-                      <Button
-                        className="flex-1 lg:flex-none lg:w-full"
-                        onClick={() => handleOpenReviews(business.displayName || business.businessName)}
-                      >
+                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
                         Ratings
                       </Button>
                       <Button
@@ -652,7 +725,8 @@ export default function TailoringClothingPage() {
         isOpen={isReviewsOpen}
         onClose={() => setIsReviewsOpen(false)}
         providerName={selectedProvider || ""}
-        reviews={[]}
+        businessId={selectedBusinessId}
+        reviews={selectedBusinessId ? businessReviews[selectedBusinessId] || [] : []}
       />
 
       {/* Business Profile Dialog */}

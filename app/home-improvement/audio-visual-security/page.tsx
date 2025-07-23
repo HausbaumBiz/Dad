@@ -14,7 +14,9 @@ import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
-import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { getBusinessReviews } from "@/app/actions/review-actions"
+import { StarRating } from "@/components/star-rating"
+import { Heart, HeartHandshake, Loader2, MapPin, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export default function AudioVisualSecurityPage() {
@@ -56,6 +58,39 @@ export default function AudioVisualSecurityPage() {
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
   const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
+  // State for ratings functionality
+  const [businessRatings, setBusinessRatings] = useState<{ [key: string]: number }>({})
+  const [businessReviews, setBusinessReviews] = useState<{ [key: string]: any[] }>({})
+
+  // Function to load reviews and calculate ratings for a business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessReviews[businessId]) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + (review.overallRating || review.rating || 0), 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: averageRating,
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
 
   // Function to load photos for a specific business
   const loadPhotosForBusiness = async (businessId: string) => {
@@ -116,6 +151,15 @@ export default function AudioVisualSecurityPage() {
       loadFavorites()
     }
   }, [businesses, currentUser])
+
+  // Load reviews for all businesses when they're loaded
+  useEffect(() => {
+    if (businesses.length > 0) {
+      businesses.forEach((business) => {
+        loadBusinessReviews(business.id)
+      })
+    }
+  }, [businesses])
 
   // Function to handle adding business to favorites
   const handleAddToFavorites = async (business: any) => {
@@ -262,7 +306,11 @@ export default function AudioVisualSecurityPage() {
 
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
-    setSelectedProvider(provider)
+    setSelectedProvider({
+      ...provider,
+      reviews: businessReviews[provider.id] || [],
+      rating: businessRatings[provider.id] || 0,
+    })
     setIsReviewsDialogOpen(true)
   }
 
@@ -414,6 +462,8 @@ export default function AudioVisualSecurityPage() {
             const allServices = getAllTerminalSubcategories(business.subcategories)
             const isFavorite = favoriteBusinesses.has(business.id)
             const isSaving = savingStates[business.id] || false
+            const businessRating = businessRatings[business.id]
+            const businessReviewList = businessReviews[business.id] || []
 
             return (
               <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
@@ -425,17 +475,29 @@ export default function AudioVisualSecurityPage() {
                       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                         {business.displayLocation && (
                           <span className="flex items-center">
-                            <span className="mr-1">📍</span>
+                            <MapPin className="w-4 h-4 mr-1" />
                             {business.displayLocation}
                           </span>
                         )}
                         {business.displayPhone && (
                           <span className="flex items-center">
-                            <span className="mr-1">📞</span>
+                            <Phone className="w-4 h-4 mr-1" />
                             {business.displayPhone}
                           </span>
                         )}
                       </div>
+
+                      {/* Rating Display */}
+                      {businessRating && businessReviewList.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <StarRating rating={businessRating} />
+                          <span className="text-sm text-gray-600">
+                            {businessRating.toFixed(1)} ({businessReviewList.length} review
+                            {businessReviewList.length !== 1 ? "s" : ""})
+                          </span>
+                        </div>
+                      )}
+
                       {allServices.length > 0 && (
                         <div className="mt-3">
                           <p className="text-sm font-medium text-gray-700">Services ({allServices.length}):</p>
@@ -545,6 +607,7 @@ export default function AudioVisualSecurityPage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.displayName}
+        businessId={selectedProvider?.id}
         reviews={selectedProvider?.reviews || []}
       />
 

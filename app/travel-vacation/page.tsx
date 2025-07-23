@@ -16,7 +16,9 @@ import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/fa
 import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake, Loader2 } from "lucide-react"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
-import { loadBusinessPhotos } from "@/app/actions/photo-actions" // Declare the variable here
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -73,6 +75,7 @@ const getSubcategoryString = (subcategory: any): string => {
 export default function TravelVacationPage() {
   const fetchIdRef = useRef(0)
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
   const [isReviewsOpen, setIsReviewsOpen] = useState(false)
   const [providers, setProviders] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
@@ -101,6 +104,10 @@ export default function TravelVacationPage() {
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
+  // Add rating state management
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
+
   const loadPhotosForBusiness = async (businessId: string) => {
     if (!businessPhotos[businessId]) {
       try {
@@ -116,6 +123,46 @@ export default function TravelVacationPage() {
           [businessId]: [],
         }))
       }
+    }
+  }
+
+  // Function to load reviews and calculate rating for a specific business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessRatings[businessId] !== undefined) {
+      return // Already loaded
+    }
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: Math.round(averageRating * 10) / 10, // Round to 1 decimal place
+        }))
+      } else {
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: 0,
+        }))
+      }
+    } catch (error) {
+      console.error(`Error loading reviews for business ${businessId}:`, error)
+      setBusinessRatings((prev) => ({
+        ...prev,
+        [businessId]: 0,
+      }))
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
     }
   }
 
@@ -171,6 +218,15 @@ export default function TravelVacationPage() {
       loadFavorites()
     }
   }, [currentUser, providers])
+
+  // Load reviews for all businesses when providers change
+  useEffect(() => {
+    if (providers.length > 0) {
+      providers.forEach((provider) => {
+        loadBusinessReviews(provider.id)
+      })
+    }
+  }, [providers])
 
   // FIXED: Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
@@ -273,9 +329,14 @@ export default function TravelVacationPage() {
     { id: "travel10", label: "Camp Grounds and Cabins", value: "Camp Grounds and Cabins" },
   ]
 
-  const handleOpenReviews = (providerName: string) => {
-    setSelectedProvider(providerName)
+  const handleOpenReviews = (provider: Business) => {
+    setSelectedProvider(provider.displayName || provider.businessName || "Business")
+    setSelectedBusinessId(provider.id)
     setIsReviewsOpen(true)
+    // Ensure reviews are loaded
+    if (!businessReviews[provider.id]) {
+      loadBusinessReviews(provider.id)
+    }
   }
 
   // Add handler for opening profile dialog
@@ -620,6 +681,22 @@ export default function TravelVacationPage() {
                           <span>{formatPhoneNumber(provider.adDesignData?.businessInfo?.phone || provider.phone)}</span>
                         </div>
                       )}
+
+                      {/* Rating Display */}
+                      <div className="flex items-center gap-2">
+                        <StarRating
+                          rating={businessRatings[provider.id] || 0}
+                          size="sm"
+                          showNumber={true}
+                          onLoadReviews={() => loadBusinessReviews(provider.id)}
+                        />
+                        {businessReviews[provider.id] && businessReviews[provider.id].length > 0 && (
+                          <span className="text-sm text-gray-600">
+                            ({businessReviews[provider.id].length} review
+                            {businessReviews[provider.id].length !== 1 ? "s" : ""})
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Display Business Subcategories - Limited to 4 */}
@@ -694,10 +771,7 @@ export default function TravelVacationPage() {
                         )}
                       </Button>
 
-                      <Button
-                        className="flex-1 lg:flex-none lg:w-full"
-                        onClick={() => handleOpenReviews(provider.displayName || provider.businessName || "Business")}
-                      >
+                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(provider)}>
                         Ratings
                       </Button>
                       <Button
@@ -720,7 +794,8 @@ export default function TravelVacationPage() {
         isOpen={isReviewsOpen}
         onClose={() => setIsReviewsOpen(false)}
         providerName={selectedProvider || ""}
-        reviews={[]}
+        businessId={selectedBusinessId}
+        reviews={selectedBusinessId ? businessReviews[selectedBusinessId] || [] : []}
       />
 
       {/* Add BusinessProfileDialog */}

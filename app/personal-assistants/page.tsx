@@ -19,6 +19,8 @@ import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/fa
 import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { getBusinessReviews } from "@/app/actions/review-actions"
+import { StarRating } from "@/components/star-rating"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -75,6 +77,11 @@ export default function PersonalAssistantsPage() {
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
+  // Add after existing state declarations:
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
+  const [businessRatings, setBusinessRatings] = useState<Record<string, { rating: number; count: number }>>({})
+  const [loadingReviews, setLoadingReviews] = useState<Record<string, boolean>>({})
+
   // Enhanced Business interface
   interface Business {
     id: string
@@ -118,6 +125,46 @@ export default function PersonalAssistantsPage() {
 
     // Check if the zip code is in the business's service area
     return business.serviceArea.includes(zipCode)
+  }
+
+  // Add this function after the loadBusinessPhotos function:
+  const loadBusinessReviews = async (businessId: string) => {
+    if (loadingReviews[businessId] || businessReviews[businessId]) {
+      return // Already loading or loaded
+    }
+
+    setLoadingReviews((prev) => ({ ...prev, [businessId]: true }))
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({ ...prev, [businessId]: reviews }))
+
+      // Calculate average rating
+      if (reviews && reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => {
+          return sum + (review.overallRating || review.rating || 0)
+        }, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: { rating: averageRating, count: reviews.length },
+        }))
+      } else {
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: { rating: 0, count: 0 },
+        }))
+      }
+    } catch (error) {
+      console.error(`Error loading reviews for business ${businessId}:`, error)
+      setBusinessReviews((prev) => ({ ...prev, [businessId]: [] }))
+      setBusinessRatings((prev) => ({
+        ...prev,
+        [businessId]: { rating: 0, count: 0 },
+      }))
+    } finally {
+      setLoadingReviews((prev) => ({ ...prev, [businessId]: false }))
+    }
   }
 
   // Function to load photos for a business
@@ -308,9 +355,10 @@ export default function PersonalAssistantsPage() {
         setAllProviders(filteredBusinesses)
         setFilteredProviders(filteredBusinesses)
 
-        // Load photos for each business
+        // Load photos and reviews for each business
         filteredBusinesses.forEach((business: Business) => {
           loadBusinessPhotos(business.id)
+          loadBusinessReviews(business.id)
         })
       } catch (err) {
         // Only update error if this is still the current request
@@ -379,9 +427,13 @@ export default function PersonalAssistantsPage() {
     }
   }, [currentUser, filteredProviders])
 
-  const handleOpenReviews = (provider: string) => {
-    setSelectedProvider(provider)
-    setIsReviewsOpen(true)
+  const handleOpenReviews = (businessId: string) => {
+    const business = filteredProviders.find((p: Business) => p.id === businessId)
+    if (business) {
+      setSelectedProvider(business.displayName || business.name)
+      setSelectedBusinessProfile({ id: businessId, name: business.displayName || business.name })
+      setIsReviewsDialogOpen(true)
+    }
   }
 
   const handleOpenProfile = (provider: Business) => {
@@ -675,6 +727,28 @@ export default function PersonalAssistantsPage() {
                         )}
                       </div>
                     </div>
+                    {/* Star Rating Display */}
+                    <div className="mb-4 flex items-center gap-2">
+                      {loadingReviews[provider.id] ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-pulse bg-gray-200 h-4 w-20 rounded"></div>
+                          <span className="text-sm text-gray-500">Loading ratings...</span>
+                        </div>
+                      ) : businessRatings[provider.id] && businessRatings[provider.id].count > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <StarRating rating={businessRatings[provider.id].rating} size="sm" />
+                          <span className="text-sm text-gray-600">
+                            {businessRatings[provider.id].rating.toFixed(1)} ({businessRatings[provider.id].count}{" "}
+                            review{businessRatings[provider.id].count !== 1 ? "s" : ""})
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <StarRating rating={0} size="sm" />
+                          <span className="text-sm text-gray-500">No reviews yet</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Right: Action Buttons */}
@@ -683,7 +757,7 @@ export default function PersonalAssistantsPage() {
                       variant="outline"
                       size="sm"
                       className="text-xs px-3 py-1 h-7 bg-transparent"
-                      onClick={() => handleOpenReviews(provider.displayName || provider.name)}
+                      onClick={() => handleOpenReviews(provider.id)}
                     >
                       Ratings
                     </Button>
@@ -831,6 +905,16 @@ export default function PersonalAssistantsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {selectedBusinessProfile && (
+        <ReviewsDialog
+          isOpen={isReviewsDialogOpen}
+          onClose={() => setIsReviewsDialogOpen(false)}
+          businessId={selectedBusinessProfile.id}
+          businessName={selectedBusinessProfile.name}
+          reviews={businessReviews[selectedBusinessProfile.id] || []}
+        />
       )}
 
       {selectedProvider && (

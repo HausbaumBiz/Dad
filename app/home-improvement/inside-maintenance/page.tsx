@@ -9,12 +9,14 @@ import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { StarRating } from "@/components/star-rating"
 import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
 import { useToast } from "@/hooks/use-toast"
-import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { Heart, HeartHandshake, Loader2, MapPin, Phone } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export default function InsideMaintenancePage() {
@@ -126,6 +128,10 @@ export default function InsideMaintenancePage() {
   // State for business photos
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
+  // Rating state
+  const [businessRatings, setBusinessRatings] = useState<Record<string, { rating: number; count: number }>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
+
   // State for favorites functionality
   const [currentUser, setCurrentUser] = useState(null)
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
@@ -133,6 +139,38 @@ export default function InsideMaintenancePage() {
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
   const subcategoryPath = "Home, Lawn, and Manual Labor > Inside Home Maintenance and Repair"
+
+  // Function to load reviews and calculate ratings for a business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessReviews[businessId]) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + (review.overallRating || review.rating || 0), 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: {
+            rating: averageRating,
+            count: reviews.length,
+          },
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
 
   // Check user session and load favorites
   useEffect(() => {
@@ -158,6 +196,19 @@ export default function InsideMaintenancePage() {
 
     if (businesses.length > 0) {
       checkUserAndLoadFavorites()
+    }
+  }, [businesses])
+
+  // Load reviews for all businesses when they're loaded
+  useEffect(() => {
+    async function loadAllReviews() {
+      for (const business of businesses) {
+        await loadBusinessReviews(business.id)
+      }
+    }
+
+    if (businesses.length > 0) {
+      loadAllReviews()
     }
   }, [businesses])
 
@@ -374,7 +425,10 @@ export default function InsideMaintenancePage() {
 
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
-    setSelectedProvider(provider)
+    setSelectedProvider({
+      ...provider,
+      reviews: businessReviews[provider.id] || [],
+    })
     setIsReviewsDialogOpen(true)
   }
 
@@ -481,102 +535,130 @@ export default function InsideMaintenancePage() {
             {selectedFilters.length === 0 && <Button>Register Your Business</Button>}
           </div>
         ) : (
-          filteredBusinesses.map((business) => (
-            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  {/* Business Info Section */}
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-semibold">{business.displayName}</h3>
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                      {getMainZipCode(business) && <span>📍 {getMainZipCode(business)}</span>}
-                      {business.displayPhone && <span>📞 {business.displayPhone}</span>}
-                    </div>
-                    {business.subcategories && getAllTerminalSubcategories(business.subcategories).length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          Services ({getAllTerminalSubcategories(business.subcategories).length}):
-                        </p>
-                        <div className="max-h-32 overflow-y-auto">
-                          <div className="flex flex-wrap gap-2">
-                            {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
-                              <span
-                                key={idx}
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
-                                ${
-                                  isServiceMatching(service)
-                                    ? "bg-green-100 text-green-800 ring-1 ring-green-400"
-                                    : "bg-primary/10 text-primary"
-                                }`}
-                              >
-                                {service}
-                              </span>
-                            ))}
-                          </div>
-                          {getAllTerminalSubcategories(business.subcategories).length > 8 && (
-                            <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+          filteredBusinesses.map((business) => {
+            const rating = businessRatings[business.id]
+            return (
+              <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {/* Business Info Section */}
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-semibold">{business.displayName}</h3>
 
-                  {/* Photo Carousel and Buttons Section */}
-                  <div className="flex flex-col lg:flex-row gap-4">
-                    <div className="flex-1">
-                      <PhotoCarousel
-                        businessId={business.id}
-                        photos={businessPhotos[business.id] || []}
-                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
-                        showMultiple={true}
-                        photosPerView={5}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
-                      <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
-                        Ratings
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 lg:flex-none bg-transparent"
-                        onClick={() => handleViewProfile(business)}
-                      >
-                        View Profile
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className={`flex-1 lg:flex-none ${
-                          favoriteBusinesses.has(business.id)
-                            ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
-                            : "text-red-600 border-red-600 hover:bg-red-50 bg-transparent"
-                        }`}
-                        onClick={() => handleAddToFavorites(business)}
-                        disabled={savingStates[business.id]}
-                      >
-                        {savingStates[business.id] ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : favoriteBusinesses.has(business.id) ? (
-                          <>
-                            <HeartHandshake className="w-4 h-4 mr-2" />
-                            Saved
-                          </>
-                        ) : (
-                          <>
-                            <Heart className="w-4 h-4 mr-2" />
-                            Save Card
-                          </>
+                      {/* Contact Info Row */}
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                        {getMainZipCode(business) && (
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-1 text-primary" />
+                            <span>{getMainZipCode(business)}</span>
+                          </div>
                         )}
-                      </Button>
+                        {business.displayPhone && (
+                          <div className="flex items-center">
+                            <Phone className="h-4 w-4 mr-1 text-primary" />
+                            <a href={`tel:${business.displayPhone}`} className="hover:text-primary transition-colors">
+                              {business.displayPhone}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Rating Display */}
+                      {rating && rating.count > 0 && (
+                        <div className="flex items-center gap-2">
+                          <StarRating rating={rating.rating} />
+                          <span className="text-sm text-gray-600">
+                            {rating.rating.toFixed(1)} ({rating.count} review{rating.count !== 1 ? "s" : ""})
+                          </span>
+                        </div>
+                      )}
+
+                      {business.subcategories && getAllTerminalSubcategories(business.subcategories).length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-1">
+                            Services ({getAllTerminalSubcategories(business.subcategories).length}):
+                          </p>
+                          <div className="max-h-32 overflow-y-auto">
+                            <div className="flex flex-wrap gap-2">
+                              {getAllTerminalSubcategories(business.subcategories).map((service, idx) => (
+                                <span
+                                  key={idx}
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap
+                                  ${
+                                    isServiceMatching(service)
+                                      ? "bg-green-100 text-green-800 ring-1 ring-green-400"
+                                      : "bg-primary/10 text-primary"
+                                  }`}
+                                >
+                                  {service}
+                                </span>
+                              ))}
+                            </div>
+                            {getAllTerminalSubcategories(business.subcategories).length > 8 && (
+                              <p className="text-xs text-gray-500 mt-1">Scroll to see more services</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Photo Carousel and Buttons Section */}
+                    <div className="flex flex-col lg:flex-row gap-4">
+                      <div className="flex-1">
+                        <PhotoCarousel
+                          businessId={business.id}
+                          photos={businessPhotos[business.id] || []}
+                          onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                          showMultiple={true}
+                          photosPerView={5}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                        <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(business)}>
+                          Ratings
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 lg:flex-none bg-transparent"
+                          onClick={() => handleViewProfile(business)}
+                        >
+                          View Profile
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className={`flex-1 lg:flex-none ${
+                            favoriteBusinesses.has(business.id)
+                              ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
+                              : "text-red-600 border-red-600 hover:bg-red-50 bg-transparent"
+                          }`}
+                          onClick={() => handleAddToFavorites(business)}
+                          disabled={savingStates[business.id]}
+                        >
+                          {savingStates[business.id] ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : favoriteBusinesses.has(business.id) ? (
+                            <>
+                              <HeartHandshake className="w-4 h-4 mr-2" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="w-4 h-4 mr-2" />
+                              Save Card
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            )
+          })
         )}
       </div>
 
@@ -585,6 +667,7 @@ export default function InsideMaintenancePage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.displayName}
+        businessId={selectedProvider?.id}
         reviews={selectedProvider?.reviews || []}
       />
 

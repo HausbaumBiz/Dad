@@ -16,6 +16,8 @@ import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -78,6 +80,7 @@ export default function ArtsEntertainmentPage() {
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
@@ -94,6 +97,10 @@ export default function ArtsEntertainmentPage() {
   // Photo state
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
+  // Rating state
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
+
   // Function to load photos for a specific business
   const loadPhotosForBusiness = async (businessId: string) => {
     if (businessPhotos[businessId]) return // Already loaded
@@ -109,6 +116,63 @@ export default function ArtsEntertainmentPage() {
       setBusinessPhotos((prev) => ({
         ...prev,
         [businessId]: [],
+      }))
+    }
+  }
+
+  // Function to load reviews for a specific business
+  const loadReviewsForBusiness = async (businessId: string) => {
+    if (businessReviews[businessId]) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+
+      // Ensure reviews is an array before processing
+      if (!Array.isArray(reviews)) {
+        console.warn(`Reviews for business ${businessId} is not an array:`, reviews)
+        setBusinessReviews((prev) => ({
+          ...prev,
+          [businessId]: [],
+        }))
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: 0,
+        }))
+        return
+      }
+
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews && reviews.length > 0) {
+        const totalRating = reviews.reduce((sum: number, review: any) => {
+          // Use overallRating if available, otherwise fall back to rating
+          const rating = review.overallRating || review.rating || 0
+          return sum + rating
+        }, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: averageRating,
+        }))
+      } else {
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: 0,
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+      setBusinessRatings((prev) => ({
+        ...prev,
+        [businessId]: 0,
       }))
     }
   }
@@ -151,6 +215,26 @@ export default function ArtsEntertainmentPage() {
       loadFavorites()
     }
   }, [currentUser, businesses])
+
+  // Load reviews for all businesses when they change
+  useEffect(() => {
+    async function loadAllReviews() {
+      const businessesToLoad =
+        appliedFilters.length > 0
+          ? allBusinesses.filter((business) => {
+              return appliedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
+            })
+          : businesses
+
+      for (const business of businessesToLoad) {
+        await loadReviewsForBusiness(business.id)
+      }
+    }
+
+    if (businesses.length > 0) {
+      loadAllReviews()
+    }
+  }, [businesses, appliedFilters, allBusinesses])
 
   // Get user's zip code from localStorage
   useEffect(() => {
@@ -259,6 +343,7 @@ export default function ArtsEntertainmentPage() {
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
+    setSelectedBusinessId(provider.id)
     setIsReviewsDialogOpen(true)
   }
 
@@ -542,6 +627,20 @@ export default function ArtsEntertainmentPage() {
                   <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
 
+                    {/* Star Rating */}
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={businessRatings[business.id] || 0} size="sm" />
+                      <span className="text-sm text-gray-600">
+                        {businessRatings[business.id] ? businessRatings[business.id].toFixed(1) : "0.0"}
+                      </span>
+                      {businessReviews[business.id] && businessReviews[business.id].length > 0 && (
+                        <span className="text-sm text-gray-500">
+                          ({businessReviews[business.id].length} review
+                          {businessReviews[business.id].length !== 1 ? "s" : ""})
+                        </span>
+                      )}
+                    </div>
+
                     {/* Contact Info Row */}
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                       {/* Location */}
@@ -686,13 +785,13 @@ export default function ArtsEntertainmentPage() {
       </Dialog>
 
       {/* Reviews Dialog */}
-      {selectedProvider && (
+      {selectedProvider && selectedBusinessId && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.displayName || selectedProvider.businessName || selectedProvider.name}
-          businessId={selectedProvider.id}
-          reviews={[]}
+          businessId={selectedBusinessId}
+          reviews={businessReviews[selectedBusinessId] || []}
         />
       )}
 

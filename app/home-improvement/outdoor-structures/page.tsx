@@ -13,9 +13,11 @@ import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
-import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { Heart, HeartHandshake, Loader2, MapPin, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 export default function OutdoorStructuresPage() {
   // Define the getAllTerminalSubcategories function first to avoid initialization errors
@@ -95,6 +97,9 @@ export default function OutdoorStructuresPage() {
   // State for business photos
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
+
   // User and favorites state
   const [currentUser, setCurrentUser] = useState(null)
   const [favoriteBusinesses, setFavoriteBusinesses] = useState(new Set())
@@ -115,6 +120,44 @@ export default function OutdoorStructuresPage() {
     } catch (error) {
       console.error(`Failed to load photos for business ${businessId}:`, error)
       setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
+
+  // Function to load reviews and calculate rating for a specific business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessRatings[businessId] !== undefined) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: Math.round(averageRating * 10) / 10, // Round to 1 decimal place
+        }))
+      } else {
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: 0,
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessRatings((prev) => ({
+        ...prev,
+        [businessId]: 0,
+      }))
+      setBusinessReviews((prev) => ({
         ...prev,
         [businessId]: [],
       }))
@@ -282,6 +325,15 @@ export default function OutdoorStructuresPage() {
       loadFavorites()
     }
   }, [currentUser, businesses])
+
+  // Load ratings for all businesses
+  useEffect(() => {
+    if (filteredBusinesses.length > 0) {
+      filteredBusinesses.forEach((business) => {
+        loadBusinessReviews(business.id)
+      })
+    }
+  }, [filteredBusinesses])
 
   // Handler for opening reviews dialog
   const handleOpenReviews = (business) => {
@@ -455,28 +507,38 @@ export default function OutdoorStructuresPage() {
                   <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{business.displayName}</h3>
 
-                    {/* Combined location, phone, and service area in one row */}
+                    {/* Contact Info Row */}
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                      <span>{business.displayLocation}</span>
+                      {/* Location */}
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 mr-1 text-primary" />
+                        <span>{business.displayLocation}</span>
+                      </div>
+
+                      {/* Phone */}
                       {business.displayPhone && (
                         <div className="flex items-center">
-                          <svg
-                            className="w-4 h-4 text-gray-500 mr-1"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                            />
-                          </svg>
+                          <Phone className="h-4 w-4 mr-1 text-primary" />
                           <span>{business.displayPhone}</span>
                         </div>
                       )}
                     </div>
+
+                    {/* Rating Display */}
+                    {businessRatings[business.id] !== undefined && (
+                      <div className="flex items-center gap-2">
+                        <StarRating rating={businessRatings[business.id]} size="sm" />
+                        <span className="text-sm text-gray-600">
+                          {businessRatings[business.id] > 0 ? (
+                            <>
+                              {businessRatings[business.id]} ({businessReviews[business.id]?.length || 0} reviews)
+                            </>
+                          ) : (
+                            "No reviews yet"
+                          )}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Services - show only 4 with +X more indicator */}
                     <div className="mt-2">
@@ -588,7 +650,8 @@ export default function OutdoorStructuresPage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedBusinessName}
-        reviews={[]}
+        businessId={selectedBusinessId}
+        reviews={selectedBusinessId ? businessReviews[selectedBusinessId] || [] : []}
       />
 
       {/* Business Profile Dialog */}

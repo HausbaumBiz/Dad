@@ -18,6 +18,8 @@ import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/fa
 import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake } from "lucide-react"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -132,6 +134,7 @@ export default function BeautyWellnessPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
@@ -150,6 +153,10 @@ export default function BeautyWellnessPage() {
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
+  // Rating state
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
 
   // Function to load business photos from Cloudflare using public URLs
   const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
@@ -242,6 +249,67 @@ export default function BeautyWellnessPage() {
       [businessId]: photos,
     }))
   }
+
+  // Function to load reviews for a specific business
+  const loadReviewsForBusiness = async (businessId: string) => {
+    if (businessReviews[businessId]) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews && reviews.length > 0) {
+        const totalRating = reviews.reduce(
+          (sum: number, review: any) => sum + (review.overallRating || review.rating || 0),
+          0,
+        )
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: averageRating,
+        }))
+      } else {
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: 0,
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+      setBusinessRatings((prev) => ({
+        ...prev,
+        [businessId]: 0,
+      }))
+    }
+  }
+
+  // Load reviews for all businesses when they change
+  useEffect(() => {
+    async function loadAllReviews() {
+      const businessesToLoad =
+        appliedFilters.length > 0
+          ? allBusinesses.filter((business) => {
+              return appliedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
+            })
+          : businesses
+
+      for (const business of businessesToLoad) {
+        await loadReviewsForBusiness(business.id)
+      }
+    }
+
+    if (businesses.length > 0) {
+      loadAllReviews()
+    }
+  }, [businesses, appliedFilters, allBusinesses])
 
   // Helper function to check if business serves a zip code
   const businessServesZipCode = (business: Business, zipCode: string): boolean => {
@@ -506,6 +574,7 @@ export default function BeautyWellnessPage() {
 
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider(provider)
+    setSelectedBusinessId(provider.id)
     setIsReviewsDialogOpen(true)
   }
 
@@ -645,6 +714,21 @@ export default function BeautyWellnessPage() {
                     <h3 className="text-xl font-semibold">
                       {business.displayName || business.businessName || "Beauty & Wellness Provider"}
                     </h3>
+
+                    {/* Star Rating */}
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={businessRatings[business.id] || 0} size="sm" />
+                      <span className="text-sm text-gray-600">
+                        {businessRatings[business.id] ? businessRatings[business.id].toFixed(1) : "0.0"}
+                      </span>
+                      {businessReviews[business.id] && businessReviews[business.id].length > 0 && (
+                        <span className="text-sm text-gray-500">
+                          ({businessReviews[business.id].length} review
+                          {businessReviews[business.id].length !== 1 ? "s" : ""})
+                        </span>
+                      )}
+                    </div>
+
                     {business.businessDescription && (
                       <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
                     )}
@@ -805,13 +889,13 @@ export default function BeautyWellnessPage() {
         </div>
       )}
 
-      {selectedProvider && (
+      {selectedProvider && selectedBusinessId && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.displayName || selectedProvider.businessName || selectedProvider.name}
-          businessId={selectedProvider.id}
-          reviews={[]}
+          businessId={selectedBusinessId}
+          reviews={businessReviews[selectedBusinessId] || []}
         />
       )}
 

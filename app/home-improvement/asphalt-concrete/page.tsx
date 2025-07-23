@@ -18,6 +18,8 @@ import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 export default function AsphaltConcretePage() {
   const filterOptions = [
@@ -52,6 +54,9 @@ export default function AsphaltConcretePage() {
   const [savingStates, setSavingStates] = useState({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
+
   // Toast hook
   const { toast } = useToast()
 
@@ -68,6 +73,44 @@ export default function AsphaltConcretePage() {
     } catch (error) {
       console.error(`Error loading photos for business ${businessId}:`, error)
       setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
+
+  // Function to load reviews and calculate rating for a specific business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessRatings[businessId] !== undefined) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: Math.round(averageRating * 10) / 10, // Round to 1 decimal place
+        }))
+      } else {
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: 0,
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessRatings((prev) => ({
+        ...prev,
+        [businessId]: 0,
+      }))
+      setBusinessReviews((prev) => ({
         ...prev,
         [businessId]: [],
       }))
@@ -319,6 +362,15 @@ export default function AsphaltConcretePage() {
     }
   }, [currentUser, filteredBusinesses])
 
+  // Load ratings for all businesses
+  useEffect(() => {
+    if (filteredBusinesses.length > 0) {
+      filteredBusinesses.forEach((business) => {
+        loadBusinessReviews(business.id)
+      })
+    }
+  }, [filteredBusinesses])
+
   // Handler for opening reviews dialog
   const handleOpenReviews = (business) => {
     setSelectedBusinessId(business.id)
@@ -500,6 +552,22 @@ export default function AsphaltConcretePage() {
                       )}
                     </div>
 
+                    {/* Rating Display */}
+                    {businessRatings[business.id] !== undefined && (
+                      <div className="flex items-center gap-2">
+                        <StarRating rating={businessRatings[business.id]} size="sm" />
+                        <span className="text-sm text-gray-600">
+                          {businessRatings[business.id] > 0 ? (
+                            <>
+                              {businessRatings[business.id]} ({businessReviews[business.id]?.length || 0} reviews)
+                            </>
+                          ) : (
+                            "No reviews yet"
+                          )}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Services Tags - All services displayed in scrollable container */}
                     <div className="max-h-32 overflow-y-auto">
                       <div className="flex flex-wrap gap-2">
@@ -601,7 +669,8 @@ export default function AsphaltConcretePage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedBusinessName}
-        reviews={[]}
+        businessId={selectedBusinessId}
+        reviews={selectedBusinessId ? businessReviews[selectedBusinessId] || [] : []}
       />
 
       {/* Business Profile Dialog */}

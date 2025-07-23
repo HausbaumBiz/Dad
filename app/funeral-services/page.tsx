@@ -5,18 +5,21 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Phone, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
+import { Phone, Tag } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { Heart, HeartHandshake, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { getUserSession } from "@/app/actions/user-actions"
 import { checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { addFavoriteBusiness } from "@/app/actions/favorite-actions"
+import { getBusinessReviews } from "@/app/actions/review-actions"
+import { StarRating } from "@/components/star-rating"
+import { PhotoCarousel } from "@/components/photo-carousel"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 // Helper function to extract string from subcategory (handles both string and object formats)
 const getSubcategoryString = (subcategory: any): string => {
@@ -58,277 +61,23 @@ interface Business {
   allSubcategories?: any[]
   subcategory?: string
   email?: string
+  averageRating?: number
+  reviewsCount?: number
 }
 
-// Photo Carousel Component - displays 5 photos in 220px × 220px format
-interface PhotoCarouselProps {
-  photos: string[]
-  businessName: string
-}
+function formatPhoneNumber(phone: string): string {
+  if (!phone) return "No phone provided"
 
-function PhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
+  // Remove all non-numeric characters
+  const cleaned = phone.replace(/\D/g, "")
 
-  if (!photos || photos.length === 0) {
-    return null // Don't show anything if no photos
+  // Check if we have a valid 10-digit US phone number
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
   }
 
-  const photosPerView = 5
-  const maxIndex = Math.max(0, photos.length - photosPerView)
-
-  const nextPhotos = () => {
-    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
-  }
-
-  const prevPhotos = () => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0))
-  }
-
-  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
-
-  return (
-    <div className="hidden lg:block w-full">
-      <div className="relative group w-full">
-        <div className="flex gap-2 justify-center w-full">
-          {visiblePhotos.map((photo, index) => (
-            <div
-              key={currentIndex + index}
-              className="w-[220px] h-[220px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
-            >
-              <Image
-                src={photo || "/placeholder.svg"}
-                alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={220}
-                height={220}
-                className="w-full h-full object-cover"
-                sizes="220px"
-              />
-            </div>
-          ))}
-
-          {/* Fill empty slots if less than 5 photos visible */}
-          {visiblePhotos.length < photosPerView && (
-            <>
-              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  className="w-[220px] h-[220px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
-                ></div>
-              ))}
-            </>
-          )}
-        </div>
-
-        {/* Navigation arrows - only show if there are more than 5 photos */}
-        {photos.length > photosPerView && (
-          <>
-            <button
-              onClick={prevPhotos}
-              disabled={currentIndex === 0}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={nextPhotos}
-              disabled={currentIndex >= maxIndex}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </>
-        )}
-
-        {/* Photo counter */}
-        {photos.length > photosPerView && (
-          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination dots - only show if there are more than 5 photos */}
-      {photos.length > photosPerView && (
-        <div className="flex justify-center mt-2 space-x-1">
-          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
-            const pageStartIndex = index * photosPerView
-            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
-            return (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(pageStartIndex)}
-                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
-              />
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Mobile Photo Carousel Component - displays 2 photos side by side
-interface MobilePhotoCarouselProps {
-  photos: string[]
-  businessName: string
-}
-
-function MobilePhotoCarousel({ photos, businessName }: MobilePhotoCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-
-  if (!photos || photos.length === 0) {
-    return null
-  }
-
-  const mobileNext = () => {
-    if (currentIndex < photos.length - 2) {
-      setCurrentIndex((prev) => prev + 1)
-    } else {
-      setCurrentIndex(0) // Loop back to start
-    }
-  }
-
-  const mobilePrev = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1)
-    } else {
-      setCurrentIndex(Math.max(0, photos.length - 2)) // Go to last possible position
-    }
-  }
-
-  const visiblePhotos = photos.slice(currentIndex, currentIndex + 2)
-
-  // Fill with placeholder if we have less than 2 photos
-  while (visiblePhotos.length < 2 && photos.length > 0) {
-    visiblePhotos.push(photos[0]) // Repeat first photo as placeholder
-  }
-
-  return (
-    <div className="relative">
-      <div className="flex gap-2 px-8">
-        {visiblePhotos.map((photo, index) => (
-          <div key={`${currentIndex}-${index}`} className="flex-1 aspect-square">
-            <Image
-              src={photo || "/placeholder.svg"}
-              alt={`${businessName} photo ${currentIndex + index + 1}`}
-              className="w-full h-full object-cover rounded-lg"
-              width={200}
-              height={200}
-            />
-          </div>
-        ))}
-      </div>
-
-      {/* Mobile Navigation Arrows - positioned outside photo area */}
-      {photos.length > 2 && (
-        <>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg"
-            onClick={mobilePrev}
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black/80 text-white hover:bg-black/90 p-2 h-10 w-10 z-10 rounded-full shadow-lg"
-            onClick={mobileNext}
-          >
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-        </>
-      )}
-
-      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1 rounded-full">
-        {Math.min(currentIndex + 2, photos.length)} of {photos.length}
-      </div>
-    </div>
-  )
-}
-
-// Function to load business photos from Cloudflare using public URLs
-const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
-  try {
-    console.log(`Loading photos for business ${businessId}`)
-
-    // Fetch business media data from the updated API
-    const response = await fetch(`/api/businesses/${businessId}`)
-    if (!response.ok) {
-      console.error(`Failed to fetch business data: ${response.status} ${response.statusText}`)
-      return []
-    }
-
-    const businessData = await response.json()
-    console.log(`Business data for ${businessId}:`, businessData)
-
-    // Try multiple possible locations for photo data
-    let photoAlbum = null
-
-    // Check direct photoAlbum property
-    if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
-      photoAlbum = businessData.photoAlbum
-    }
-    // Check nested media.photoAlbum
-    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
-      photoAlbum = businessData.media.photoAlbum
-    }
-    // Check adDesign.photoAlbum
-    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
-      photoAlbum = businessData.adDesign.photoAlbum
-    }
-
-    if (!photoAlbum || !Array.isArray(photoAlbum)) {
-      console.log(`No photo album found for business ${businessId}`)
-      return []
-    }
-
-    console.log(`Found ${photoAlbum.length} photos in album for business ${businessId}`)
-
-    // Convert Cloudflare image IDs to public URLs
-    const photoUrls = photoAlbum
-      .map((photo: any, index: number) => {
-        // Handle different photo data structures
-        let imageId = null
-
-        if (typeof photo === "string") {
-          // If photo is just a string (image ID)
-          imageId = photo
-        } else if (photo && typeof photo === "object") {
-          // If photo is an object, try to extract the image ID
-          imageId = photo.imageId || photo.id || photo.cloudflareId || photo.url
-
-          // If it's already a full URL, return it as-is
-          if (typeof imageId === "string" && (imageId.startsWith("http") || imageId.startsWith("https"))) {
-            console.log(`Photo ${index} already has full URL: ${imageId}`)
-            return imageId
-          }
-        }
-
-        if (!imageId) {
-          console.warn(`No image ID found for photo ${index}:`, photo)
-          return null
-        }
-
-        // Generate public Cloudflare URL
-        try {
-          const publicUrl = getCloudflareImageUrl(imageId, "public")
-          console.log(`Generated URL for image ${imageId}: ${publicUrl}`)
-          return publicUrl
-        } catch (error) {
-          console.error(`Error generating URL for image ${imageId}:`, error)
-          return null
-        }
-      })
-      .filter(Boolean) // Remove null/undefined URLs
-
-    console.log(`Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
-    return photoUrls
-  } catch (error) {
-    console.error(`Error loading photos for business ${businessId}:`, error)
-    return []
-  }
+  // Return original if not a standard format
+  return phone
 }
 
 // Helper function to check if business serves a zip code
@@ -358,6 +107,18 @@ const businessServesZipCode = (business: Business, zipCode: string): boolean => 
   return matches
 }
 
+// Helper function to get all subcategories for a business
+const getBusinessSubcategories = (business: Business): string[] => {
+  const subcategories = business.subcategories || []
+  const allSubcategories = business.allSubcategories || []
+
+  // Combine and deduplicate subcategories
+  const allCategories = [...new Set([...subcategories, ...allSubcategories])]
+
+  // Filter out empty strings and undefined values
+  return allCategories.filter(Boolean).map(getSubcategoryString)
+}
+
 export default function FuneralServicesPage() {
   const fetchIdRef = useRef(0)
   const { toast } = useToast()
@@ -377,7 +138,7 @@ export default function FuneralServicesPage() {
   // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
-    id: number
+    id: string
     name: string
     rating: number
     reviews: number
@@ -406,6 +167,29 @@ export default function FuneralServicesPage() {
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
   const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const [businessRatings, setBusinessRatings] = useState<{ [key: string]: { rating: number; count: number } }>({})
+  const [loadingRatings, setLoadingRatings] = useState<{ [key: string]: boolean }>({})
+
+  // Add photo state management
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (!businessPhotos[businessId]) {
+      try {
+        const photos = await loadBusinessPhotos(businessId)
+        setBusinessPhotos((prev) => ({
+          ...prev,
+          [businessId]: photos,
+        }))
+      } catch (error) {
+        console.error(`Failed to load photos for business ${businessId}:`, error)
+        setBusinessPhotos((prev) => ({
+          ...prev,
+          [businessId]: [],
+        }))
+      }
+    }
+  }
 
   useEffect(() => {
     const savedZipCode = localStorage.getItem("savedZipCode")
@@ -450,6 +234,60 @@ export default function FuneralServicesPage() {
       loadFavorites()
     }
   }, [currentUser, allBusinesses])
+
+  // Load ratings for all businesses
+  useEffect(() => {
+    async function loadBusinessRatings() {
+      const newRatings: { [key: string]: { rating: number; count: number } } = {}
+      const newLoadingStates: { [key: string]: boolean } = {}
+
+      for (const business of filteredBusinesses) {
+        newLoadingStates[business.id] = true
+      }
+
+      setLoadingRatings(newLoadingStates)
+
+      for (const business of filteredBusinesses) {
+        try {
+          const reviews = await getBusinessReviews(business.id)
+
+          if (reviews && reviews.length > 0) {
+            const totalRating = reviews.reduce((sum, review) => {
+              // Use overallRating if available, otherwise use rating
+              const reviewRating = review.overallRating || (review as any).rating || 0
+              return sum + reviewRating
+            }, 0)
+
+            const averageRating = totalRating / reviews.length
+            newRatings[business.id] = {
+              rating: averageRating,
+              count: reviews.length,
+            }
+
+            // Update the business object with the rating data
+            business.averageRating = averageRating
+            business.reviewsCount = reviews.length
+          } else {
+            newRatings[business.id] = { rating: 0, count: 0 }
+            business.averageRating = 0
+            business.reviewsCount = 0
+          }
+        } catch (error) {
+          console.error(`Error loading ratings for business ${business.id}:`, error)
+          newRatings[business.id] = { rating: 0, count: 0 }
+        } finally {
+          newLoadingStates[business.id] = false
+        }
+      }
+
+      setBusinessRatings(newRatings)
+      setLoadingRatings(newLoadingStates)
+    }
+
+    if (filteredBusinesses.length > 0) {
+      loadBusinessRatings()
+    }
+  }, [filteredBusinesses])
 
   // Helper function for exact subcategory matching
   const hasExactSubcategoryMatch = (business: Business, filters: string[]): boolean => {
@@ -578,14 +416,6 @@ export default function FuneralServicesPage() {
 
         const fetchedBusinesses = await getBusinessesForCategoryPage("/funeral-services")
 
-        // Load photos for each business using public Cloudflare URLs
-        const businessesWithPhotos = await Promise.all(
-          fetchedBusinesses.map(async (business: Business) => {
-            const photos = await loadBusinessPhotos(business.id)
-            return { ...business, photos }
-          }),
-        )
-
         // Check if this is still the current request
         if (currentFetchId !== fetchIdRef.current) {
           console.log(`[Funeral Services] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
@@ -595,10 +425,10 @@ export default function FuneralServicesPage() {
         console.log(`[Funeral Services] Fetch ${currentFetchId} completed, got ${fetchedBusinesses.length} businesses`)
 
         // Filter by zip code if available
-        let filteredBusinesses = businessesWithPhotos
+        let filteredBusinesses = fetchedBusinesses
         if (userZipCode) {
           console.log(`[Funeral Services] Filtering by zip code: ${userZipCode}`)
-          filteredBusinesses = businessesWithPhotos.filter((business: Business) => {
+          filteredBusinesses = fetchedBusinesses.filter((business: Business) => {
             const serves = businessServesZipCode(business, userZipCode)
             console.log(
               `[Funeral Services] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
@@ -634,10 +464,10 @@ export default function FuneralServicesPage() {
 
   const handleOpenReviews = (business: Business) => {
     setSelectedProvider({
-      id: Number.parseInt(business.id || "0"),
+      id: business.id,
       name: business.displayName || business.businessName || "Funeral Service Provider",
-      rating: business.rating || 0,
-      reviews: business.reviewCount || business.reviews || 0,
+      rating: business.averageRating || business.rating || 0,
+      reviews: business.reviewsCount || business.reviewCount || business.reviews || 0,
     })
     setIsReviewsDialogOpen(true)
   }
@@ -793,142 +623,140 @@ export default function FuneralServicesPage() {
           <div className="grid gap-6">
             {filteredBusinesses.map((business: Business) => (
               <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                <div className="flex flex-col space-y-4">
-                  {/* Business Name and Description */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <div className="space-y-3">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold">
                       {business.displayName || business.businessName || "Funeral Service Provider"}
                     </h3>
+
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      <span>
+                        {business.displayLocation ||
+                          `${business.adDesignData?.businessInfo?.city || ""}, ${business.adDesignData?.businessInfo?.state || ""}`
+                            .trim()
+                            .replace(/^,|,$/, "") ||
+                          "Location not specified"}
+                      </span>
+
+                      {(business.adDesignData?.businessInfo?.phone || business.displayPhone) && (
+                        <div className="flex items-center">
+                          <Phone className="w-4 h-4 mr-1" />
+                          <span>
+                            {formatPhoneNumber(business.adDesignData?.businessInfo?.phone || business.displayPhone)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Rating Display */}
+                      <div className="flex items-center gap-2">
+                        {loadingRatings[business.id] ? (
+                          <div className="flex items-center">
+                            <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin mr-2"></div>
+                            <span className="text-sm text-gray-500">Loading ratings...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <StarRating
+                              rating={business.averageRating || business.rating || 0}
+                              size="sm"
+                              showNumber={true}
+                              onLoadReviews={() => {}}
+                            />
+                            {businessRatings[business.id] && businessRatings[business.id].count > 0 && (
+                              <span className="text-sm text-gray-600">
+                                ({businessRatings[business.id].count} review
+                                {businessRatings[business.id].count !== 1 ? "s" : ""})
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Display Business Subcategories */}
+                    {getBusinessSubcategories(business).length > 0 && (
+                      <div>
+                        <div className="flex items-center mb-1">
+                          <Tag className="w-4 h-4 text-gray-500 mr-1" />
+                          <span className="text-xs font-medium text-gray-600">Services Offered:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {getBusinessSubcategories(business).map((subcategory, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                            >
+                              {subcategory}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {business.businessDescription && (
-                      <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
+                      <p className="text-sm text-gray-700 line-clamp-2">{business.businessDescription}</p>
                     )}
                   </div>
 
-                  {/* Main content area with contact info and buttons */}
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                    {/* Left side - Contact and Location Info - Made smaller */}
-                    <div className="lg:w-64 space-y-2 flex-shrink-0">
-                      {/* Phone */}
-                      {business.displayPhone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <a
-                            href={`tel:${business.displayPhone}`}
-                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                          >
-                            {business.displayPhone}
-                          </a>
-                        </div>
-                      )}
-
-                      {/* Location */}
-                      {business.displayLocation && (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="text-gray-700 text-sm">{business.displayLocation}</span>
-                        </div>
-                      )}
-
-                      {/* Service Area Indicator */}
-                      {userZipCode && (
-                        <div className="text-xs text-green-600 mt-1">
-                          {business.isNationwide ? (
-                            <span>✓ Serves nationwide</span>
-                          ) : business.serviceArea?.includes(userZipCode) ? (
-                            <span>✓ Serves {userZipCode} and surrounding areas</span>
-                          ) : business.zipCode === userZipCode ? (
-                            <span>✓ Located in {userZipCode}</span>
-                          ) : null}
-                        </div>
-                      )}
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="flex flex-col lg:flex-row gap-4 items-center lg:items-start">
+                    {/* Photo Carousel */}
+                    <div className="flex-1 flex justify-center lg:justify-start">
+                      <div className="w-full max-w-md lg:max-w-none">
+                        <PhotoCarousel
+                          businessId={business.id}
+                          photos={businessPhotos[business.id] || []}
+                          onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                          showMultiple={true}
+                          photosPerView={5}
+                          className="w-full"
+                        />
+                      </div>
                     </div>
 
-                    {/* Right side - Action Buttons */}
-                    <div className="flex flex-col gap-2 lg:items-end lg:ml-auto lg:w-24 flex-shrink-0">
+                    {/* Action Buttons */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32 justify-center lg:justify-start w-full lg:w-auto">
+                      {/* Save Card Button */}
                       <Button
                         variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
-                        size="sm"
+                        className={`flex-1 lg:flex-none lg:w-full ${
+                          favoriteBusinesses.has(business.id)
+                            ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "border-red-600 text-red-600 hover:bg-red-50 bg-transparent"
+                        }`}
                         onClick={() => handleAddToFavorites(business)}
                         disabled={savingStates[business.id]}
-                        className={
-                          favoriteBusinesses.has(business.id)
-                            ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 text-white"
-                            : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
-                        }
                       >
                         {savingStates[business.id] ? (
                           <>
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                             Saving...
                           </>
                         ) : favoriteBusinesses.has(business.id) ? (
                           <>
-                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            <HeartHandshake className="w-4 h-4 mr-2" />
                             Saved
                           </>
                         ) : (
                           <>
-                            <Heart className="h-4 w-4 mr-1" />
+                            <Heart className="w-4 h-4 mr-2" />
                             Save Card
                           </>
                         )}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenReviews(business)}
-                        className="text-sm min-w-[100px]"
-                      >
+
+                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
                         Ratings
                       </Button>
                       <Button
-                        variant="default"
-                        size="sm"
+                        variant="outline"
+                        className="flex-1 lg:flex-none lg:w-full bg-transparent"
                         onClick={() => handleViewProfile(business)}
-                        className="text-sm min-w-[100px]"
                       >
                         View Profile
                       </Button>
                     </div>
-                  </div>
-
-                  {/* Subcategories/Specialties */}
-                  {business.subcategories && business.subcategories.length > 0 && (
-                    <div className="w-full">
-                      <div className="lg:w-64">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
-                      </div>
-                      <div className="flex flex-wrap gap-2 w-full">
-                        {business.subcategories.map((subcategory: any, index: number) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                          >
-                            {getSubcategoryString(subcategory)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Photo Carousel - Desktop version (unchanged) */}
-                  <div className="hidden lg:block w-full">
-                    <PhotoCarousel
-                      photos={business.photos || []}
-                      businessName={business.displayName || business.businessName || "Funeral Service Provider"}
-                    />
-                  </div>
-
-                  {/* Photo Carousel - Mobile version (new) */}
-                  <div className="lg:hidden w-full">
-                    {business.photos && business.photos.length > 0 && (
-                      <div className="mb-4">
-                        <MobilePhotoCarousel
-                          photos={business.photos}
-                          businessName={business.displayName || business.businessName || "Funeral Service Provider"}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -938,13 +766,14 @@ export default function FuneralServicesPage() {
       )}
 
       {/* Reviews Dialog */}
-      <ReviewsDialog
-        isOpen={isReviewsDialogOpen}
-        onClose={() => setIsReviewsDialogOpen(false)}
-        providerName={selectedProvider?.name || ""}
-        businessId={selectedProvider?.id.toString() || ""}
-        reviews={[]}
-      />
+      {selectedProvider && (
+        <ReviewsDialog
+          isOpen={isReviewsDialogOpen}
+          onClose={() => setIsReviewsDialogOpen(false)}
+          providerName={selectedProvider.name}
+          businessId={selectedProvider.id}
+        />
+      )}
 
       {/* Business Profile Dialog */}
       <BusinessProfileDialog

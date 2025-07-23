@@ -14,7 +14,9 @@ import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
-import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
+import { Heart, HeartHandshake, Loader2, MapPin, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export default function PestControlPage() {
@@ -41,6 +43,10 @@ export default function PestControlPage() {
 
   // Photo state
   const [businessPhotos, setBusinessPhotos] = useState<{ [key: string]: string[] }>({})
+
+  // State for ratings and reviews
+  const [businessRatings, setBusinessRatings] = useState<{ [key: string]: number }>({})
+  const [businessReviews, setBusinessReviews] = useState<{ [key: string]: any[] }>({})
 
   // Favorites functionality state
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -84,6 +90,54 @@ export default function PestControlPage() {
       loadFavorites()
     }
   }, [currentUser, providers])
+
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) return // Already loaded
+
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
+
+  // Function to load reviews and calculate rating for a business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessReviews[businessId]) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: averageRating,
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
 
   // Handle adding business to favorites
   const handleAddToFavorites = async (provider: any) => {
@@ -158,27 +212,6 @@ export default function PestControlPage() {
 
   const clearFilters = () => {
     setSelectedFilters([])
-  }
-
-  // Function to load photos for a specific business
-  const loadPhotosForBusiness = async (businessId: string) => {
-    if (businessPhotos[businessId]) {
-      return // Already loaded
-    }
-
-    try {
-      const photos = await loadBusinessPhotos(businessId)
-      setBusinessPhotos((prev) => ({
-        ...prev,
-        [businessId]: photos,
-      }))
-    } catch (error) {
-      console.error(`Error loading photos for business ${businessId}:`, error)
-      setBusinessPhotos((prev) => ({
-        ...prev,
-        [businessId]: [],
-      }))
-    }
   }
 
   // Updated function to display ALL terminal subcategories
@@ -286,6 +319,11 @@ export default function PestControlPage() {
         })
 
         setProviders(transformedProviders)
+
+        // Load reviews for each business
+        transformedProviders.forEach((provider) => {
+          loadBusinessReviews(provider.id)
+        })
       } catch (error) {
         console.error("Error fetching businesses:", error)
         setError("Failed to load businesses")
@@ -299,7 +337,11 @@ export default function PestControlPage() {
 
   // Handle opening reviews dialog
   const handleOpenReviews = (provider) => {
-    setSelectedProvider(provider)
+    setSelectedProvider({
+      ...provider,
+      reviews: businessReviews[provider.id] || [],
+      rating: businessRatings[provider.id] || 0,
+    })
     setIsReviewsDialogOpen(true)
   }
 
@@ -451,10 +493,34 @@ export default function PestControlPage() {
                     {/* Business Info */}
                     <div>
                       <h3 className="text-xl font-semibold">{provider.name}</h3>
+
+                      {/* Contact Info Row */}
                       <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                        <span>{provider.location}</span>
-                        {provider.phone && <span>📞 {provider.phone}</span>}
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1 text-primary" />
+                          <span>{provider.location}</span>
+                        </div>
+                        {provider.phone && (
+                          <div className="flex items-center">
+                            <Phone className="h-4 w-4 mr-1 text-primary" />
+                            <a href={`tel:${provider.phone}`} className="hover:text-primary transition-colors">
+                              {provider.phone}
+                            </a>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Rating Display */}
+                      {businessRatings[provider.id] && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <StarRating rating={businessRatings[provider.id]} />
+                          <span className="text-sm text-gray-600">
+                            {businessRatings[provider.id].toFixed(1)} ({businessReviews[provider.id]?.length || 0}{" "}
+                            reviews)
+                          </span>
+                        </div>
+                      )}
+
                       {allServices.length > 0 && (
                         <div className="mt-2">
                           <div className="max-h-32 overflow-y-auto">
@@ -558,6 +624,7 @@ export default function PestControlPage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.name}
+        businessId={selectedProvider?.id}
         reviews={selectedProvider?.reviews || []}
       />
 

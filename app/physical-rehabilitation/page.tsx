@@ -17,6 +17,8 @@ import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake, Loader2 } from "lucide-react"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { toast } from "@/hooks/use-toast"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -63,6 +65,10 @@ export default function PhysicalRehabilitationPage() {
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [allProviders, setAllProviders] = useState<any[]>([]) // Declaration moved here
+
+  // Rating state
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
 
   const loadPhotosForBusiness = async (businessId: string) => {
     if (businessPhotos[businessId]) return // Already loaded
@@ -131,6 +137,40 @@ export default function PhysicalRehabilitationPage() {
       loadFavorites()
     }
   }, [currentUser, allProviders])
+
+  // Load business reviews and ratings
+  const loadBusinessReviews = async (providers: any[]) => {
+    const ratings: Record<string, number> = {}
+    const reviews: Record<string, any[]> = {}
+
+    for (const provider of providers) {
+      try {
+        const businessReviews = await getBusinessReviews(provider.id)
+        reviews[provider.id] = businessReviews
+
+        if (businessReviews.length > 0) {
+          const totalRating = businessReviews.reduce((sum, review) => sum + review.overallRating, 0)
+          ratings[provider.id] = totalRating / businessReviews.length
+        } else {
+          ratings[provider.id] = 0
+        }
+      } catch (error) {
+        console.error(`Error loading reviews for provider ${provider.id}:`, error)
+        ratings[provider.id] = 0
+        reviews[provider.id] = []
+      }
+    }
+
+    setBusinessRatings(ratings)
+    setBusinessReviews(reviews)
+  }
+
+  // Load reviews when providers change
+  useEffect(() => {
+    if (providers.length > 0) {
+      loadBusinessReviews(providers)
+    }
+  }, [providers])
 
   // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
@@ -249,7 +289,7 @@ export default function PhysicalRehabilitationPage() {
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
       ...provider,
-      reviewsData: provider.reviews || [],
+      reviewsData: businessReviews[provider.id] || [],
     })
     setIsReviewsDialogOpen(true)
   }
@@ -545,6 +585,16 @@ export default function PhysicalRehabilitationPage() {
                       )}
                     </div>
 
+                    {/* Rating Display */}
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={businessRatings[provider.id] || 0} />
+                      <span className="text-sm text-gray-600">
+                        {businessRatings[provider.id] > 0
+                          ? `${businessRatings[provider.id].toFixed(1)} (${businessReviews[provider.id]?.length || 0} reviews)`
+                          : "No reviews yet"}
+                      </span>
+                    </div>
+
                     {/* Services */}
                     {provider.services && provider.services.length > 0 && (
                       <div>
@@ -630,6 +680,7 @@ export default function PhysicalRehabilitationPage() {
           onClose={() => setIsReviewsDialogOpen(false)}
           providerName={selectedProvider.name}
           reviews={selectedProvider?.reviewsData || []}
+          businessId={selectedProvider?.id}
         />
       )}
 

@@ -14,8 +14,10 @@ import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
-import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { Heart, HeartHandshake, Loader2, MapPin, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 export default function TrashCleanupPage() {
   const { toast } = useToast()
@@ -56,6 +58,10 @@ export default function TrashCleanupPage() {
   const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
+  // Rating state management
+  const [businessRatings, setBusinessRatings] = useState<{ [key: string]: { rating: number; reviewCount: number } }>({})
+  const [businessReviews, setBusinessReviews] = useState<{ [key: string]: any[] }>({})
+
   // Function to load photos for a specific business
   const loadPhotosForBusiness = async (businessId: string) => {
     if (businessPhotos[businessId]) return // Already loaded
@@ -71,6 +77,53 @@ export default function TrashCleanupPage() {
       setBusinessPhotos((prev) => ({
         ...prev,
         [businessId]: [],
+      }))
+    }
+  }
+
+  // Function to load reviews and ratings for a specific business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessReviews[businessId]) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: {
+            rating: Math.round(averageRating * 10) / 10,
+            reviewCount: reviews.length,
+          },
+        }))
+      } else {
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: {
+            rating: 0,
+            reviewCount: 0,
+          },
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+      setBusinessRatings((prev) => ({
+        ...prev,
+        [businessId]: {
+          rating: 0,
+          reviewCount: 0,
+        },
       }))
     }
   }
@@ -143,6 +196,19 @@ export default function TrashCleanupPage() {
       loadFavorites()
     }
   }, [currentUser, providers])
+
+  // Load reviews and ratings for all businesses
+  useEffect(() => {
+    async function loadAllReviews() {
+      for (const provider of providers) {
+        await loadBusinessReviews(provider.id)
+      }
+    }
+
+    if (providers.length > 0) {
+      loadAllReviews()
+    }
+  }, [providers])
 
   // Function to handle adding business to favorites
   const handleAddToFavorites = async (provider: any) => {
@@ -374,7 +440,13 @@ export default function TrashCleanupPage() {
 
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {
-    setSelectedProvider(provider)
+    const providerWithReviews = {
+      ...provider,
+      reviews: businessReviews[provider.id] || [],
+      rating: businessRatings[provider.id]?.rating || 0,
+      reviewCount: businessRatings[provider.id]?.reviewCount || 0,
+    }
+    setSelectedProvider(providerWithReviews)
     setIsReviewsDialogOpen(true)
   }
 
@@ -475,6 +547,7 @@ export default function TrashCleanupPage() {
             const filterValues = getFilterValues(selectedFilters)
             const isFavorite = favoriteBusinesses.has(provider.id)
             const isSaving = savingStates[provider.id] || false
+            const businessRating = businessRatings[provider.id]
 
             return (
               <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
@@ -487,15 +560,30 @@ export default function TrashCleanupPage() {
                       <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                         {provider.location && (
                           <div className="flex items-center">
-                            <span>📍 {provider.location}</span>
+                            <MapPin className="h-4 w-4 mr-1 text-primary" />
+                            <span>{provider.location}</span>
                           </div>
                         )}
                         {provider.phone && (
                           <div className="flex items-center">
-                            <span>📞 {provider.phone}</span>
+                            <Phone className="h-4 w-4 mr-1 text-primary" />
+                            <a href={`tel:${provider.phone}`} className="hover:text-primary transition-colors">
+                              {provider.phone}
+                            </a>
                           </div>
                         )}
                       </div>
+
+                      {/* Rating Display */}
+                      {businessRating && businessRating.reviewCount > 0 && (
+                        <div className="flex items-center gap-2">
+                          <StarRating rating={businessRating.rating} size="sm" />
+                          <span className="text-sm text-gray-600">
+                            {businessRating.rating.toFixed(1)} ({businessRating.reviewCount}{" "}
+                            {businessRating.reviewCount === 1 ? "review" : "reviews"})
+                          </span>
+                        </div>
+                      )}
 
                       {allServices.length > 0 && (
                         <div>
@@ -594,6 +682,7 @@ export default function TrashCleanupPage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.name}
+        businessId={selectedProvider?.id}
         reviews={selectedProvider?.reviews || []}
       />
 

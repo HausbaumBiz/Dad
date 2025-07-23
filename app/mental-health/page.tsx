@@ -10,11 +10,13 @@ import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { PhotoCarousel } from "@/components/photo-carousel"
+import { StarRating } from "@/components/star-rating"
 import { MapPin, Phone, X } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { Heart, HeartHandshake } from "lucide-react"
 
@@ -97,6 +99,11 @@ export default function MentalHealthPage() {
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
+  // Rating and review state
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
+
   const fetchIdRef = useRef(0)
 
   useEffect(() => {
@@ -154,6 +161,57 @@ export default function MentalHealthPage() {
       loadFavorites()
     }
   }, [currentUser, allProviders])
+
+  // Load reviews for all businesses when providers are loaded
+  useEffect(() => {
+    async function loadAllBusinessReviews() {
+      if (filteredProviders.length === 0) return
+
+      console.log("Loading reviews for all mental health providers...")
+
+      for (const provider of filteredProviders) {
+        // Skip if already loaded
+        if (businessReviews[provider.id]) continue
+
+        try {
+          const reviews = await getBusinessReviews(provider.id)
+
+          setBusinessReviews((prev) => ({
+            ...prev,
+            [provider.id]: reviews,
+          }))
+
+          // Calculate average rating
+          if (reviews.length > 0) {
+            const totalRating = reviews.reduce((sum, review) => sum + (review.overallRating || review.rating || 0), 0)
+            const averageRating = totalRating / reviews.length
+
+            setBusinessRatings((prev) => ({
+              ...prev,
+              [provider.id]: averageRating,
+            }))
+          } else {
+            setBusinessRatings((prev) => ({
+              ...prev,
+              [provider.id]: 0,
+            }))
+          }
+        } catch (error) {
+          console.error(`Error loading reviews for business ${provider.id}:`, error)
+          setBusinessReviews((prev) => ({
+            ...prev,
+            [provider.id]: [],
+          }))
+          setBusinessRatings((prev) => ({
+            ...prev,
+            [provider.id]: 0,
+          }))
+        }
+      }
+    }
+
+    loadAllBusinessReviews()
+  }, [filteredProviders])
 
   // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
@@ -428,8 +486,9 @@ export default function MentalHealthPage() {
   const handleOpenReviews = (provider: any) => {
     setSelectedProvider({
       ...provider,
-      reviews: provider.reviews || [],
+      reviews: businessReviews[provider.id] || [],
     })
+    setSelectedBusinessId(provider.id)
     setIsReviewsDialogOpen(true)
   }
 
@@ -608,6 +667,20 @@ export default function MentalHealthPage() {
                   <div className="space-y-2">
                     <h3 className="text-xl font-semibold">{provider.displayName}</h3>
 
+                    {/* Star Rating Display */}
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={businessRatings[provider.id] || 0} />
+                      <span className="text-sm text-gray-600">
+                        {businessRatings[provider.id] ? businessRatings[provider.id].toFixed(1) : "0.0"}
+                      </span>
+                      {businessReviews[provider.id] && businessReviews[provider.id].length > 0 && (
+                        <span className="text-sm text-gray-500">
+                          ({businessReviews[provider.id].length}{" "}
+                          {businessReviews[provider.id].length === 1 ? "review" : "reviews"})
+                        </span>
+                      )}
+                    </div>
+
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                       {provider.displayLocation && (
                         <div className="flex items-center">
@@ -723,7 +796,7 @@ export default function MentalHealthPage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.name}
-        businessId={selectedProvider?.id}
+        businessId={selectedBusinessId}
         reviews={selectedProvider?.reviews || []}
       />
 

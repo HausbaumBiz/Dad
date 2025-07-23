@@ -13,7 +13,9 @@ import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
-import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { getBusinessReviews } from "@/app/actions/review-actions"
+import { StarRating } from "@/components/star-rating"
+import { Heart, HeartHandshake, Loader2, MapPin, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
@@ -52,6 +54,10 @@ export default function OutsideMaintenancePage() {
   // State for photos
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, any[]>>({})
 
+  // State for ratings and reviews
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
+
   // User and favorites state
   const [currentUser, setCurrentUser] = useState(null)
   const [favoriteBusinesses, setFavoriteBusinesses] = useState(new Set())
@@ -72,6 +78,35 @@ export default function OutsideMaintenancePage() {
     } catch (error) {
       console.error(`Failed to load photos for business ${businessId}:`, error)
       setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
+
+  // Function to load reviews and calculate rating for a business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessReviews[businessId]) return // Already loaded
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: averageRating,
+        }))
+      }
+    } catch (error) {
+      console.error(`Failed to load reviews for business ${businessId}:`, error)
+      setBusinessReviews((prev) => ({
         ...prev,
         [businessId]: [],
       }))
@@ -178,7 +213,7 @@ export default function OutsideMaintenancePage() {
       if (result.success) {
         setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
         toast({
-          title: "Business Saved!",
+          title: "Business Card Saved!",
           description: "Business card has been added to your favorites.",
           variant: "default",
         })
@@ -348,6 +383,19 @@ export default function OutsideMaintenancePage() {
           })
         })
 
+  // Load reviews for all businesses when they change
+  useEffect(() => {
+    const loadAllReviews = async () => {
+      for (const business of filteredBusinesses) {
+        await loadBusinessReviews(business.id)
+      }
+    }
+
+    if (filteredBusinesses.length > 0) {
+      loadAllReviews()
+    }
+  }, [filteredBusinesses])
+
   // Handler for opening reviews dialog
   const handleOpenReviews = (business) => {
     setSelectedBusinessId(business.id)
@@ -459,19 +507,34 @@ export default function OutsideMaintenancePage() {
 
                     {/* Contact Info Row */}
                     <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                      <span>{business.displayLocation}</span>
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 mr-1 text-primary" />
+                        <span>{business.displayLocation}</span>
+                      </div>
                       {business.displayPhone && (
                         <div className="flex items-center">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                            />
-                          </svg>
-                          <span>{business.displayPhone}</span>
+                          <Phone className="h-4 w-4 mr-1 text-primary" />
+                          <a href={`tel:${business.displayPhone}`} className="hover:text-primary transition-colors">
+                            {business.displayPhone}
+                          </a>
                         </div>
+                      )}
+                    </div>
+
+                    {/* Rating Display */}
+                    <div className="flex items-center gap-2">
+                      {businessRatings[business.id] ? (
+                        <>
+                          <StarRating rating={businessRatings[business.id]} size="sm" />
+                          <span className="text-sm font-medium text-gray-700">
+                            {businessRatings[business.id].toFixed(1)}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            ({businessReviews[business.id]?.length || 0} reviews)
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-sm text-gray-500">No reviews yet</span>
                       )}
                     </div>
 
@@ -568,7 +631,8 @@ export default function OutsideMaintenancePage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedBusinessName}
-        reviews={[]}
+        businessId={selectedBusinessId}
+        reviews={selectedBusinessId ? businessReviews[selectedBusinessId] || [] : []}
       />
 
       {/* Business Profile Dialog */}

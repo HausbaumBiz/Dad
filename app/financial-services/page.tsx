@@ -17,6 +17,8 @@ import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/fa
 import { getUserSession } from "@/app/actions/user-actions"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Heart, HeartHandshake, LogIn } from "lucide-react"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 interface Business {
   id: string
@@ -75,11 +77,15 @@ export default function FinancialServicesPage() {
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
 
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+
+  const [businessRatings, setBusinessRatings] = useState<Record<string, number>>({})
+  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
 
   const filterOptions = [
     { id: "financial1", label: "Accountants", value: "Accountants" },
@@ -195,6 +201,46 @@ export default function FinancialServicesPage() {
     }
   }
 
+  // Function to load reviews and calculate rating for a specific business
+  const loadBusinessReviews = async (businessId: string) => {
+    if (businessRatings[businessId] !== undefined) {
+      return // Already loaded
+    }
+
+    try {
+      const reviews = await getBusinessReviews(businessId)
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      // Calculate average rating
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
+        const averageRating = totalRating / reviews.length
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: Math.round(averageRating * 10) / 10, // Round to 1 decimal place
+        }))
+      } else {
+        setBusinessRatings((prev) => ({
+          ...prev,
+          [businessId]: 0,
+        }))
+      }
+    } catch (error) {
+      console.error(`Error loading reviews for business ${businessId}:`, error)
+      setBusinessRatings((prev) => ({
+        ...prev,
+        [businessId]: 0,
+      }))
+      setBusinessReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+    }
+  }
+
   useEffect(() => {
     async function fetchBusinesses() {
       const currentFetchId = ++fetchIdRef.current
@@ -257,6 +303,18 @@ export default function FinancialServicesPage() {
 
     fetchBusinesses()
   }, [userZipCode])
+
+  // Add this useEffect after the existing useEffect that fetches businesses
+  useEffect(() => {
+    // Load reviews for all businesses when they are loaded
+    if (filteredBusinesses.length > 0) {
+      filteredBusinesses.forEach((business) => {
+        if (!businessRatings[business.id] && businessRatings[business.id] !== 0) {
+          loadBusinessReviews(business.id)
+        }
+      })
+    }
+  }, [filteredBusinesses, businessRatings])
 
   // Helper function to check if business has exact subcategory match
   const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
@@ -378,7 +436,12 @@ export default function FinancialServicesPage() {
   // Handle opening reviews dialog
   const handleOpenReviews = (business: Business) => {
     setSelectedBusiness(business)
+    setSelectedBusinessId(business.id)
     setIsReviewsDialogOpen(true)
+    // Load reviews if not already loaded
+    if (!businessReviews[business.id]) {
+      loadBusinessReviews(business.id)
+    }
   }
 
   // Handle opening profile dialog
@@ -527,6 +590,17 @@ export default function FinancialServicesPage() {
                       )}
                     </div>
 
+                    {/* Rating Display */}
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={businessRatings[business.id] || 0} size="sm" />
+                      {businessReviews[business.id] && businessReviews[business.id].length > 0 && (
+                        <span className="text-sm text-gray-600">
+                          ({businessReviews[business.id].length} review
+                          {businessReviews[business.id].length !== 1 ? "s" : ""})
+                        </span>
+                      )}
+                    </div>
+
                     <div>
                       <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
                       <div className="flex flex-wrap gap-1">
@@ -622,10 +696,13 @@ export default function FinancialServicesPage() {
       {/* Reviews Dialog */}
       <ReviewsDialog
         isOpen={isReviewsDialogOpen}
-        onClose={() => setIsReviewsDialogOpen(false)}
+        onClose={() => {
+          setIsReviewsDialogOpen(false)
+          setSelectedBusinessId(null)
+        }}
         providerName={selectedBusiness?.displayName}
-        businessId={selectedBusiness?.id}
-        reviews={selectedBusiness?.reviews || []}
+        businessId={selectedBusinessId}
+        reviews={selectedBusinessId ? businessReviews[selectedBusinessId] || [] : []}
       />
 
       {/* Business Profile Dialog */}
