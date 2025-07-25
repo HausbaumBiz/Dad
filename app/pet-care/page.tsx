@@ -9,15 +9,19 @@ import { Phone, MapPin } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { ReviewTroubleshooter } from "@/components/review-troubleshooter"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { Card, CardContent } from "@/components/ui/card"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
-import { Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { Heart, HeartHandshake, Loader2, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { getBusinessReviews, preloadBusinessReviews } from "@/app/actions/review-actions"
+import { StarRating } from "@/components/star-rating"
+import { ReviewSystemError } from "@/lib/review-error-handler"
 
 // Enhanced Business interface
 interface Business {
@@ -57,8 +61,9 @@ export default function PetCarePage() {
   const [loading, setLoading] = useState(true)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [isTroubleshooterOpen, setIsTroubleshooterOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
-    id: string // Change from number to string
+    id: string
     name: string
     rating: number
     reviews: number
@@ -81,6 +86,12 @@ export default function PetCarePage() {
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const { toast } = useToast()
 
+  // Enhanced review handling with troubleshooting
+  const [cachedReviews, setCachedReviews] = useState<Record<string, any[]>>({})
+  const [reviewLoadingStates, setReviewLoadingStates] = useState<Record<string, boolean>>({})
+  const [reviewErrors, setReviewErrors] = useState<Record<string, any>>({})
+  const [troubleshootingData, setTroubleshootingData] = useState<any>(null)
+
   const filterOptions = [
     { id: "pet1", label: "Veterinarians", value: "Veterinarians" },
     { id: "pet2", label: "Pet Hospitals", value: "Pet Hospitals" },
@@ -97,6 +108,13 @@ export default function PetCarePage() {
     { id: "pet13", label: "Pet Poop Pickup", value: "Pet Poop Pickup" },
     { id: "pet14", label: "Other Pet Care", value: "Other Pet Care" },
   ]
+
+  // Generate session ID for troubleshooting
+  useEffect(() => {
+    if (typeof window !== "undefined" && !sessionStorage.getItem("sessionId")) {
+      sessionStorage.setItem("sessionId", `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+    }
+  }, [])
 
   // Get user's zip code from localStorage
   useEffect(() => {
@@ -330,6 +348,7 @@ export default function PetCarePage() {
         console.log(`[PetCare] Fetch ${currentFetchId} got ${fetchedBusinesses.length} businesses`)
 
         // Filter businesses by zip code if userZipCode is available
+        let finalBusinesses = businessesWithPhotos
         if (userZipCode) {
           const originalCount = businessesWithPhotos.length
           const filteredBusinesses = businessesWithPhotos.filter((business: Business) =>
@@ -338,13 +357,21 @@ export default function PetCarePage() {
           console.log(
             `[PetCare] Filtered from ${originalCount} to ${filteredBusinesses.length} businesses for zip ${userZipCode}`,
           )
-          setBusinesses(filteredBusinesses)
-          setAllBusinesses(filteredBusinesses)
-          setFilteredBusinesses(filteredBusinesses)
-        } else {
-          setBusinesses(businessesWithPhotos)
-          setAllBusinesses(businessesWithPhotos)
-          setFilteredBusinesses(businessesWithPhotos)
+          finalBusinesses = filteredBusinesses
+        }
+
+        setBusinesses(finalBusinesses)
+        setAllBusinesses(finalBusinesses)
+        setFilteredBusinesses(finalBusinesses)
+
+        // Preload reviews for visible businesses (first 10)
+        const businessIds = finalBusinesses.slice(0, 10).map((b) => b.id)
+        if (businessIds.length > 0) {
+          console.log(`[PetCare] Preloading reviews for ${businessIds.length} businesses`)
+          // Don't await this - let it run in background
+          preloadBusinessReviews(businessIds).catch((error) => {
+            console.warn("[PetCare] Review preloading failed:", error)
+          })
         }
       } catch (error) {
         // Only update error if this is still the current request
@@ -362,14 +389,133 @@ export default function PetCarePage() {
     loadBusinesses()
   }, [userZipCode])
 
-  const handleViewReviews = (business: Business) => {
+  // Enhanced review loading with comprehensive error handling
+  const loadReviewsForBusiness = async (businessId: string) => {
+    // Return cached reviews if available
+    if (cachedReviews[businessId]) {
+      return cachedReviews[businessId]
+    }
+
+    // Check if already loading
+    if (reviewLoadingStates[businessId]) {
+      return []
+    }
+
+    setReviewLoadingStates((prev) => ({ ...prev, [businessId]: true }))
+    setReviewErrors((prev) => ({ ...prev, [businessId]: null }))
+
+    try {
+      console.log(`Loading reviews for business ${businessId}`)
+      const reviews = await getBusinessReviews(businessId)
+
+      // Cache the reviews (even if empty)
+      setCachedReviews((prev) => ({
+        ...prev,
+        [businessId]: reviews,
+      }))
+
+      return reviews
+    } catch (error) {
+      console.error(`Error loading reviews for business ${businessId}:`, error)
+
+      // Handle ReviewSystemError with troubleshooting data
+      if (error instanceof ReviewSystemError) {
+        setReviewErrors((prev) => ({
+          ...prev,
+          [businessId]: error.troubleshootingData,
+        }))
+
+        // Show specific error message based on error type
+        let errorMessage = "Unable to load reviews at this time."
+        if (error.troubleshootingData?.errorType === "RATE_LIMIT") {
+          errorMessage = "Too many requests. Please wait a moment and try again."
+        } else if (error.troubleshootingData?.errorType === "TIMEOUT") {
+          errorMessage = "Request timed out. Please check your connection and try again."
+        }
+
+        toast({
+          title: "Reviews Unavailable",
+          description: errorMessage,
+          variant: "default",
+          action: (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setTroubleshootingData(error.troubleshootingData)
+                setIsTroubleshooterOpen(true)
+              }}
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Troubleshoot
+            </Button>
+          ),
+        })
+      } else {
+        // Handle other errors
+        setReviewErrors((prev) => ({
+          ...prev,
+          [businessId]: {
+            timestamp: new Date().toISOString(),
+            businessId,
+            errorType: "UNKNOWN_ERROR",
+            errorMessage: error instanceof Error ? error.message : "Unknown error",
+            retryAttempts: 0,
+            lastAttemptTime: new Date().toISOString(),
+            redisStatus: "unknown",
+            cacheHit: false,
+            userAgent: navigator.userAgent,
+            sessionId: sessionStorage.getItem("sessionId") || "unknown",
+          },
+        }))
+
+        toast({
+          title: "Reviews Unavailable",
+          description: "Unable to load reviews at this time. Please try again later.",
+          variant: "default",
+        })
+      }
+
+      // Cache empty array to prevent repeated failed requests
+      setCachedReviews((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
+
+      return []
+    } finally {
+      setReviewLoadingStates((prev) => ({ ...prev, [businessId]: false }))
+    }
+  }
+
+  const handleViewReviews = async (business: Business) => {
+    // Show loading state immediately
     setSelectedProvider({
-      id: business.id || "0", // Keep as string, don't parse as number
+      id: business.id,
       name: business.displayName || business.businessName || "Pet Care Provider",
-      rating: business.rating || 0,
-      reviews: business.reviewCount || 0,
+      rating: 0,
+      reviews: 0,
     })
+    setSelectedBusinessId(business.id)
     setIsReviewsDialogOpen(true)
+
+    // Load reviews in background
+    const reviews = await loadReviewsForBusiness(business.id)
+
+    // Calculate rating from reviews
+    let rating = 0
+    if (reviews.length > 0) {
+      const totalRating = reviews.reduce((sum, review) => sum + (review.overallRating || review.rating || 0), 0)
+      rating = totalRating / reviews.length
+    }
+
+    // Update provider data with loaded reviews
+    setSelectedProvider({
+      id: business.id,
+      name: business.displayName || business.businessName || "Pet Care Provider",
+      rating: rating,
+      reviews: reviews.length,
+    })
   }
 
   const handleViewProfile = (business: Business) => {
@@ -377,6 +523,25 @@ export default function PetCarePage() {
     setSelectedBusinessId(business.id || "")
     setSelectedBusinessName(business.displayName || business.businessName || "Pet Care Provider")
     setIsProfileDialogOpen(true)
+  }
+
+  const handleRetryReviews = async () => {
+    if (!selectedBusinessId) return
+
+    // Clear cached data and error state
+    setCachedReviews((prev) => {
+      const newCache = { ...prev }
+      delete newCache[selectedBusinessId]
+      return newCache
+    })
+    setReviewErrors((prev) => {
+      const newErrors = { ...prev }
+      delete newErrors[selectedBusinessId]
+      return newErrors
+    })
+
+    // Retry loading reviews
+    await loadReviewsForBusiness(selectedBusinessId)
   }
 
   return (
@@ -494,6 +659,22 @@ export default function PetCarePage() {
                     <h3 className="text-xl font-semibold">
                       {business.displayName || business.businessName || "Pet Care Provider"}
                     </h3>
+
+                    {/* Show static rating from business data if available */}
+                    {(business.rating || business.reviewCount) && (
+                      <div className="flex items-center gap-2">
+                        <StarRating rating={business.rating || 0} />
+                        <span className="text-sm text-gray-600">
+                          {business.rating ? business.rating.toFixed(1) : "0.0"}
+                        </span>
+                        {business.reviewCount && business.reviewCount > 0 && (
+                          <span className="text-sm text-gray-500">
+                            ({business.reviewCount} {business.reviewCount === 1 ? "review" : "reviews"})
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {business.businessDescription && (
                       <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
                     )}
@@ -592,9 +773,31 @@ export default function PetCarePage() {
                           </>
                         )}
                       </Button>
-                      <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleViewReviews(business)}>
-                        Ratings
+
+                      {/* Ratings Button with Error Indicator */}
+                      <Button
+                        className={`flex-1 lg:flex-none lg:w-full ${
+                          reviewErrors[business.id] ? "border-yellow-500 text-yellow-700" : ""
+                        }`}
+                        onClick={() => handleViewReviews(business)}
+                        disabled={reviewLoadingStates[business.id]}
+                        variant={reviewErrors[business.id] ? "outline" : "default"}
+                      >
+                        {reviewLoadingStates[business.id] ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Loading...
+                          </>
+                        ) : reviewErrors[business.id] ? (
+                          <>
+                            <AlertTriangle className="h-4 w-4 mr-2" />
+                            Ratings
+                          </>
+                        ) : (
+                          "Ratings"
+                        )}
                       </Button>
+
                       <Button
                         variant="outline"
                         className="flex-1 lg:flex-none lg:w-full bg-transparent"
@@ -616,8 +819,8 @@ export default function PetCarePage() {
         isOpen={isReviewsDialogOpen}
         onClose={() => setIsReviewsDialogOpen(false)}
         providerName={selectedProvider?.name || ""}
-        businessId={selectedProvider?.id || ""} // Remove .toString() since it's already a string
-        reviews={[]}
+        businessId={selectedProvider?.id || ""}
+        reviews={cachedReviews[selectedBusinessId] || []} // Use cached reviews
       />
 
       {/* Business Profile Dialog */}
@@ -626,6 +829,16 @@ export default function PetCarePage() {
         onClose={() => setIsProfileDialogOpen(false)}
         businessId={selectedBusinessId}
         businessName={selectedBusinessName}
+      />
+
+      {/* Review Troubleshooter Dialog */}
+      <ReviewTroubleshooter
+        isOpen={isTroubleshooterOpen}
+        onClose={() => setIsTroubleshooterOpen(false)}
+        businessId={selectedBusinessId}
+        businessName={selectedBusinessName}
+        errorData={troubleshootingData}
+        onRetry={handleRetryReviews}
       />
 
       {/* Login Dialog */}

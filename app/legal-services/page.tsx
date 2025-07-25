@@ -1004,11 +1004,64 @@ export default function LegalServicesPage() {
                   </div>
                 )}
 
-                {/* Desktop Photo Carousel */}
-                <PhotoCarouselOld
-                  photos={provider.photos || []}
-                  businessName={provider.displayName || provider.businessName || "Legal Professional"}
-                />
+                {/* Desktop Photo Album and Action Buttons Layout */}
+                <div className="flex gap-6 items-start">
+                  {/* Photo Album on Left */}
+                  <div className="flex-1">
+                    <PhotoCarouselOld
+                      photos={provider.photos || []}
+                      businessName={provider.displayName || provider.businessName || "Legal Professional"}
+                    />
+                  </div>
+
+                  {/* Action Buttons on Right */}
+                  <div className="flex flex-col gap-2 w-32 flex-shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenReviews(provider)}
+                      className="text-sm min-w-[120px]"
+                    >
+                      Reviews
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleViewProfile(provider)}
+                      className="text-sm min-w-[120px]"
+                    >
+                      View Profile
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAddToFavorites(provider)}
+                      disabled={savingStates[provider.id]}
+                      className={`text-sm min-w-[120px] ${
+                        favoriteBusinesses.has(provider.id)
+                          ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
+                          : "border-red-500 text-red-500 hover:bg-red-50"
+                      }`}
+                    >
+                      {savingStates[provider.id] ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Saving...
+                        </>
+                      ) : favoriteBusinesses.has(provider.id) ? (
+                        <>
+                          <HeartHandshake className="h-4 w-4 mr-1" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <Heart className="h-4 w-4 mr-1" />
+                          Save Card
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           ))}

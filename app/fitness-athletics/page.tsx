@@ -743,39 +743,36 @@ export default function FitnessAthleticsPage() {
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="space-y-4">
-                  {/* Business Header with Rating */}
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2 flex-1">
-                      <h3 className="text-xl font-semibold">{business.displayName || business.name}</h3>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                        {business.displayLocation && (
-                          <div className="flex items-center">
-                            <MapPin className="h-4 w-4 mr-1" />
-                            <span>{business.displayLocation}</span>
-                          </div>
-                        )}
-                        {(business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone) && (
-                          <div className="flex items-center">
-                            <Phone className="h-4 w-4 mr-1" />
-                            <a
-                              href={`tel:${business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone}`}
-                              className="hover:text-primary"
-                            >
-                              {formatPhoneNumber(
-                                business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone,
-                              )}
-                            </a>
-                          </div>
-                        )}
-                      </div>
+                  {/* Business Header */}
+                  <div className="space-y-2 flex-1">
+                    <h3 className="text-xl font-semibold">{business.displayName || business.name}</h3>
+
+                    {/* Star Rating below business name */}
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={business.rating || 0} size="sm" />
+                      <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
                     </div>
 
-                    {/* Star Rating in top-right corner */}
-                    <div className="flex flex-col items-end ml-4">
-                      <div className="flex items-center gap-2">
-                        <StarRating rating={business.rating || 0} size="sm" />
-                        <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
-                      </div>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {business.displayLocation && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span>{business.displayLocation}</span>
+                        </div>
+                      )}
+                      {(business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone) && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          <a
+                            href={`tel:${business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone}`}
+                            className="hover:text-primary"
+                          >
+                            {formatPhoneNumber(
+                              business.adDesignData?.businessInfo?.phone || business.displayPhone || business.phone,
+                            )}
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
 

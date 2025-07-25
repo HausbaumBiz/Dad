@@ -7,9 +7,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { StarRating } from "@/components/star-rating"
-import { Loader2, User, Calendar, CheckCircle } from "lucide-react"
+import { ReviewTroubleshooter } from "@/components/review-troubleshooter"
+import { Loader2, User, Calendar, CheckCircle, AlertTriangle, RefreshCw } from "lucide-react"
 import { getBusinessReviews, submitReview, type Review } from "@/app/actions/review-actions"
 import { getUserSession } from "@/app/actions/user-actions"
+import { ReviewSystemError } from "@/lib/review-error-handler"
 import { useToast } from "@/components/ui/use-toast"
 
 interface ReviewsDialogProps {
@@ -57,6 +59,8 @@ export function ReviewsDialog({
   const [submitting, setSubmitting] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [averageRating, setAverageRating] = useState(0)
+  const [loadError, setLoadError] = useState<any>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const [reviewForm, setReviewForm] = useState<ReviewFormData>({
     serviceQuality: 0,
     costTransparency: 0,
@@ -91,20 +95,79 @@ export function ReviewsDialog({
     }
   }, [reviews])
 
-  const loadReviews = async () => {
+  const loadReviews = async (isRetry = false) => {
     try {
       setLoading(true)
-      console.log(`[ReviewsDialog] Loading reviews for business ${businessId}`)
+      setLoadError(null)
+
+      if (isRetry) {
+        setRetryCount((prev) => prev + 1)
+        // Add a small delay for retries to let Redis recover
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      }
+
+      console.log(`[ReviewsDialog] Loading reviews for business ${businessId} (attempt ${retryCount + 1})`)
+
       const fetchedReviews = await getBusinessReviews(businessId)
       console.log(`[ReviewsDialog] Loaded ${fetchedReviews.length} reviews:`, fetchedReviews)
       setReviews(fetchedReviews)
+      setRetryCount(0) // Reset on success
     } catch (error) {
       console.error("Error loading reviews:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load reviews. Please try again.",
-        variant: "destructive",
-      })
+
+      // Handle our custom ReviewSystemError with troubleshooting data
+      if (error instanceof ReviewSystemError) {
+        setLoadError(error.troubleshootingData)
+
+        // Show different messages based on error type
+        let errorMessage = "Unable to load reviews at this time."
+        const toastVariant: "default" | "destructive" = "default"
+
+        if (error.troubleshootingData?.errorType === "TIMEOUT") {
+          errorMessage = "Request timed out. The database may be temporarily busy."
+        } else if (error.troubleshootingData?.errorType === "CONNECTION_ERROR") {
+          errorMessage = "Connection issue detected. Retrying may help."
+        } else if (error.troubleshootingData?.errorType === "DATA_ERROR") {
+          errorMessage = "Data format issue detected. This is usually temporary."
+        } else if (error.troubleshootingData?.errorType === "REDIS_ERROR") {
+          errorMessage = "Database temporarily unavailable. Please try again in a moment."
+        }
+
+        toast({
+          title: "Reviews Loading Issue",
+          description: errorMessage,
+          variant: toastVariant,
+        })
+      } else {
+        // Handle other types of errors
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        setLoadError({
+          timestamp: new Date().toISOString(),
+          businessId,
+          errorType: "UNKNOWN_ERROR",
+          errorMessage,
+          retryAttempts: retryCount,
+          lastAttemptTime: new Date().toISOString(),
+          redisStatus: "unknown",
+          cacheHit: false,
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "server",
+          sessionId:
+            typeof sessionStorage !== "undefined" ? sessionStorage.getItem("sessionId") || "unknown" : "server",
+          errorFrequency: 0,
+          networkLatency: 0,
+          systemInfo: {
+            timestamp: new Date().toISOString(),
+            operation: "getBusinessReviews",
+            memoryUsage: null,
+          },
+        })
+
+        toast({
+          title: "Error",
+          description: "Failed to load reviews. Please try again.",
+          variant: "destructive",
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -233,6 +296,10 @@ export function ReviewsDialog({
     return Math.round(average * 10) / 10
   }
 
+  const handleRetry = () => {
+    loadReviews(true)
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -245,6 +312,34 @@ export function ReviewsDialog({
           <div className="flex justify-center items-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2">Loading reviews...</span>
+          </div>
+        ) : loadError ? (
+          <div className="space-y-4">
+            <Card className="border-yellow-200 bg-yellow-50">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                  <h3 className="font-semibold text-yellow-800">Reviews Temporarily Unavailable</h3>
+                </div>
+                <p className="text-yellow-700 mb-4">
+                  We're experiencing temporary issues loading reviews. This is usually due to high traffic or database
+                  maintenance.
+                </p>
+                <div className="flex gap-3">
+                  <Button onClick={handleRetry} variant="outline" size="sm" className="bg-white">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Try Again
+                  </Button>
+                  <ReviewTroubleshooter
+                    businessId={businessId}
+                    businessName={providerName}
+                    errorData={loadError}
+                    onRetry={handleRetry}
+                  />
+                </div>
+                {retryCount > 0 && <p className="text-xs text-yellow-600 mt-2">Retry attempts: {retryCount}</p>}
+              </CardContent>
+            </Card>
           </div>
         ) : (
           <div className="space-y-6">
