@@ -19,7 +19,7 @@ import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake, Loader2, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
-import { getBusinessReviews, preloadBusinessReviews } from "@/app/actions/review-actions"
+import { getBusinessReviews, preloadBusinessReviews, getBusinessRating } from "@/app/actions/review-actions"
 import { StarRating } from "@/components/star-rating"
 import { ReviewSystemError } from "@/lib/review-error-handler"
 
@@ -59,6 +59,7 @@ export default function PetCarePage() {
 
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
   const [isTroubleshooterOpen, setIsTroubleshooterOpen] = useState(false)
@@ -316,46 +317,90 @@ export default function PetCarePage() {
     }
   }
 
-  // Fetch businesses with race condition prevention and enhanced error handling
+  // Fetch businesses with race condition prevention and enhanced error handling - ENHANCED WITH RATINGS
   useEffect(() => {
-    async function loadBusinesses() {
+    async function fetchBusinesses() {
       const currentFetchId = ++fetchIdRef.current
-      console.log(`[PetCare] Starting fetch ${currentFetchId} for zip code:`, userZipCode)
+      console.log(`[Pet Care] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
 
       try {
         setLoading(true)
-        const fetchedBusinesses = await getBusinessesForCategoryPage("/pet-care")
+        setError(null)
+        const result = await getBusinessesForCategoryPage("/pet-care")
+        console.log(`[Pet Care] Raw businesses from API:`, result)
 
-        // Load photos for each business using public Cloudflare URLs with enhanced error handling
-        const businessesWithPhotos = await Promise.all(
-          fetchedBusinesses.map(async (business: Business) => {
+        // Load photos and ratings concurrently for each business
+        const businessesWithPhotosAndReviews = await Promise.all(
+          result.map(async (business: Business) => {
             try {
-              const photos = await loadBusinessPhotos(business.id)
-              return { ...business, photos }
-            } catch (photoError) {
-              console.error(`[PetCare] Error loading photos for business ${business.id}:`, photoError)
-              return { ...business, photos: [] }
+              console.log(
+                `[Pet Care] Processing business ${business.id}: ${business.displayName || business.businessName}`,
+              )
+
+              // Load photos and rating data concurrently
+              const [photos, ratingData] = await Promise.all([
+                loadBusinessPhotos(business.id || ""),
+                getBusinessRating(business.id || "").catch((error) => {
+                  console.error(`Failed to get rating for business ${business.id}:`, error)
+                  return { rating: 0, reviewCount: 0 }
+                }),
+              ])
+
+              console.log(`[Pet Care] Rating data for business ${business.id}:`, ratingData)
+
+              const enhancedBusiness = {
+                ...business,
+                photos,
+                rating: ratingData.rating,
+                reviewCount: ratingData.reviewCount,
+              }
+
+              console.log(`[Pet Care] Enhanced business ${business.id}:`, {
+                name: enhancedBusiness.displayName || enhancedBusiness.businessName,
+                rating: enhancedBusiness.rating,
+                reviewCount: enhancedBusiness.reviewCount,
+                photos: enhancedBusiness.photos?.length || 0,
+              })
+
+              return enhancedBusiness
+            } catch (error) {
+              console.error(`Error loading data for business ${business.id}:`, error)
+              // Return business with default values if individual business fails
+              return {
+                ...business,
+                photos: [],
+                rating: 0,
+                reviewCount: 0,
+              }
             }
           }),
         )
 
-        // Only update if this is still the current request
+        // Check if this is still the current request
         if (currentFetchId !== fetchIdRef.current) {
-          console.log(`[PetCare] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          console.log(`[Pet Care] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
           return
         }
 
-        console.log(`[PetCare] Fetch ${currentFetchId} got ${fetchedBusinesses.length} businesses`)
+        console.log(`[Pet Care] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+        console.log(
+          `[Pet Care] Businesses with ratings:`,
+          businessesWithPhotosAndReviews.map((b) => ({
+            name: b.displayName || b.businessName,
+            rating: b.rating,
+            reviewCount: b.reviewCount,
+          })),
+        )
 
         // Filter businesses by zip code if userZipCode is available
-        let finalBusinesses = businessesWithPhotos
+        let finalBusinesses = businessesWithPhotosAndReviews
         if (userZipCode) {
-          const originalCount = businessesWithPhotos.length
-          const filteredBusinesses = businessesWithPhotos.filter((business: Business) =>
+          const originalCount = businessesWithPhotosAndReviews.length
+          const filteredBusinesses = businessesWithPhotosAndReviews.filter((business: Business) =>
             businessServesZipCode(business, userZipCode),
           )
           console.log(
-            `[PetCare] Filtered from ${originalCount} to ${filteredBusinesses.length} businesses for zip ${userZipCode}`,
+            `[Pet Care] Filtered from ${originalCount} to ${filteredBusinesses.length} businesses for zip ${userZipCode}`,
           )
           finalBusinesses = filteredBusinesses
         }
@@ -367,16 +412,17 @@ export default function PetCarePage() {
         // Preload reviews for visible businesses (first 10)
         const businessIds = finalBusinesses.slice(0, 10).map((b) => b.id)
         if (businessIds.length > 0) {
-          console.log(`[PetCare] Preloading reviews for ${businessIds.length} businesses`)
+          console.log(`[Pet Care] Preloading reviews for ${businessIds.length} businesses`)
           // Don't await this - let it run in background
           preloadBusinessReviews(businessIds).catch((error) => {
-            console.warn("[PetCare] Review preloading failed:", error)
+            console.warn("[Pet Care] Review preloading failed:", error)
           })
         }
       } catch (error) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
-          console.error(`[PetCare] Fetch ${currentFetchId} error:`, error)
+          console.error(`[Pet Care] Fetch ${currentFetchId} error:`, error)
+          setError(error instanceof Error ? error.message : "Failed to load businesses")
         }
       } finally {
         // Only update loading if this is still the current request
@@ -386,7 +432,7 @@ export default function PetCarePage() {
       }
     }
 
-    loadBusinesses()
+    fetchBusinesses()
   }, [userZipCode])
 
   // Enhanced review loading with comprehensive error handling
@@ -493,8 +539,8 @@ export default function PetCarePage() {
     setSelectedProvider({
       id: business.id,
       name: business.displayName || business.businessName || "Pet Care Provider",
-      rating: 0,
-      reviews: 0,
+      rating: business.rating || 0,
+      reviews: business.reviewCount || 0,
     })
     setSelectedBusinessId(business.id)
     setIsReviewsDialogOpen(true)
@@ -502,9 +548,9 @@ export default function PetCarePage() {
     // Load reviews in background
     const reviews = await loadReviewsForBusiness(business.id)
 
-    // Calculate rating from reviews
-    let rating = 0
-    if (reviews.length > 0) {
+    // Calculate rating from reviews if not already available
+    let rating = business.rating || 0
+    if (reviews.length > 0 && !business.rating) {
       const totalRating = reviews.reduce((sum, review) => sum + (review.overallRating || review.rating || 0), 0)
       rating = totalRating / reviews.length
     }
@@ -542,6 +588,23 @@ export default function PetCarePage() {
 
     // Retry loading reviews
     await loadReviewsForBusiness(selectedBusinessId)
+  }
+
+  if (error) {
+    return (
+      <CategoryLayout title="Pet Care Services" backLink="/" backText="Categories">
+        <div className="mt-8 p-8 text-center">
+          <div className="text-red-600 mb-4">
+            <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading Pet Care Services</p>
+          </div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Try Again
+          </Button>
+        </div>
+      </CategoryLayout>
+    )
   }
 
   return (
@@ -660,20 +723,20 @@ export default function PetCarePage() {
                       {business.displayName || business.businessName || "Pet Care Provider"}
                     </h3>
 
-                    {/* Show static rating from business data if available */}
-                    {(business.rating || business.reviewCount) && (
-                      <div className="flex items-center gap-2">
-                        <StarRating rating={business.rating || 0} />
-                        <span className="text-sm text-gray-600">
-                          {business.rating ? business.rating.toFixed(1) : "0.0"}
+                    {/* Enhanced Star Rating Display - Integrated from Redis */}
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={business.rating || 0} size="md" />
+                      <span className="text-sm text-gray-600 font-medium">
+                        {business.rating ? business.rating.toFixed(1) : "0.0"}
+                      </span>
+                      {business.reviewCount && business.reviewCount > 0 ? (
+                        <span className="text-sm text-gray-500">
+                          ({business.reviewCount} {business.reviewCount === 1 ? "review" : "reviews"})
                         </span>
-                        {business.reviewCount && business.reviewCount > 0 && (
-                          <span className="text-sm text-gray-500">
-                            ({business.reviewCount} {business.reviewCount === 1 ? "review" : "reviews"})
-                          </span>
-                        )}
-                      </div>
-                    )}
+                      ) : (
+                        <span className="text-sm text-gray-500">No reviews yet</span>
+                      )}
+                    </div>
 
                     {business.businessDescription && (
                       <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
