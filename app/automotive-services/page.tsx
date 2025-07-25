@@ -19,7 +19,7 @@ import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { StarRating } from "@/components/star-rating"
-import { getBusinessReviews } from "@/app/actions/review-actions"
+import { getBusinessRating } from "@/app/actions/review-actions"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -407,52 +407,42 @@ export default function AutomotiveServicesPage() {
         setError(null)
 
         const result = await getBusinessesForCategoryPage("/automotive-services")
+        console.log(`[Automotive Services] Raw businesses from API:`, result)
 
-        // Load photos and reviews concurrently for each business
+        // Load photos and ratings concurrently for each business
         const businessesWithPhotosAndReviews = await Promise.all(
           result.map(async (business: Business) => {
             try {
-              // Load photos and reviews concurrently
-              const [photos, reviewsData] = await Promise.all([
+              console.log(
+                `[Automotive Services] Processing business ${business.id}: ${business.displayName || business.businessName}`,
+              )
+
+              // Load photos and rating data concurrently
+              const [photos, ratingData] = await Promise.all([
                 loadBusinessPhotos(business.id),
-                getBusinessReviews(business.id).catch(() => ({ reviews: [], averageRating: 0, totalReviews: 0 })),
+                getBusinessRating(business.id).catch((error) => {
+                  console.error(`Failed to get rating for business ${business.id}:`, error)
+                  return { rating: 0, reviewCount: 0 }
+                }),
               ])
 
-              // Calculate rating and review count with proper type safety
-              let rating = 0
-              let reviewCount = 0
+              console.log(`[Automotive Services] Rating data for business ${business.id}:`, ratingData)
 
-              if (reviewsData && typeof reviewsData === "object") {
-                // Handle averageRating
-                if (typeof reviewsData.averageRating === "number" && !isNaN(reviewsData.averageRating)) {
-                  rating = reviewsData.averageRating
-                } else if (typeof reviewsData.averageRating === "string") {
-                  const parsed = Number.parseFloat(reviewsData.averageRating)
-                  rating = !isNaN(parsed) ? parsed : 0
-                }
-
-                // Handle totalReviews/reviewCount
-                if (typeof reviewsData.totalReviews === "number" && !isNaN(reviewsData.totalReviews)) {
-                  reviewCount = reviewsData.totalReviews
-                } else if (typeof reviewsData.reviewCount === "number" && !isNaN(reviewsData.reviewCount)) {
-                  reviewCount = reviewsData.reviewCount
-                } else if (typeof reviewsData.totalReviews === "string") {
-                  const parsed = Number.parseInt(reviewsData.totalReviews, 10)
-                  reviewCount = !isNaN(parsed) ? parsed : 0
-                } else if (Array.isArray(reviewsData.reviews)) {
-                  reviewCount = reviewsData.reviews.length
-                }
-              }
-
-              // Ensure rating is between 0 and 5
-              rating = Math.max(0, Math.min(5, rating))
-
-              return {
+              const enhancedBusiness = {
                 ...business,
                 photos,
-                rating: Number(rating) || 0,
-                reviewCount: Number(reviewCount) || 0,
+                rating: ratingData.rating,
+                reviewCount: ratingData.reviewCount,
               }
+
+              console.log(`[Automotive Services] Enhanced business ${business.id}:`, {
+                name: enhancedBusiness.displayName || enhancedBusiness.businessName,
+                rating: enhancedBusiness.rating,
+                reviewCount: enhancedBusiness.reviewCount,
+                photos: enhancedBusiness.photos?.length || 0,
+              })
+
+              return enhancedBusiness
             } catch (error) {
               console.error(`Error loading data for business ${business.id}:`, error)
               // Return business with default values if individual business fails
@@ -475,6 +465,14 @@ export default function AutomotiveServicesPage() {
         }
 
         console.log(`[Automotive Services] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+        console.log(
+          `[Automotive Services] Businesses with ratings:`,
+          businessesWithPhotosAndReviews.map((b) => ({
+            name: b.displayName || b.businessName,
+            rating: b.rating,
+            reviewCount: b.reviewCount,
+          })),
+        )
 
         // Filter businesses by zip code if userZipCode is available
         if (userZipCode) {
@@ -862,19 +860,25 @@ export default function AutomotiveServicesPage() {
                 <Card key={business.id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex flex-col space-y-4">
-                      {/* Business Name and Star Rating */}
-                      <div className="flex justify-between items-start">
-                        <h3 className="text-xl font-semibold text-gray-900 flex-1">
-                          {business.displayName || business.businessName}
-                        </h3>
-                        <div className="flex items-center ml-4">
-                          <StarRating
-                            rating={business.rating || 0}
-                            size="sm"
-                            showRating={true}
-                            reviewCount={business.reviewCount || 0}
-                          />
-                        </div>
+                      {/* Business Name */}
+                      <h3 className="text-xl font-semibold text-gray-900 flex-1">
+                        {business.displayName || business.businessName}
+                      </h3>
+
+                      {/* Star Rating - moved below business name */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <StarRating rating={business.rating || 0} size="sm" />
+                        <span className="text-sm text-gray-600">
+                          {business.rating && business.rating > 0 ? business.rating.toFixed(1) : "0.0"}
+                        </span>
+                        {business.reviewCount && business.reviewCount > 0 && (
+                          <span className="text-sm text-gray-500">
+                            ({business.reviewCount} review{business.reviewCount !== 1 ? "s" : ""})
+                          </span>
+                        )}
+                        {(!business.reviewCount || business.reviewCount === 0) && (
+                          <span className="text-sm text-gray-500">(No reviews yet)</span>
+                        )}
                       </div>
 
                       {/* Contact Info - Compact Layout */}
