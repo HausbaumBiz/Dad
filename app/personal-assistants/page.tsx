@@ -10,19 +10,36 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { useState } from "react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useEffect } from "react"
-import { MapPin, Phone, Camera, ChevronLeft, ChevronRight } from "lucide-react"
+import { MapPin, Phone, X, Heart, HeartHandshake, Loader2, LogIn } from "lucide-react"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useRef } from "react"
-import { getBusinessMedia, type MediaItem } from "@/app/actions/media-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
-import { Heart, HeartHandshake, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { getBusinessReviews } from "@/app/actions/review-actions"
 import { StarRating } from "@/components/star-rating"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
-// Helper function to extract string from subcategory data
+// Enhanced Business interface with service area
+interface Business {
+  id: string
+  displayName?: string
+  businessName: string
+  displayLocation?: string
+  displayPhone?: string
+  zipCode: string
+  email?: string
+  serviceArea?: string[] // Array of ZIP codes the business serves
+  isNationwide?: boolean // Whether the business serves nationwide
+  subcategories?: any[] // Changed from string[] to any[] to handle objects
+  allSubcategories?: any[] // Changed from string[] to any[] to handle objects
+  rating?: number
+  reviewCount?: number
+  subcategory?: string | any // Can be string or object
+}
+
+// Helper function to extract string value from subcategory object
 const getSubcategoryString = (subcategory: any): string => {
   if (typeof subcategory === "string") {
     return subcategory
@@ -38,268 +55,7 @@ const getSubcategoryString = (subcategory: any): string => {
 
 export default function PersonalAssistantsPage() {
   const { toast } = useToast()
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
-  const [isReviewsOpen, setIsReviewsOpen] = useState(false)
-
-  // State for profile dialog
-  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
-  const [selectedBusinessProfile, setSelectedBusinessProfile] = useState<{ id: string; name: string } | null>(null)
-
-  // State for filtering
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
-  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
-  const [allProviders, setAllProviders] = useState([])
-  const [filteredProviders, setFilteredProviders] = useState([])
-
-  // State for media/photos
-  const [businessPhotos, setBusinessPhotos] = useState<Record<string, MediaItem[]>>({})
-  const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
-
-  // State for carousel navigation
-  const [carouselIndex, setCarouselIndex] = useState<Record<string, number>>({})
-
-  // State for reviews dialog
-  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-
-  // Remove the mock providers state and replace with real data fetching
-  const [providers, setProviders] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [userZipCode, setUserZipCode] = useState<string | null>(null)
-
-  // Add after existing state declarations:
   const fetchIdRef = useRef(0)
-
-  // State for favorites functionality
-  const [currentUser, setCurrentUser] = useState<any>(null)
-  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
-  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
-  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
-
-  // Add after existing state declarations:
-  const [businessReviews, setBusinessReviews] = useState<Record<string, any[]>>({})
-  const [businessRatings, setBusinessRatings] = useState<Record<string, { rating: number; count: number }>>({})
-  const [loadingReviews, setLoadingReviews] = useState<Record<string, boolean>>({})
-
-  // Enhanced Business interface
-  interface Business {
-    id: string
-    name?: string
-    displayName?: string
-    displayPhone?: string
-    displayCity?: string
-    displayState?: string
-    city?: string
-    state?: string
-    phone?: string
-    rating?: number
-    reviewCount?: number
-    services?: any[]
-    subcategories?: any[]
-    allSubcategories?: any[]
-    zipCode?: string
-    serviceArea?: string[]
-    adDesignData?: {
-      businessInfo?: {
-        phone?: string
-        city?: string
-        state?: string
-      }
-    }
-    email?: string
-    displayLocation?: string
-  }
-
-  // Helper function to check if business serves a zip code
-  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
-    // If business has no service area defined, fall back to primary zip code
-    if (!business.serviceArea || business.serviceArea.length === 0) {
-      return business.zipCode === zipCode
-    }
-
-    // Check if business serves nationwide (indicated by having "nationwide" in service area)
-    if (business.serviceArea.some((area) => area.toLowerCase().includes("nationwide"))) {
-      return true
-    }
-
-    // Check if the zip code is in the business's service area
-    return business.serviceArea.includes(zipCode)
-  }
-
-  // Add this function after the loadBusinessPhotos function:
-  const loadBusinessReviews = async (businessId: string) => {
-    if (loadingReviews[businessId] || businessReviews[businessId]) {
-      return // Already loading or loaded
-    }
-
-    setLoadingReviews((prev) => ({ ...prev, [businessId]: true }))
-
-    try {
-      const reviews = await getBusinessReviews(businessId)
-      setBusinessReviews((prev) => ({ ...prev, [businessId]: reviews }))
-
-      // Calculate average rating
-      if (reviews && reviews.length > 0) {
-        const totalRating = reviews.reduce((sum, review) => {
-          return sum + (review.overallRating || review.rating || 0)
-        }, 0)
-        const averageRating = totalRating / reviews.length
-        setBusinessRatings((prev) => ({
-          ...prev,
-          [businessId]: { rating: averageRating, count: reviews.length },
-        }))
-      } else {
-        setBusinessRatings((prev) => ({
-          ...prev,
-          [businessId]: { rating: 0, count: 0 },
-        }))
-      }
-    } catch (error) {
-      console.error(`Error loading reviews for business ${businessId}:`, error)
-      setBusinessReviews((prev) => ({ ...prev, [businessId]: [] }))
-      setBusinessRatings((prev) => ({
-        ...prev,
-        [businessId]: { rating: 0, count: 0 },
-      }))
-    } finally {
-      setLoadingReviews((prev) => ({ ...prev, [businessId]: false }))
-    }
-  }
-
-  // Function to load photos for a business
-  const loadBusinessPhotos = async (businessId: string) => {
-    if (loadingPhotos[businessId] || businessPhotos[businessId]) {
-      return // Already loading or loaded
-    }
-
-    setLoadingPhotos((prev) => ({ ...prev, [businessId]: true }))
-
-    try {
-      const mediaData = await getBusinessMedia(businessId)
-      const photos = mediaData?.photoAlbum || []
-
-      setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
-      setCarouselIndex((prev) => ({ ...prev, [businessId]: 0 }))
-    } catch (error) {
-      console.error(`Error loading photos for business ${businessId}:`, error)
-      setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
-    } finally {
-      setLoadingPhotos((prev) => ({ ...prev, [businessId]: false }))
-    }
-  }
-
-  // Carousel navigation functions
-  const handlePrevious = (businessId: string) => {
-    const photos = businessPhotos[businessId] || []
-    const currentIndex = carouselIndex[businessId] || 0
-    const newIndex = currentIndex > 0 ? currentIndex - 1 : Math.max(0, photos.length - 5)
-    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
-  }
-
-  const handleNext = (businessId: string) => {
-    const photos = businessPhotos[businessId] || []
-    const currentIndex = carouselIndex[businessId] || 0
-    const maxIndex = Math.max(0, photos.length - 5)
-    const newIndex = currentIndex < maxIndex ? currentIndex + 1 : 0
-    setCarouselIndex((prev) => ({ ...prev, [businessId]: newIndex }))
-  }
-
-  // Function to format phone numbers
-  const formatPhoneNumber = (phone: string): string => {
-    if (!phone) return "No phone provided"
-
-    // Remove all non-numeric characters
-    const cleaned = phone.replace(/\D/g, "")
-
-    // Check if it's a valid 10-digit US phone number
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
-    }
-
-    // Return original if not a standard format
-    return phone
-  }
-
-  // Filter handling functions
-  const handleFilterChange = (filterId: string, checked: boolean) => {
-    const filterOption = filterOptions.find((option) => option.id === filterId)
-    if (!filterOption) return
-
-    setSelectedFilters((prev) => {
-      if (checked) {
-        return [...prev, filterOption.value]
-      } else {
-        return prev.filter((filter) => filter !== filterOption.value)
-      }
-    })
-  }
-
-  const hasExactSubcategoryMatch = (businessSubcategories: any[], filter: string): boolean => {
-    return businessSubcategories.some((subcategory) => {
-      // Use helper function to get string value
-      const subcatNormalized = getSubcategoryString(subcategory).trim().toLowerCase()
-      const filterNormalized = filter.trim().toLowerCase()
-
-      // Only exact matches
-      return subcatNormalized === filterNormalized
-    })
-  }
-
-  const applyFilters = () => {
-    console.log("Applying filters:", selectedFilters)
-    console.log("All providers:", allProviders)
-
-    setAppliedFilters([...selectedFilters])
-
-    if (selectedFilters.length === 0) {
-      setFilteredProviders(allProviders)
-      return
-    }
-
-    const filtered = allProviders.filter((business: Business) => {
-      // Get all subcategories for this business
-      const businessSubcategories = [...(business.allSubcategories || []), ...(business.subcategories || [])]
-
-      console.log(`Business ${business.displayName || business.name} subcategories:`, businessSubcategories)
-
-      // Check if any selected filter matches any business subcategory
-      const hasMatch = selectedFilters.some((filter) => {
-        // Use strict matching
-        const filterMatch = hasExactSubcategoryMatch(businessSubcategories, filter)
-        console.log(`Filter "${filter}" matches business: ${filterMatch}`)
-        return filterMatch
-      })
-
-      console.log(`Business ${business.displayName || business.name} has match: ${hasMatch}`)
-      return hasMatch
-    })
-
-    console.log("Filtered results:", filtered)
-    setFilteredProviders(filtered)
-
-    // Show toast notification
-    toast({
-      title: filtered.length > 0 ? "Filters Applied" : "No Matches Found",
-      description:
-        filtered.length > 0
-          ? `Showing ${filtered.length} of ${allProviders.length} businesses`
-          : "No businesses match your selected filters",
-      duration: 3000,
-    })
-  }
-
-  const clearFilters = () => {
-    setSelectedFilters([])
-    setAppliedFilters([])
-    setFilteredProviders(allProviders)
-
-    toast({
-      title: "Filters Cleared",
-      description: `Showing all ${allProviders.length} businesses`,
-      duration: 3000,
-    })
-  }
 
   const filterOptions = [
     { id: "assistants1", label: "Personal Drivers", value: "Personal Drivers" },
@@ -309,203 +65,383 @@ export default function PersonalAssistantsPage() {
     { id: "assistants5", label: "Personal Shoppers", value: "Personal Shoppers" },
   ]
 
-  // Replace the useEffect:
-  useEffect(() => {
-    async function fetchBusinesses() {
-      const currentFetchId = ++fetchIdRef.current
+  const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState<any>(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
+  const [businesses, setBusinesses] = useState<Business[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
 
-      try {
-        setLoading(true)
-        setError(null)
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
 
-        console.log(`[Personal Assistants] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+  // Photo state
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
 
-        const businesses = await getBusinessesForCategoryPage("/personal-assistants")
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string) => {
+    if (businessPhotos[businessId]) return // Already loaded
 
-        // Check if this is still the current request
-        if (currentFetchId !== fetchIdRef.current) {
-          console.log(
-            `[Personal Assistants] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`,
-          )
-          return
-        }
-
-        console.log(`[Personal Assistants] Fetch ${currentFetchId} completed, got ${businesses.length} businesses`)
-        console.log("Sample business data:", businesses[0]) // Debug log
-
-        // Filter by zip code if available
-        let filteredBusinesses = businesses
-        if (userZipCode) {
-          console.log(`[Personal Assistants] Filtering by zip code: ${userZipCode}`)
-          filteredBusinesses = businesses.filter((business: Business) => {
-            const serves = businessServesZipCode(business, userZipCode)
-            console.log(
-              `[Personal Assistants] Business ${business.displayName || business.name} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
-              {
-                serviceArea: business.serviceArea,
-                primaryZip: business.zipCode,
-              },
-            )
-            return serves
-          })
-          console.log(`[Personal Assistants] After filtering: ${filteredBusinesses.length} businesses`)
-        }
-
-        // Use businesses as-is without adding default subcategories
-        setAllProviders(filteredBusinesses)
-        setFilteredProviders(filteredBusinesses)
-
-        // Load photos and reviews for each business
-        filteredBusinesses.forEach((business: Business) => {
-          loadBusinessPhotos(business.id)
-          loadBusinessReviews(business.id)
-        })
-      } catch (err) {
-        // Only update error if this is still the current request
-        if (currentFetchId === fetchIdRef.current) {
-          console.error(`[Personal Assistants] Error in fetch ${currentFetchId}:`, err)
-          setError("Failed to load businesses")
-        }
-      } finally {
-        // Only update loading if this is still the current request
-        if (currentFetchId === fetchIdRef.current) {
-          setLoading(false)
-        }
-      }
+    try {
+      const photos = await loadBusinessPhotos(businessId)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: photos,
+      }))
+    } catch (error) {
+      console.error(`Failed to load photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({
+        ...prev,
+        [businessId]: [],
+      }))
     }
-
-    fetchBusinesses()
-  }, [userZipCode])
-
-  // Get user's zip code from localStorage
-  useEffect(() => {
-    const savedZipCode = localStorage.getItem("savedZipCode")
-    if (savedZipCode) {
-      setUserZipCode(savedZipCode)
-    }
-  }, [])
+  }
 
   // Check user session
   useEffect(() => {
     async function checkUserSession() {
       try {
         const session = await getUserSession()
-        setCurrentUser(session?.user || null)
+        if (session?.user) {
+          setCurrentUser(session.user)
+        }
       } catch (error) {
         console.error("Error checking user session:", error)
-        setCurrentUser(null)
       }
     }
     checkUserSession()
   }, [])
 
-  // Load user's favorite businesses
+  // Load favorite businesses for current user
   useEffect(() => {
     async function loadFavorites() {
-      if (!currentUser?.id) {
-        setFavoriteBusinesses(new Set())
-        return
-      }
+      if (!currentUser) return
 
       try {
-        const favoriteChecks = await Promise.all(
-          filteredProviders.map(async (provider: Business) => {
-            const isFavorite = await checkIfBusinessIsFavorite(provider.id)
-            return { id: provider.id, isFavorite }
-          }),
-        )
-
-        const favoriteIds = favoriteChecks.filter((check) => check.isFavorite).map((check) => check.id)
-        setFavoriteBusinesses(new Set(favoriteIds))
+        const favoriteIds = new Set<string>()
+        for (const business of businesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favoriteIds.add(business.id)
+          }
+        }
+        setFavoriteBusinesses(favoriteIds)
       } catch (error) {
         console.error("Error loading favorites:", error)
       }
     }
 
-    if (filteredProviders.length > 0) {
+    if (businesses.length > 0) {
       loadFavorites()
     }
-  }, [currentUser, filteredProviders])
+  }, [currentUser, businesses])
 
-  const handleOpenReviews = (businessId: string) => {
-    const business = filteredProviders.find((p: Business) => p.id === businessId)
-    if (business) {
-      setSelectedProvider(business.displayName || business.name)
-      setSelectedBusinessProfile({ id: businessId, name: business.displayName || business.name })
-      setIsReviewsDialogOpen(true)
+  // Get user's zip code from localStorage
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
+      console.log(`User zip code loaded: ${savedZipCode}`)
+    } else {
+      console.log("No user zip code found in localStorage")
     }
+  }, [])
+
+  // Helper function to check if a business serves a specific zip code
+  const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
+    console.log(`Checking service area for ${business.displayName || business.businessName}:`)
+    console.log(`  - Primary ZIP: ${business.zipCode}`)
+    console.log(`  - Service Area: [${business.serviceArea?.join(", ") || "none"}]`)
+    console.log(`  - Nationwide: ${business.isNationwide || false}`)
+    console.log(`  - Target ZIP: ${targetZipCode}`)
+
+    // Check if business is nationwide
+    if (business.isNationwide) {
+      console.log(`  - ${business.displayName || business.businessName}: nationwide=true, matches=true`)
+      return true
+    }
+
+    // Check if zip code is in service area
+    if (business.serviceArea && Array.isArray(business.serviceArea) && business.serviceArea.length > 0) {
+      const matches = business.serviceArea.includes(targetZipCode)
+      console.log(
+        `  - ${business.displayName || business.businessName}: serviceArea=[${business.serviceArea.join(", ")}], userZip="${targetZipCode}", matches=${matches}`,
+      )
+      return matches
+    }
+
+    // Fall back to primary zip code
+    const matches = business.zipCode === targetZipCode
+    console.log(
+      `  - ${business.displayName || business.businessName}: primaryZip="${business.zipCode}", userZip="${targetZipCode}", matches=${matches}`,
+    )
+    return matches
   }
 
-  const handleOpenProfile = (provider: Business) => {
-    setSelectedBusinessProfile({ id: provider.id, name: provider.displayName || provider.name })
+  // Fetch businesses in this category
+  useEffect(() => {
+    async function fetchBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(
+        `[${new Date().toISOString()}] Fetching businesses for /personal-assistants (request #${currentFetchId})`,
+      )
+
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        const result = await getBusinessesForCategoryPage("/personal-assistants")
+        console.log(
+          `[${new Date().toISOString()}] Retrieved ${result.length} total businesses (request #${currentFetchId})`,
+        )
+
+        // Check if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
+          return
+        }
+
+        result.forEach((business: Business) => {
+          console.log(
+            `  - ${business.id}: "${business.displayName || business.businessName}" (zipCode: ${business.zipCode})`,
+          )
+        })
+
+        // Load photos and reviews concurrently for each business
+        const businessesWithRatings = await Promise.all(
+          result.map(async (business: Business) => {
+            try {
+              // Load photos and reviews concurrently
+              const [photos, reviews] = await Promise.all([
+                loadBusinessPhotos(business.id).catch((error) => {
+                  console.error(`Failed to load photos for business ${business.id}:`, error)
+                  return []
+                }),
+                getBusinessReviews(business.id).catch((error) => {
+                  console.error(`Failed to load reviews for business ${business.id}:`, error)
+                  return []
+                }),
+              ])
+
+              // Store photos
+              setBusinessPhotos((prev) => ({
+                ...prev,
+                [business.id]: photos,
+              }))
+
+              // Calculate rating and review count
+              let rating = 0
+              let reviewCount = 0
+
+              if (Array.isArray(reviews) && reviews.length > 0) {
+                const totalRating = reviews.reduce((sum: number, review: any) => {
+                  const reviewRating = review.overallRating || review.rating || 0
+                  return sum + (typeof reviewRating === "number" ? reviewRating : 0)
+                }, 0)
+                rating = totalRating / reviews.length
+                reviewCount = reviews.length
+              }
+
+              // Ensure rating is a valid number between 0 and 5
+              rating = Math.max(0, Math.min(5, isNaN(rating) ? 0 : rating))
+              reviewCount = Math.max(0, isNaN(reviewCount) ? 0 : reviewCount)
+
+              return {
+                ...business,
+                rating,
+                reviewCount,
+              }
+            } catch (error) {
+              console.error(`Error processing business ${business.id}:`, error)
+              return {
+                ...business,
+                rating: 0,
+                reviewCount: 0,
+              }
+            }
+          }),
+        )
+
+        // Check again if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
+          return
+        }
+
+        // Filter by zip code if available
+        let filteredResult = businessesWithRatings
+        if (userZipCode) {
+          console.log(
+            `[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${currentFetchId})`,
+          )
+          filteredResult = businessesWithRatings.filter((business: Business) =>
+            businessServesZipCode(business, userZipCode),
+          )
+          console.log(
+            `[${new Date().toISOString()}] After filtering: ${filteredResult.length} businesses (request #${currentFetchId})`,
+          )
+        }
+
+        setBusinesses(filteredResult)
+        setAllBusinesses(filteredResult) // Store all businesses
+      } catch (error) {
+        console.error("Error fetching businesses:", error)
+        if (currentFetchId === fetchIdRef.current) {
+          setError("Failed to load businesses")
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading businesses. Please try again later.",
+            variant: "destructive",
+          })
+        }
+      } finally {
+        if (currentFetchId === fetchIdRef.current) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    fetchBusinesses()
+  }, [toast, userZipCode])
+
+  const handleOpenReviews = (provider: any) => {
+    setSelectedProvider(provider)
+    setSelectedBusinessId(provider.id)
+    setIsReviewsDialogOpen(true)
+  }
+
+  const handleOpenProfile = (provider: any) => {
+    console.log("Opening profile for business:", provider.id, provider.businessName)
+    setSelectedProvider(provider)
     setIsProfileDialogOpen(true)
   }
 
-  const handleAddToFavorites = async (provider: Business) => {
+  // Handle adding business to favorites
+  const handleAddToFavorites = async (business: Business) => {
     if (!currentUser) {
       setIsLoginDialogOpen(true)
       return
     }
 
-    if (favoriteBusinesses.has(provider.id)) {
-      toast({
-        title: "Already Saved",
-        description: `${provider.displayName || provider.name} is already in your favorites`,
-        duration: 3000,
-      })
-      return
-    }
-
-    setSavingStates((prev) => ({ ...prev, [provider.id]: true }))
+    // Set loading state
+    setSavingStates((prev) => ({ ...prev, [business.id]: true }))
 
     try {
       const result = await addFavoriteBusiness({
-        id: provider.id,
-        businessName: provider.name || "",
-        displayName: provider.displayName || provider.name || "",
-        phone: provider.displayPhone || provider.phone || "",
-        email: provider.email || "",
-        address: provider.displayLocation || "",
-        zipCode: provider.zipCode || "",
+        id: business.id,
+        businessName: business.businessName,
+        displayName: business.displayName,
+        phone: business.displayPhone,
+        email: business.email,
+        address: business.displayLocation,
+        zipCode: business.zipCode,
       })
 
       if (result.success) {
-        setFavoriteBusinesses((prev) => new Set([...prev, provider.id]))
+        setFavoriteBusinesses((prev) => new Set([...prev, business.id]))
         toast({
           title: "Business Card Saved!",
           description: result.message,
-          duration: 3000,
         })
       } else {
         toast({
           title: "Error",
           description: result.message,
           variant: "destructive",
-          duration: 3000,
         })
       }
     } catch (error) {
       console.error("Error adding to favorites:", error)
       toast({
         title: "Error",
-        description: "Failed to save business card. Please try again.",
+        description: "Failed to save business card",
         variant: "destructive",
-        duration: 3000,
       })
     } finally {
-      setSavingStates((prev) => ({ ...prev, [provider.id]: false }))
+      setSavingStates((prev) => ({ ...prev, [business.id]: false }))
     }
   }
 
-  const mockReviews = {
-    "Personal Assistant 1": [
-      { id: 1, rating: 5, comment: "Great service!" },
-      { id: 2, rating: 4, comment: "Good, but could be better." },
-    ],
-    "Personal Assistant 2": [
-      { id: 3, rating: 3, comment: "Average service." },
-      { id: 4, rating: 5, comment: "Excellent!" },
-    ],
+  // Handle clearing zip code filter
+  const handleClearZipCode = () => {
+    localStorage.removeItem("savedZipCode")
+    setUserZipCode(null)
+  }
+
+  // Function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, filterValue: string): boolean => {
+    const subcategories = business.subcategories || []
+    const allSubcategories = business.allSubcategories || []
+
+    // Check subcategories array
+    for (const subcategory of subcategories) {
+      const subcategoryStr = getSubcategoryString(subcategory)
+      if (subcategoryStr === filterValue) {
+        return true
+      }
+    }
+
+    // Check allSubcategories array
+    for (const subcategory of allSubcategories) {
+      const subcategoryStr = getSubcategoryString(subcategory)
+      if (subcategoryStr === filterValue) {
+        return true
+      }
+    }
+
+    // Check business.subcategory field
+    if (business.subcategory) {
+      const subcategoryStr = getSubcategoryString(business.subcategory)
+      if (subcategoryStr === filterValue) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  // Handle filter selection
+  const handleFilterChange = (filterId: string, filterValue: string, checked: boolean) => {
+    if (checked) {
+      setSelectedFilters((prev) => [...prev, filterValue])
+    } else {
+      setSelectedFilters((prev) => prev.filter((f) => f !== filterValue))
+    }
+  }
+
+  // Apply filters
+  const applyFilters = () => {
+    console.log("Applying filters:", selectedFilters)
+
+    if (selectedFilters.length === 0) {
+      setBusinesses(allBusinesses)
+      setAppliedFilters([])
+      return
+    }
+
+    const filtered = allBusinesses.filter((business) => {
+      return selectedFilters.some((filter) => hasExactSubcategoryMatch(business, filter))
+    })
+
+    console.log(`Filtered results: ${filtered.length} businesses`)
+    setBusinesses(filtered)
+    setAppliedFilters([...selectedFilters])
+    setSelectedFilters([])
+  }
+
+  // Clear filters
+  const clearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setBusinesses(allBusinesses)
   }
 
   return (
@@ -539,432 +475,305 @@ export default function PersonalAssistantsPage() {
         </div>
       </div>
 
-      {/* Enhanced Filter Controls */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-        <div className="flex flex-wrap gap-4 mb-4">
+      {/* Enhanced Filter Interface */}
+      <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <h3 className="text-lg font-semibold mb-4">Filter by Service Type</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           {filterOptions.map((option) => (
             <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
-                id={option.id}
                 checked={selectedFilters.includes(option.value)}
-                onChange={(e) => handleFilterChange(option.id, e.target.checked)}
+                onChange={(e) => handleFilterChange(option.id, option.value, e.target.checked)}
                 className="rounded border-gray-300 text-primary focus:ring-primary"
               />
-              <span className="text-sm font-medium text-gray-700">{option.label}</span>
+              <span className="text-sm text-gray-700">{option.label}</span>
             </label>
           ))}
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button onClick={applyFilters} disabled={selectedFilters.length === 0} size="sm">
+          <div className="flex items-center space-x-4">
+            <Button
+              onClick={applyFilters}
+              disabled={selectedFilters.length === 0}
+              className="bg-primary hover:bg-primary/90"
+            >
               Apply Filters ({selectedFilters.length})
             </Button>
+
             {appliedFilters.length > 0 && (
-              <Button variant="outline" onClick={clearFilters} size="sm">
+              <Button
+                onClick={clearFilters}
+                variant="outline"
+                className="text-gray-600 hover:text-gray-800 bg-transparent"
+              >
                 Clear Filters
               </Button>
             )}
           </div>
-          {selectedFilters.length > 0 && (
-            <span className="text-sm text-gray-600">
-              {selectedFilters.length} filter{selectedFilters.length !== 1 ? "s" : ""} selected
-            </span>
+
+          {appliedFilters.length > 0 && (
+            <div className="text-sm text-gray-600">
+              Showing {businesses.length} of {allBusinesses.length} businesses
+            </div>
           )}
         </div>
+
+        {/* Active Filters Display */}
+        {appliedFilters.length > 0 && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm font-medium text-blue-800 mb-2">Active Filters:</p>
+            <div className="flex flex-wrap gap-2">
+              {appliedFilters.map((filter, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                >
+                  {filter}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Active Filters Display */}
-      {appliedFilters.length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-blue-700">
-                <span className="font-medium">Active filters:</span> {appliedFilters.join(", ")}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Showing {filteredProviders.length} of {allProviders.length} businesses
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs bg-transparent">
-              Clear
-            </Button>
-          </div>
-        </div>
-      )}
-
+      {/* Zip Code Status Indicator */}
       {userZipCode && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-blue-700">
-              <span className="font-medium">Showing personal assistants for zip code:</span> {userZipCode}
-              <span className="text-xs block mt-1">(Includes businesses with {userZipCode} in their service area)</span>
-            </p>
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-blue-800">Showing businesses that service: {userZipCode}</p>
+                <p className="text-sm text-blue-700">Including businesses with this ZIP code in their service area</p>
+              </div>
+            </div>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              onClick={() => {
-                localStorage.removeItem("savedZipCode")
-                setUserZipCode(null)
-              }}
-              className="text-xs"
+              onClick={handleClearZipCode}
+              className="text-blue-700 hover:text-blue-900 hover:bg-blue-100"
             >
+              <X className="w-4 h-4 mr-1" />
               Clear Filter
             </Button>
           </div>
         </div>
       )}
 
-      {loading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading personal assistants...</p>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <p>Loading businesses...</p>
         </div>
       ) : error ? (
-        <div className="text-center py-8">
+        <div className="text-center py-12">
           <p className="text-red-600">{error}</p>
         </div>
-      ) : filteredProviders.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="max-w-md mx-auto">
-            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {appliedFilters.length > 0
-                ? "No Personal Assistants Match Your Filters"
-                : userZipCode
-                  ? `No Personal Assistants in ${userZipCode} Area`
-                  : "No Personal Assistants Yet"}
-            </h3>
-            <p className="text-gray-600 mb-4">
-              {appliedFilters.length > 0
-                ? `No businesses found matching: ${appliedFilters.join(", ")}. Try adjusting your filters.`
-                : userZipCode
-                  ? `We're building our network of personal assistant services in the ${userZipCode} area.`
-                  : "Be the first personal assistant service to join our platform and connect with clients in your area."}
-            </p>
-            {appliedFilters.length > 0 ? (
-              <Button onClick={clearFilters} className="bg-indigo-600 hover:bg-indigo-700">
-                Clear Filters
-              </Button>
-            ) : (
-              <Button className="bg-indigo-600 hover:bg-indigo-700">Register Your Service</Button>
-            )}
-          </div>
+      ) : businesses.length > 0 ? (
+        <div className="space-y-6">
+          {businesses.map((business) => {
+            const isFavorite = favoriteBusinesses.has(business.id)
+            const isSaving = savingStates[business.id]
+
+            return (
+              <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  {/* Compact Business Info */}
+                  <div className="space-y-2">
+                    {/* Business Name */}
+                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
+
+                    {/* Star Rating below business name */}
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={business.rating || 0} size="sm" />
+                      <span className="text-sm text-gray-600">
+                        {business.rating ? business.rating.toFixed(1) : "0.0"}
+                      </span>
+                      {business.reviewCount && business.reviewCount > 0 && (
+                        <span className="text-sm text-gray-500">
+                          ({business.reviewCount} review{business.reviewCount !== 1 ? "s" : ""})
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Contact Info Row */}
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {/* Location */}
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 mr-1 text-primary" />
+                        <span>{business.displayLocation}</span>
+                      </div>
+
+                      {/* Phone */}
+                      {business.displayPhone && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1 text-primary" />
+                          <a href={`tel:${business.displayPhone}`} className="hover:text-primary transition-colors">
+                            {business.displayPhone}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Services */}
+                    {business.subcategories && business.subcategories.length > 0 && (
+                      <div>
+                        <div className="flex flex-wrap gap-2">
+                          {business.subcategories.map((service: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Photo Carousel and Buttons Row */}
+                  <div className="mt-4 flex flex-col lg:flex-row gap-4">
+                    {/* Photo Carousel */}
+                    <div className="flex-1">
+                      <PhotoCarousel
+                        businessId={business.id}
+                        photos={businessPhotos[business.id] || []}
+                        onLoadPhotos={() => loadPhotosForBusiness(business.id)}
+                        showMultiple={true}
+                        photosPerView={5}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-40">
+                      <Button className="flex-1 lg:flex-none min-w-[120px]" onClick={() => handleOpenReviews(business)}>
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none min-w-[120px] bg-transparent"
+                        onClick={() => handleOpenProfile(business)}
+                      >
+                        View Profile
+                      </Button>
+                      <Button
+                        variant={isFavorite ? "default" : "outline"}
+                        className={`flex-1 lg:flex-none min-w-[120px] ${
+                          isFavorite
+                            ? "bg-red-500 hover:bg-red-600 text-white"
+                            : "bg-transparent border-red-500 text-red-500 hover:bg-red-50"
+                        }`}
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={isFavorite || isSaving}
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : isFavorite ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       ) : (
-        <div className="space-y-6">
-          {filteredProviders.map((provider) => (
-            <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-6">
-                  {/* Left: Business Info - Made wider */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {provider.displayName || provider.name}
-                    </h3>
-
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
-                        <span>
-                          {provider.adDesignData?.businessInfo?.city && provider.adDesignData?.businessInfo?.state
-                            ? `${provider.adDesignData.businessInfo.city}, ${provider.adDesignData.businessInfo.state}`
-                            : provider.displayCity && provider.displayState
-                              ? `${provider.displayCity}, ${provider.displayState}`
-                              : provider.city && provider.state
-                                ? `${provider.city}, ${provider.state}`
-                                : provider.zipCode
-                                  ? `ZIP: ${provider.zipCode}`
-                                  : "Location not specified"}
-                        </span>
-                      </div>
-                      {(provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone) && (
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Phone className="w-4 h-4 mr-2 flex-shrink-0" />
-                          <span>
-                            {formatPhoneNumber(
-                              provider.adDesignData?.businessInfo?.phone || provider.displayPhone || provider.phone,
-                            )}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-1">
-                        {provider.allSubcategories && provider.allSubcategories.length > 0 ? (
-                          provider.allSubcategories.map((service: string, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))
-                        ) : provider.subcategories && provider.subcategories.length > 0 ? (
-                          provider.subcategories.map((service: string, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            Personal Services
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {/* Star Rating Display */}
-                    <div className="mb-4 flex items-center gap-2">
-                      {loadingReviews[provider.id] ? (
-                        <div className="flex items-center gap-2">
-                          <div className="animate-pulse bg-gray-200 h-4 w-20 rounded"></div>
-                          <span className="text-sm text-gray-500">Loading ratings...</span>
-                        </div>
-                      ) : businessRatings[provider.id] && businessRatings[provider.id].count > 0 ? (
-                        <div className="flex items-center gap-2">
-                          <StarRating rating={businessRatings[provider.id].rating} size="sm" />
-                          <span className="text-sm text-gray-600">
-                            {businessRatings[provider.id].rating.toFixed(1)} ({businessRatings[provider.id].count}{" "}
-                            review{businessRatings[provider.id].count !== 1 ? "s" : ""})
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <StarRating rating={0} size="sm" />
-                          <span className="text-sm text-gray-500">No reviews yet</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right: Action Buttons */}
-                  <div className="flex flex-col space-y-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs px-3 py-1 h-7 bg-transparent"
-                      onClick={() => handleOpenReviews(provider.id)}
-                    >
-                      Ratings
-                    </Button>
-                    <Button size="sm" className="text-xs px-3 py-1 h-7" onClick={() => handleOpenProfile(provider)}>
-                      View Profile
-                    </Button>
-                    <Button
-                      variant={favoriteBusinesses.has(provider.id) ? "default" : "outline"}
-                      size="sm"
-                      className={`text-xs px-3 py-1 h-7 ${
-                        favoriteBusinesses.has(provider.id)
-                          ? "bg-red-600 hover:bg-red-700 text-white border-red-600"
-                          : "bg-transparent border-red-600 text-red-600 hover:bg-red-50"
-                      }`}
-                      onClick={() => handleAddToFavorites(provider)}
-                      disabled={savingStates[provider.id]}
-                    >
-                      {savingStates[provider.id] ? (
-                        <>
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          Saving...
-                        </>
-                      ) : favoriteBusinesses.has(provider.id) ? (
-                        <>
-                          <HeartHandshake className="w-3 h-3 mr-1" />
-                          Saved
-                        </>
-                      ) : (
-                        <>
-                          <Heart className="w-3 h-3 mr-1" />
-                          Save Card
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Photo Gallery at Bottom - Updated to 220px × 220px photos */}
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  {/* Mobile: Use PhotoCarousel component */}
-                  <div className="block md:hidden">
-                    {businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
-                      <PhotoCarousel
-                        businessId={provider.id}
-                        photos={businessPhotos[provider.id].map((photo) => {
-                          // Handle both cloudflare and regular URLs
-                          if (photo.cloudflareImageId) {
-                            return `https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${photo.cloudflareImageId}/public`
-                          }
-                          return photo.url || "/placeholder.svg"
-                        })}
-                        onLoadPhotos={() => loadBusinessPhotos(provider.id)}
-                        showMultiple={true}
-                        photosPerView={2}
-                        size="medium"
-                        className="h-48"
-                      />
-                    ) : loadingPhotos[provider.id] ? (
-                      <div className="flex items-center justify-center w-full h-48 bg-gray-100 rounded-lg">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center w-full h-48 bg-gray-100 rounded-lg">
-                        <div className="text-center">
-                          <Camera className="w-8 h-8 mx-auto text-gray-400 mb-1" />
-                          <span className="text-gray-500 text-sm">No photos available</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Desktop: Keep existing carousel */}
-                  <div className="hidden md:block">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePrevious(provider.id)}
-                        disabled={!businessPhotos[provider.id] || businessPhotos[provider.id].length <= 5}
-                        className="h-8 w-8 p-0 flex-shrink-0 bg-transparent"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-
-                      <div className="flex space-x-2 overflow-hidden flex-1">
-                        {loadingPhotos[provider.id] ? (
-                          <div className="flex items-center justify-center w-full h-[220px]">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                          </div>
-                        ) : businessPhotos[provider.id] && businessPhotos[provider.id].length > 0 ? (
-                          businessPhotos[provider.id]
-                            .slice(carouselIndex[provider.id] || 0, (carouselIndex[provider.id] || 0) + 5)
-                            .map((photo, index) => (
-                              <div key={photo.id} className="flex-shrink-0 w-[220px] h-[220px]">
-                                <Image
-                                  src={`https://imagedelivery.net/${process.env.NEXT_PUBLIC_CLOUDFLARE_ACCOUNT_ID}/${photo.cloudflareImageId}/public`}
-                                  alt={photo.filename || `Photo ${index + 1}`}
-                                  width={220}
-                                  height={220}
-                                  className="w-full h-full object-cover rounded-lg"
-                                  onError={(e) => {
-                                    // Fallback to original URL if Cloudflare fails
-                                    e.currentTarget.src = photo.url || "/placeholder.svg"
-                                  }}
-                                />
-                              </div>
-                            ))
-                        ) : (
-                          <div className="flex items-center justify-center w-full h-[220px] bg-gray-100 rounded-lg">
-                            <div className="text-center">
-                              <Camera className="w-8 h-8 mx-auto text-gray-400 mb-1" />
-                              <span className="text-gray-500 text-sm">No photos available</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleNext(provider.id)}
-                        disabled={
-                          !businessPhotos[provider.id] ||
-                          businessPhotos[provider.id].length <= 5 ||
-                          (carouselIndex[provider.id] || 0) >= businessPhotos[provider.id].length - 5
-                        }
-                        className="h-8 w-8 p-0 flex-shrink-0"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {businessPhotos[provider.id] && businessPhotos[provider.id].length > 5 && (
-                      <div className="text-center mt-2">
-                        <span className="text-xs text-gray-500">
-                          {(carouselIndex[provider.id] || 0) + 1}-
-                          {Math.min((carouselIndex[provider.id] || 0) + 5, businessPhotos[provider.id].length)} of{" "}
-                          {businessPhotos[provider.id].length} photos
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="text-center py-12">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 max-w-2xl mx-auto">
+            <h3 className="text-xl font-medium text-blue-800 mb-2">
+              {userZipCode ? `No Personal Assistants Found in ${userZipCode}` : "No Personal Assistants Found"}
+            </h3>
+            <p className="text-blue-700 mb-4">
+              {userZipCode
+                ? `No personal assistant services found serving ZIP code ${userZipCode}. Try clearing the filter to see all providers.`
+                : "We're building our network of personal assistant services in your area."}
+            </p>
+            <div className="bg-white rounded border border-blue-100 p-4">
+              <p className="text-gray-700 font-medium">Are you a personal assistant or support professional?</p>
+              <p className="text-gray-600 mt-1">
+                Join Hausbaum to showcase your services and connect with clients in your area.
+              </p>
+              <Button className="mt-3" asChild>
+                <a href="/business-register">Register Your Service</a>
+              </Button>
+            </div>
+          </div>
         </div>
-      )}
-
-      {selectedBusinessProfile && (
-        <ReviewsDialog
-          isOpen={isReviewsDialogOpen}
-          onClose={() => setIsReviewsDialogOpen(false)}
-          businessId={selectedBusinessProfile.id}
-          businessName={selectedBusinessProfile.name}
-          reviews={businessReviews[selectedBusinessProfile.id] || []}
-        />
-      )}
-
-      {selectedProvider && (
-        <ReviewsDialog
-          isOpen={isReviewsOpen}
-          onClose={() => setIsReviewsOpen(false)}
-          providerName={selectedProvider || ""}
-          reviews={mockReviews[selectedProvider] || []}
-        />
-      )}
-
-      {selectedBusinessProfile && (
-        <BusinessProfileDialog
-          isOpen={isProfileDialogOpen}
-          onClose={() => setIsProfileDialogOpen(false)}
-          businessId={selectedBusinessProfile.id}
-          businessName={selectedBusinessProfile.name}
-        />
       )}
 
       {/* Login Dialog */}
       <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Login Required</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <LogIn className="h-5 w-5" />
+              Login Required
+            </DialogTitle>
             <DialogDescription>You need to be logged in to save business cards to your favorites.</DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-3 pt-4">
-            <Button
-              onClick={() => {
-                setIsLoginDialogOpen(false)
-                window.location.href = "/user-login"
-              }}
-              className="w-full"
-            >
-              Login to Your Account
+          <div className="flex gap-3 mt-4">
+            <Button asChild className="flex-1">
+              <a href="/user-login">Login</a>
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsLoginDialogOpen(false)
-                window.location.href = "/user-register"
-              }}
-              className="w-full"
-            >
-              Create New Account
+            <Button variant="outline" asChild className="flex-1 bg-transparent">
+              <a href="/user-register">Sign Up</a>
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Reviews Dialog */}
+      {selectedProvider && selectedBusinessId && (
+        <ReviewsDialog
+          isOpen={isReviewsDialogOpen}
+          onClose={() => setIsReviewsDialogOpen(false)}
+          providerName={selectedProvider.displayName || selectedProvider.businessName || selectedProvider.name}
+          businessId={selectedBusinessId}
+          reviews={[]} // Reviews are now loaded in the main component
+        />
+      )}
+
+      {/* Business Profile Dialog */}
+      {selectedProvider && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedProvider.id}
+          businessName={selectedProvider.displayName || selectedProvider.businessName}
+          searchZipCode={userZipCode}
+        />
+      )}
 
       <Toaster />
     </CategoryLayout>

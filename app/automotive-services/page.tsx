@@ -2,6 +2,7 @@
 
 import { CategoryLayout } from "@/components/category-layout"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
@@ -858,11 +859,11 @@ export default function AutomotiveServicesPage() {
 
             <div className="grid gap-6">
               {filteredBusinesses.map((business) => (
-                <div key={business.id} className="hover:shadow-lg transition-shadow">
-                  <div className="p-6">
+                <Card key={business.id} className="hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
                     <div className="flex flex-col space-y-4">
-                      {/* Business Name and Basic Info */}
-                      <div className="flex justify-between items-start mb-2">
+                      {/* Business Name and Star Rating */}
+                      <div className="flex justify-between items-start">
                         <h3 className="text-xl font-semibold text-gray-900 flex-1">
                           {business.displayName || business.businessName}
                         </h3>
@@ -910,140 +911,140 @@ export default function AutomotiveServicesPage() {
                           {business.description || business.businessDescription}
                         </p>
                       )}
-                    </div>
 
-                    {/* Subcategories/Specialties */}
-                    {getSubcategories(business).length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Specializes in:</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {getSubcategories(business).map((subcategory, index) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                            >
-                              {subcategory}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Desktop: Original layout with photos on the right */}
-                    <div className="hidden lg:flex lg:items-start gap-4">
-                      {/* Photo Carousel - Desktop */}
-                      <div className="flex-1 flex justify-center">
-                        <PhotoCarousel
-                          businessId={business.id}
-                          photos={business.photos || []}
-                          onLoadPhotos={handleLoadPhotos}
-                          showMultiple={true}
-                          photosPerView={5}
-                          size="medium"
-                        />
-                      </div>
-
-                      {/* Action Buttons - Desktop */}
-                      <div className="flex flex-col items-end justify-start space-y-2 w-28 flex-shrink-0">
-                        <Button
-                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
-                          className={
-                            favoriteBusinesses.has(business.id)
-                              ? "w-full min-w-[110px] bg-red-600 hover:bg-red-700 text-white"
-                              : "w-full min-w-[110px] bg-transparent border-red-600 text-red-600 hover:bg-red-50"
-                          }
-                          onClick={() => handleAddToFavorites(business)}
-                          disabled={savingStates[business.id]}
-                        >
-                          {savingStates[business.id] ? (
-                            <>
-                              <div className="h-4 w-4 mr-2 animate-spin"></div>
-                              Saving...
-                            </>
-                          ) : favoriteBusinesses.has(business.id) ? (
-                            <>
-                              <HeartHandshake className="h-4 w-4 mr-2" />
-                              Saved
-                            </>
-                          ) : (
-                            <>
-                              <Heart className="h-4 w-4 mr-2" />
-                              Save Card
-                            </>
-                          )}
-                        </Button>
-                        <Button className="w-full min-w-[110px]" onClick={() => handleViewReviews(business)}>
-                          Reviews
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="w-full min-w-[110px] bg-transparent"
-                          onClick={() => handleViewProfile(business)}
-                        >
-                          View Profile
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Mobile: Photos below services, buttons below photos */}
-                    <div className="lg:hidden">
-                      {/* Photo Carousel - Mobile */}
-                      {business.photos && business.photos.length > 0 && (
+                      {/* Subcategories/Specialties */}
+                      {getSubcategories(business).length > 0 && (
                         <div className="mb-4">
-                          <PhotoCarousel
-                            businessId={business.id}
-                            photos={business.photos}
-                            onLoadPhotos={handleLoadPhotos}
-                            showMultiple={true}
-                            photosPerView={2}
-                            size="small"
-                          />
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Specializes in:</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {getSubcategories(business).map((subcategory, index) => (
+                              <span
+                                key={index}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                              >
+                                {subcategory}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       )}
 
-                      {/* Action Buttons - Mobile */}
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <Button
-                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
-                          className={
-                            favoriteBusinesses.has(business.id)
-                              ? "flex-1 bg-red-600 hover:bg-red-700 text-white"
-                              : "flex-1 bg-transparent border-red-600 text-red-600 hover:bg-red-50"
-                          }
-                          onClick={() => handleAddToFavorites(business)}
-                          disabled={savingStates[business.id]}
-                        >
-                          {savingStates[business.id] ? (
-                            <>
-                              <div className="h-4 w-4 mr-2 animate-spin"></div>
-                              Saving...
-                            </>
-                          ) : favoriteBusinesses.has(business.id) ? (
-                            <>
-                              <HeartHandshake className="h-4 w-4 mr-2" />
-                              Saved
-                            </>
-                          ) : (
-                            <>
-                              <Heart className="h-4 w-4 mr-2" />
-                              Save Card
-                            </>
-                          )}
-                        </Button>
-                        <Button className="flex-1" onClick={() => handleViewReviews(business)}>
-                          Reviews
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="flex-1 bg-transparent"
-                          onClick={() => handleViewProfile(business)}
-                        >
-                          View Profile
-                        </Button>
+                      {/* Desktop: Original layout with photos on the right */}
+                      <div className="hidden lg:flex lg:items-start gap-4">
+                        {/* Photo Carousel - Desktop */}
+                        <div className="flex-1 flex justify-center">
+                          <PhotoCarousel
+                            businessId={business.id}
+                            photos={business.photos || []}
+                            onLoadPhotos={handleLoadPhotos}
+                            showMultiple={true}
+                            photosPerView={5}
+                            size="medium"
+                          />
+                        </div>
+
+                        {/* Action Buttons - Desktop */}
+                        <div className="flex flex-col items-end justify-start space-y-2 w-28 flex-shrink-0">
+                          <Button
+                            variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                            className={
+                              favoriteBusinesses.has(business.id)
+                                ? "w-full min-w-[110px] bg-red-600 hover:bg-red-700 text-white"
+                                : "w-full min-w-[110px] bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                            }
+                            onClick={() => handleAddToFavorites(business)}
+                            disabled={savingStates[business.id]}
+                          >
+                            {savingStates[business.id] ? (
+                              <>
+                                <div className="h-4 w-4 mr-2 animate-spin"></div>
+                                Saving...
+                              </>
+                            ) : favoriteBusinesses.has(business.id) ? (
+                              <>
+                                <HeartHandshake className="h-4 w-4 mr-2" />
+                                Saved
+                              </>
+                            ) : (
+                              <>
+                                <Heart className="h-4 w-4 mr-2" />
+                                Save Card
+                              </>
+                            )}
+                          </Button>
+                          <Button className="w-full min-w-[110px]" onClick={() => handleViewReviews(business)}>
+                            Reviews
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="w-full min-w-[110px] bg-transparent"
+                            onClick={() => handleViewProfile(business)}
+                          >
+                            View Profile
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Mobile: Photos below services, buttons below photos */}
+                      <div className="lg:hidden">
+                        {/* Photo Carousel - Mobile */}
+                        {business.photos && business.photos.length > 0 && (
+                          <div className="mb-4">
+                            <PhotoCarousel
+                              businessId={business.id}
+                              photos={business.photos}
+                              onLoadPhotos={handleLoadPhotos}
+                              showMultiple={true}
+                              photosPerView={2}
+                              size="small"
+                            />
+                          </div>
+                        )}
+
+                        {/* Action Buttons - Mobile */}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Button
+                            variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                            className={
+                              favoriteBusinesses.has(business.id)
+                                ? "flex-1 bg-red-600 hover:bg-red-700 text-white"
+                                : "flex-1 bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                            }
+                            onClick={() => handleAddToFavorites(business)}
+                            disabled={savingStates[business.id]}
+                          >
+                            {savingStates[business.id] ? (
+                              <>
+                                <div className="h-4 w-4 mr-2 animate-spin"></div>
+                                Saving...
+                              </>
+                            ) : favoriteBusinesses.has(business.id) ? (
+                              <>
+                                <HeartHandshake className="h-4 w-4 mr-2" />
+                                Saved
+                              </>
+                            ) : (
+                              <>
+                                <Heart className="h-4 w-4 mr-2" />
+                                Save Card
+                              </>
+                            )}
+                          </Button>
+                          <Button className="flex-1" onClick={() => handleViewReviews(business)}>
+                            Reviews
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1 bg-transparent"
+                            onClick={() => handleViewProfile(business)}
+                          >
+                            View Profile
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>

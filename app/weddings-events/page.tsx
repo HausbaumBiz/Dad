@@ -528,14 +528,15 @@ export default function WeddingsEventsPage() {
             <Card key={provider.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="space-y-4">
-                  {/* Compact Business Info */}
+                  {/* Compact Business Info - MODIFIED: Star rating moved below business name */}
                   <div className="space-y-2">
-                    <div className="flex items-start justify-between">
-                      <h3 className="text-xl font-semibold text-gray-900 leading-tight flex-1">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 leading-tight">
                         {provider.displayName || provider.businessName || "Wedding Professional"}
                       </h3>
-                      {/* Star Rating Display */}
-                      <div className="flex items-center gap-2 ml-4">
+
+                      {/* Star Rating Display - MOVED below business name */}
+                      <div className="flex items-center gap-2 mt-1">
                         <StarRating rating={provider.rating || 0} size="sm" />
                         <span className="text-sm text-gray-600">
                           ({provider.reviewCount || 0} review{(provider.reviewCount || 0) !== 1 ? "s" : ""})

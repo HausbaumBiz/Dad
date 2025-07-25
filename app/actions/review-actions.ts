@@ -114,11 +114,29 @@ export async function getBusinessReviews(businessId: string): Promise<Review[]> 
         // Skip if no data found
         if (!reviewData) continue
 
-        // Make sure we're dealing with a string
-        const reviewString = typeof reviewData === "string" ? reviewData : JSON.stringify(reviewData)
+        let review: Review
 
-        // Parse the review data
-        const review = JSON.parse(reviewString) as Review
+        // Handle different data formats
+        if (typeof reviewData === "string") {
+          try {
+            review = JSON.parse(reviewData) as Review
+          } catch (parseError) {
+            console.error(`Error parsing JSON for review ${id}:`, parseError)
+            continue
+          }
+        } else if (typeof reviewData === "object" && reviewData !== null) {
+          // If it's already an object, use it directly
+          review = reviewData as Review
+        } else {
+          console.error(`Invalid review data format for ${id}:`, typeof reviewData)
+          continue
+        }
+
+        // Validate that we have a proper review object
+        if (!review || typeof review !== "object") {
+          console.error(`Invalid review object for ${id}:`, review)
+          continue
+        }
 
         // Handle legacy reviews that might not have the new structure
         if (!review.ratings) {
@@ -135,9 +153,27 @@ export async function getBusinessReviews(businessId: string): Promise<Review[]> 
           review.overallRating = oldRating
         }
 
+        // Ensure required fields exist
+        if (!review.id) review.id = id
+        if (!review.businessId) review.businessId = businessId
+        if (!review.date) review.date = new Date().toISOString()
+        if (typeof review.overallRating !== "number") {
+          // Calculate from ratings if available
+          if (review.ratings && typeof review.ratings === "object") {
+            const ratingsArray = Object.values(review.ratings).filter((r) => typeof r === "number")
+            if (ratingsArray.length > 0) {
+              review.overallRating = ratingsArray.reduce((sum, rating) => sum + rating, 0) / ratingsArray.length
+            } else {
+              review.overallRating = 0
+            }
+          } else {
+            review.overallRating = 0
+          }
+        }
+
         reviews.push(review)
       } catch (err) {
-        console.error(`Error parsing review ${id}:`, err)
+        console.error(`Error processing review ${id}:`, err)
         // Continue with other reviews even if one fails
       }
     }

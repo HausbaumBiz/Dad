@@ -34,8 +34,6 @@ const getSubcategoryString = (subcategory: any): string => {
   return "Unknown Service"
 }
 
-// Add fetchIdRef for race condition prevention
-
 // Enhanced Business interface
 interface Business {
   id: string
@@ -532,53 +530,50 @@ export default function EducationTutoringPage() {
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="space-y-4">
-                  {/* Business Header with Rating */}
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2 flex-1">
-                      <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                        {business.displayLocation && (
-                          <div className="flex items-center">
-                            <MapPin className="h-4 w-4 mr-1" />
-                            <span>{business.displayLocation}</span>
-                          </div>
-                        )}
-                        {(business.displayPhone || business.phone) && (
-                          <div className="flex items-center">
-                            <Phone className="h-4 w-4 mr-1" />
-                            <a href={`tel:${business.displayPhone || business.phone}`} className="hover:text-primary">
-                              {formatPhoneNumber(business.displayPhone || business.phone)}
-                            </a>
-                          </div>
-                        )}
-                      </div>
+                  {/* Business Header with Rating MOVED below business name */}
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
 
-                      {/* Business Description */}
-                      {business.businessDescription && (
-                        <p className="text-gray-700 text-sm leading-relaxed">{business.businessDescription}</p>
+                    {/* Star Rating moved below business name */}
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={business.rating || 0} size="sm" />
+                      <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      {business.displayLocation && (
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span>{business.displayLocation}</span>
+                        </div>
                       )}
-
-                      {/* Service Area Indicator */}
-                      {userZipCode && (
-                        <div className="text-xs text-green-600">
-                          {business.isNationwide ? (
-                            <span>✓ Serves nationwide</span>
-                          ) : business.serviceArea?.includes(userZipCode) ? (
-                            <span>✓ Serves {userZipCode} and surrounding areas</span>
-                          ) : business.zipCode === userZipCode ? (
-                            <span>✓ Located in {userZipCode}</span>
-                          ) : null}
+                      {(business.displayPhone || business.phone) && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          <a href={`tel:${business.displayPhone || business.phone}`} className="hover:text-primary">
+                            {formatPhoneNumber(business.displayPhone || business.phone)}
+                          </a>
                         </div>
                       )}
                     </div>
 
-                    {/* Star Rating in top-right corner */}
-                    <div className="flex flex-col items-end ml-4">
-                      <div className="flex items-center gap-2">
-                        <StarRating rating={business.rating || 0} size="sm" />
-                        <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
+                    {/* Business Description */}
+                    {business.businessDescription && (
+                      <p className="text-gray-700 text-sm leading-relaxed">{business.businessDescription}</p>
+                    )}
+
+                    {/* Service Area Indicator */}
+                    {userZipCode && (
+                      <div className="text-xs text-green-600">
+                        {business.isNationwide ? (
+                          <span>✓ Serves nationwide</span>
+                        ) : business.serviceArea?.includes(userZipCode) ? (
+                          <span>✓ Serves {userZipCode} and surrounding areas</span>
+                        ) : business.zipCode === userZipCode ? (
+                          <span>✓ Located in {userZipCode}</span>
+                        ) : null}
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Services */}
