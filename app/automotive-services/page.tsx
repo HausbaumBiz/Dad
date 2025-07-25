@@ -2,7 +2,6 @@
 
 import { CategoryLayout } from "@/components/category-layout"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
@@ -18,6 +17,8 @@ import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/fa
 import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -33,6 +34,7 @@ interface Business {
   phone?: string
   rating?: number
   reviews?: number
+  reviewCount?: number
   services?: any[]
   subcategories?: any[]
   allSubcategories?: any[]
@@ -405,11 +407,61 @@ export default function AutomotiveServicesPage() {
 
         const result = await getBusinessesForCategoryPage("/automotive-services")
 
-        // Load photos for each business using public Cloudflare URLs
-        const businessesWithPhotos = await Promise.all(
+        // Load photos and reviews concurrently for each business
+        const businessesWithPhotosAndReviews = await Promise.all(
           result.map(async (business: Business) => {
-            const photos = await loadBusinessPhotos(business.id)
-            return { ...business, photos }
+            try {
+              // Load photos and reviews concurrently
+              const [photos, reviewsData] = await Promise.all([
+                loadBusinessPhotos(business.id),
+                getBusinessReviews(business.id).catch(() => ({ reviews: [], averageRating: 0, totalReviews: 0 })),
+              ])
+
+              // Calculate rating and review count with proper type safety
+              let rating = 0
+              let reviewCount = 0
+
+              if (reviewsData && typeof reviewsData === "object") {
+                // Handle averageRating
+                if (typeof reviewsData.averageRating === "number" && !isNaN(reviewsData.averageRating)) {
+                  rating = reviewsData.averageRating
+                } else if (typeof reviewsData.averageRating === "string") {
+                  const parsed = Number.parseFloat(reviewsData.averageRating)
+                  rating = !isNaN(parsed) ? parsed : 0
+                }
+
+                // Handle totalReviews/reviewCount
+                if (typeof reviewsData.totalReviews === "number" && !isNaN(reviewsData.totalReviews)) {
+                  reviewCount = reviewsData.totalReviews
+                } else if (typeof reviewsData.reviewCount === "number" && !isNaN(reviewsData.reviewCount)) {
+                  reviewCount = reviewsData.reviewCount
+                } else if (typeof reviewsData.totalReviews === "string") {
+                  const parsed = Number.parseInt(reviewsData.totalReviews, 10)
+                  reviewCount = !isNaN(parsed) ? parsed : 0
+                } else if (Array.isArray(reviewsData.reviews)) {
+                  reviewCount = reviewsData.reviews.length
+                }
+              }
+
+              // Ensure rating is between 0 and 5
+              rating = Math.max(0, Math.min(5, rating))
+
+              return {
+                ...business,
+                photos,
+                rating: Number(rating) || 0,
+                reviewCount: Number(reviewCount) || 0,
+              }
+            } catch (error) {
+              console.error(`Error loading data for business ${business.id}:`, error)
+              // Return business with default values if individual business fails
+              return {
+                ...business,
+                photos: [],
+                rating: 0,
+                reviewCount: 0,
+              }
+            }
           }),
         )
 
@@ -426,7 +478,7 @@ export default function AutomotiveServicesPage() {
         // Filter businesses by zip code if userZipCode is available
         if (userZipCode) {
           console.log(`[Automotive Services] Filtering by zip code: ${userZipCode}`)
-          const filteredBusinesses = businessesWithPhotos.filter((business: Business) => {
+          const filteredBusinesses = businessesWithPhotosAndReviews.filter((business: Business) => {
             const serves = businessServesZipCode(business, userZipCode)
             console.log(
               `[Automotive Services] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
@@ -439,9 +491,9 @@ export default function AutomotiveServicesPage() {
           setAllBusinesses(filteredBusinesses)
           setFilteredBusinesses(filteredBusinesses)
         } else {
-          setBusinesses(businessesWithPhotos)
-          setAllBusinesses(businessesWithPhotos)
-          setFilteredBusinesses(businessesWithPhotos)
+          setBusinesses(businessesWithPhotosAndReviews)
+          setAllBusinesses(businessesWithPhotosAndReviews)
+          setFilteredBusinesses(businessesWithPhotosAndReviews)
         }
       } catch (error) {
         // Only update error state if this is still the current request
@@ -806,184 +858,192 @@ export default function AutomotiveServicesPage() {
 
             <div className="grid gap-6">
               {filteredBusinesses.map((business) => (
-                <Card key={business.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
+                <div key={business.id} className="hover:shadow-lg transition-shadow">
+                  <div className="p-6">
                     <div className="flex flex-col space-y-4">
                       {/* Business Name and Basic Info */}
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-xl font-semibold text-gray-900 flex-1">
                           {business.displayName || business.businessName}
                         </h3>
-
-                        {/* Contact Info - Compact Layout */}
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 gap-2 text-sm text-gray-600 mb-3">
-                          {getPhoneNumber(business) && (
-                            <div className="flex items-center">
-                              <Phone className="h-4 w-4 mr-2 text-primary" />
-                              <a href={`tel:${getPhoneNumber(business)}`} className="text-blue-600 hover:underline">
-                                {formatPhoneNumber(getPhoneNumber(business)!)}
-                              </a>
-                            </div>
-                          )}
-
-                          {getLocation(business) && (
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-2 text-primary" />
-                              <span>{getLocation(business)}</span>
-                            </div>
-                          )}
+                        <div className="flex items-center ml-4">
+                          <StarRating
+                            rating={business.rating || 0}
+                            size="sm"
+                            showRating={true}
+                            reviewCount={business.reviewCount || 0}
+                          />
                         </div>
+                      </div>
 
-                        {/* Service Area Indicator */}
-                        {business.isNationwide ? (
-                          <div className="text-xs text-green-600 font-medium mb-3">✓ Serves nationwide</div>
-                        ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
-                          <div className="text-xs text-green-600 font-medium mb-3">
-                            ✓ Serves {userZipCode} and surrounding areas
+                      {/* Contact Info - Compact Layout */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 gap-2 text-sm text-gray-600 mb-3">
+                        {getPhoneNumber(business) && (
+                          <div className="flex items-center">
+                            <Phone className="h-4 w-4 mr-2 text-primary" />
+                            <a href={`tel:${getPhoneNumber(business)}`} className="text-blue-600 hover:underline">
+                              {formatPhoneNumber(getPhoneNumber(business)!)}
+                            </a>
                           </div>
-                        ) : null}
+                        )}
 
-                        {/* Description */}
-                        {(business.description || business.businessDescription) && (
-                          <p className="text-gray-600 text-sm leading-relaxed mb-3">
-                            {business.description || business.businessDescription}
-                          </p>
+                        {getLocation(business) && (
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-2 text-primary" />
+                            <span>{getLocation(business)}</span>
+                          </div>
                         )}
                       </div>
 
-                      {/* Subcategories/Specialties */}
-                      {getSubcategories(business).length > 0 && (
+                      {/* Service Area Indicator */}
+                      {business.isNationwide ? (
+                        <div className="text-xs text-green-600 font-medium mb-3">✓ Serves nationwide</div>
+                      ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
+                        <div className="text-xs text-green-600 font-medium mb-3">
+                          ✓ Serves {userZipCode} and surrounding areas
+                        </div>
+                      ) : null}
+
+                      {/* Description */}
+                      {(business.description || business.businessDescription) && (
+                        <p className="text-gray-600 text-sm leading-relaxed mb-3">
+                          {business.description || business.businessDescription}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Subcategories/Specialties */}
+                    {getSubcategories(business).length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Specializes in:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {getSubcategories(business).map((subcategory, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {subcategory}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Desktop: Original layout with photos on the right */}
+                    <div className="hidden lg:flex lg:items-start gap-4">
+                      {/* Photo Carousel - Desktop */}
+                      <div className="flex-1 flex justify-center">
+                        <PhotoCarousel
+                          businessId={business.id}
+                          photos={business.photos || []}
+                          onLoadPhotos={handleLoadPhotos}
+                          showMultiple={true}
+                          photosPerView={5}
+                          size="medium"
+                        />
+                      </div>
+
+                      {/* Action Buttons - Desktop */}
+                      <div className="flex flex-col items-end justify-start space-y-2 w-28 flex-shrink-0">
+                        <Button
+                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                          className={
+                            favoriteBusinesses.has(business.id)
+                              ? "w-full min-w-[110px] bg-red-600 hover:bg-red-700 text-white"
+                              : "w-full min-w-[110px] bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                          }
+                          onClick={() => handleAddToFavorites(business)}
+                          disabled={savingStates[business.id]}
+                        >
+                          {savingStates[business.id] ? (
+                            <>
+                              <div className="h-4 w-4 mr-2 animate-spin"></div>
+                              Saving...
+                            </>
+                          ) : favoriteBusinesses.has(business.id) ? (
+                            <>
+                              <HeartHandshake className="h-4 w-4 mr-2" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="h-4 w-4 mr-2" />
+                              Save Card
+                            </>
+                          )}
+                        </Button>
+                        <Button className="w-full min-w-[110px]" onClick={() => handleViewReviews(business)}>
+                          Reviews
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full min-w-[110px] bg-transparent"
+                          onClick={() => handleViewProfile(business)}
+                        >
+                          View Profile
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Mobile: Photos below services, buttons below photos */}
+                    <div className="lg:hidden">
+                      {/* Photo Carousel - Mobile */}
+                      {business.photos && business.photos.length > 0 && (
                         <div className="mb-4">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Specializes in:</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {getSubcategories(business).map((subcategory, index) => (
-                              <span
-                                key={index}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                              >
-                                {subcategory}
-                              </span>
-                            ))}
-                          </div>
+                          <PhotoCarousel
+                            businessId={business.id}
+                            photos={business.photos}
+                            onLoadPhotos={handleLoadPhotos}
+                            showMultiple={true}
+                            photosPerView={2}
+                            size="small"
+                          />
                         </div>
                       )}
 
-                      {/* Desktop: Original layout with photos on the right */}
-                      <div className="hidden lg:flex lg:items-start gap-4">
-                        {/* Photo Carousel - Desktop */}
-                        <div className="flex-1 flex justify-center">
-                          <PhotoCarousel
-                            businessId={business.id}
-                            photos={business.photos || []}
-                            onLoadPhotos={handleLoadPhotos}
-                            showMultiple={true}
-                            photosPerView={5}
-                            size="medium"
-                          />
-                        </div>
-
-                        {/* Action Buttons - Desktop */}
-                        <div className="flex flex-col items-end justify-start space-y-2 w-28 flex-shrink-0">
-                          <Button
-                            variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
-                            className={
-                              favoriteBusinesses.has(business.id)
-                                ? "w-full min-w-[110px] bg-red-600 hover:bg-red-700 text-white"
-                                : "w-full min-w-[110px] bg-transparent border-red-600 text-red-600 hover:bg-red-50"
-                            }
-                            onClick={() => handleAddToFavorites(business)}
-                            disabled={savingStates[business.id]}
-                          >
-                            {savingStates[business.id] ? (
-                              <>
-                                <div className="h-4 w-4 mr-2 animate-spin"></div>
-                                Saving...
-                              </>
-                            ) : favoriteBusinesses.has(business.id) ? (
-                              <>
-                                <HeartHandshake className="h-4 w-4 mr-2" />
-                                Saved
-                              </>
-                            ) : (
-                              <>
-                                <Heart className="h-4 w-4 mr-2" />
-                                Save Card
-                              </>
-                            )}
-                          </Button>
-                          <Button className="w-full min-w-[110px]" onClick={() => handleViewReviews(business)}>
-                            Reviews
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="w-full min-w-[110px] bg-transparent"
-                            onClick={() => handleViewProfile(business)}
-                          >
-                            View Profile
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Mobile: Photos below services, buttons below photos */}
-                      <div className="lg:hidden">
-                        {/* Photo Carousel - Mobile */}
-                        {business.photos && business.photos.length > 0 && (
-                          <div className="mb-4">
-                            <PhotoCarousel
-                              businessId={business.id}
-                              photos={business.photos}
-                              onLoadPhotos={handleLoadPhotos}
-                              showMultiple={true}
-                              photosPerView={2}
-                              size="small"
-                            />
-                          </div>
-                        )}
-
-                        {/* Action Buttons - Mobile */}
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Button
-                            variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
-                            className={
-                              favoriteBusinesses.has(business.id)
-                                ? "flex-1 bg-red-600 hover:bg-red-700 text-white"
-                                : "flex-1 bg-transparent border-red-600 text-red-600 hover:bg-red-50"
-                            }
-                            onClick={() => handleAddToFavorites(business)}
-                            disabled={savingStates[business.id]}
-                          >
-                            {savingStates[business.id] ? (
-                              <>
-                                <div className="h-4 w-4 mr-2 animate-spin"></div>
-                                Saving...
-                              </>
-                            ) : favoriteBusinesses.has(business.id) ? (
-                              <>
-                                <HeartHandshake className="h-4 w-4 mr-2" />
-                                Saved
-                              </>
-                            ) : (
-                              <>
-                                <Heart className="h-4 w-4 mr-2" />
-                                Save Card
-                              </>
-                            )}
-                          </Button>
-                          <Button className="flex-1" onClick={() => handleViewReviews(business)}>
-                            Reviews
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="flex-1 bg-transparent"
-                            onClick={() => handleViewProfile(business)}
-                          >
-                            View Profile
-                          </Button>
-                        </div>
+                      {/* Action Buttons - Mobile */}
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                          className={
+                            favoriteBusinesses.has(business.id)
+                              ? "flex-1 bg-red-600 hover:bg-red-700 text-white"
+                              : "flex-1 bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                          }
+                          onClick={() => handleAddToFavorites(business)}
+                          disabled={savingStates[business.id]}
+                        >
+                          {savingStates[business.id] ? (
+                            <>
+                              <div className="h-4 w-4 mr-2 animate-spin"></div>
+                              Saving...
+                            </>
+                          ) : favoriteBusinesses.has(business.id) ? (
+                            <>
+                              <HeartHandshake className="h-4 w-4 mr-2" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="h-4 w-4 mr-2" />
+                              Save Card
+                            </>
+                          )}
+                        </Button>
+                        <Button className="flex-1" onClick={() => handleViewReviews(business)}>
+                          Reviews
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1 bg-transparent"
+                          onClick={() => handleViewProfile(business)}
+                        >
+                          View Profile
+                        </Button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

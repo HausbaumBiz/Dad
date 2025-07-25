@@ -17,6 +17,8 @@ import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -192,6 +194,56 @@ export default function RetailStoresPage() {
           return
         }
 
+        // Load reviews for each business and calculate ratings
+        const businessesWithData = await Promise.all(
+          fetchedBusinesses.map(async (business: Business) => {
+            try {
+              // Load reviews for this business
+              const reviews = await getBusinessReviews(business.id)
+
+              // Calculate average rating from reviews
+              let rating = 0
+              let reviewCount = 0
+
+              if (reviews && Array.isArray(reviews) && reviews.length > 0) {
+                reviewCount = reviews.length
+                const totalRating = reviews.reduce((sum, review) => {
+                  const reviewRating =
+                    typeof review.overallRating === "number"
+                      ? review.overallRating
+                      : typeof review.rating === "number"
+                        ? review.rating
+                        : 0
+                  return sum + reviewRating
+                }, 0)
+                rating = totalRating / reviewCount
+              }
+
+              return {
+                ...business,
+                reviewsData: reviews,
+                rating: Number(rating.toFixed(1)) || 0,
+                reviewCount: Number(reviewCount) || 0,
+              }
+            } catch (error) {
+              console.error(`Error loading reviews for business ${business.id}:`, error)
+              // Return business with default values if loading fails
+              return {
+                ...business,
+                reviewsData: [],
+                rating: 0,
+                reviewCount: 0,
+              }
+            }
+          }),
+        )
+
+        // Check again if this is still the latest request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[${new Date().toISOString()}] Ignoring stale response for request #${currentFetchId}`)
+          return
+        }
+
         fetchedBusinesses.forEach((business: Business) => {
           console.log(
             `  - ${business.id}: "${business.displayName || business.businessName}" (zipCode: ${business.zipCode})`,
@@ -199,12 +251,12 @@ export default function RetailStoresPage() {
         })
 
         // Filter by zip code if available
-        let filteredBusinesses = fetchedBusinesses
+        let filteredBusinesses = businessesWithData
         if (userZipCode) {
           console.log(
             `[${new Date().toISOString()}] Filtering by user zip code: ${userZipCode} (request #${currentFetchId})`,
           )
-          filteredBusinesses = fetchedBusinesses.filter((business: Business) =>
+          filteredBusinesses = businessesWithData.filter((business: Business) =>
             businessServesZipCode(business, userZipCode),
           )
           console.log(
@@ -498,9 +550,17 @@ export default function RetailStoresPage() {
                 <div className="space-y-4">
                   {/* Compact Business Info */}
                   <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-gray-900 leading-tight">
-                      {provider.displayName || provider.businessName}
-                    </h3>
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-xl font-semibold text-gray-900 leading-tight flex-1 pr-4">
+                        {provider.displayName || provider.businessName}
+                      </h3>
+                      <div className="flex flex-col items-end flex-shrink-0">
+                        <div className="flex items-center gap-1">
+                          <StarRating rating={provider.rating || 0} size="sm" />
+                          <span className="text-sm text-gray-600">({provider.reviewCount || 0})</span>
+                        </div>
+                      </div>
+                    </div>
 
                     <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                       {/* Location Display */}

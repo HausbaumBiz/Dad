@@ -15,6 +15,8 @@ import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Enhanced Business interface
 interface Business {
@@ -28,6 +30,7 @@ interface Business {
   state?: string
   phone?: string
   rating?: number
+  reviewCount?: number
   reviews?: any[]
   description?: string
   subcategory?: string
@@ -285,46 +288,122 @@ function formatPhoneNumber(phoneNumberString: string) {
   return phoneNumberString
 }
 
+const fetchBusinesses = async (
+  fetchIdRef: any,
+  setIsLoading: any,
+  setBusinesses: any,
+  setAllBusinesses: any,
+  toast: any,
+  userZipCode: any,
+) => {
+  const currentFetchId = ++fetchIdRef.current
+
+  try {
+    setIsLoading(true)
+
+    console.log(`[Food Dining] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+
+    const result = await getBusinessesForCategoryPage("/food-dining")
+
+    // Load photos and reviews for each business concurrently
+    const businessesWithData = await Promise.all(
+      result.map(async (business: Business) => {
+        try {
+          // Load photos and reviews concurrently
+          const [photos, reviews] = await Promise.all([
+            loadBusinessPhotos(business.id),
+            getBusinessReviews(business.id),
+          ])
+
+          // Calculate average rating from reviews
+          let rating = 0
+          let reviewCount = 0
+
+          if (reviews && Array.isArray(reviews) && reviews.length > 0) {
+            reviewCount = reviews.length
+            const totalRating = reviews.reduce((sum, review) => {
+              const reviewRating =
+                typeof review.overallRating === "number"
+                  ? review.overallRating
+                  : typeof review.rating === "number"
+                    ? review.rating
+                    : 0
+              return sum + reviewRating
+            }, 0)
+            rating = totalRating / reviewCount
+          }
+
+          return {
+            ...business,
+            photos,
+            reviews,
+            rating: Number(rating.toFixed(1)) || 0,
+            reviewCount: Number(reviewCount) || 0,
+          }
+        } catch (error) {
+          console.error(`Error loading data for business ${business.id}:`, error)
+          // Return business with default values if loading fails
+          return {
+            ...business,
+            photos: [],
+            reviews: [],
+            rating: 0,
+            reviewCount: 0,
+          }
+        }
+      }),
+    )
+
+    // Check if this is still the current request
+    if (currentFetchId !== fetchIdRef.current) {
+      console.log(`[Food Dining] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+      return
+    }
+
+    console.log(`[Food Dining] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+
+    // Filter by zip code if available
+    let filteredResult = businessesWithData
+    if (userZipCode) {
+      console.log(`[Food Dining] Filtering by zip code: ${userZipCode}`)
+      filteredResult = businessesWithData.filter((business: Business) => {
+        const serves = businessServesZipCode(business, userZipCode)
+        console.log(
+          `[Food Dining] Business ${business.displayName || business.adDesignData?.businessInfo?.businessName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
+          {
+            serviceArea: business.serviceArea,
+            primaryZip: business.zipCode,
+            isNationwide: business.isNationwide,
+          },
+        )
+        return serves
+      })
+      console.log(`[Food Dining] After filtering: ${filteredResult.length} businesses`)
+    }
+
+    setBusinesses(filteredResult)
+    setAllBusinesses(filteredResult)
+  } catch (error) {
+    // Only update error if this is still the current request
+    if (currentFetchId === fetchIdRef.current) {
+      console.error(`[Food Dining] Error in fetch ${currentFetchId}:`, error)
+      toast({
+        title: "Error loading businesses",
+        description: "There was a problem loading businesses. Please try again later.",
+        variant: "destructive",
+      })
+    }
+  } finally {
+    // Only update loading if this is still the current request
+    if (currentFetchId === fetchIdRef.current) {
+      setIsLoading(false)
+    }
+  }
+}
+
 export default function FoodDiningPage() {
   const { toast } = useToast()
   const fetchIdRef = useRef(0)
-
-  const filterOptions = [
-    { id: "restaurant1", label: "Asian", value: "Asian" },
-    { id: "restaurant2", label: "Indian", value: "Indian" },
-    { id: "restaurant3", label: "Middle Eastern", value: "Middle Eastern" },
-    { id: "restaurant4", label: "Mexican", value: "Mexican" },
-    { id: "restaurant5", label: "Italian", value: "Italian" },
-    { id: "restaurant6", label: "American", value: "American" },
-    { id: "restaurant7", label: "Greek", value: "Greek" },
-    { id: "restaurant8", label: "Other Ethnic Foods", value: "Other Ethnic Foods" },
-    { id: "restaurant9", label: "Upscale", value: "Upscale" },
-    { id: "restaurant10", label: "Casual", value: "Casual" },
-    { id: "restaurant11", label: "Coffee and Tea Shops", value: "Coffee and Tea Shops" },
-    { id: "restaurant12", label: "Ice Cream, Confectionery and Cakes", value: "Ice Cream, Confectionery and Cakes" },
-    { id: "restaurant13", label: "Pizzeria", value: "Pizzeria" },
-    { id: "restaurant14", label: "Bars/Pubs/Taverns", value: "Bars/Pubs/Taverns" },
-    {
-      id: "restaurant15",
-      label: "Organic/Vegetarian",
-      value: "Organic/Vegetarian",
-    },
-    { id: "restaurant16", label: "Fast Food", value: "Fast Food" },
-    { id: "restaurant17", label: "Catering", value: "Catering" },
-    { id: "restaurant18", label: "Buffet", value: "Buffet" },
-    { id: "restaurant19", label: "Bakery/Bagels/Donuts", value: "Bakery/Bagels/Donuts" },
-    { id: "restaurant20", label: "Breakfast", value: "Breakfast" },
-    { id: "restaurant21", label: "24 hour/Open Late", value: "24 hour/Open Late" },
-    { id: "restaurant22", label: "Carts/Stands/Trucks", value: "Carts/Stands/Trucks" },
-    { id: "restaurant23", label: "Dinner Theater", value: "Dinner Theater" },
-    { id: "restaurant24", label: "Sandwich Shops", value: "Sandwich Shops" },
-    { id: "restaurant25", label: "Drive-Ins", value: "Drive-Ins" },
-    { id: "restaurant26", label: "Seafood", value: "Seafood" },
-    { id: "restaurant27", label: "Steak House", value: "Steak House" },
-    { id: "restaurant28", label: "Sushi", value: "Sushi" },
-    { id: "restaurant29", label: "Cafeteria", value: "Cafeteria" },
-  ]
-
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
@@ -346,73 +425,8 @@ export default function FoodDiningPage() {
     }
   }, [])
 
-  const fetchBusinesses = async () => {
-    const currentFetchId = ++fetchIdRef.current
-
-    try {
-      setIsLoading(true)
-
-      console.log(`[Food Dining] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
-
-      const result = await getBusinessesForCategoryPage("/food-dining")
-
-      // Load photos for each business using public Cloudflare URLs
-      const businessesWithPhotos = await Promise.all(
-        result.map(async (business: Business) => {
-          const photos = await loadBusinessPhotos(business.id)
-          return { ...business, photos }
-        }),
-      )
-
-      // Check if this is still the current request
-      if (currentFetchId !== fetchIdRef.current) {
-        console.log(`[Food Dining] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
-        return
-      }
-
-      console.log(`[Food Dining] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
-
-      // Filter by zip code if available
-      let filteredResult = businessesWithPhotos
-      if (userZipCode) {
-        console.log(`[Food Dining] Filtering by zip code: ${userZipCode}`)
-        filteredResult = businessesWithPhotos.filter((business: Business) => {
-          const serves = businessServesZipCode(business, userZipCode)
-          console.log(
-            `[Food Dining] Business ${business.displayName || business.adDesignData?.businessInfo?.businessName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
-            {
-              serviceArea: business.serviceArea,
-              primaryZip: business.zipCode,
-              isNationwide: business.isNationwide,
-            },
-          )
-          return serves
-        })
-        console.log(`[Food Dining] After filtering: ${filteredResult.length} businesses`)
-      }
-
-      setBusinesses(filteredResult)
-      setAllBusinesses(filteredResult)
-    } catch (error) {
-      // Only update error if this is still the current request
-      if (currentFetchId === fetchIdRef.current) {
-        console.error(`[Food Dining] Error in fetch ${currentFetchId}:`, error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
-      }
-    } finally {
-      // Only update loading if this is still the current request
-      if (currentFetchId === fetchIdRef.current) {
-        setIsLoading(false)
-      }
-    }
-  }
-
   useEffect(() => {
-    fetchBusinesses()
+    fetchBusinesses(fetchIdRef, setIsLoading, setBusinesses, setAllBusinesses, toast, userZipCode)
   }, [userZipCode])
 
   // Check user session
@@ -812,13 +826,21 @@ export default function FoodDiningPage() {
             {filteredBusinesses.map((business: Business) => (
               <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
                 <div className="flex flex-col space-y-4">
-                  {/* Business Name and Description */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {business.displayName ||
-                        business.adDesignData?.businessInfo?.businessName ||
-                        business.businessName}
-                    </h3>
+                  {/* Business Name, Star Rating, and Description */}
+                  <div className="relative">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-xl font-semibold text-gray-900 flex-1 pr-4">
+                        {business.displayName ||
+                          business.adDesignData?.businessInfo?.businessName ||
+                          business.businessName}
+                      </h3>
+                      <div className="flex flex-col items-end flex-shrink-0">
+                        <div className="flex items-center gap-1">
+                          <StarRating rating={business.rating || 0} size="sm" />
+                          <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
+                        </div>
+                      </div>
+                    </div>
                     {business.description && (
                       <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
                     )}
@@ -1112,3 +1134,39 @@ export default function FoodDiningPage() {
     </CategoryLayout>
   )
 }
+
+const filterOptions = [
+  { id: "restaurant1", label: "Asian", value: "Asian" },
+  { id: "restaurant2", label: "Indian", value: "Indian" },
+  { id: "restaurant3", label: "Middle Eastern", value: "Middle Eastern" },
+  { id: "restaurant4", label: "Mexican", value: "Mexican" },
+  { id: "restaurant5", label: "Italian", value: "Italian" },
+  { id: "restaurant6", label: "American", value: "American" },
+  { id: "restaurant7", label: "Greek", value: "Greek" },
+  { id: "restaurant8", label: "Other Ethnic Foods", value: "Other Ethnic Foods" },
+  { id: "restaurant9", label: "Upscale", value: "Upscale" },
+  { id: "restaurant10", label: "Casual", value: "Casual" },
+  { id: "restaurant11", label: "Coffee and Tea Shops", value: "Coffee and Tea Shops" },
+  { id: "restaurant12", label: "Ice Cream, Confectionery and Cakes", value: "Ice Cream, Confectionery and Cakes" },
+  { id: "restaurant13", label: "Pizzeria", value: "Pizzeria" },
+  { id: "restaurant14", label: "Bars/Pubs/Taverns", value: "Bars/Pubs/Taverns" },
+  {
+    id: "restaurant15",
+    label: "Organic/Vegetarian",
+    value: "Organic/Vegetarian",
+  },
+  { id: "restaurant16", label: "Fast Food", value: "Fast Food" },
+  { id: "restaurant17", label: "Catering", value: "Catering" },
+  { id: "restaurant18", label: "Buffet", value: "Buffet" },
+  { id: "restaurant19", label: "Bakery/Bagels/Donuts", value: "Bakery/Bagels/Donuts" },
+  { id: "restaurant20", label: "Breakfast", value: "Breakfast" },
+  { id: "restaurant21", label: "24 hour/Open Late", value: "24 hour/Open Late" },
+  { id: "restaurant22", label: "Carts/Stands/Trucks", value: "Carts/Stands/Trucks" },
+  { id: "restaurant23", label: "Dinner Theater", value: "Dinner Theater" },
+  { id: "restaurant24", label: "Sandwich Shops", value: "Sandwich Shops" },
+  { id: "restaurant25", label: "Drive-Ins", value: "Drive-Ins" },
+  { id: "restaurant26", label: "Seafood", value: "Seafood" },
+  { id: "restaurant27", label: "Steak House", value: "Steak House" },
+  { id: "restaurant28", label: "Sushi", value: "Sushi" },
+  { id: "restaurant29", label: "Cafeteria", value: "Cafeteria" },
+]

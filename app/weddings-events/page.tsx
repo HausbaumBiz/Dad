@@ -18,6 +18,8 @@ import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/fa
 import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Helper function to safely extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -36,7 +38,7 @@ const getSubcategoryString = (subcategory: any): string => {
 export default function WeddingsEventsPage() {
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<{
-    id: number
+    id: string
     name: string
     rating: number
     reviews: number
@@ -79,10 +81,12 @@ export default function WeddingsEventsPage() {
     displayPhone?: string
     rating?: number
     reviewCount?: number
-    subcategories?: any[] // Changed from string[] to any[]
+    subcategories?: any[]
     zipCode?: string
     serviceArea?: string[]
     isNationwide?: boolean
+    photos?: string[]
+    email?: string
   }
 
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
@@ -230,7 +234,7 @@ export default function WeddingsEventsPage() {
     }
   }
 
-  // Replace the useEffect for fetching businesses:
+  // Replace the useEffect for fetching businesses with enhanced rating loading:
   useEffect(() => {
     const fetchProviders = async () => {
       const currentFetchId = ++fetchIdRef.current
@@ -239,6 +243,39 @@ export default function WeddingsEventsPage() {
       try {
         setLoading(true)
         let businesses = await getBusinessesForCategoryPage("/weddings-events")
+
+        // Load photos and reviews for each business to get ratings immediately
+        const businessesWithPhotosAndReviews = await Promise.all(
+          businesses.map(async (business: Business) => {
+            try {
+              const photos = await loadBusinessPhotos(business.id)
+              const reviews = await getBusinessReviews(business.id)
+
+              let rating = 0
+              let reviewCount = 0
+
+              if (reviews && Array.isArray(reviews) && reviews.length > 0) {
+                reviewCount = reviews.length
+                rating = reviews.reduce((sum, review) => sum + (review.overallRating || 0), 0) / reviews.length
+              }
+
+              return {
+                ...business,
+                photos,
+                rating: Math.round(rating * 10) / 10, // Round to 1 decimal place
+                reviewCount,
+              }
+            } catch (error) {
+              console.error(`Error loading data for business ${business.id}:`, error)
+              return {
+                ...business,
+                photos: [],
+                rating: 0,
+                reviewCount: 0,
+              }
+            }
+          }),
+        )
 
         // Only update if this is still the current request
         if (currentFetchId !== fetchIdRef.current) {
@@ -250,11 +287,15 @@ export default function WeddingsEventsPage() {
 
         // Filter by zip code if available
         if (userZipCode) {
-          const originalCount = businesses.length
-          businesses = businesses.filter((business: Business) => businessServesZipCode(business, userZipCode))
+          const originalCount = businessesWithPhotosAndReviews.length
+          businesses = businessesWithPhotosAndReviews.filter((business: Business) =>
+            businessServesZipCode(business, userZipCode),
+          )
           console.log(
             `[Weddings] Filtered from ${originalCount} to ${businesses.length} businesses for zip ${userZipCode}`,
           )
+        } else {
+          businesses = businessesWithPhotosAndReviews
         }
 
         setProviders(businesses)
@@ -489,9 +530,18 @@ export default function WeddingsEventsPage() {
                 <div className="space-y-4">
                   {/* Compact Business Info */}
                   <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-gray-900 leading-tight">
-                      {provider.displayName || provider.businessName || "Wedding Professional"}
-                    </h3>
+                    <div className="flex items-start justify-between">
+                      <h3 className="text-xl font-semibold text-gray-900 leading-tight flex-1">
+                        {provider.displayName || provider.businessName || "Wedding Professional"}
+                      </h3>
+                      {/* Star Rating Display */}
+                      <div className="flex items-center gap-2 ml-4">
+                        <StarRating rating={provider.rating || 0} size="sm" />
+                        <span className="text-sm text-gray-600">
+                          ({provider.reviewCount || 0} review{(provider.reviewCount || 0) !== 1 ? "s" : ""})
+                        </span>
+                      </div>
+                    </div>
 
                     {provider.businessDescription && (
                       <p className="text-gray-600 text-sm line-clamp-2">{provider.businessDescription}</p>
@@ -538,7 +588,7 @@ export default function WeddingsEventsPage() {
                       <div className="w-full max-w-md lg:max-w-none">
                         <PhotoCarousel
                           businessId={provider.id}
-                          photos={businessPhotos[provider.id] || []}
+                          photos={provider.photos || []}
                           onLoadPhotos={() => loadPhotosForBusiness(provider.id)}
                           showMultiple={true}
                           photosPerView={5}

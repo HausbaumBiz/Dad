@@ -1,23 +1,24 @@
 "use client"
 
+import { useState, useEffect, useRef } from "react"
 import { CategoryLayout } from "@/components/category-layout"
-import type { FilterOption } from "@/components/category-filter"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
-import { useToast } from "@/components/ui/use-toast"
-import { useState, useEffect, useRef } from "react"
+import { useToast } from "@/hooks/use-toast"
+import { StarRating } from "@/components/star-rating"
 import Image from "next/image"
-import { Phone, MapPin, LoaderIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { Loader2, Phone, MapPin, Heart, HeartHandshake } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
-import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 import { Checkbox } from "@/components/ui/checkbox"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
-import { Heart, HeartHandshake } from "lucide-react"
-import { ReviewLoginDialog } from "@/components/review-login-dialog"
 
 // Helper function to extract string from subcategory data
 const getSubcategoryString = (subcategory: any): string => {
@@ -33,312 +34,345 @@ const getSubcategoryString = (subcategory: any): string => {
   return "Unknown Service"
 }
 
-// Enhanced Business interface with service area support
+// Enhanced Business interface
 interface Business {
   id: string
-  businessName: string
   displayName?: string
+  businessName?: string
+  displayLocation?: string
   city?: string
   state?: string
   zipCode?: string
-  displayCity?: string
-  displayState?: string
-  displayLocation?: string
   displayPhone?: string
   phone?: string
   rating?: number
-  reviews?: number
-  subcategories?: any[] // Changed from string[] to any[]
-  businessDescription?: string
-  adDesignData?: {
-    businessInfo?: {
-      phone?: string
-      city?: string
-      state?: string
-    }
-  }
+  reviewCount?: number
+  allSubcategories?: any[]
+  subcategory?: string
   serviceArea?: string[]
   isNationwide?: boolean
-  photos?: string[]
-  email?: string
+  businessDescription?: string
 }
 
-// Photo Carousel Component - displays 5 photos in square format for desktop
-interface DesktopPhotoCarouselProps {
-  photos: string[]
-  businessName: string
+// Helper function to check if business serves the zip code
+const businessServesZipCode = (business: Business, zipCode: string): boolean => {
+  console.log(`Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`, {
+    isNationwide: business.isNationwide,
+    serviceArea: business.serviceArea,
+    primaryZip: business.zipCode,
+  })
+
+  // Check if business serves nationwide
+  if (business.isNationwide) {
+    console.log(`✓ Business serves nationwide`)
+    return true
+  }
+
+  // Check if zip code is in service area
+  if (business.serviceArea && Array.isArray(business.serviceArea)) {
+    const serves = business.serviceArea.includes(zipCode)
+    console.log(`${serves ? "✓" : "✗"} Service area check: ${business.serviceArea.join(", ")}`)
+    return serves
+  }
+
+  // Fallback to primary zip code
+  const matches = business.zipCode === zipCode
+  console.log(`${matches ? "✓" : "✗"} Primary zip code check: ${business.zipCode}`)
+  return matches
 }
 
-function DesktopPhotoCarousel({ photos, businessName }: DesktopPhotoCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
+// Format phone number to (XXX) XXX-XXXX
+function formatPhoneNumber(phoneNumberString: string | undefined | null): string {
+  if (!phoneNumberString) return "No phone provided"
 
-  if (!photos || photos.length === 0) {
-    return null // Don't show anything if no photos
+  // Strip all non-numeric characters
+  const cleaned = phoneNumberString.replace(/\D/g, "")
+
+  // Check if it's a valid 10-digit number
+  if (cleaned.length === 10) {
+    return `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6, 10)}`
   }
 
-  const photosPerView = 5
-  const maxIndex = Math.max(0, photos.length - photosPerView)
-
-  const nextPhotos = () => {
-    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
-  }
-
-  const prevPhotos = () => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0))
-  }
-
-  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
-
-  return (
-    <div className="w-full">
-      <div className="relative group w-full">
-        <div className="flex gap-2 justify-center w-full">
-          {visiblePhotos.map((photo, index) => (
-            <div
-              key={currentIndex + index}
-              className="w-[220px] h-[220px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
-            >
-              <Image
-                src={photo || "/placeholder.svg"}
-                alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={220}
-                height={220}
-                className="w-full h-full object-cover"
-                sizes="220px"
-              />
-            </div>
-          ))}
-
-          {/* Fill empty slots if less than 5 photos visible */}
-          {visiblePhotos.length < photosPerView && (
-            <>
-              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  className="w-[220px] h-[220px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
-                ></div>
-              ))}
-            </>
-          )}
-        </div>
-
-        {/* Navigation arrows - only show if there are more than 5 photos */}
-        {photos.length > photosPerView && (
-          <>
-            <button
-              onClick={prevPhotos}
-              disabled={currentIndex === 0}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={nextPhotos}
-              disabled={currentIndex >= maxIndex}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </>
-        )}
-
-        {/* Photo counter */}
-        {photos.length > photosPerView && (
-          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination dots - only show if there are more than 5 photos */}
-      {photos.length > photosPerView && (
-        <div className="flex justify-center mt-2 space-x-1">
-          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
-            const pageStartIndex = index * photosPerView
-            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
-            return (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(pageStartIndex)}
-                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
-              />
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Function to load business photos from Cloudflare using public URLs
-const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
-  try {
-    console.log(`Loading photos for business ${businessId}`)
-
-    // Fetch business media data from the updated API
-    const response = await fetch(`/api/businesses/${businessId}`)
-    if (!response.ok) {
-      console.error(`Failed to fetch business data: ${response.status} ${response.statusText}`)
-      return []
-    }
-
-    const businessData = await response.json()
-    console.log(`Business data for ${businessId}:`, businessData)
-
-    // Try multiple possible locations for photo data
-    let photoAlbum = null
-
-    // Check direct photoAlbum property
-    if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
-      photoAlbum = businessData.photoAlbum
-    }
-    // Check nested media.photoAlbum
-    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
-      photoAlbum = businessData.media.photoAlbum
-    }
-    // Check adDesign.photoAlbum
-    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
-      photoAlbum = businessData.adDesign.photoAlbum
-    }
-
-    if (!photoAlbum || !Array.isArray(photoAlbum)) {
-      console.log(`No photo album found for business ${businessId}`)
-      return []
-    }
-
-    console.log(`Found ${photoAlbum.length} photos in album for business ${businessId}`)
-
-    // Convert Cloudflare image IDs to public URLs
-    const photoUrls = photoAlbum
-      .map((photo: any, index: number) => {
-        // Handle different photo data structures
-        let imageId = null
-
-        if (typeof photo === "string") {
-          // If photo is just a string (image ID)
-          imageId = photo
-        } else if (photo && typeof photo === "object") {
-          // If photo is an object, try to extract the image ID
-          imageId = photo.imageId || photo.id || photo.cloudflareId || photo.url
-
-          // If it's already a full URL, return it as-is
-          if (typeof imageId === "string" && (imageId.startsWith("http") || imageId.startsWith("https"))) {
-            console.log(`Photo ${index} already has full URL: ${imageId}`)
-            return imageId
-          }
-        }
-
-        if (!imageId) {
-          console.warn(`No image ID found for photo ${index}:`, photo)
-          return null
-        }
-
-        // Generate public Cloudflare URL
-        try {
-          const publicUrl = getCloudflareImageUrl(imageId, "public")
-          console.log(`Generated URL for image ${imageId}: ${publicUrl}`)
-          return publicUrl
-        } catch (error) {
-          console.error(`Error generating URL for image ${imageId}:`, error)
-          return null
-        }
-      })
-      .filter(Boolean) // Remove null/undefined URLs
-
-    console.log(`Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
-    return photoUrls
-  } catch (error) {
-    console.error(`Error loading photos for business ${businessId}:`, error)
-    return []
-  }
+  // Return original if not 10 digits
+  return phoneNumberString
 }
 
 export default function MusicLessonsPage() {
   const { toast } = useToast()
-  const fetchIdRef = useRef(0)
-
   const filterOptions = [
-    { id: "music1", label: "Piano Lessons", value: "Piano Lessons" },
-    { id: "music2", label: "Guitar Lessons", value: "Guitar Lessons" },
-    { id: "music3", label: "Violin Lessons", value: "Violin Lessons" },
-    { id: "music4", label: "Cello Lessons", value: "Cello Lessons" },
-    { id: "music5", label: "Trumpet Lessons", value: "Trumpet Lessons" },
-    { id: "music6", label: "Other Instrument Lessons", value: "Other Instrument Lessons" },
-    { id: "music7", label: "Instrument Repair", value: "Instrument Repair" },
-    { id: "music8", label: "Used and New Instruments for Sale", value: "Used and New Instruments for Sale" },
-    { id: "music9", label: "Other Music", value: "Other Music" },
+    { id: "instrument1", label: "Piano", value: "Piano" },
+    { id: "instrument2", label: "Guitar", value: "Guitar" },
+    { id: "instrument3", label: "Violin", value: "Violin" },
+    { id: "instrument4", label: "Drums", value: "Drums" },
+    { id: "instrument5", label: "Voice/Singing", value: "Voice/Singing" },
+    { id: "instrument6", label: "Bass Guitar", value: "Bass Guitar" },
+    { id: "instrument7", label: "Saxophone", value: "Saxophone" },
+    { id: "instrument8", label: "Trumpet", value: "Trumpet" },
+    { id: "instrument9", label: "Flute", value: "Flute" },
+    { id: "instrument10", label: "Cello", value: "Cello" },
+    { id: "instrument11", label: "Other Instruments", value: "Other Instruments" },
   ]
 
-  // State for reviews dialog
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
-  const [selectedProvider, setSelectedProvider] = useState<{
-    id: number
-    name: string
-    reviews: any[]
-  } | null>(null)
-
-  // State for business profile dialog
-  const [isBusinessProfileOpen, setIsBusinessProfileOpen] = useState(false)
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string>("")
-  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
-
-  // State for providers
-  const [providers, setProviders] = useState<Business[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState<any>(null)
+  const [businesses, setBusinesses] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [userZipCode, setUserZipCode] = useState<string | null>(null)
+  const fetchIdRef = useRef(0)
 
-  // User and favorites state
+  // Filter State Variables
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([])
+  const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([])
+
+  const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
+  const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
+
+  // State for ratings
+  const [businessRatings, setBusinessRatings] = useState<Record<string, { rating: number; reviewCount: number }>>({})
+
+  // Favorites functionality state
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({})
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
 
-  // Filter state management
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
-  const [appliedFilters, setAppliedFilters] = useState<string[]>([])
-  const [allProviders, setAllProviders] = useState<Business[]>([])
-  const [filteredProviders, setFilteredProviders] = useState<Business[]>([])
-
-  // Helper function to check if business serves a zip code
-  const businessServesZipCode = (business: Business, zipCode: string): boolean => {
-    console.log(
-      `[Music Lessons] Checking if business ${business.displayName || business.businessName} serves ${zipCode}:`,
-      {
-        isNationwide: business.isNationwide,
-        serviceArea: business.serviceArea,
-        primaryZip: business.zipCode,
-      },
-    )
-
-    // Check if business serves nationwide
-    if (business.isNationwide) {
-      console.log(`[Music Lessons] Business serves nationwide`)
-      return true
+  useEffect(() => {
+    const savedZipCode = localStorage.getItem("savedZipCode")
+    if (savedZipCode) {
+      setUserZipCode(savedZipCode)
     }
+  }, [])
 
-    // Check if business service area includes the zip code
-    if (business.serviceArea && Array.isArray(business.serviceArea)) {
-      const serves = business.serviceArea.some((area) => {
-        if (typeof area === "string") {
-          return area.toLowerCase().includes("nationwide") || area === zipCode
+  // Check user session
+  useEffect(() => {
+    async function checkUserSession() {
+      try {
+        const session = await getUserSession()
+        if (session?.user) {
+          setCurrentUser(session.user)
         }
-        return false
-      })
-      console.log(`[Music Lessons] Service area check result: ${serves}`)
-      if (serves) return true
+      } catch (error) {
+        console.error("Error checking user session:", error)
+      }
+    }
+    checkUserSession()
+  }, [])
+
+  // Load favorites when user is available
+  useEffect(() => {
+    async function loadFavorites() {
+      if (!currentUser) return
+
+      try {
+        const favoriteIds = new Set<string>()
+        for (const business of filteredBusinesses) {
+          const isFavorite = await checkIfBusinessIsFavorite(business.id)
+          if (isFavorite) {
+            favoriteIds.add(business.id)
+          }
+        }
+        setFavoriteBusinesses(favoriteIds)
+      } catch (error) {
+        console.error("Error loading favorites:", error)
+      }
     }
 
-    // Fall back to primary zip code comparison
-    const primaryMatch = business.zipCode === zipCode
-    console.log(`[Music Lessons] Primary zip code match: ${primaryMatch}`)
-    return primaryMatch
+    if (filteredBusinesses.length > 0) {
+      loadFavorites()
+    }
+  }, [currentUser, filteredBusinesses])
+
+  // Function to load reviews and calculate rating for a business
+  const loadReviewsForBusiness = async (businessId: string) => {
+    try {
+      const reviews = await getBusinessReviews(businessId)
+
+      let rating = 0
+      let reviewCount = 0
+
+      if (reviews && Array.isArray(reviews) && reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => {
+          const reviewRating = typeof review.overallRating === "number" ? review.overallRating : 0
+          return sum + reviewRating
+        }, 0)
+        rating = totalRating / reviews.length
+        reviewCount = reviews.length
+      }
+
+      return { rating: Number(rating) || 0, reviewCount: Number(reviewCount) || 0 }
+    } catch (error) {
+      console.error(`Error loading reviews for business ${businessId}:`, error)
+      return { rating: 0, reviewCount: 0 }
+    }
   }
 
-  // Clear zip code filter
-  const clearZipCodeFilter = () => {
-    setUserZipCode(null)
-    localStorage.removeItem("savedZipCode")
+  useEffect(() => {
+    async function fetchBusinesses() {
+      const currentFetchId = ++fetchIdRef.current
+      console.log(`[Music Lessons] Starting fetch ${currentFetchId} for zip code:`, userZipCode)
+
+      setIsLoading(true)
+      try {
+        let result = await getBusinessesForCategoryPage("/music-lessons")
+
+        // Only update if this is still the current request
+        if (currentFetchId !== fetchIdRef.current) {
+          console.log(`[Music Lessons] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+          return
+        }
+
+        console.log(`[Music Lessons] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+
+        // Filter by zip code if available
+        if (userZipCode) {
+          const originalCount = result.length
+          result = result.filter((business: Business) => businessServesZipCode(business, userZipCode))
+          console.log(
+            `[Music Lessons] Filtered from ${originalCount} to ${result.length} businesses for zip ${userZipCode}`,
+          )
+        }
+
+        // Load photos and reviews concurrently for each business
+        const businessesWithData = await Promise.all(
+          result.map(async (business: Business) => {
+            try {
+              const [photos, reviewData] = await Promise.all([
+                loadBusinessPhotos(business.id).catch(() => []),
+                loadReviewsForBusiness(business.id).catch(() => ({ rating: 0, reviewCount: 0 })),
+              ])
+
+              // Update photos state
+              setBusinessPhotos((prev) => ({
+                ...prev,
+                [business.id]: photos,
+              }))
+
+              // Update ratings state
+              setBusinessRatings((prev) => ({
+                ...prev,
+                [business.id]: reviewData,
+              }))
+
+              // Attach rating data to business object
+              return {
+                ...business,
+                rating: reviewData.rating,
+                reviewCount: reviewData.reviewCount,
+              }
+            } catch (error) {
+              console.error(`Error loading data for business ${business.id}:`, error)
+              return {
+                ...business,
+                rating: 0,
+                reviewCount: 0,
+              }
+            }
+          }),
+        )
+
+        setBusinesses(businessesWithData)
+        setAllBusinesses(businessesWithData)
+        setFilteredBusinesses(businessesWithData)
+      } catch (error) {
+        // Only update error if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          console.error(`[Music Lessons] Fetch ${currentFetchId} error:`, error)
+          toast({
+            title: "Error loading businesses",
+            description: "There was a problem loading businesses. Please try again later.",
+            variant: "destructive",
+          })
+        }
+      } finally {
+        // Only update loading if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    fetchBusinesses()
+  }, [toast, userZipCode])
+
+  // Function to check if business has exact subcategory match
+  const hasExactSubcategoryMatch = (business: Business, subcategory: string): boolean => {
+    if (business.allSubcategories && Array.isArray(business.allSubcategories)) {
+      return business.allSubcategories.some(
+        (sub) => getSubcategoryString(sub).toLowerCase() === subcategory.toLowerCase(),
+      )
+    }
+    return false
+  }
+
+  // Filter handlers
+  const handleFilterChange = (subcategory: string) => {
+    setSelectedFilters((prev) =>
+      prev.includes(subcategory) ? prev.filter((f) => f !== subcategory) : [...prev, subcategory],
+    )
+  }
+
+  const handleApplyFilters = () => {
+    setAppliedFilters([...selectedFilters])
+
+    let filtered = [...allBusinesses]
+    if (selectedFilters.length > 0) {
+      filtered = allBusinesses.filter((business) =>
+        selectedFilters.every((filter) => hasExactSubcategoryMatch(business, filter)),
+      )
+    }
+
+    setFilteredBusinesses(filtered)
+
+    toast({
+      title: "Filters Applied",
+      description: `Showing businesses with ${selectedFilters.length} selected instrument${selectedFilters.length !== 1 ? "s" : ""}`,
+    })
+  }
+
+  const handleClearFilters = () => {
+    setSelectedFilters([])
+    setAppliedFilters([])
+    setFilteredBusinesses([...allBusinesses])
+
+    toast({
+      title: "Filters Cleared",
+      description: "Showing all music lesson providers",
+    })
+  }
+
+  const handleOpenReviews = (provider: any) => {
+    setSelectedProvider(provider)
+    setIsReviewsDialogOpen(true)
+  }
+
+  const handleOpenProfile = (provider: any) => {
+    setSelectedProvider(provider)
+    setIsProfileDialogOpen(true)
+  }
+
+  // Function to load photos for a specific business
+  const loadPhotosForBusiness = async (businessId: string, businessName: string) => {
+    if (businessPhotos[businessId] || loadingPhotos[businessId]) {
+      return // Already loaded or loading
+    }
+
+    setLoadingPhotos((prev) => ({ ...prev, [businessId]: true }))
+
+    try {
+      console.log(`Loading photos for business: ${businessName}`, { id: businessId })
+      const photos = await loadBusinessPhotos(businessId)
+      console.log(`Loaded ${photos.length} photos for business ${businessId}`)
+
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: photos }))
+    } catch (error) {
+      console.error(`Error loading photos for business ${businessId}:`, error)
+      setBusinessPhotos((prev) => ({ ...prev, [businessId]: [] }))
+    } finally {
+      setLoadingPhotos((prev) => ({ ...prev, [businessId]: false }))
+    }
   }
 
   // Handle adding business to favorites
@@ -348,11 +382,11 @@ export default function MusicLessonsPage() {
       return
     }
 
-    // Prevent duplicate saves
     if (favoriteBusinesses.has(business.id)) {
       toast({
         title: "Already Saved",
-        description: "This business card is already in your favorites.",
+        description: "This business card is already in your favorites",
+        variant: "destructive",
       })
       return
     }
@@ -362,11 +396,11 @@ export default function MusicLessonsPage() {
     try {
       const result = await addFavoriteBusiness({
         id: business.id,
-        businessName: business.businessName,
-        displayName: business.displayName,
-        phone: business.displayPhone,
-        email: business.email || "",
-        address: business.displayLocation,
+        businessName: business.businessName || "",
+        displayName: business.displayName || business.businessName || "",
+        phone: business.displayPhone || business.phone || "",
+        email: "", // Not available in this context
+        address: business.displayLocation || "",
         zipCode: business.zipCode || "",
       })
 
@@ -379,7 +413,7 @@ export default function MusicLessonsPage() {
       } else {
         toast({
           title: "Error",
-          description: result.message || "Failed to save business card",
+          description: result.message,
           variant: "destructive",
         })
       }
@@ -395,194 +429,12 @@ export default function MusicLessonsPage() {
     }
   }
 
-  // Function to check if business has exact subcategory match
-  const hasExactSubcategory = (business: Business, filter: string) => {
-    return business.subcategories?.some(
-      (subcategory) => getSubcategoryString(subcategory).toLowerCase() === filter.toLowerCase(),
-    )
-  }
-
-  // Filter handlers
-  const handleFilterChange = (filter: string) => {
-    setSelectedFilters((prev) => {
-      if (prev.includes(filter)) {
-        return prev.filter((f) => f !== filter)
-      } else {
-        return [...prev, filter]
-      }
-    })
-  }
-
-  const handleApplyFilters = () => {
-    setAppliedFilters([...selectedFilters])
-    let filtered = [...allProviders]
-
-    if (selectedFilters.length > 0) {
-      filtered = allProviders.filter((business) => {
-        return selectedFilters.every((filter) => hasExactSubcategory(business, filter))
-      })
-    }
-
-    setFilteredProviders(filtered)
-
-    toast({
-      title: "Filters Applied",
-      description: `Showing businesses with ${selectedFilters.length} selected service${selectedFilters.length !== 1 ? "s" : ""}`,
-    })
-  }
-
-  const handleClearFilters = () => {
-    setSelectedFilters([])
-    setAppliedFilters([])
-    setFilteredProviders([...allProviders])
-
-    toast({
-      title: "Filters Cleared",
-      description: "Showing all music lesson providers",
-    })
-  }
-
-  useEffect(() => {
-    const savedZipCode = localStorage.getItem("savedZipCode")
-    if (savedZipCode) {
-      setUserZipCode(savedZipCode)
-    }
-  }, [])
-
-  // Check user session
-  useEffect(() => {
-    async function checkUserSession() {
-      try {
-        const session = await getUserSession()
-        setCurrentUser(session?.user || null)
-      } catch (error) {
-        console.error("Error checking user session:", error)
-        setCurrentUser(null)
-      }
-    }
-
-    checkUserSession()
-  }, [])
-
-  // Load user's favorite businesses
-  useEffect(() => {
-    async function loadFavorites() {
-      if (!currentUser?.id) {
-        setFavoriteBusinesses(new Set())
-        return
-      }
-
-      try {
-        const favoriteChecks = await Promise.all(
-          allProviders.map(async (business) => {
-            const isFavorite = await checkIfBusinessIsFavorite(business.id)
-            return { businessId: business.id, isFavorite }
-          }),
-        )
-
-        const favoriteIds = favoriteChecks.filter(({ isFavorite }) => isFavorite).map(({ businessId }) => businessId)
-
-        setFavoriteBusinesses(new Set(favoriteIds))
-      } catch (error) {
-        console.error("Error loading favorites:", error)
-      }
-    }
-
-    if (allProviders.length > 0) {
-      loadFavorites()
-    }
-  }, [currentUser, allProviders])
-
-  useEffect(() => {
-    async function fetchProviders() {
-      const currentFetchId = ++fetchIdRef.current
-      console.log(`[Music Lessons] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
-
-      try {
-        setLoading(true)
-        setError(null)
-
-        console.log("Fetching music lesson businesses...")
-        const businesses = await getBusinessesForCategoryPage("/music-lessons")
-
-        // Check if this is still the current request
-        if (currentFetchId !== fetchIdRef.current) {
-          console.log(`[Music Lessons] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
-          return
-        }
-
-        console.log(`[Music Lessons] Fetch ${currentFetchId} completed, got ${businesses.length} businesses`)
-
-        // Load photos for each business using public Cloudflare URLs
-        const businessesWithPhotos = await Promise.all(
-          businesses.map(async (business: Business) => {
-            const photos = await loadBusinessPhotos(business.id)
-            return { ...business, photos }
-          }),
-        )
-
-        // Filter by zip code if available
-        let filteredBusinesses = businessesWithPhotos
-        if (userZipCode) {
-          console.log(`[Music Lessons] Filtering by zip code: ${userZipCode}`)
-          filteredBusinesses = businessesWithPhotos.filter((business: Business) => {
-            const serves = businessServesZipCode(business, userZipCode)
-            console.log(
-              `[Music Lessons] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
-              business,
-            )
-            return serves
-          })
-          console.log(`[Music Lessons] After filtering: ${filteredBusinesses.length} businesses`)
-        }
-
-        console.log("Fetched music lesson businesses:", filteredBusinesses)
-        setAllProviders(filteredBusinesses)
-        setFilteredProviders(filteredBusinesses)
-      } catch (error) {
-        // Only update error state if this is still the current request
-        if (currentFetchId === fetchIdRef.current) {
-          console.error("Error fetching music lesson providers:", error)
-          setError("Failed to load providers")
-          toast({
-            title: "Error loading businesses",
-            description: "There was a problem loading music lesson providers. Please try again later.",
-            variant: "destructive",
-          })
-        }
-      } finally {
-        // Only update loading state if this is still the current request
-        if (currentFetchId === fetchIdRef.current) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchProviders()
-  }, [userZipCode])
-
-  const handleViewProfile = (business: Business) => {
-    console.log("Opening profile for business:", business)
-    setSelectedBusinessId(business.id)
-    setSelectedBusinessName(business.displayName || business.businessName || "Music Instructor")
-    setIsBusinessProfileOpen(true)
-  }
-
-  const handleViewReviews = (business: Business) => {
-    setSelectedProvider({
-      id: Number.parseInt(business.id),
-      name: business.displayName || business.businessName || "Music Instructor",
-      reviews: [],
-    })
-    setIsReviewsDialogOpen(true)
-  }
-
   return (
-    <CategoryLayout title="Music Lessons & Instrument Services" backLink="/" backText="Categories">
+    <CategoryLayout title="Music Lessons" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/music%20lesson-VcAdpdYV65QHk4izPaeiVUsKQZwn9Q.png"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/music-lessons-YjKGqJzXzXzXzXzXzXzXzXzXzXzXzX.png"
             alt="Music Lessons"
             width={500}
             height={500}
@@ -592,25 +444,26 @@ export default function MusicLessonsPage() {
 
         <div className="space-y-6">
           <p className="text-lg text-gray-700">
-            Find qualified music teachers and instrument services in your area. Browse options below or use filters to
-            narrow your search.
+            Find qualified music instructors and lesson providers in your area. Browse options below or use filters to
+            narrow your search by instrument.
           </p>
 
           <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
             <h3 className="font-medium text-primary mb-2">Why Choose Hausbaum?</h3>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Read reviews from other customers</li>
-              <li>View business videos showcasing work and staff</li>
-              <li>Access exclusive coupons directly on each business listing</li>
-              <li>Discover job openings from businesses you'd trust to hire yourself</li>
+              <li>Read reviews from other students</li>
+              <li>View instructor videos and teaching styles</li>
+              <li>Access exclusive lesson deals and promotions</li>
+              <li>Discover job openings at music schools and studios</li>
             </ul>
           </div>
         </div>
       </div>
 
+      {/* Filter interface */}
       <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex justify-between items-center mb-4">
-          <h4 className="text-lg font-semibold text-gray-800">Filter by Service Type</h4>
+          <h4 className="text-lg font-semibold text-gray-800">Filter by Instrument</h4>
           <div className="flex gap-2">
             <Button onClick={handleApplyFilters} disabled={selectedFilters.length === 0} size="sm">
               Apply Filters {selectedFilters.length > 0 && `(${selectedFilters.length})`}
@@ -624,7 +477,7 @@ export default function MusicLessonsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {filterOptions.map((option: FilterOption) => (
+          {filterOptions.map((option) => (
             <label
               key={option.id}
               className="flex items-center space-x-2 bg-gray-50 rounded-md border border-gray-200 px-3 py-2 hover:bg-gray-100 transition-colors cursor-pointer"
@@ -647,334 +500,235 @@ export default function MusicLessonsPage() {
       )}
 
       {userZipCode && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-blue-800 text-sm">
-                <strong>Showing results for ZIP code: {userZipCode}</strong>
-                <br />
-                <span className="text-blue-600">Including businesses that serve your area or operate nationwide.</span>
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearZipCodeFilter}
-              className="text-blue-600 border-blue-300 hover:bg-blue-100 bg-transparent"
-            >
-              Clear Filter
-            </Button>
-          </div>
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Showing businesses that serve zip code:</span> {userZipCode}
+            <span className="text-xs block mt-1">Includes businesses with {userZipCode} in their service area</span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem("savedZipCode")
+              setUserZipCode(null)
+            }}
+            className="text-blue-700 border-blue-300 hover:bg-blue-100"
+          >
+            Clear Filter
+          </Button>
         </div>
       )}
 
-      <div className="space-y-6">
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <LoaderIcon className="h-8 w-8 animate-spin text-primary mr-2" />
-            <p>Loading music lesson providers...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-8">
-            <p className="text-red-600">{error}</p>
-          </div>
-        ) : filteredProviders.length === 0 ? (
-          <div className="text-center py-12">
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">
-              {userZipCode ? `No Music Lesson Providers in ${userZipCode}` : "No Music Lesson Providers Found"}
-            </h3>
-            <p className="text-gray-600 mb-4">
-              {userZipCode
-                ? `We're building our network of music instructors in the ${userZipCode} area.`
-                : "We're currently building our network of music instructors in your area."}
-            </p>
-            <p className="text-sm text-gray-500">
-              Are you a music instructor?{" "}
-              <a href="/business-register" className="text-primary hover:underline">
-                Register your business
-              </a>{" "}
-              to be featured here.
-            </p>
-          </div>
-        ) : (
-          <>
-            {filteredProviders.length > 0 && (
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Found {filteredProviders.length} Music Lesson Provider{filteredProviders.length !== 1 ? "s" : ""}
-                </h2>
-              </div>
-            )}
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+          <p>Loading music lesson providers...</p>
+        </div>
+      ) : filteredBusinesses.length > 0 ? (
+        <div className="space-y-6">
+          {filteredBusinesses.map((business) => (
+            <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  {/* Business name at the top */}
+                  <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
 
-            {filteredProviders.map((business: Business) => (
-              <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-                <div className="flex flex-col space-y-4">
-                  {/* Business Name and Description */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {business.displayName || business.businessName || "Music Instructor"}
-                    </h3>
-                    {business.businessDescription && (
-                      <p className="text-gray-600 text-sm leading-relaxed">{business.businessDescription}</p>
+                  {/* Star rating directly underneath the business name */}
+                  <div className="flex items-center gap-2">
+                    <StarRating rating={business.rating || 0} size="sm" />
+                    <span className="text-sm text-gray-600">
+                      {business.rating ? business.rating.toFixed(1) : "0.0"}
+                    </span>
+                    {business.reviewCount && business.reviewCount > 0 && (
+                      <span className="text-sm text-gray-500">
+                        ({business.reviewCount} review{business.reviewCount !== 1 ? "s" : ""})
+                      </span>
                     )}
                   </div>
 
-                  {/* Mobile Layout */}
-                  <div className="lg:hidden space-y-4">
-                    {/* Contact Info */}
-                    <div className="space-y-2">
-                      {business.displayPhone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <a
-                            href={`tel:${business.displayPhone}`}
-                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                          >
-                            {business.displayPhone}
-                          </a>
-                        </div>
-                      )}
-
+                  {/* Contact info and services below that */}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                       {business.displayLocation && (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="text-gray-700 text-sm">{business.displayLocation}</span>
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          <span>{business.displayLocation}</span>
                         </div>
                       )}
-
-                      {userZipCode && (
-                        <div className="text-xs text-green-600 mt-1">
-                          {business.isNationwide ? (
-                            <span>✓ Serves nationwide</span>
-                          ) : business.serviceArea?.includes(userZipCode) ? (
-                            <span>✓ Serves {userZipCode} and surrounding areas</span>
-                          ) : business.zipCode === userZipCode ? (
-                            <span>✓ Located in {userZipCode}</span>
-                          ) : null}
+                      {(business.displayPhone || business.phone) && (
+                        <div className="flex items-center">
+                          <Phone className="h-4 w-4 mr-1" />
+                          <a href={`tel:${business.displayPhone || business.phone}`} className="hover:text-primary">
+                            {formatPhoneNumber(business.displayPhone || business.phone)}
+                          </a>
                         </div>
                       )}
                     </div>
 
-                    {/* Services */}
-                    {business.subcategories && business.subcategories.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {business.subcategories.map((subcategory: any, index: number) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                            >
-                              {getSubcategoryString(subcategory)}
-                            </span>
-                          ))}
-                        </div>
+                    {/* Business Description */}
+                    {business.businessDescription && (
+                      <p className="text-gray-700 text-sm leading-relaxed">{business.businessDescription}</p>
+                    )}
+
+                    {/* Service Area Indicator */}
+                    {userZipCode && (
+                      <div className="text-xs text-green-600">
+                        {business.isNationwide ? (
+                          <span>✓ Serves nationwide</span>
+                        ) : business.serviceArea?.includes(userZipCode) ? (
+                          <span>✓ Serves {userZipCode} and surrounding areas</span>
+                        ) : business.zipCode === userZipCode ? (
+                          <span>✓ Located in {userZipCode}</span>
+                        ) : null}
                       </div>
                     )}
 
-                    {/* Photo Carousel */}
-                    <PhotoCarousel
-                      businessId={business.id}
-                      photos={business.photos || []}
-                      onLoadPhotos={() => {}}
-                      showMultiple={true}
-                      photosPerView={2}
-                      size="small"
-                    />
+                    {/* Services */}
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Instruments:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
+                          business.allSubcategories.map((service, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {getSubcategoryString(service)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            Music Lessons
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex justify-center gap-2">
-                      {/* Save Card Button */}
+                  {/* Photo album on the left with action buttons on the right in the bottom section */}
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    {/* Photo Carousel on the left */}
+                    <div className="flex-1">
+                      {loadingPhotos[business.id] ? (
+                        <div className="flex items-center justify-center w-full h-[200px] bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Loading photos...</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <PhotoCarousel
+                          businessId={business.id}
+                          photos={businessPhotos[business.id] || []}
+                          onLoadPhotos={() => {}}
+                          showMultiple={true}
+                          photosPerView={5}
+                          size="small"
+                          className="w-full"
+                        />
+                      )}
+                    </div>
+
+                    {/* Action buttons on the right */}
+                    <div className="flex flex-row lg:flex-col gap-2 lg:w-40">
+                      <Button className="flex-1 lg:flex-none min-w-[120px]" onClick={() => handleOpenReviews(business)}>
+                        Ratings
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 lg:flex-none min-w-[120px] bg-transparent"
+                        onClick={() => handleOpenProfile(business)}
+                      >
+                        View Profile
+                      </Button>
                       <Button
                         variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handleAddToFavorites(business)}
-                        disabled={savingStates[business.id]}
                         className={
                           favoriteBusinesses.has(business.id)
-                            ? "text-sm min-w-[110px] bg-red-600 hover:bg-red-700 border-red-600"
-                            : "text-sm min-w-[110px] bg-transparent border-red-600 text-red-600 hover:bg-red-50"
+                            ? "flex-1 lg:flex-none min-w-[120px] bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            : "flex-1 lg:flex-none min-w-[120px] text-red-600 border-red-600 hover:bg-red-50"
                         }
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
                       >
                         {savingStates[business.id] ? (
                           <>
-                            <LoaderIcon className="h-4 w-4 animate-spin mr-1" />
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             Saving...
                           </>
                         ) : favoriteBusinesses.has(business.id) ? (
                           <>
-                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            <HeartHandshake className="h-4 w-4 mr-2" />
                             Saved
                           </>
                         ) : (
                           <>
-                            <Heart className="h-4 w-4 mr-1" />
+                            <Heart className="h-4 w-4 mr-2" />
                             Save Card
                           </>
                         )}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewReviews(business)}
-                        className="text-sm min-w-[110px] bg-transparent"
-                      >
-                        Reviews
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleViewProfile(business)}
-                        className="text-sm min-w-[110px]"
-                      >
-                        View Profile
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Desktop Layout */}
-                  <div className="hidden lg:flex lg:flex-col lg:space-y-4">
-                    {/* Main content area with contact info and buttons */}
-                    <div className="flex lg:items-start gap-4">
-                      {/* Left side - Contact and Location Info */}
-                      <div className="lg:w-56 space-y-2 flex-shrink-0">
-                        {business.displayPhone && (
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                            <a
-                              href={`tel:${business.displayPhone}`}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                            >
-                              {business.displayPhone}
-                            </a>
-                          </div>
-                        )}
-
-                        {business.displayLocation && (
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                            <span className="text-gray-700 text-sm">{business.displayLocation}</span>
-                          </div>
-                        )}
-
-                        {userZipCode && (
-                          <div className="text-xs text-green-600 mt-1">
-                            {business.isNationwide ? (
-                              <span>✓ Serves nationwide</span>
-                            ) : business.serviceArea?.includes(userZipCode) ? (
-                              <span>✓ Serves {userZipCode} and surrounding areas</span>
-                            ) : business.zipCode === userZipCode ? (
-                              <span>✓ Located in {userZipCode}</span>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Right side - Action Buttons */}
-                      <div className="flex flex-col gap-2 lg:items-end lg:w-28 flex-shrink-0">
-                        {/* Save Card Button */}
-                        <Button
-                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handleAddToFavorites(business)}
-                          disabled={savingStates[business.id]}
-                          className={
-                            favoriteBusinesses.has(business.id)
-                              ? "text-sm min-w-[110px] bg-red-600 hover:bg-red-700 border-red-600"
-                              : "text-sm min-w-[110px] bg-transparent border-red-600 text-red-600 hover:bg-red-50"
-                          }
-                        >
-                          {savingStates[business.id] ? (
-                            <>
-                              <LoaderIcon className="h-4 w-4 animate-spin mr-1" />
-                              Saving...
-                            </>
-                          ) : favoriteBusinesses.has(business.id) ? (
-                            <>
-                              <HeartHandshake className="h-4 w-4 mr-1" />
-                              Saved
-                            </>
-                          ) : (
-                            <>
-                              <Heart className="h-4 w-4 mr-1" />
-                              Save Card
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewReviews(business)}
-                          className="text-sm min-w-[110px] bg-transparent"
-                        >
-                          Reviews
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleViewProfile(business)}
-                          className="text-sm min-w-[110px]"
-                        >
-                          View Profile
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Subcategories/Specialties */}
-                    {business.subcategories && business.subcategories.length > 0 && (
-                      <div className="w-full">
-                        <div className="lg:w-56">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Specialties:</h4>
-                        </div>
-                        <div className="flex flex-wrap gap-2 w-full mb-4">
-                          {business.subcategories.map((subcategory: any, index: number) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                            >
-                              {getSubcategoryString(subcategory)}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Desktop Photo Carousel - moved below specialties */}
-                    <div className="w-full flex justify-center">
-                      <DesktopPhotoCarousel
-                        photos={business.photos || []}
-                        businessName={business.displayName || business.businessName || "Music Instructor"}
-                      />
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </>
-        )}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-8 max-w-2xl mx-auto">
+            <h3 className="text-xl font-medium text-orange-800 mb-2">No Music Lesson Providers Found</h3>
+            <p className="text-orange-700 mb-4">
+              {userZipCode
+                ? `We're building our network of qualified music instructors that serve the ${userZipCode} area.`
+                : "We're building our network of qualified music instructors in your area."}
+            </p>
+            <div className="bg-white rounded border border-orange-100 p-4">
+              <p className="text-gray-700 font-medium">Are you a music instructor?</p>
+              <p className="text-gray-600 mt-1">
+                Join Hausbaum to connect with students in your area who want to learn music.
+              </p>
+              <Button className="mt-3" asChild>
+                <a href="/business-register">Register Your Music Teaching Business</a>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedProvider && (
         <ReviewsDialog
           isOpen={isReviewsDialogOpen}
           onClose={() => setIsReviewsDialogOpen(false)}
-          providerName={selectedProvider.name || ""}
-          businessId={selectedProvider.id?.toString() || ""}
+          providerName={selectedProvider.displayName || selectedProvider.businessName || selectedProvider.name}
+          businessId={selectedProvider.id}
           reviews={[]}
         />
       )}
 
-      {selectedBusinessId && (
+      {selectedProvider && (
         <BusinessProfileDialog
-          businessId={selectedBusinessId}
-          businessName={selectedBusinessName}
-          isOpen={isBusinessProfileOpen}
-          onClose={() => setIsBusinessProfileOpen(false)}
+          isOpen={isProfileDialogOpen}
+          onClose={() => setIsProfileDialogOpen(false)}
+          businessId={selectedProvider.id}
         />
       )}
 
       {/* Login Dialog */}
-      <ReviewLoginDialog isOpen={isLoginDialogOpen} onClose={() => setIsLoginDialogOpen(false)} />
+      <ReviewLoginDialog
+        isOpen={isLoginDialogOpen}
+        onClose={() => setIsLoginDialogOpen(false)}
+        onSuccess={() => {
+          setIsLoginDialogOpen(false)
+          // Refresh user session after successful login
+          getUserSession().then((session) => {
+            if (session?.user) {
+              setCurrentUser(session.user)
+            }
+          })
+        }}
+      />
 
       <Toaster />
     </CategoryLayout>

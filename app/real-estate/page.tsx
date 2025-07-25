@@ -16,6 +16,8 @@ import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/fa
 import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Enhanced Business interface
 interface Business {
@@ -29,6 +31,7 @@ interface Business {
   state?: string
   phone?: string
   rating?: number
+  reviewCount?: number
   reviews?: any[]
   description?: string
   subcategory?: string
@@ -286,19 +289,129 @@ function formatPhoneNumber(phoneNumberString: string) {
   return phoneNumberString
 }
 
+const fetchBusinesses = async (
+  fetchIdRef: any,
+  setIsLoading: any,
+  setBusinesses: any,
+  setAllBusinesses: any,
+  toast: any,
+  userZipCode: any,
+) => {
+  const currentFetchId = ++fetchIdRef.current
+
+  try {
+    setIsLoading(true)
+
+    console.log(`[Real Estate] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
+
+    const result = await getBusinessesForCategoryPage("/real-estate")
+
+    // Load photos and reviews for each business concurrently
+    const businessesWithData = await Promise.all(
+      result.map(async (business: Business) => {
+        try {
+          // Load photos and reviews concurrently
+          const [photos, reviews] = await Promise.all([
+            loadBusinessPhotos(business.id),
+            getBusinessReviews(business.id),
+          ])
+
+          // Calculate average rating from reviews
+          let rating = 0
+          let reviewCount = 0
+
+          if (reviews && Array.isArray(reviews) && reviews.length > 0) {
+            reviewCount = reviews.length
+            const totalRating = reviews.reduce((sum, review) => {
+              const reviewRating =
+                typeof review.overallRating === "number"
+                  ? review.overallRating
+                  : typeof review.rating === "number"
+                    ? review.rating
+                    : 0
+              return sum + reviewRating
+            }, 0)
+            rating = totalRating / reviewCount
+          }
+
+          return {
+            ...business,
+            photos,
+            reviews,
+            rating: Number(rating.toFixed(1)) || 0,
+            reviewCount: Number(reviewCount) || 0,
+          }
+        } catch (error) {
+          console.error(`Error loading data for business ${business.id}:`, error)
+          // Return business with default values if loading fails
+          return {
+            ...business,
+            photos: [],
+            reviews: [],
+            rating: 0,
+            reviewCount: 0,
+          }
+        }
+      }),
+    )
+
+    // Check if this is still the current request
+    if (currentFetchId !== fetchIdRef.current) {
+      console.log(`[Real Estate] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
+      return
+    }
+
+    console.log(`[Real Estate] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+
+    // Filter by zip code if available
+    let filteredResult = businessesWithData
+    if (userZipCode) {
+      console.log(`[Real Estate] Filtering by zip code: ${userZipCode}`)
+      filteredResult = businessesWithData.filter((business: Business) => {
+        const serves = businessServesZipCode(business, userZipCode)
+        console.log(
+          `[Real Estate] Business ${business.displayName || business.adDesignData?.businessInfo?.businessName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
+          {
+            serviceArea: business.serviceArea,
+            primaryZip: business.zipCode,
+            isNationwide: business.isNationwide,
+          },
+        )
+        return serves
+      })
+      console.log(`[Real Estate] After filtering: ${filteredResult.length} businesses`)
+    }
+
+    setBusinesses(filteredResult)
+    setAllBusinesses(filteredResult)
+  } catch (error) {
+    // Only update error if this is still the current request
+    if (currentFetchId === fetchIdRef.current) {
+      console.error(`[Real Estate] Error in fetch ${currentFetchId}:`, error)
+      toast({
+        title: "Error loading businesses",
+        description: "There was a problem loading businesses. Please try again later.",
+        variant: "destructive",
+      })
+    }
+  } finally {
+    // Only update loading if this is still the current request
+    if (currentFetchId === fetchIdRef.current) {
+      setIsLoading(false)
+    }
+  }
+}
+
+const filterOptions = [
+  { id: "1", value: "Real Estate Buying", label: "Real Estate Buying" },
+  { id: "2", value: "Real Estate Selling", label: "Real Estate Selling" },
+  { id: "3", value: "Property Management", label: "Property Management" },
+  { id: "4", value: "Home Staging", label: "Home Staging" },
+]
+
 export default function RealEstatePage() {
   const { toast } = useToast()
   const fetchIdRef = useRef(0)
-
-  const filterOptions = [
-    { id: "home1", label: "Real Estate Agent", value: "Real Estate Agent" },
-    { id: "home2", label: "Real Estate Appraising", value: "Real Estate Appraising" },
-    { id: "home3", label: "Home Staging", value: "Home Staging" },
-    { id: "home4", label: "Home Inspection", value: "Home Inspection" },
-    { id: "home5", label: "Home Energy Audit", value: "Home Energy Audit" },
-    { id: "home6", label: "Other Home Buying and Selling", value: "Other Home Buying and Selling" },
-  ]
-
   const [selectedProvider, setSelectedProvider] = useState<any>(null)
   const [isReviewsDialogOpen, setIsReviewsDialogOpen] = useState(false)
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
@@ -358,73 +471,8 @@ export default function RealEstatePage() {
     }
   }, [currentUser, businesses])
 
-  const fetchBusinesses = async () => {
-    const currentFetchId = ++fetchIdRef.current
-
-    try {
-      setIsLoading(true)
-
-      console.log(`[Real Estate] Starting fetch ${currentFetchId} at ${new Date().toISOString()}`)
-
-      const result = await getBusinessesForCategoryPage("/real-estate")
-
-      // Load photos for each business using public Cloudflare URLs
-      const businessesWithPhotos = await Promise.all(
-        result.map(async (business: Business) => {
-          const photos = await loadBusinessPhotos(business.id)
-          return { ...business, photos }
-        }),
-      )
-
-      // Check if this is still the current request
-      if (currentFetchId !== fetchIdRef.current) {
-        console.log(`[Real Estate] Ignoring stale response ${currentFetchId}, current is ${fetchIdRef.current}`)
-        return
-      }
-
-      console.log(`[Real Estate] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
-
-      // Filter by zip code if available
-      let filteredResult = businessesWithPhotos
-      if (userZipCode) {
-        console.log(`[Real Estate] Filtering by zip code: ${userZipCode}`)
-        filteredResult = businessesWithPhotos.filter((business: Business) => {
-          const serves = businessServesZipCode(business, userZipCode)
-          console.log(
-            `[Real Estate] Business ${business.displayName || business.adDesignData?.businessInfo?.businessName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
-            {
-              serviceArea: business.serviceArea,
-              primaryZip: business.zipCode,
-              isNationwide: business.isNationwide,
-            },
-          )
-          return serves
-        })
-        console.log(`[Real Estate] After filtering: ${filteredResult.length} businesses`)
-      }
-
-      setBusinesses(filteredResult)
-      setAllBusinesses(filteredResult)
-    } catch (error) {
-      // Only update error if this is still the current request
-      if (currentFetchId === fetchIdRef.current) {
-        console.error(`[Real Estate] Error in fetch ${currentFetchId}:`, error)
-        toast({
-          title: "Error loading businesses",
-          description: "There was a problem loading businesses. Please try again later.",
-          variant: "destructive",
-        })
-      }
-    } finally {
-      // Only update loading if this is still the current request
-      if (currentFetchId === fetchIdRef.current) {
-        setIsLoading(false)
-      }
-    }
-  }
-
   useEffect(() => {
-    fetchBusinesses()
+    fetchBusinesses(fetchIdRef, setIsLoading, setBusinesses, setAllBusinesses, toast, userZipCode)
   }, [userZipCode])
 
   // Helper function to check if a business has a specific subcategory
@@ -770,13 +818,21 @@ export default function RealEstatePage() {
             {filteredBusinesses.map((business: Business) => (
               <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
                 <div className="flex flex-col space-y-4">
-                  {/* Business Name and Description */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {business.displayName ||
-                        business.adDesignData?.businessInfo?.businessName ||
-                        business.businessName}
-                    </h3>
+                  {/* Business Name, Star Rating, and Description */}
+                  <div className="relative">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-xl font-semibold text-gray-900 flex-1 pr-4">
+                        {business.displayName ||
+                          business.adDesignData?.businessInfo?.businessName ||
+                          business.businessName}
+                      </h3>
+                      <div className="flex flex-col items-end flex-shrink-0">
+                        <div className="flex items-center gap-1">
+                          <StarRating rating={business.rating || 0} size="sm" />
+                          <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
+                        </div>
+                      </div>
+                    </div>
                     {business.description && (
                       <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
                     )}

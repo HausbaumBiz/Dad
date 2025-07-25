@@ -19,6 +19,8 @@ import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/fa
 import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { StarRating } from "@/components/star-rating"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 
 // Photo Carousel Component - displays 5 photos in landscape format
 interface PhotoCarouselProps {
@@ -224,6 +226,7 @@ interface Business {
   phone?: string
   rating?: number
   reviews?: number
+  reviewCount?: number
   services?: any[]
   subcategories?: any[]
   description?: string
@@ -237,7 +240,7 @@ interface Business {
   serviceArea?: string[]
   isNationwide?: boolean
   allSubcategories?: any[]
-  photos?: string[] // Add this line
+  photos?: string[]
   email?: string
 }
 
@@ -463,11 +466,61 @@ export default function CareServicesPage() {
 
         const result = await getBusinessesForCategoryPage("/care-services")
 
-        // Load photos for each business using public Cloudflare URLs
-        const businessesWithPhotos = await Promise.all(
+        // Load photos and reviews concurrently for each business
+        const businessesWithPhotosAndReviews = await Promise.all(
           result.map(async (business: Business) => {
-            const photos = await loadBusinessPhotos(business.id || "")
-            return { ...business, photos }
+            try {
+              // Load photos and reviews concurrently
+              const [photos, reviewsData] = await Promise.all([
+                loadBusinessPhotos(business.id || ""),
+                getBusinessReviews(business.id || "").catch(() => ({ reviews: [], averageRating: 0, totalReviews: 0 })),
+              ])
+
+              // Calculate rating and review count with proper type safety
+              let rating = 0
+              let reviewCount = 0
+
+              if (reviewsData && typeof reviewsData === "object") {
+                // Handle averageRating
+                if (typeof reviewsData.averageRating === "number" && !isNaN(reviewsData.averageRating)) {
+                  rating = reviewsData.averageRating
+                } else if (typeof reviewsData.averageRating === "string") {
+                  const parsed = Number.parseFloat(reviewsData.averageRating)
+                  rating = !isNaN(parsed) ? parsed : 0
+                }
+
+                // Handle totalReviews/reviewCount
+                if (typeof reviewsData.totalReviews === "number" && !isNaN(reviewsData.totalReviews)) {
+                  reviewCount = reviewsData.totalReviews
+                } else if (typeof reviewsData.reviewCount === "number" && !isNaN(reviewsData.reviewCount)) {
+                  reviewCount = reviewsData.reviewCount
+                } else if (typeof reviewsData.totalReviews === "string") {
+                  const parsed = Number.parseInt(reviewsData.totalReviews, 10)
+                  reviewCount = !isNaN(parsed) ? parsed : 0
+                } else if (Array.isArray(reviewsData.reviews)) {
+                  reviewCount = reviewsData.reviews.length
+                }
+              }
+
+              // Ensure rating is between 0 and 5
+              rating = Math.max(0, Math.min(5, rating))
+
+              return {
+                ...business,
+                photos,
+                rating: Number(rating) || 0,
+                reviewCount: Number(reviewCount) || 0,
+              }
+            } catch (error) {
+              console.error(`Error loading data for business ${business.id}:`, error)
+              // Return business with default values if individual business fails
+              return {
+                ...business,
+                photos: [],
+                rating: 0,
+                reviewCount: 0,
+              }
+            }
           }),
         )
 
@@ -482,7 +535,7 @@ export default function CareServicesPage() {
         // Filter businesses by zip code if userZipCode is available
         if (userZipCode) {
           console.log(`[Care Services] Filtering by zip code: ${userZipCode}`)
-          const filteredBusinessesByZip = businessesWithPhotos.filter((business: Business) => {
+          const filteredBusinessesByZip = businessesWithPhotosAndReviews.filter((business: Business) => {
             const serves = businessServesZipCode(business, userZipCode)
             console.log(
               `[Care Services] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
@@ -495,9 +548,9 @@ export default function CareServicesPage() {
           setAllBusinesses(filteredBusinessesByZip)
           setFilteredBusinesses(filteredBusinessesByZip)
         } else {
-          setBusinesses(businessesWithPhotos)
-          setAllBusinesses(businessesWithPhotos)
-          setFilteredBusinesses(businessesWithPhotos)
+          setBusinesses(businessesWithPhotosAndReviews)
+          setAllBusinesses(businessesWithPhotosAndReviews)
+          setFilteredBusinesses(businessesWithPhotosAndReviews)
         }
       } catch (error) {
         // Only update error state if this is still the current request
@@ -911,14 +964,22 @@ export default function CareServicesPage() {
                     <CardContent className="p-6">
                       <div className="flex flex-col space-y-4">
                         {/* Business Name and Description */}
-                        <div>
-                          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="text-xl font-semibold text-gray-900 flex-1">
                             {business.displayName || business.businessName}
                           </h3>
-                          {business.description && (
-                            <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
-                          )}
+                          <div className="flex items-center ml-4">
+                            <StarRating
+                              rating={business.rating || 0}
+                              size="sm"
+                              showRating={true}
+                              reviewCount={business.reviewCount || 0}
+                            />
+                          </div>
                         </div>
+                        {business.description && (
+                          <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
+                        )}
 
                         {/* Main content area with contact info, photos, and buttons */}
                         <div className="flex flex-col lg:flex-row lg:items-start gap-4">

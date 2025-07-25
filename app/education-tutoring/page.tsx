@@ -6,12 +6,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/hooks/use-toast"
+import { StarRating } from "@/components/star-rating"
 import Image from "next/image"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { Loader2, Phone, MapPin, Heart, HeartHandshake } from "lucide-react"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
+import { getBusinessReviews } from "@/app/actions/review-actions"
 import { Checkbox } from "@/components/ui/checkbox"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
@@ -46,7 +48,7 @@ interface Business {
   displayPhone?: string
   phone?: string
   rating?: number
-  reviews?: number
+  reviewCount?: number
   allSubcategories?: any[] // Changed from string[] to any[]
   subcategory?: string
   serviceArea?: string[]
@@ -130,6 +132,9 @@ export default function EducationTutoringPage() {
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, string[]>>({})
   const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
 
+  // State for ratings
+  const [businessRatings, setBusinessRatings] = useState<Record<string, { rating: number; reviewCount: number }>>({})
+
   // Favorites functionality state
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<Set<string>>(new Set())
@@ -182,6 +187,30 @@ export default function EducationTutoringPage() {
     }
   }, [currentUser, filteredBusinesses])
 
+  // Function to load reviews and calculate rating for a business
+  const loadReviewsForBusiness = async (businessId: string) => {
+    try {
+      const reviews = await getBusinessReviews(businessId)
+
+      let rating = 0
+      let reviewCount = 0
+
+      if (reviews && Array.isArray(reviews) && reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => {
+          const reviewRating = typeof review.overallRating === "number" ? review.overallRating : 0
+          return sum + reviewRating
+        }, 0)
+        rating = totalRating / reviews.length
+        reviewCount = reviews.length
+      }
+
+      return { rating: Number(rating) || 0, reviewCount: Number(reviewCount) || 0 }
+    } catch (error) {
+      console.error(`Error loading reviews for business ${businessId}:`, error)
+      return { rating: 0, reviewCount: 0 }
+    }
+  }
+
   useEffect(() => {
     async function fetchBusinesses() {
       const currentFetchId = ++fetchIdRef.current
@@ -208,9 +237,47 @@ export default function EducationTutoringPage() {
           )
         }
 
-        setBusinesses(result)
-        setAllBusinesses(result)
-        setFilteredBusinesses(result)
+        // Load photos and reviews concurrently for each business
+        const businessesWithData = await Promise.all(
+          result.map(async (business: Business) => {
+            try {
+              const [photos, reviewData] = await Promise.all([
+                loadBusinessPhotos(business.id).catch(() => []),
+                loadReviewsForBusiness(business.id).catch(() => ({ rating: 0, reviewCount: 0 })),
+              ])
+
+              // Update photos state
+              setBusinessPhotos((prev) => ({
+                ...prev,
+                [business.id]: photos,
+              }))
+
+              // Update ratings state
+              setBusinessRatings((prev) => ({
+                ...prev,
+                [business.id]: reviewData,
+              }))
+
+              // Attach rating data to business object
+              return {
+                ...business,
+                rating: reviewData.rating,
+                reviewCount: reviewData.reviewCount,
+              }
+            } catch (error) {
+              console.error(`Error loading data for business ${business.id}:`, error)
+              return {
+                ...business,
+                rating: 0,
+                reviewCount: 0,
+              }
+            }
+          }),
+        )
+
+        setBusinesses(businessesWithData)
+        setAllBusinesses(businessesWithData)
+        setFilteredBusinesses(businessesWithData)
       } catch (error) {
         // Only update error if this is still the current request
         if (currentFetchId === fetchIdRef.current) {
@@ -231,15 +298,6 @@ export default function EducationTutoringPage() {
 
     fetchBusinesses()
   }, [toast, userZipCode])
-
-  // Load photos for all businesses after they're loaded
-  useEffect(() => {
-    if (filteredBusinesses.length > 0) {
-      filteredBusinesses.forEach((business) => {
-        loadPhotosForBusiness(business.id, business.displayName || business.businessName || "Education Provider")
-      })
-    }
-  }, [filteredBusinesses])
 
   // Function to check if business has exact subcategory match
   const hasExactSubcategoryMatch = (business: Business, subcategory: string): boolean => {
@@ -474,63 +532,73 @@ export default function EducationTutoringPage() {
             <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="space-y-4">
-                  {/* Compact Business Info */}
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                      {business.displayLocation && (
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          <span>{business.displayLocation}</span>
-                        </div>
+                  {/* Business Header with Rating */}
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-2 flex-1">
+                      <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                        {business.displayLocation && (
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-1" />
+                            <span>{business.displayLocation}</span>
+                          </div>
+                        )}
+                        {(business.displayPhone || business.phone) && (
+                          <div className="flex items-center">
+                            <Phone className="h-4 w-4 mr-1" />
+                            <a href={`tel:${business.displayPhone || business.phone}`} className="hover:text-primary">
+                              {formatPhoneNumber(business.displayPhone || business.phone)}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Business Description */}
+                      {business.businessDescription && (
+                        <p className="text-gray-700 text-sm leading-relaxed">{business.businessDescription}</p>
                       )}
-                      {(business.displayPhone || business.phone) && (
-                        <div className="flex items-center">
-                          <Phone className="h-4 w-4 mr-1" />
-                          <a href={`tel:${business.displayPhone || business.phone}`} className="hover:text-primary">
-                            {formatPhoneNumber(business.displayPhone || business.phone)}
-                          </a>
+
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="text-xs text-green-600">
+                          {business.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : business.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} and surrounding areas</span>
+                          ) : business.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
                         </div>
                       )}
                     </div>
 
-                    {/* Business Description */}
-                    {business.businessDescription && (
-                      <p className="text-gray-700 text-sm leading-relaxed">{business.businessDescription}</p>
-                    )}
-
-                    {/* Service Area Indicator */}
-                    {userZipCode && (
-                      <div className="text-xs text-green-600">
-                        {business.isNationwide ? (
-                          <span>✓ Serves nationwide</span>
-                        ) : business.serviceArea?.includes(userZipCode) ? (
-                          <span>✓ Serves {userZipCode} and surrounding areas</span>
-                        ) : business.zipCode === userZipCode ? (
-                          <span>✓ Located in {userZipCode}</span>
-                        ) : null}
+                    {/* Star Rating in top-right corner */}
+                    <div className="flex flex-col items-end ml-4">
+                      <div className="flex items-center gap-2">
+                        <StarRating rating={business.rating || 0} size="sm" />
+                        <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
                       </div>
-                    )}
+                    </div>
+                  </div>
 
-                    {/* Services */}
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {business.allSubcategories && business.allSubcategories.length > 0 ? (
-                          business.allSubcategories.map((service, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {getSubcategoryString(service)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            Education & Tutoring
+                  {/* Services */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-1">Services:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {business.allSubcategories && business.allSubcategories.length > 0 ? (
+                        business.allSubcategories.map((service, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {getSubcategoryString(service)}
                           </span>
-                        )}
-                      </div>
+                        ))
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          Education & Tutoring
+                        </span>
+                      )}
                     </div>
                   </div>
 
