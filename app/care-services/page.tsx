@@ -12,7 +12,6 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-actions"
 import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronLeft, ChevronRight } from "lucide-react"
 import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
@@ -20,114 +19,7 @@ import { getUserSession } from "@/app/actions/user-actions"
 import { Heart, HeartHandshake } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { StarRating } from "@/components/star-rating"
-import { getBusinessReviews } from "@/app/actions/review-actions"
-
-// Photo Carousel Component - displays 5 photos in landscape format
-interface PhotoCarouselProps {
-  photos: string[]
-  businessName: string
-}
-
-function OldPhotoCarousel({ photos, businessName }: PhotoCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-
-  if (!photos || photos.length === 0) {
-    return null // Don't show anything if no photos
-  }
-
-  const photosPerView = 5
-  const maxIndex = Math.max(0, photos.length - photosPerView)
-
-  const nextPhotos = () => {
-    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
-  }
-
-  const prevPhotos = () => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0))
-  }
-
-  const visiblePhotos = photos.slice(currentIndex, currentIndex + photosPerView)
-
-  return (
-    <div className="hidden lg:block w-full">
-      <div className="relative group w-full">
-        <div className="flex gap-2 justify-center w-full">
-          {visiblePhotos.map((photo, index) => (
-            <div
-              key={currentIndex + index}
-              className="w-[220px] h-[220px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
-            >
-              <Image
-                src={photo || "/placeholder.svg"}
-                alt={`${businessName} photo ${currentIndex + index + 1}`}
-                width={220}
-                height={220}
-                className="w-full h-full object-cover"
-                sizes="220px"
-              />
-            </div>
-          ))}
-
-          {/* Fill empty slots if less than 5 photos visible */}
-          {visiblePhotos.length < photosPerView && (
-            <>
-              {Array.from({ length: photosPerView - visiblePhotos.length }).map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  className="w-[220px] h-[220px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
-                ></div>
-              ))}
-            </>
-          )}
-        </div>
-
-        {/* Navigation arrows - only show if there are more than 5 photos */}
-        {photos.length > photosPerView && (
-          <>
-            <button
-              onClick={prevPhotos}
-              disabled={currentIndex === 0}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={nextPhotos}
-              disabled={currentIndex >= maxIndex}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </>
-        )}
-
-        {/* Photo counter */}
-        {photos.length > photosPerView && (
-          <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-            {Math.min(currentIndex + photosPerView, photos.length)} of {photos.length}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination dots - only show if there are more than 5 photos */}
-      {photos.length > photosPerView && (
-        <div className="flex justify-center mt-2 space-x-1">
-          {Array.from({ length: Math.ceil(photos.length / photosPerView) }).map((_, index) => {
-            const pageStartIndex = index * photosPerView
-            const isActive = currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
-            return (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(pageStartIndex)}
-                className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
-              />
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
+import { getBusinessRating } from "@/app/actions/review-actions"
 
 // Function to load business photos from Cloudflare using public URLs
 const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
@@ -453,8 +345,6 @@ export default function CareServicesPage() {
     })
   }
 
-  const [currentIndex, setCurrentIndex] = useState(0) // Moved useState to top level
-
   useEffect(() => {
     async function fetchBusinesses() {
       const currentFetchId = ++fetchIdRef.current
@@ -465,52 +355,42 @@ export default function CareServicesPage() {
         setError(null)
 
         const result = await getBusinessesForCategoryPage("/care-services")
+        console.log(`[Care Services] Raw businesses from API:`, result)
 
-        // Load photos and reviews concurrently for each business
+        // Load photos and ratings concurrently for each business
         const businessesWithPhotosAndReviews = await Promise.all(
           result.map(async (business: Business) => {
             try {
-              // Load photos and reviews concurrently
-              const [photos, reviewsData] = await Promise.all([
+              console.log(
+                `[Care Services] Processing business ${business.id}: ${business.displayName || business.businessName}`,
+              )
+
+              // Load photos and rating data concurrently
+              const [photos, ratingData] = await Promise.all([
                 loadBusinessPhotos(business.id || ""),
-                getBusinessReviews(business.id || "").catch(() => ({ reviews: [], averageRating: 0, totalReviews: 0 })),
+                getBusinessRating(business.id || "").catch((error) => {
+                  console.error(`Failed to get rating for business ${business.id}:`, error)
+                  return { rating: 0, reviewCount: 0 }
+                }),
               ])
 
-              // Calculate rating and review count with proper type safety
-              let rating = 0
-              let reviewCount = 0
+              console.log(`[Care Services] Rating data for business ${business.id}:`, ratingData)
 
-              if (reviewsData && typeof reviewsData === "object") {
-                // Handle averageRating
-                if (typeof reviewsData.averageRating === "number" && !isNaN(reviewsData.averageRating)) {
-                  rating = reviewsData.averageRating
-                } else if (typeof reviewsData.averageRating === "string") {
-                  const parsed = Number.parseFloat(reviewsData.averageRating)
-                  rating = !isNaN(parsed) ? parsed : 0
-                }
-
-                // Handle totalReviews/reviewCount
-                if (typeof reviewsData.totalReviews === "number" && !isNaN(reviewsData.totalReviews)) {
-                  reviewCount = reviewsData.totalReviews
-                } else if (typeof reviewsData.reviewCount === "number" && !isNaN(reviewsData.reviewCount)) {
-                  reviewCount = reviewsData.reviewCount
-                } else if (typeof reviewsData.totalReviews === "string") {
-                  const parsed = Number.parseInt(reviewsData.totalReviews, 10)
-                  reviewCount = !isNaN(parsed) ? parsed : 0
-                } else if (Array.isArray(reviewsData.reviews)) {
-                  reviewCount = reviewsData.reviews.length
-                }
-              }
-
-              // Ensure rating is between 0 and 5
-              rating = Math.max(0, Math.min(5, rating))
-
-              return {
+              const enhancedBusiness = {
                 ...business,
                 photos,
-                rating: Number(rating) || 0,
-                reviewCount: Number(reviewCount) || 0,
+                rating: ratingData.rating,
+                reviewCount: ratingData.reviewCount,
               }
+
+              console.log(`[Care Services] Enhanced business ${business.id}:`, {
+                name: enhancedBusiness.displayName || enhancedBusiness.businessName,
+                rating: enhancedBusiness.rating,
+                reviewCount: enhancedBusiness.reviewCount,
+                photos: enhancedBusiness.photos?.length || 0,
+              })
+
+              return enhancedBusiness
             } catch (error) {
               console.error(`Error loading data for business ${business.id}:`, error)
               // Return business with default values if individual business fails
@@ -531,6 +411,14 @@ export default function CareServicesPage() {
         }
 
         console.log(`[Care Services] Fetch ${currentFetchId} completed, got ${result.length} businesses`)
+        console.log(
+          `[Care Services] Businesses with ratings:`,
+          businessesWithPhotosAndReviews.map((b) => ({
+            name: b.displayName || b.businessName,
+            rating: b.rating,
+            reviewCount: b.reviewCount,
+          })),
+        )
 
         // Filter businesses by zip code if userZipCode is available
         if (userZipCode) {
@@ -539,7 +427,6 @@ export default function CareServicesPage() {
             const serves = businessServesZipCode(business, userZipCode)
             console.log(
               `[Care Services] Business ${business.displayName || business.businessName} (${business.zipCode}) serves ${userZipCode}: ${serves}`,
-              business,
             )
             return serves
           })
@@ -811,19 +698,6 @@ export default function CareServicesPage() {
     }
   }
 
-  const photosPerView = 5
-  const maxIndex = Math.max(0, (businesses[0]?.photos?.length || 0) - photosPerView)
-
-  const nextPhotos = () => {
-    setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
-  }
-
-  const prevPhotos = () => {
-    setCurrentIndex((prev) => Math.max(prev - 1, 0))
-  }
-
-  const visiblePhotos = (businesses[0]?.photos || []).slice(currentIndex, currentIndex + photosPerView)
-
   return (
     <CategoryLayout title="Elder and Child Care Services" backLink="/" backText="Categories">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -946,327 +820,142 @@ export default function CareServicesPage() {
 
             <div className="grid gap-6">
               {filteredBusinesses.map((business) => {
-                const photosPerView = 5
-                const maxIndex = Math.max(0, (business.photos?.length || 0) - photosPerView)
+                const isFavorite = favoriteBusinesses.has(business.id || "")
+                const isSaving = savingStates[business.id || ""]
 
-                const nextPhotos = () => {
-                  setCurrentIndex((prev) => Math.min(prev + 1, maxIndex))
-                }
-
-                const prevPhotos = () => {
-                  setCurrentIndex((prev) => Math.max(prev - 1, 0))
-                }
-
-                const visiblePhotos = (business.photos || []).slice(currentIndex, currentIndex + photosPerView)
+                console.log(`[Care Services] Rendering business ${business.id}:`, {
+                  name: business.displayName || business.businessName,
+                  rating: business.rating,
+                  reviewCount: business.reviewCount,
+                })
 
                 return (
-                  <Card key={business.id} className="hover:shadow-lg transition-shadow">
+                  <Card key={business.id} className="overflow-hidden hover:shadow-md transition-shadow">
                     <CardContent className="p-6">
-                      <div className="flex flex-col space-y-4">
-                        {/* Business Name and Description */}
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="text-xl font-semibold text-gray-900 flex-1">
-                            {business.displayName || business.businessName}
-                          </h3>
-                          <div className="flex items-center ml-4">
-                            <StarRating
-                              rating={business.rating || 0}
-                              size="sm"
-                              showRating={true}
-                              reviewCount={business.reviewCount || 0}
-                            />
-                          </div>
+                      {/* Compact Business Info */}
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-semibold">{business.displayName || business.businessName}</h3>
+
+                        {/* Star Rating */}
+                        <div className="flex items-center gap-2">
+                          <StarRating rating={business.rating || 0} size="sm" />
+                          <span className="text-sm text-gray-600">
+                            {business.rating && business.rating > 0 ? business.rating.toFixed(1) : "0.0"}
+                          </span>
+                          {business.reviewCount && business.reviewCount > 0 && (
+                            <span className="text-sm text-gray-500">
+                              ({business.reviewCount} review{business.reviewCount !== 1 ? "s" : ""})
+                            </span>
+                          )}
+                          {(!business.reviewCount || business.reviewCount === 0) && (
+                            <span className="text-sm text-gray-500">(No reviews yet)</span>
+                          )}
                         </div>
-                        {business.description && (
-                          <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
+
+                        {/* Contact Info Row */}
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                          {/* Location */}
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-1 text-primary" />
+                            <span>{getLocation(business)}</span>
+                          </div>
+
+                          {/* Phone */}
+                          {getPhoneNumber(business) && (
+                            <div className="flex items-center">
+                              <Phone className="h-4 w-4 mr-1 text-primary" />
+                              <a
+                                href={`tel:${getPhoneNumber(business)}`}
+                                className="hover:text-primary transition-colors"
+                              >
+                                {formatPhoneNumber(getPhoneNumber(business))}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Services */}
+                        {getSubcategories(business).length > 0 && (
+                          <div>
+                            <div className="flex flex-wrap gap-2">
+                              {getSubcategories(business).map((subcategory, index) => (
+                                <span
+                                  key={index}
+                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                                >
+                                  {subcategory}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         )}
 
-                        {/* Main content area with contact info, photos, and buttons */}
-                        <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                          {/* Mobile Layout */}
-                          <div className="lg:hidden space-y-4">
-                            {/* Contact and Location Info */}
-                            <div className="space-y-2">
-                              {/* Phone */}
-                              {getPhoneNumber(business) && (
-                                <div className="flex items-center text-sm text-gray-600">
-                                  <Phone className="h-4 w-4 mr-2 text-primary" />
-                                  <a href={`tel:${getPhoneNumber(business)}`} className="text-blue-600 hover:underline">
-                                    {formatPhoneNumber(getPhoneNumber(business))}
-                                  </a>
-                                </div>
-                              )}
+                        {/* Service Area Indicator */}
+                        {business.isNationwide ? (
+                          <div className="text-xs text-green-600 font-medium">✓ Serves nationwide</div>
+                        ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
+                          <div className="text-xs text-green-600 font-medium">
+                            ✓ Serves {userZipCode} and surrounding areas
+                          </div>
+                        ) : null}
+                      </div>
 
-                              {/* Location */}
-                              {getLocation(business) && (
-                                <div className="flex items-center text-sm text-gray-600">
-                                  <MapPin className="h-4 w-4 mr-2 text-primary" />
-                                  <span>{getLocation(business)}</span>
-                                </div>
-                              )}
+                      {/* Photo Carousel and Buttons Row */}
+                      <div className="mt-4 flex flex-col lg:flex-row gap-4">
+                        {/* Photo Carousel */}
+                        <div className="flex-1">
+                          <PhotoCarousel
+                            businessId={business.id || ""}
+                            photos={business.photos || []}
+                            onLoadPhotos={() => {}} // No-op since photos are already loaded
+                            showMultiple={true}
+                            photosPerView={5}
+                            className="w-full"
+                          />
+                        </div>
 
-                              {/* Service Area Indicator */}
-                              {business.isNationwide ? (
-                                <div className="text-xs text-green-600 font-medium mb-1">✓ Serves nationwide</div>
-                              ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
-                                <div className="text-xs text-green-600 font-medium mb-1">
-                                  ✓ Serves {userZipCode} and surrounding areas
-                                </div>
-                              ) : null}
-                            </div>
-
-                            {/* Services List - Mobile */}
-                            {getSubcategories(business).length > 0 && (
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
-                                <div className="flex flex-wrap gap-2">
-                                  {getSubcategories(business).map((subcategory, index) => (
-                                    <span
-                                      key={index}
-                                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                                    >
-                                      {subcategory}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
+                        {/* Action Buttons */}
+                        <div className="flex flex-row lg:flex-col gap-2 lg:w-40">
+                          <Button
+                            className="flex-1 lg:flex-none min-w-[120px]"
+                            onClick={() => handleViewReviews(business)}
+                          >
+                            Ratings
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1 lg:flex-none min-w-[120px] bg-transparent"
+                            onClick={() => handleViewProfile(business)}
+                          >
+                            View Profile
+                          </Button>
+                          <Button
+                            variant={isFavorite ? "default" : "outline"}
+                            className={`flex-1 lg:flex-none min-w-[120px] ${
+                              isFavorite
+                                ? "bg-red-500 hover:bg-red-600 text-white"
+                                : "bg-transparent border-red-500 text-red-500 hover:bg-red-50"
+                            }`}
+                            onClick={() => handleAddToFavorites(business)}
+                            disabled={isFavorite || isSaving}
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                Saving...
+                              </>
+                            ) : isFavorite ? (
+                              <>
+                                <HeartHandshake className="h-4 w-4 mr-1" />
+                                Saved
+                              </>
+                            ) : (
+                              <>
+                                <Heart className="h-4 w-4 mr-1" />
+                                Save Card
+                              </>
                             )}
-
-                            {/* Photo Carousel - Mobile */}
-                            <PhotoCarousel
-                              businessId={business.id || ""}
-                              photos={business.photos || []}
-                              onLoadPhotos={() => {}} // No-op since photos are already loaded
-                              showMultiple={true}
-                              photosPerView={2}
-                              size="small"
-                              className="w-full"
-                            />
-
-                            {/* Action Buttons - Mobile */}
-                            <div className="flex justify-center space-x-4">
-                              <Button className="min-w-[110px]" onClick={() => handleViewReviews(business)}>
-                                Reviews
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="min-w-[110px] bg-transparent"
-                                onClick={() => handleViewProfile(business)}
-                              >
-                                View Profile
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className={`min-w-[110px] ${
-                                  favoriteBusinesses.has(business.id || "")
-                                    ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
-                                    : "border-red-500 text-red-500 hover:bg-red-50 bg-transparent"
-                                }`}
-                                onClick={() => handleAddToFavorites(business)}
-                                disabled={savingStates[business.id || ""]}
-                              >
-                                {savingStates[business.id || ""] ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Saving...
-                                  </>
-                                ) : favoriteBusinesses.has(business.id || "") ? (
-                                  <>
-                                    <HeartHandshake className="h-4 w-4 mr-2" />
-                                    Saved
-                                  </>
-                                ) : (
-                                  <>
-                                    <Heart className="h-4 w-4 mr-2" />
-                                    Save Card
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Desktop Layout */}
-                          <div className="hidden lg:block w-full">
-                            <div className="flex flex-col space-y-4">
-                              {/* Contact and Location Info */}
-                              <div className="flex items-start justify-between">
-                                <div className="space-y-2">
-                                  {/* Phone */}
-                                  {getPhoneNumber(business) && (
-                                    <div className="flex items-center text-sm text-gray-600">
-                                      <Phone className="h-4 w-4 mr-2 text-primary" />
-                                      <a
-                                        href={`tel:${getPhoneNumber(business)}`}
-                                        className="text-blue-600 hover:underline"
-                                      >
-                                        {formatPhoneNumber(getPhoneNumber(business))}
-                                      </a>
-                                    </div>
-                                  )}
-
-                                  {/* Location */}
-                                  {getLocation(business) && (
-                                    <div className="flex items-center text-sm text-gray-600">
-                                      <MapPin className="h-4 w-4 mr-2 text-primary" />
-                                      <span>{getLocation(business)}</span>
-                                    </div>
-                                  )}
-
-                                  {/* Service Area Indicator */}
-                                  {business.isNationwide ? (
-                                    <div className="text-xs text-green-600 font-medium">✓ Serves nationwide</div>
-                                  ) : userZipCode && business.serviceArea?.includes(userZipCode) ? (
-                                    <div className="text-xs text-green-600 font-medium">
-                                      ✓ Serves {userZipCode} and surrounding areas
-                                    </div>
-                                  ) : null}
-                                </div>
-
-                                {/* Action Buttons - Desktop */}
-                                <div className="flex space-x-2">
-                                  <Button className="min-w-[110px]" onClick={() => handleViewReviews(business)}>
-                                    Reviews
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    className="min-w-[110px] bg-transparent"
-                                    onClick={() => handleViewProfile(business)}
-                                  >
-                                    View Profile
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    className={`min-w-[110px] ${
-                                      favoriteBusinesses.has(business.id || "")
-                                        ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
-                                        : "border-red-500 text-red-500 hover:bg-red-50 bg-transparent"
-                                    }`}
-                                    onClick={() => handleAddToFavorites(business)}
-                                    disabled={savingStates[business.id || ""]}
-                                  >
-                                    {savingStates[business.id || ""] ? (
-                                      <>
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        Saving...
-                                      </>
-                                    ) : favoriteBusinesses.has(business.id || "") ? (
-                                      <>
-                                        <HeartHandshake className="h-4 w-4 mr-2" />
-                                        Saved
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Heart className="h-4 w-4 mr-2" />
-                                        Save Card
-                                      </>
-                                    )}
-                                  </Button>
-                                </div>
-                              </div>
-
-                              {/* Services List - Desktop */}
-                              {getSubcategories(business).length > 0 && (
-                                <div>
-                                  <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
-                                  <div className="flex flex-wrap gap-2">
-                                    {getSubcategories(business).map((subcategory, index) => (
-                                      <span
-                                        key={index}
-                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                                      >
-                                        {subcategory}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Photo Carousel - Desktop */}
-                              <div className="w-full">
-                                <div className="relative group w-full">
-                                  <div className="flex gap-2 justify-center w-full">
-                                    {visiblePhotos.map((photo, index) => (
-                                      <div
-                                        key={currentIndex + index}
-                                        className="w-[220px] h-[220px] bg-gray-100 rounded-lg overflow-hidden flex-shrink-0"
-                                      >
-                                        <Image
-                                          src={photo || "/placeholder.svg"}
-                                          alt={`${business.displayName || business.businessName} photo ${currentIndex + index + 1}`}
-                                          width={220}
-                                          height={220}
-                                          className="w-full h-full object-cover"
-                                          sizes="220px"
-                                        />
-                                      </div>
-                                    ))}
-
-                                    {/* Fill empty slots if less than 5 photos visible */}
-                                    {visiblePhotos.length < photosPerView && (
-                                      <>
-                                        {Array.from({ length: photosPerView - visiblePhotos.length }).map(
-                                          (_, index) => (
-                                            <div
-                                              key={`empty-${index}`}
-                                              className="w-[220px] h-[220px] bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 flex-shrink-0"
-                                            ></div>
-                                          ),
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-
-                                  {/* Navigation arrows - only show if there are more than 5 photos */}
-                                  {(business.photos?.length || 0) > photosPerView && (
-                                    <>
-                                      <button
-                                        onClick={prevPhotos}
-                                        disabled={currentIndex === 0}
-                                        className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-                                      >
-                                        <ChevronLeft size={16} />
-                                      </button>
-                                      <button
-                                        onClick={nextPhotos}
-                                        disabled={currentIndex >= maxIndex}
-                                        className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed z-10"
-                                      >
-                                        <ChevronRight size={16} />
-                                      </button>
-                                    </>
-                                  )}
-
-                                  {/* Photo counter */}
-                                  {(business.photos?.length || 0) > photosPerView && (
-                                    <div className="absolute top-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                                      {Math.min(currentIndex + photosPerView, business.photos?.length || 0)} of{" "}
-                                      {business.photos?.length || 0}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Pagination dots - only show if there are more than 5 photos */}
-                                {(business.photos?.length || 0) > photosPerView && (
-                                  <div className="flex justify-center mt-2 space-x-1">
-                                    {Array.from({
-                                      length: Math.ceil((business.photos?.length || 0) / photosPerView),
-                                    }).map((_, index) => {
-                                      const pageStartIndex = index * photosPerView
-                                      const isActive =
-                                        currentIndex >= pageStartIndex && currentIndex < pageStartIndex + photosPerView
-                                      return (
-                                        <button
-                                          key={index}
-                                          onClick={() => setCurrentIndex(pageStartIndex)}
-                                          className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-blue-500" : "bg-gray-300"}`}
-                                        />
-                                      )
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -1315,6 +1004,7 @@ export default function CareServicesPage() {
         onClose={() => setIsProfileDialogOpen(false)}
         businessId={selectedBusinessId}
         businessName={selectedBusinessName}
+        searchZipCode={userZipCode}
       />
 
       {/* Login Dialog */}

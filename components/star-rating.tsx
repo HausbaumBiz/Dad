@@ -1,63 +1,68 @@
 "use client"
 
-import { useState } from "react"
 import { Star } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface StarRatingProps {
   rating: number
-  onChange?: (rating: number) => void
-  interactive?: boolean
+  maxRating?: number
   size?: "sm" | "md" | "lg"
+  interactive?: boolean
+  onRatingChange?: (rating: number) => void
+  className?: string
 }
 
-export function StarRating({ rating, onChange, interactive = false, size = "md" }: StarRatingProps) {
-  const [hoverRating, setHoverRating] = useState(0)
+export function StarRating({
+  rating,
+  maxRating = 5,
+  size = "md",
+  interactive = false,
+  onRatingChange,
+  className,
+}: StarRatingProps) {
+  // Ensure rating is within bounds
+  const clampedRating = Math.max(0, Math.min(maxRating, rating || 0))
 
-  const starSizes = {
-    sm: "w-3 h-3",
-    md: "w-4 h-4",
-    lg: "w-5 h-5",
+  const sizeClasses = {
+    sm: "h-4 w-4",
+    md: "h-5 w-5",
+    lg: "h-6 w-6",
   }
 
-  const starSize = starSizes[size]
-
-  const handleMouseEnter = (index: number) => {
-    if (interactive) {
-      setHoverRating(index)
-    }
-  }
-
-  const handleMouseLeave = () => {
-    if (interactive) {
-      setHoverRating(0)
-    }
-  }
-
-  const handleClick = (index: number) => {
-    if (interactive && onChange) {
-      onChange(index)
+  const handleStarClick = (starIndex: number) => {
+    if (interactive && onRatingChange) {
+      onRatingChange(starIndex + 1)
     }
   }
 
   return (
-    <div className="flex">
-      {[1, 2, 3, 4, 5].map((index) => {
-        const isActive = index <= (hoverRating || rating)
+    <div className={cn("flex items-center", className)}>
+      {Array.from({ length: maxRating }, (_, index) => {
+        const starValue = index + 1
+        const fillPercentage = Math.max(0, Math.min(1, clampedRating - index))
 
         return (
-          <span
+          <div
             key={index}
-            className={`${interactive ? "cursor-pointer" : ""}`}
-            onMouseEnter={() => handleMouseEnter(index)}
-            onMouseLeave={handleMouseLeave}
-            onClick={() => handleClick(index)}
+            className={cn("relative", interactive && "cursor-pointer")}
+            onClick={() => handleStarClick(index)}
           >
+            {/* Background star (empty) */}
             <Star
-              className={`${starSize} ${
-                isActive ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
-              } transition-colors`}
+              className={cn(
+                sizeClasses[size],
+                "text-gray-300",
+                interactive && "hover:text-yellow-400 transition-colors",
+              )}
             />
-          </span>
+
+            {/* Foreground star (filled) */}
+            {fillPercentage > 0 && (
+              <div className="absolute inset-0 overflow-hidden" style={{ width: `${fillPercentage * 100}%` }}>
+                <Star className={cn(sizeClasses[size], "text-yellow-400 fill-yellow-400")} />
+              </div>
+            )}
+          </div>
         )
       })}
     </div>

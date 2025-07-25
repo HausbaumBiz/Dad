@@ -1,302 +1,429 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useState, useEffect } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { type Review, getBusinessReviews } from "@/app/actions/review-actions"
-import { ReviewForm } from "@/components/review-form"
-import { ReviewLoginDialog } from "@/components/review-login-dialog"
+import { Card, CardContent } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { StarRating } from "@/components/star-rating"
+import { Loader2, User, Calendar, CheckCircle } from "lucide-react"
+import { getBusinessReviews, submitReview, type Review } from "@/app/actions/review-actions"
+import { getUserSession } from "@/app/actions/user-actions"
 import { useToast } from "@/components/ui/use-toast"
-import { StarRating } from "./star-rating"
-import { Star } from "lucide-react"
 
 interface ReviewsDialogProps {
   isOpen: boolean
   onClose: () => void
   providerName: string
   businessId: string
-  reviews?: any[]
+  reviews: Review[]
 }
 
-const questionLabels = {
-  serviceQuality: "Service Quality",
-  costTransparency: "Cost Transparency",
-  communication: "Communication",
-  expertise: "Expertise",
-  dependability: "Dependability",
-  professionalism: "Professionalism",
+interface ReviewFormData {
+  serviceQuality: number
+  costTransparency: number
+  communication: number
+  expertise: number
+  dependability: number
+  professionalism: number
+  comment: string
 }
 
-export function ReviewsDialog({ isOpen, onClose, providerName, businessId, reviews = [] }: ReviewsDialogProps) {
+const ratingCategories = [
+  {
+    key: "serviceQuality",
+    label: "Service Quality",
+    description: "How satisfied were you with the quality of service?",
+  },
+  { key: "costTransparency", label: "Cost Transparency", description: "Were costs clearly communicated upfront?" },
+  { key: "communication", label: "Communication", description: "How responsive and clear was their communication?" },
+  { key: "expertise", label: "Expertise", description: "How knowledgeable and skilled were they?" },
+  { key: "dependability", label: "Dependability", description: "Were they reliable and punctual?" },
+  { key: "professionalism", label: "Professionalism", description: "How professional was their conduct?" },
+]
+
+export function ReviewsDialog({
+  isOpen,
+  onClose,
+  providerName,
+  businessId,
+  reviews: initialReviews,
+}: ReviewsDialogProps) {
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState("reviews")
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
-  const [businessReviews, setBusinessReviews] = useState<Review[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-
-  useEffect(() => {
-    // Check if user is logged in
-    const checkLoginStatus = async () => {
-      try {
-        const response = await fetch("/api/user/session")
-        const data = await response.json()
-        setIsLoggedIn(data.authenticated)
-      } catch (error) {
-        console.error("Error checking login status:", error)
-        setIsLoggedIn(false)
-      }
-    }
-
-    // Fetch reviews from database
-    const fetchReviews = async () => {
-      if (businessId && isOpen) {
-        console.log("Fetching reviews for business:", businessId)
-        setIsLoading(true)
-
-        // Retry logic for rate limiting
-        const maxRetries = 3
-        let retryCount = 0
-
-        while (retryCount < maxRetries) {
-          try {
-            const fetchedReviews = await getBusinessReviews(businessId)
-            console.log("Fetched reviews:", fetchedReviews)
-            setBusinessReviews(fetchedReviews)
-            setIsLoading(false) // Set loading to false on success
-            break // Success, exit retry loop
-          } catch (error) {
-            console.error("Error fetching reviews:", error)
-
-            // Check if it's a rate limiting error
-            if (error.message?.includes("429") || error.message?.includes("Too Many Requests")) {
-              retryCount++
-              if (retryCount < maxRetries) {
-                console.log(`Rate limited, retrying in ${retryCount * 1000}ms... (attempt ${retryCount}/${maxRetries})`)
-                await new Promise((resolve) => setTimeout(resolve, retryCount * 1000)) // Exponential backoff
-                continue
-              }
-            }
-
-            // If not rate limiting or max retries reached, show error
-            toast({
-              title: "Error fetching reviews",
-              description: "There was a problem loading reviews. Please try again later.",
-              variant: "destructive",
-            })
-            setBusinessReviews([]) // Set empty array on error
-            setIsLoading(false) // Set loading to false on error
-            break
-          }
-        }
-      } else {
-        setIsLoading(false)
-        setBusinessReviews([])
-      }
-    }
-
-    if (isOpen) {
-      checkLoginStatus()
-      fetchReviews()
-    } else {
-      // Reset state when dialog closes
-      setIsLoading(false)
-      setBusinessReviews([])
-      setActiveTab("reviews")
-    }
-  }, [isOpen, businessId, toast])
-
-  const handleWriteReviewClick = () => {
-    if (isLoggedIn) {
-      setActiveTab("write-review")
-    } else {
-      setIsLoginDialogOpen(true)
-    }
-  }
-
-  const handleReviewSuccess = async () => {
-    setActiveTab("reviews")
-    // Refresh reviews
-    try {
-      setIsLoading(true)
-      const refreshedReviews = await getBusinessReviews(businessId)
-      setBusinessReviews(refreshedReviews)
-      setIsLoading(false)
-    } catch (error) {
-      console.error("Error refreshing reviews:", error)
-      setIsLoading(false)
-    }
-  }
-
-  // Use either database reviews or provided mock reviews
-  const displayReviews = businessReviews.length > 0 ? businessReviews : reviews
-
-  console.log("Current state:", {
-    isLoading,
-    businessReviews: businessReviews.length,
-    displayReviews: displayReviews.length,
+  const [reviews, setReviews] = useState<Review[]>(initialReviews || [])
+  const [loading, setLoading] = useState(false)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [averageRating, setAverageRating] = useState(0)
+  const [reviewForm, setReviewForm] = useState<ReviewFormData>({
+    serviceQuality: 0,
+    costTransparency: 0,
+    communication: 0,
+    expertise: 0,
+    dependability: 0,
+    professionalism: 0,
+    comment: "",
   })
 
-  return (
-    <>
-      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">{providerName} Reviews</DialogTitle>
-            <DialogDescription>Customer reviews and experiences with {providerName}</DialogDescription>
-          </DialogHeader>
+  // Load reviews when dialog opens
+  useEffect(() => {
+    if (isOpen && businessId) {
+      loadReviews()
+      checkUserSession()
+    }
+  }, [isOpen, businessId])
 
-          <Tabs defaultValue="reviews" value={activeTab} onValueChange={setActiveTab}>
-            <div className="flex justify-between items-center">
-              <TabsList>
-                <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                <TabsTrigger value="write-review">Write a Review</TabsTrigger>
-              </TabsList>
-              {activeTab === "reviews" && (
-                <Button variant="outline" size="sm" onClick={handleWriteReviewClick}>
-                  Leave a Review
+  // Calculate average rating when reviews change
+  useEffect(() => {
+    if (reviews.length > 0) {
+      const validRatings = reviews.map((review) => review.overallRating || 0).filter((rating) => rating > 0)
+
+      if (validRatings.length > 0) {
+        const average = validRatings.reduce((sum, rating) => sum + rating, 0) / validRatings.length
+        setAverageRating(Math.round(average * 10) / 10)
+      } else {
+        setAverageRating(0)
+      }
+    } else {
+      setAverageRating(0)
+    }
+  }, [reviews])
+
+  const loadReviews = async () => {
+    try {
+      setLoading(true)
+      console.log(`[ReviewsDialog] Loading reviews for business ${businessId}`)
+      const fetchedReviews = await getBusinessReviews(businessId)
+      console.log(`[ReviewsDialog] Loaded ${fetchedReviews.length} reviews:`, fetchedReviews)
+      setReviews(fetchedReviews)
+    } catch (error) {
+      console.error("Error loading reviews:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load reviews. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const checkUserSession = async () => {
+    try {
+      const user = await getUserSession()
+      setCurrentUser(user)
+    } catch (error) {
+      console.error("Error checking user session:", error)
+    }
+  }
+
+  const handleRatingChange = (category: keyof ReviewFormData, rating: number) => {
+    setReviewForm((prev) => ({
+      ...prev,
+      [category]: rating,
+    }))
+  }
+
+  const handleSubmitReview = async () => {
+    if (!currentUser) {
+      toast({
+        title: "Login Required",
+        description: "You must be logged in to submit a review.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate that all ratings are provided
+    const ratingValues = ratingCategories.map((cat) => reviewForm[cat.key as keyof ReviewFormData] as number)
+    if (ratingValues.some((rating) => rating === 0)) {
+      toast({
+        title: "Incomplete Review",
+        description: "Please provide ratings for all categories.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!reviewForm.comment.trim()) {
+      toast({
+        title: "Comment Required",
+        description: "Please provide a comment with your review.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setSubmitting(true)
+
+      const reviewData = {
+        businessId,
+        ratings: {
+          serviceQuality: reviewForm.serviceQuality,
+          costTransparency: reviewForm.costTransparency,
+          communication: reviewForm.communication,
+          expertise: reviewForm.expertise,
+          dependability: reviewForm.dependability,
+          professionalism: reviewForm.professionalism,
+        },
+        comment: reviewForm.comment.trim(),
+      }
+
+      const result = await submitReview(reviewData)
+
+      if (result.success) {
+        toast({
+          title: "Review Submitted!",
+          description: "Thank you for your feedback.",
+        })
+
+        // Reset form
+        setReviewForm({
+          serviceQuality: 0,
+          costTransparency: 0,
+          communication: 0,
+          expertise: 0,
+          dependability: 0,
+          professionalism: 0,
+          comment: "",
+        })
+        setShowReviewForm(false)
+
+        // Reload reviews
+        await loadReviews()
+      } else {
+        throw new Error(result.message || "Failed to submit review")
+      }
+    } catch (error) {
+      console.error("Error submitting review:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to submit review. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    } catch {
+      return "Date not available"
+    }
+  }
+
+  const getCategoryAverage = (category: keyof Review["ratings"]) => {
+    if (reviews.length === 0) return 0
+
+    const validRatings = reviews.map((review) => review.ratings?.[category] || 0).filter((rating) => rating > 0)
+
+    if (validRatings.length === 0) return 0
+
+    const average = validRatings.reduce((sum, rating) => sum + rating, 0) / validRatings.length
+    return Math.round(average * 10) / 10
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold">Reviews for {providerName}</DialogTitle>
+          <DialogDescription>Read reviews from other customers and share your own experience</DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2">Loading reviews...</span>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Overall Rating Summary */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-primary mb-2">{averageRating.toFixed(1)}</div>
+                    <StarRating rating={averageRating} size="lg" className="justify-center mb-2" />
+                    <p className="text-gray-600">
+                      Based on {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-lg">Rating Breakdown</h3>
+                    {ratingCategories.map((category) => (
+                      <div key={category.key} className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{category.label}</span>
+                        <div className="flex items-center gap-2">
+                          <StarRating rating={getCategoryAverage(category.key as keyof Review["ratings"])} size="sm" />
+                          <span className="text-sm text-gray-600 w-8">
+                            {getCategoryAverage(category.key as keyof Review["ratings"]).toFixed(1)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              {currentUser ? (
+                <Button onClick={() => setShowReviewForm(!showReviewForm)} className="flex-1 md:flex-none">
+                  {showReviewForm ? "Cancel Review" : "Write a Review"}
+                </Button>
+              ) : (
+                <Button asChild className="flex-1 md:flex-none">
+                  <a href="/user-login">Login to Write Review</a>
                 </Button>
               )}
             </div>
 
-            <TabsContent value="reviews" className="mt-4">
-              {/* Average Rating and Review Count */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-gray-900">
-                      {displayReviews.length > 0
-                        ? (
-                            displayReviews.reduce(
-                              (sum, review) => sum + (review.overallRating || review.rating || 0),
-                              0,
-                            ) / displayReviews.length
-                          ).toFixed(1)
-                        : "0.0"}
+            {/* Review Form */}
+            {showReviewForm && (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Write Your Review</h3>
+
+                  <div className="space-y-6">
+                    {/* Rating Categories */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {ratingCategories.map((category) => (
+                        <div key={category.key} className="space-y-2">
+                          <Label className="text-sm font-medium">{category.label}</Label>
+                          <p className="text-xs text-gray-600">{category.description}</p>
+                          <StarRating
+                            rating={reviewForm[category.key as keyof ReviewFormData] as number}
+                            interactive={true}
+                            onRatingChange={(rating) =>
+                              handleRatingChange(category.key as keyof ReviewFormData, rating)
+                            }
+                            size="md"
+                          />
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex justify-center mt-1">
-                      <StarRating
-                        rating={
-                          displayReviews.length > 0
-                            ? displayReviews.reduce(
-                                (sum, review) => sum + (review.overallRating || review.rating || 0),
-                                0,
-                              ) / displayReviews.length
-                            : 0
-                        }
+
+                    {/* Comment */}
+                    <div className="space-y-2">
+                      <Label htmlFor="comment">Your Review</Label>
+                      <Textarea
+                        id="comment"
+                        placeholder="Share your experience with this provider..."
+                        value={reviewForm.comment}
+                        onChange={(e) => setReviewForm((prev) => ({ ...prev, comment: e.target.value }))}
+                        rows={4}
                       />
                     </div>
-                  </div>
-                  <div className="text-left">
-                    <div className="text-lg font-semibold text-gray-900">
-                      {displayReviews.length} {displayReviews.length === 1 ? "Review" : "Reviews"}
-                    </div>
-                    <div className="text-sm text-gray-600">Based on customer feedback</div>
-                  </div>
-                </div>
-              </div>
 
-              {isLoading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mx-auto"></div>
-                  <p className="mt-2 text-gray-500">Loading reviews...</p>
-                </div>
+                    {/* Submit Button */}
+                    <Button onClick={handleSubmitReview} disabled={submitting} className="w-full md:w-auto">
+                      {submitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        "Submit Review"
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Reviews List */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Customer Reviews ({reviews.length})</h3>
+
+              {reviews.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <div className="text-gray-500">
+                      <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <h4 className="text-lg font-medium mb-2">No Reviews Yet</h4>
+                      <p>Be the first to review {providerName}!</p>
+                    </div>
+                  </CardContent>
+                </Card>
               ) : (
-                <>
-                  {displayReviews.length > 0 ? (
-                    <div className="space-y-6">
-                      {displayReviews.map((review, index) => {
-                        console.log("Rendering review:", review)
-                        return (
-                          <div key={review.id || index} className="border-b pb-6 last:border-b-0">
-                            <div className="flex justify-between items-start mb-4">
+                <div className="space-y-4">
+                  {reviews.map((review) => (
+                    <Card key={review.id}>
+                      <CardContent className="p-6">
+                        <div className="space-y-4">
+                          {/* Review Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
+                                <User className="h-5 w-5 text-primary" />
+                              </div>
                               <div>
-                                <p className="font-semibold">{review.userName || "Anonymous"}</p>
-                                <div className="flex items-center mt-1">
-                                  <StarRating rating={review.overallRating || review.rating || 0} />
-                                  <span className="text-sm text-gray-500 ml-2">
-                                    Overall: {(review.overallRating || review.rating || 0).toFixed(1)} stars
-                                  </span>
-                                  <span className="text-sm text-gray-500 ml-2">•</span>
-                                  <span className="text-sm text-gray-500 ml-2">
-                                    {review.date ? new Date(review.date).toLocaleDateString() : "No date"}
-                                  </span>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium">{review.userName}</h4>
+                                  {review.verified && (
+                                    <CheckCircle className="h-4 w-4 text-green-500" title="Verified Review" />
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <Calendar className="h-4 w-4" />
+                                  {formatDate(review.date)}
                                 </div>
                               </div>
-                              {review.verified && (
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                                  Verified
-                                </span>
-                              )}
                             </div>
+                            <div className="text-right">
+                              <div className="flex items-center gap-2">
+                                <StarRating rating={review.overallRating || 0} size="sm" />
+                                <span className="text-sm font-medium">{(review.overallRating || 0).toFixed(1)}</span>
+                              </div>
+                            </div>
+                          </div>
 
-                            {/* Detailed ratings if available */}
-                            {review.ratings && (
-                              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                                <h4 className="text-sm font-medium mb-2">Detailed Ratings:</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                                  {Object.entries(review.ratings).map(([key, rating]) => (
-                                    <div key={key} className="flex justify-between items-center">
-                                      <span className="text-gray-600">
-                                        {questionLabels[key as keyof typeof questionLabels]}:
-                                      </span>
-                                      <div className="flex items-center">
-                                        <div className="flex">
-                                          {[1, 2, 3, 4, 5].map((star) => (
-                                            <Star
-                                              key={star}
-                                              className={`h-3 w-3 ${
-                                                star <= rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
-                                              }`}
-                                            />
-                                          ))}
-                                        </div>
-                                        <span className="ml-1 text-xs">({rating})</span>
+                          {/* Review Comment */}
+                          <p className="text-gray-700 leading-relaxed">{review.comment}</p>
+
+                          {/* Detailed Ratings */}
+                          {review.ratings && (
+                            <div className="border-t pt-4">
+                              <h5 className="text-sm font-medium mb-3">Detailed Ratings</h5>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {ratingCategories.map((category) => {
+                                  const rating = review.ratings[category.key as keyof Review["ratings"]] || 0
+                                  return (
+                                    <div key={category.key} className="flex items-center justify-between">
+                                      <span className="text-xs text-gray-600">{category.label}</span>
+                                      <div className="flex items-center gap-1">
+                                        <StarRating rating={rating} size="sm" />
+                                        <span className="text-xs text-gray-500 w-6">{rating.toFixed(1)}</span>
                                       </div>
                                     </div>
-                                  ))}
-                                </div>
+                                  )
+                                })}
                               </div>
-                            )}
-
-                            <p className="text-gray-700">{review.comment || "No comment provided"}</p>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">No reviews yet. Be the first to review!</p>
-                    </div>
-                  )}
-                </>
-              )}
-            </TabsContent>
-
-            <TabsContent value="write-review" className="mt-4">
-              {isLoggedIn ? (
-                <ReviewForm businessId={businessId} businessName={providerName} onSuccess={handleReviewSuccess} />
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-700 mb-4">Please log in to write a review</p>
-                  <Button onClick={() => setIsLoginDialogOpen(true)}>Log In or Register</Button>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               )}
-            </TabsContent>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
-
-      <ReviewLoginDialog
-        isOpen={isLoginDialogOpen}
-        onClose={() => setIsLoginDialogOpen(false)}
-        onSuccess={() => {
-          setIsLoggedIn(true)
-          setIsLoginDialogOpen(false)
-          setActiveTab("write-review")
-        }}
-      />
-    </>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }

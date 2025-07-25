@@ -1,6 +1,6 @@
 "use server"
 
-import { kv } from "@vercel/kv"
+import { redis } from "@/lib/redis"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 import { getUserById } from "@/lib/user"
@@ -73,13 +73,13 @@ export async function submitReview(data: ReviewSubmission) {
 
     // Store review in database
     // 1. Add to business's reviews set
-    await kv.sadd(`business:${data.businessId}:reviews`, review.id)
+    await redis.sadd(`business:${data.businessId}:reviews`, review.id)
 
     // 2. Store the review object as a JSON string
-    await kv.set(`review:${review.id}`, JSON.stringify(review))
+    await redis.set(`review:${review.id}`, JSON.stringify(review))
 
     // 3. Add to user's reviews set (for user profile)
-    await kv.sadd(`user:${userId}:reviews`, review.id)
+    await redis.sadd(`user:${userId}:reviews`, review.id)
 
     // 4. Update business rating
     await updateBusinessRating(data.businessId)
@@ -97,10 +97,14 @@ export async function submitReview(data: ReviewSubmission) {
 
 export async function getBusinessReviews(businessId: string): Promise<Review[]> {
   try {
+    console.log(`[getBusinessReviews] Fetching reviews for business ${businessId}`)
+
     // Get review IDs for the business
-    const reviewIds = await kv.smembers(`business:${businessId}:reviews`)
+    const reviewIds = await redis.smembers(`business:${businessId}:reviews`)
+    console.log(`[getBusinessReviews] Found review IDs:`, reviewIds)
 
     if (!reviewIds || reviewIds.length === 0) {
+      console.log(`[getBusinessReviews] No review IDs found for business ${businessId}`)
       return []
     }
 
@@ -109,37 +113,46 @@ export async function getBusinessReviews(businessId: string): Promise<Review[]> 
 
     for (const id of reviewIds) {
       try {
-        const reviewData = await kv.get(`review:${id}`)
+        console.log(`[getBusinessReviews] Fetching review data for ID: ${id}`)
+        const reviewData = await redis.get(`review:${id}`)
+        console.log(`[getBusinessReviews] Raw review data for ${id}:`, reviewData)
 
         // Skip if no data found
-        if (!reviewData) continue
-
-        let review: Review
-
-        // Handle different data formats
-        if (typeof reviewData === "string") {
-          try {
-            review = JSON.parse(reviewData) as Review
-          } catch (parseError) {
-            console.error(`Error parsing JSON for review ${id}:`, parseError)
-            continue
-          }
-        } else if (typeof reviewData === "object" && reviewData !== null) {
-          // If it's already an object, use it directly
-          review = reviewData as Review
-        } else {
-          console.error(`Invalid review data format for ${id}:`, typeof reviewData)
+        if (!reviewData) {
+          console.log(`[getBusinessReviews] No data found for review ${id}`)
           continue
         }
 
+        let review: Review
+
+        // Handle different data types
+        if (typeof reviewData === "string") {
+          // Data is already a JSON string
+          try {
+            review = JSON.parse(reviewData)
+          } catch (parseError) {
+            console.error(`[getBusinessReviews] Error parsing JSON string for review ${id}:`, parseError)
+            continue
+          }
+        } else if (typeof reviewData === "object" && reviewData !== null) {
+          // Data is already an object
+          review = reviewData as Review
+        } else {
+          console.error(`[getBusinessReviews] Unexpected data type for review ${id}:`, typeof reviewData)
+          continue
+        }
+
+        console.log(`[getBusinessReviews] Parsed review for ${id}:`, review)
+
         // Validate that we have a proper review object
         if (!review || typeof review !== "object") {
-          console.error(`Invalid review object for ${id}:`, review)
+          console.error(`[getBusinessReviews] Invalid review object for ${id}:`, review)
           continue
         }
 
         // Handle legacy reviews that might not have the new structure
         if (!review.ratings) {
+          console.log(`[getBusinessReviews] Converting legacy review ${id}`)
           // Convert old single rating to new structure
           const oldRating = (review as any).rating || 5
           review.ratings = {
@@ -153,12 +166,8 @@ export async function getBusinessReviews(businessId: string): Promise<Review[]> 
           review.overallRating = oldRating
         }
 
-        // Ensure required fields exist
-        if (!review.id) review.id = id
-        if (!review.businessId) review.businessId = businessId
-        if (!review.date) review.date = new Date().toISOString()
+        // Ensure overallRating exists
         if (typeof review.overallRating !== "number") {
-          // Calculate from ratings if available
           if (review.ratings && typeof review.ratings === "object") {
             const ratingsArray = Object.values(review.ratings).filter((r) => typeof r === "number")
             if (ratingsArray.length > 0) {
@@ -172,55 +181,161 @@ export async function getBusinessReviews(businessId: string): Promise<Review[]> 
         }
 
         reviews.push(review)
+        console.log(`[getBusinessReviews] Successfully processed review ${id}`)
       } catch (err) {
-        console.error(`Error processing review ${id}:`, err)
+        console.error(`[getBusinessReviews] Error processing review ${id}:`, err)
         // Continue with other reviews even if one fails
       }
     }
 
+    console.log(`[getBusinessReviews] Final reviews array for business ${businessId}:`, reviews)
+
     // Sort by date (newest first)
-    return reviews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    const sortedReviews = reviews.sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime()
+      const dateB = new Date(b.date || 0).getTime()
+      return dateB - dateA
+    })
+
+    console.log(`[getBusinessReviews] Returning ${sortedReviews.length} reviews for business ${businessId}`)
+    return sortedReviews
   } catch (error) {
-    console.error("Error fetching business reviews:", error)
+    console.error(`[getBusinessReviews] Error fetching business reviews for ${businessId}:`, error)
     return []
+  }
+}
+
+// Server action to get business rating data
+export async function getBusinessRating(businessId: string): Promise<{ rating: number; reviewCount: number }> {
+  try {
+    console.log(`[getBusinessRating] Getting rating for business ${businessId}`)
+
+    // Try to get cached rating from Redis first
+    const [cachedRating, cachedReviewCount] = await Promise.all([
+      redis.get(`business:${businessId}:rating`).catch(() => null),
+      redis.get(`business:${businessId}:reviewCount`).catch(() => null),
+    ])
+
+    console.log(`[getBusinessRating] Cached data for ${businessId}:`, { cachedRating, cachedReviewCount })
+
+    if (cachedRating !== null && cachedReviewCount !== null) {
+      const rating = Number.parseFloat(cachedRating as string) || 0
+      const reviewCount = Number.parseInt(cachedReviewCount as string, 10) || 0
+      console.log(`[getBusinessRating] Using cached rating for ${businessId}: ${rating} (${reviewCount} reviews)`)
+      return { rating, reviewCount }
+    }
+
+    // Fall back to calculating from reviews
+    console.log(`[getBusinessRating] No cached data, calculating from reviews for ${businessId}`)
+    const reviews = await getBusinessReviews(businessId)
+    console.log(`[getBusinessRating] Got ${reviews.length} reviews for business ${businessId}`)
+
+    if (!Array.isArray(reviews) || reviews.length === 0) {
+      console.log(`[getBusinessRating] No valid reviews found for business ${businessId}`)
+      return { rating: 0, reviewCount: 0 }
+    }
+
+    // Calculate average from individual reviews
+    const validRatings = reviews
+      .map((review) => {
+        // Try to get rating from different possible fields
+        const rating = review.overallRating || review.rating || 0
+        return typeof rating === "number" && !isNaN(rating) ? rating : 0
+      })
+      .filter((rating) => rating > 0)
+
+    console.log(`[getBusinessRating] Valid ratings for ${businessId}:`, validRatings)
+
+    if (validRatings.length === 0) {
+      console.log(`[getBusinessRating] No valid ratings found for business ${businessId}`)
+      return { rating: 0, reviewCount: 0 }
+    }
+
+    const totalRating = validRatings.reduce((sum, rating) => sum + rating, 0)
+    const calculatedAverage = totalRating / validRatings.length
+
+    console.log(`[getBusinessRating] Calculated average for ${businessId}: ${calculatedAverage}`)
+
+    // Cache the calculated values
+    try {
+      await Promise.all([
+        redis.set(`business:${businessId}:rating`, calculatedAverage.toString()),
+        redis.set(`business:${businessId}:reviewCount`, reviews.length.toString()),
+      ])
+      console.log(`[getBusinessRating] Cached rating for ${businessId}`)
+    } catch (cacheError) {
+      console.warn(`[getBusinessRating] Failed to cache rating for business ${businessId}:`, cacheError)
+    }
+
+    return {
+      rating: Math.round(calculatedAverage * 10) / 10,
+      reviewCount: reviews.length,
+    }
+  } catch (error) {
+    console.error(`[getBusinessRating] Error getting rating for business ${businessId}:`, error)
+    return { rating: 0, reviewCount: 0 }
   }
 }
 
 async function updateBusinessRating(businessId: string) {
   try {
+    console.log(`[updateBusinessRating] Updating rating for business ${businessId}`)
+
     // Get all reviews for the business
     const reviews = await getBusinessReviews(businessId)
+    console.log(`[updateBusinessRating] Got ${reviews.length} reviews for business ${businessId}`)
 
     if (reviews.length === 0) {
+      console.log(`[updateBusinessRating] No reviews found, setting rating to 0`)
+      // Set rating to 0 if no reviews
+      await redis.set(`business:${businessId}:rating`, "0")
+      await redis.set(`business:${businessId}:reviewCount`, "0")
       return
     }
 
     // Calculate average rating using overall ratings
-    const totalRating = reviews.reduce((sum, review) => sum + review.overallRating, 0)
-    const averageRating = totalRating / reviews.length
+    const validRatings = reviews
+      .map((review) => review.overallRating)
+      .filter((rating) => typeof rating === "number" && !isNaN(rating) && rating > 0)
 
-    // Check if the business exists and what type it is
-    const keyType = await kv.type(`business:${businessId}`)
+    if (validRatings.length === 0) {
+      console.log(`[updateBusinessRating] No valid ratings found`)
+      await redis.set(`business:${businessId}:rating`, "0")
+      await redis.set(`business:${businessId}:reviewCount`, "0")
+      return
+    }
 
-    // Store the rating in a separate key to avoid type conflicts
-    await kv.set(`business:${businessId}:rating`, averageRating.toFixed(1))
-    await kv.set(`business:${businessId}:reviewCount`, reviews.length.toString())
+    const totalRating = validRatings.reduce((sum, rating) => sum + rating, 0)
+    const averageRating = totalRating / validRatings.length
 
-    // If the business is a hash, we can also update those fields
-    if (keyType === "hash") {
-      try {
-        await kv.hset(`business:${businessId}`, {
+    console.log(
+      `[updateBusinessRating] Calculated average rating: ${averageRating} from ${validRatings.length} valid ratings`,
+    )
+
+    // Store the rating in separate keys
+    await redis.set(`business:${businessId}:rating`, averageRating.toFixed(1))
+    await redis.set(`business:${businessId}:reviewCount`, reviews.length.toString())
+
+    // Check if the business exists as a hash and update if possible
+    try {
+      const keyType = await redis.type(`business:${businessId}`)
+      if (keyType === "hash") {
+        await redis.hset(`business:${businessId}`, {
           rating: averageRating.toFixed(1),
           reviewCount: reviews.length.toString(),
         })
-      } catch (err) {
-        console.error(`Error updating business hash for ${businessId}:`, err)
-        // We already stored the rating in separate keys, so we can continue
+        console.log(`[updateBusinessRating] Updated business hash for ${businessId}`)
       }
+    } catch (err) {
+      console.warn(`[updateBusinessRating] Could not update business hash for ${businessId}:`, err)
+      // We already stored the rating in separate keys, so we can continue
     }
 
+    console.log(
+      `[updateBusinessRating] Successfully updated rating for business ${businessId}: ${averageRating.toFixed(1)} (${reviews.length} reviews)`,
+    )
     return averageRating
   } catch (error) {
-    console.error("Error updating business rating:", error)
+    console.error(`[updateBusinessRating] Error updating business rating for ${businessId}:`, error)
   }
 }
