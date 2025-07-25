@@ -828,17 +828,15 @@ export default function FoodDiningPage() {
                 <div className="flex flex-col space-y-4">
                   {/* Business Name, Star Rating, and Description */}
                   <div className="relative">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-xl font-semibold text-gray-900 flex-1 pr-4">
+                    <div className="mb-2">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-1">
                         {business.displayName ||
                           business.adDesignData?.businessInfo?.businessName ||
                           business.businessName}
                       </h3>
-                      <div className="flex flex-col items-end flex-shrink-0">
-                        <div className="flex items-center gap-1">
-                          <StarRating rating={business.rating || 0} size="sm" />
-                          <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
-                        </div>
+                      <div className="flex items-center gap-1 mb-2">
+                        <StarRating rating={business.rating || 0} size="sm" />
+                        <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
                       </div>
                     </div>
                     {business.description && (
@@ -958,90 +956,39 @@ export default function FoodDiningPage() {
 
                   {/* Desktop Layout */}
                   <div className="hidden lg:flex flex-col space-y-4">
-                    {/* Main content area with contact info and buttons */}
-                    <div className="flex items-start justify-between">
-                      {/* Left side - Contact and Location Info */}
-                      <div className="space-y-2 flex-shrink-0">
-                        {/* Phone Number */}
-                        {getPhoneNumber(business) && (
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                            <a
-                              href={`tel:${getPhoneNumber(business)}`}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                            >
-                              {formatPhoneNumber(getPhoneNumber(business)!)}
-                            </a>
-                          </div>
-                        )}
-
-                        {/* Location */}
+                    {/* Contact and Location Info */}
+                    <div className="space-y-2">
+                      {/* Phone Number */}
+                      {getPhoneNumber(business) && (
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="text-gray-700 text-sm">{getLocation(business)}</span>
+                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <a
+                            href={`tel:${getPhoneNumber(business)}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                          >
+                            {formatPhoneNumber(getPhoneNumber(business)!)}
+                          </a>
                         </div>
+                      )}
 
-                        {/* Service Area Indicator */}
-                        {userZipCode && (
-                          <div className="text-xs text-green-600 mt-1">
-                            {business.isNationwide ? (
-                              <span>✓ Serves nationwide</span>
-                            ) : business.serviceArea?.includes(userZipCode) ? (
-                              <span>✓ Serves {userZipCode} and surrounding areas</span>
-                            ) : business.zipCode === userZipCode ? (
-                              <span>✓ Located in {userZipCode}</span>
-                            ) : null}
-                          </div>
-                        )}
+                      {/* Location */}
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <span className="text-gray-700 text-sm">{getLocation(business)}</span>
                       </div>
 
-                      {/* Right side - Action Buttons */}
-                      <div className="flex flex-col gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleReviewsClick(business)}
-                          className="text-sm min-w-[100px]"
-                        >
-                          Reviews
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleProfileClick(business)}
-                          className="text-sm min-w-[100px]"
-                        >
-                          View Profile
-                        </Button>
-                        <Button
-                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handleAddToFavorites(business)}
-                          disabled={savingStates[business.id]}
-                          className={
-                            favoriteBusinesses.has(business.id)
-                              ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 border-red-600"
-                              : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
-                          }
-                        >
-                          {savingStates[business.id] ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              Saving...
-                            </>
-                          ) : favoriteBusinesses.has(business.id) ? (
-                            <>
-                              <HeartHandshake className="h-4 w-4 mr-1" />
-                              Saved
-                            </>
-                          ) : (
-                            <>
-                              <Heart className="h-4 w-4 mr-1" />
-                              Save Card
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                      {/* Service Area Indicator */}
+                      {userZipCode && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {business.isNationwide ? (
+                            <span>✓ Serves nationwide</span>
+                          ) : business.serviceArea?.includes(userZipCode) ? (
+                            <span>✓ Serves {userZipCode} and surrounding areas</span>
+                          ) : business.zipCode === userZipCode ? (
+                            <span>✓ Located in {userZipCode}</span>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
 
                     {/* Subcategories/Cuisine Types */}
@@ -1061,16 +1008,69 @@ export default function FoodDiningPage() {
                       </div>
                     )}
 
-                    {/* Desktop Photo Carousel */}
-                    <DesktopPhotoCarousel
-                      photos={business.photos || []}
-                      businessName={
-                        business.displayName ||
-                        business.adDesignData?.businessInfo?.businessName ||
-                        business.businessName ||
-                        "Restaurant"
-                      }
-                    />
+                    {/* Photo Album and Action Buttons Layout */}
+                    <div className="flex gap-6">
+                      {/* Left side - Photo Album */}
+                      <div className="flex-1">
+                        <DesktopPhotoCarousel
+                          photos={business.photos || []}
+                          businessName={
+                            business.displayName ||
+                            business.adDesignData?.businessInfo?.businessName ||
+                            business.businessName ||
+                            "Restaurant"
+                          }
+                        />
+                      </div>
+
+                      {/* Right side - Action Buttons */}
+                      <div className="flex flex-col gap-2 flex-shrink-0">
+                        <Button
+                          variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleAddToFavorites(business)}
+                          disabled={savingStates[business.id]}
+                          className={
+                            favoriteBusinesses.has(business.id)
+                              ? "text-sm min-w-[120px] bg-red-600 hover:bg-red-700 border-red-600"
+                              : "text-sm min-w-[120px] border-red-600 text-red-600 hover:bg-red-50"
+                          }
+                        >
+                          {savingStates[business.id] ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Saving...
+                            </>
+                          ) : favoriteBusinesses.has(business.id) ? (
+                            <>
+                              <HeartHandshake className="h-4 w-4 mr-1" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Heart className="h-4 w-4 mr-1" />
+                              Save Card
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleReviewsClick(business)}
+                          className="text-sm min-w-[120px]"
+                        >
+                          Reviews
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleProfileClick(business)}
+                          className="text-sm min-w-[120px]"
+                        >
+                          View Profile
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

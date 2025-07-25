@@ -550,15 +550,13 @@ export default function RetailStoresPage() {
                 <div className="space-y-4">
                   {/* Compact Business Info */}
                   <div className="space-y-2">
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-xl font-semibold text-gray-900 leading-tight flex-1 pr-4">
+                    <div className="space-y-1">
+                      <h3 className="text-xl font-semibold text-gray-900 leading-tight">
                         {provider.displayName || provider.businessName}
                       </h3>
-                      <div className="flex flex-col items-end flex-shrink-0">
-                        <div className="flex items-center gap-1">
-                          <StarRating rating={provider.rating || 0} size="sm" />
-                          <span className="text-sm text-gray-600">({provider.reviewCount || 0})</span>
-                        </div>
+                      <div className="flex items-center gap-1">
+                        <StarRating rating={provider.rating || 0} size="sm" />
+                        <span className="text-sm text-gray-600">({provider.reviewCount || 0})</span>
                       </div>
                     </div>
 

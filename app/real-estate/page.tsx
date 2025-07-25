@@ -818,28 +818,23 @@ export default function RealEstatePage() {
             {filteredBusinesses.map((business: Business) => (
               <div key={business.id} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
                 <div className="flex flex-col space-y-4">
-                  {/* Business Name, Star Rating, and Description */}
-                  <div className="relative">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-xl font-semibold text-gray-900 flex-1 pr-4">
+                  {/* Mobile Layout */}
+                  <div className="lg:hidden space-y-4">
+                    {/* Business Name, Star Rating, and Description */}
+                    <div className="relative">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
                         {business.displayName ||
                           business.adDesignData?.businessInfo?.businessName ||
                           business.businessName}
                       </h3>
-                      <div className="flex flex-col items-end flex-shrink-0">
-                        <div className="flex items-center gap-1">
-                          <StarRating rating={business.rating || 0} size="sm" />
-                          <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
-                        </div>
+                      <div className="flex items-center gap-1 mb-2">
+                        <StarRating rating={business.rating || 0} size="sm" />
+                        <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
                       </div>
+                      {business.description && (
+                        <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
+                      )}
                     </div>
-                    {business.description && (
-                      <p className="text-gray-600 text-sm leading-relaxed">{business.description}</p>
-                    )}
-                  </div>
-
-                  {/* Mobile Layout */}
-                  <div className="lg:hidden space-y-4">
                     {/* Contact info */}
                     <div className="space-y-2">
                       {getPhoneNumber(business) && (
@@ -937,32 +932,77 @@ export default function RealEstatePage() {
 
                   {/* Desktop Layout */}
                   <div className="hidden lg:flex flex-col space-y-4">
-                    {/* Contact info and action buttons */}
-                    <div className="flex items-start justify-between">
-                      {/* Left side - Contact and Location Info */}
-                      <div className="space-y-2">
-                        {/* Phone Number */}
-                        {getPhoneNumber(business) && (
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                            <a
-                              href={`tel:${getPhoneNumber(business)}`}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                            >
-                              {formatPhoneNumber(getPhoneNumber(business)!)}
-                            </a>
-                          </div>
-                        )}
-
-                        {/* Location */}
+                    {/* Business Name and Star Rating */}
+                    <div className="relative">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        {business.displayName ||
+                          business.adDesignData?.businessInfo?.businessName ||
+                          business.businessName}
+                      </h3>
+                      <div className="flex items-center gap-1 mb-2">
+                        <StarRating rating={business.rating || 0} size="sm" />
+                        <span className="text-sm text-gray-600">({business.reviewCount || 0})</span>
+                      </div>
+                      {business.description && (
+                        <p className="text-gray-600 text-sm leading-relaxed mb-4">{business.description}</p>
+                      )}
+                    </div>
+                    {/* Contact info */}
+                    <div className="space-y-2">
+                      {/* Phone Number */}
+                      {getPhoneNumber(business) && (
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="text-gray-700 text-sm">{getLocation(business)}</span>
+                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <a
+                            href={`tel:${getPhoneNumber(business)}`}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                          >
+                            {formatPhoneNumber(getPhoneNumber(business)!)}
+                          </a>
                         </div>
+                      )}
+
+                      {/* Location */}
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <span className="text-gray-700 text-sm">{getLocation(business)}</span>
+                      </div>
+                    </div>
+
+                    {/* Services */}
+                    {getSubcategories(business).length > 0 && (
+                      <div className="w-full">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
+                        <div className="flex flex-wrap gap-2 w-full">
+                          {getSubcategories(business).map((subcategory: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                            >
+                              {typeof subcategory === "string" ? subcategory : subcategory.name || "Unknown"}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Photo Album and Action Buttons Layout */}
+                    <div className="flex gap-6 items-start">
+                      {/* Left side - Photo Album */}
+                      <div className="flex-1">
+                        <DesktopPhotoCarousel
+                          photos={business.photos || []}
+                          businessName={
+                            business.displayName ||
+                            business.adDesignData?.businessInfo?.businessName ||
+                            business.businessName ||
+                            "Real Estate Professional"
+                          }
+                        />
                       </div>
 
                       {/* Right side - Action Buttons */}
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2 flex-shrink-0">
                         <Button
                           variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
                           size="sm"
@@ -970,8 +1010,8 @@ export default function RealEstatePage() {
                           disabled={savingStates[business.id]}
                           className={
                             favoriteBusinesses.has(business.id)
-                              ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 border-red-600"
-                              : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
+                              ? "text-sm min-w-[120px] bg-red-600 hover:bg-red-700 border-red-600"
+                              : "text-sm min-w-[120px] border-red-600 text-red-600 hover:bg-red-50"
                           }
                         >
                           {savingStates[business.id] ? (
@@ -995,7 +1035,7 @@ export default function RealEstatePage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleReviewsClick(business)}
-                          className="text-sm min-w-[100px]"
+                          className="text-sm min-w-[120px]"
                         >
                           Ratings
                         </Button>
@@ -1003,40 +1043,12 @@ export default function RealEstatePage() {
                           variant="default"
                           size="sm"
                           onClick={() => handleProfileClick(business)}
-                          className="text-sm min-w-[100px]"
+                          className="text-sm min-w-[120px]"
                         >
                           View Profile
                         </Button>
                       </div>
                     </div>
-
-                    {/* Services - Display ALL services without truncation */}
-                    {getSubcategories(business).length > 0 && (
-                      <div className="w-full">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Services:</h4>
-                        <div className="flex flex-wrap gap-2 w-full">
-                          {getSubcategories(business).map((subcategory: any, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                            >
-                              {typeof subcategory === "string" ? subcategory : subcategory.name || "Unknown"}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Desktop Photo Carousel - Now below services */}
-                    <DesktopPhotoCarousel
-                      photos={business.photos || []}
-                      businessName={
-                        business.displayName ||
-                        business.adDesignData?.businessInfo?.businessName ||
-                        business.businessName ||
-                        "Real Estate Professional"
-                      }
-                    />
                   </div>
                 </div>
               </div>
