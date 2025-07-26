@@ -744,7 +744,7 @@ export default function MentalHealthPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="lg:w-48 flex flex-row lg:flex-col gap-2 justify-center lg:justify-start w-full lg:w-auto">
+                    <div className="lg:w-48 flex flex-col sm:flex-row lg:flex-col gap-2 justify-center lg:justify-start w-full lg:w-auto">
                       <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(provider)}>
                         Ratings
                       </Button>

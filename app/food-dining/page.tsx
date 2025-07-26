@@ -906,7 +906,7 @@ export default function FoodDiningPage() {
                     />
 
                     {/* Mobile Action Buttons */}
-                    <div className="flex justify-center gap-2">
+                    <div className="flex flex-col sm:flex-row justify-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"

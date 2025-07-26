@@ -882,35 +882,35 @@ export default function RealEstatePage() {
                     />
 
                     {/* Mobile Action Buttons */}
-                    <Button
-                      variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handleAddToFavorites(business)}
-                      disabled={savingStates[business.id]}
-                      className={
-                        favoriteBusinesses.has(business.id)
-                          ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 border-red-600"
-                          : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
-                      }
-                    >
-                      {savingStates[business.id] ? (
-                        <>
-                          <Image src="/loader.svg" alt="Saving..." width={16} height={16} className="mr-1" />
-                          Saving...
-                        </>
-                      ) : favoriteBusinesses.has(business.id) ? (
-                        <>
-                          <HeartHandshake className="h-4 w-4 mr-1" />
-                          Saved
-                        </>
-                      ) : (
-                        <>
-                          <Heart className="h-4 w-4 mr-1" />
-                          Save Card
-                        </>
-                      )}
-                    </Button>
-                    <div className="flex justify-center gap-2">
+                    <div className="flex flex-col sm:flex-row justify-center gap-2">
+                      <Button
+                        variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleAddToFavorites(business)}
+                        disabled={savingStates[business.id]}
+                        className={
+                          favoriteBusinesses.has(business.id)
+                            ? "text-sm min-w-[100px] bg-red-600 hover:bg-red-700 border-red-600"
+                            : "text-sm min-w-[100px] border-red-600 text-red-600 hover:bg-red-50"
+                        }
+                      >
+                        {savingStates[business.id] ? (
+                          <>
+                            <Image src="/loader.svg" alt="Saving..." width={16} height={16} className="mr-1" />
+                            Saving...
+                          </>
+                        ) : favoriteBusinesses.has(business.id) ? (
+                          <>
+                            <HeartHandshake className="h-4 w-4 mr-1" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Heart className="h-4 w-4 mr-1" />
+                            Save Card
+                          </>
+                        )}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

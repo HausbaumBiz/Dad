@@ -692,7 +692,7 @@ export default function ArtsEntertainmentPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-40">
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:w-40">
                       <Button className="flex-1 lg:flex-none min-w-[120px]" onClick={() => handleOpenReviews(business)}>
                         Ratings
                       </Button>

@@ -828,7 +828,7 @@ export default function LegalServicesPage() {
                   />
 
                   {/* Action Buttons */}
-                  <div className="flex justify-center gap-2">
+                  <div className="flex flex-col sm:flex-row justify-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -942,7 +942,7 @@ export default function LegalServicesPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleOpenReviews(provider)}
-                      className="text-sm min-w-[100px]"
+                      className="text-sm min-w-[120px]"
                     >
                       Reviews
                     </Button>
@@ -950,7 +950,7 @@ export default function LegalServicesPage() {
                       variant="default"
                       size="sm"
                       onClick={() => handleViewProfile(provider)}
-                      className="text-sm min-w-[100px]"
+                      className="text-sm min-w-[120px]"
                     >
                       View Profile
                     </Button>
@@ -959,7 +959,7 @@ export default function LegalServicesPage() {
                       size="sm"
                       onClick={() => handleAddToFavorites(provider)}
                       disabled={savingStates[provider.id]}
-                      className={`text-sm min-w-[100px] ${
+                      className={`text-sm min-w-[120px] ${
                         favoriteBusinesses.has(provider.id)
                           ? "bg-red-500 text-white border-red-500 hover:bg-red-600"
                           : "border-red-500 text-red-500 hover:bg-red-50"

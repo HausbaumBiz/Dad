@@ -716,7 +716,7 @@ export default function FuneralServicesPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32 justify-center lg:justify-start w-full lg:w-auto">
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:w-32 justify-center lg:justify-start w-full lg:w-auto">
                       {/* Save Card Button */}
                       <Button
                         variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}

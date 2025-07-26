@@ -672,7 +672,7 @@ export default function TailoringClothingPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32 w-full justify-center lg:justify-start lg:w-auto">
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:w-32 w-full justify-center lg:justify-start lg:w-auto">
                       {/* Save Card Button */}
                       <Button
                         variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}

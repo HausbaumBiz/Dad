@@ -622,7 +622,7 @@ export default function EducationTutoringPage() {
                     </div>
 
                     {/* Action Buttons - Centered on mobile, right-aligned on desktop */}
-                    <div className="w-full lg:w-32 flex flex-row justify-center lg:flex-col gap-2 lg:justify-start">
+                    <div className="w-full lg:w-32 flex flex-col sm:flex-row justify-center lg:flex-col gap-2 lg:justify-start">
                       <Button className="flex-1 lg:flex-none lg:w-full" onClick={() => handleOpenReviews(business)}>
                         Ratings
                       </Button>
