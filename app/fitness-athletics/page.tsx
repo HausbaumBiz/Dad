@@ -823,7 +823,7 @@ export default function FitnessAthleticsPage() {
                     </div>
 
                     {/* Action Buttons - Centered on mobile */}
-                    <div className="lg:w-32 flex flex-row lg:flex-col gap-2 lg:justify-start justify-center w-full lg:w-auto">
+                    <div className="lg:w-32 flex flex-col sm:flex-row lg:flex-col gap-2 lg:justify-start justify-center w-full lg:w-auto">
                       <Button
                         className="flex-1 lg:flex-none lg:w-full"
                         onClick={() => handleOpenReviews(business.displayName || business.name)}

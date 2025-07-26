@@ -598,7 +598,7 @@ export default function WeddingsEventsPage() {
                     </div>
 
                     {/* Action Buttons - fixed width on the right - Centered on mobile */}
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32 flex-shrink-0 justify-center lg:justify-start w-full lg:w-auto">
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:w-32 flex-shrink-0 justify-center lg:justify-start w-full lg:w-auto">
                       <Button className="flex-1 lg:w-full" onClick={() => handleOpenReviews(provider)}>
                         Ratings
                       </Button>
