@@ -1,6 +1,7 @@
 "use server"
 
 import { Redis } from "@upstash/redis"
+import { getUserSession } from "./user-actions"
 
 // Helper function to safely extract error messages
 function getErrorMessage(error: unknown): string {
@@ -131,311 +132,292 @@ async function safeRedisSmembers(key: string): Promise<string[]> {
   }
 }
 
-// Get business ad design data
-async function getBusinessAdDesignData(businessId: string) {
-  try {
-    const businessInfoKey = `business:${businessId}:adDesign:businessInfo`
-    const businessInfo = await safeRedisGet(businessInfoKey)
+// Cloudflare Images Configuration
+const CLOUDFLARE_ACCOUNT_HASH = "Fx83XHJ2QHIeAJio-AnNbA"
 
-    if (businessInfo) {
-      const parsedBusinessInfo = safeJsonParse(businessInfo, {})
-      console.log(`Found ad design data for business ${businessId}:`, parsedBusinessInfo)
-      return {
-        businessInfo: parsedBusinessInfo,
-      }
-    }
-
-    const mainAdDesignKey = `business:${businessId}:adDesign`
-    const mainAdDesignData = await safeRedisGet(mainAdDesignKey)
-
-    if (mainAdDesignData) {
-      const parsedData = safeJsonParse(mainAdDesignData, {})
-      if (parsedData && parsedData.businessInfo) {
-        console.log(`Found business info in main ad design data for ${businessId}:`, parsedData.businessInfo)
-        return {
-          businessInfo: parsedData.businessInfo,
-        }
-      }
-    }
-
-    console.log(`No ad design data found for business ${businessId}`)
-    return null
-  } catch (error) {
-    console.error(`Error getting ad design for business ${businessId}:`, getErrorMessage(error))
-    return null
+// Generate Cloudflare image URL using public variant
+function generateCloudflareImageUrl(imageId: string, variant = "public"): string {
+  if (!imageId || typeof imageId !== "string") {
+    console.warn("Invalid image ID provided:", imageId)
+    return ""
   }
+
+  // Clean the image ID - remove any existing URL parts
+  const cleanImageId = imageId.replace(/^.*\/([a-f0-9-]+)\/.*$/, "$1")
+  const url = `https://imagedelivery.net/${CLOUDFLARE_ACCOUNT_HASH}/${cleanImageId}/${variant}`
+
+  console.log(`Generated Cloudflare URL: ${url} from imageId: ${imageId}`)
+  return url
 }
 
-// Get business service area data
-async function getBusinessServiceArea(businessId: string) {
+// Check if URL is already a Cloudflare image URL
+function isCloudflareImageUrl(url: string): boolean {
+  if (!url || typeof url !== "string") return false
+  return url.includes("imagedelivery.net")
+}
+
+// Extract image ID from existing Cloudflare URL
+function extractImageIdFromUrl(url: string): string | null {
+  if (!isCloudflareImageUrl(url)) return null
+
   try {
-    console.log(`Getting service area for business ${businessId}`)
-
-    let isNationwide = false
-    try {
-      const nationwideKey = `business:${businessId}:nationwide`
-      const nationwideValue = await safeRedisGet(nationwideKey)
-      isNationwide = Boolean(nationwideValue)
-      console.log(`Business ${businessId} nationwide flag: ${isNationwide}`)
-    } catch (error) {
-      console.warn(`Error getting nationwide flag for business ${businessId}:`, getErrorMessage(error))
-      isNationwide = false
-    }
-
-    let zipCodes: any[] = []
-    try {
-      const zipCodesKey = `business:${businessId}:zipcodes`
-      console.log(`Checking zip codes at key: ${zipCodesKey}`)
-
-      const zipCodesData = await safeRedisGet(zipCodesKey)
-
-      if (zipCodesData) {
-        if (typeof zipCodesData === "string") {
-          try {
-            zipCodes = JSON.parse(zipCodesData)
-            console.log(`Parsed ${zipCodes.length} zip codes from JSON string for business ${businessId}`)
-          } catch (parseError) {
-            console.error(`Error parsing ZIP codes JSON for business ${businessId}:`, getErrorMessage(parseError))
-          }
-        } else if (Array.isArray(zipCodesData)) {
-          zipCodes = zipCodesData.map((item) => {
-            if (typeof item === "string") {
-              return { zip: item, city: "", state: "", latitude: 0, longitude: 0 }
-            }
-            return item
-          })
-          console.log(`Got ${zipCodes.length} zip codes from array for business ${businessId}`)
-        }
-      }
-    } catch (error) {
-      console.warn(`Error getting ZIP codes for business ${businessId}:`, getErrorMessage(error))
-    }
-
-    if (zipCodes.length === 0) {
-      try {
-        const setKey = `business:${businessId}:zipcodes:set`
-        console.log(`Trying fallback zip codes set at key: ${setKey}`)
-
-        const zipCodeStrings = await safeRedisSmembers(setKey)
-        if (zipCodeStrings && zipCodeStrings.length > 0) {
-          zipCodes = zipCodeStrings.map((zip) => ({
-            zip,
-            city: "",
-            state: "",
-            latitude: 0,
-            longitude: 0,
-          }))
-          console.log(`Got ${zipCodes.length} zip codes from fallback set for business ${businessId}`)
-        }
-      } catch (error) {
-        console.warn(`Error getting ZIP codes from fallback set for business ${businessId}:`, getErrorMessage(error))
-      }
-    }
-
-    const zipCodeStrings = zipCodes
-      .map((z) => (typeof z === "string" ? z : z?.zip))
-      .filter(Boolean)
-      .map(String)
-
-    console.log(
-      `Business ${businessId} service area: nationwide=${isNationwide}, zipCodes=${zipCodeStrings.join(", ")}`,
-    )
-
-    return {
-      isNationwide,
-      zipCodes: zipCodeStrings,
+    // Match pattern: https://imagedelivery.net/ACCOUNT_HASH/IMAGE_ID/VARIANT
+    const match = url.match(/imagedelivery\.net\/[^/]+\/([a-f0-9-]+)\//)
+    if (match && match[1]) {
+      return match[1]
     }
   } catch (error) {
-    console.error(`Error getting service area for business ${businessId}:`, getErrorMessage(error))
-    return {
-      isNationwide: false,
-      zipCodes: [],
-    }
+    console.error("Error extracting image ID from URL:", error)
   }
+
+  return null
 }
 
-// Get ALL subcategories for a business
-async function getAllBusinessSubcategories(businessId: string): Promise<any[]> {
-  try {
-    console.log(`Getting ALL subcategories for business ${businessId}`)
+// Fix Cloudflare image URL to use correct account hash
+function fixCloudflareImageUrl(url: string): string {
+  if (!isCloudflareImageUrl(url)) return url
 
-    const categoriesKey = `business:${businessId}:categories`
-    const categoriesData = await safeRedisGet(categoriesKey)
+  const imageId = extractImageIdFromUrl(url)
+  if (!imageId) return url
 
-    if (categoriesData) {
-      const categories = safeJsonParse(categoriesData, [])
-      const categoryArray = ensureArray(categories, `getAllBusinessSubcategories-categories-${businessId}`)
-
-      console.log(`Found ${categoryArray.length} category selections for business ${businessId}:`, categoryArray)
-
-      if (categoryArray.length > 0) {
-        return categoryArray
-      }
-    }
-
-    const allSubcategoriesKey = `business:${businessId}:allSubcategories`
-    const allSubcategoriesData = await safeRedisGet(allSubcategoriesKey)
-
-    if (allSubcategoriesData) {
-      const subcategories = safeJsonParse(allSubcategoriesData, [])
-      const subcategoryArray = ensureArray(subcategories, `getAllBusinessSubcategories-allSub-${businessId}`)
-
-      console.log(`Found ${subcategoryArray.length} allSubcategories for business ${businessId}:`, subcategoryArray)
-
-      if (subcategoryArray.length > 0) {
-        return subcategoryArray
-      }
-    }
-
-    console.log(`No subcategories found for business ${businessId}`)
-    return []
-  } catch (error) {
-    console.error(`Error getting ALL subcategories for business ${businessId}:`, getErrorMessage(error))
-    return []
-  }
+  return generateCloudflareImageUrl(imageId, "public")
 }
 
-// Check if business has windows/doors services
-function hasWindowsDoorsServices(subcategories: any[]): boolean {
-  if (!Array.isArray(subcategories)) return false
+// Helper function to process photo data and generate URLs (same as pool-services)
+function processPhotoData(photoData: any): string[] {
+  const photos: string[] = []
 
-  const windowsDoorsKeywords = [
-    "window",
-    "door",
-    "glass",
-    "glazing",
-    "locksmith",
-    "security film",
-    "tinting",
-    "curtain",
-    "blind",
-    "drapery",
-    "replacement",
-    "installation",
-  ]
+  if (!photoData) return photos
 
-  return subcategories.some((subcat) => {
-    const path = typeof subcat === "string" ? subcat : subcat?.fullPath || subcat?.name || ""
-    return windowsDoorsKeywords.some((keyword) => path.toLowerCase().includes(keyword.toLowerCase()))
-  })
-}
-
-// Main function to get businesses for windows and doors page
-export async function getBusinessesForWindowsDoorsPage(): Promise<any[]> {
-  try {
-    console.log("Loading businesses for Windows and Doors category...")
-
-    // Get businesses from the "Home, Lawn, and Manual Labor" category
-    const categoryKey = "category:Home, Lawn, and Manual Labor:businesses"
-    const businessIds = await safeRedisSmembers(categoryKey)
-
-    if (!businessIds || businessIds.length === 0) {
-      console.log("No businesses found in Home, Lawn, and Manual Labor category")
-      return []
-    }
-
-    console.log(`Found ${businessIds.length} businesses in Home, Lawn, and Manual Labor category`)
-
-    const businesses: any[] = []
-
-    for (const businessId of businessIds) {
-      try {
-        const businessData = await safeRedisGet(`business:${businessId}`)
-        if (businessData && typeof businessData === "object") {
-          // Get ad design data for display name and location
-          const adDesignData = await getBusinessAdDesignData(businessId)
-
-          // Get ALL subcategories for this business
-          const allSubcategories = await getAllBusinessSubcategories(businessId)
-
-          // Check if this business offers windows/doors services
-          if (!hasWindowsDoorsServices(allSubcategories)) {
-            console.log(`Business ${businessId} does not offer windows/doors services, skipping`)
-            continue
-          }
-
-          // Get service area data
-          const serviceAreaData = await getBusinessServiceArea(businessId)
-
-          const business = {
-            ...businessData,
-            id: businessId,
-            displayName: adDesignData?.businessInfo?.businessName || businessData.businessName || "Unnamed Business",
-            displayCity: adDesignData?.businessInfo?.city || businessData.city,
-            displayState: adDesignData?.businessInfo?.state || businessData.state,
-            displayPhone: adDesignData?.businessInfo?.phone || businessData.phone,
-            zipCode: businessData.zipCode || adDesignData?.businessInfo?.zipCode || "",
-            serviceArea: serviceAreaData.zipCodes || [],
-            isNationwide: serviceAreaData.isNationwide || false,
-            adDesignData: adDesignData,
-            subcategories: allSubcategories,
-            allSubcategories: allSubcategories,
-          }
-
-          // Create display location
-          if (business.displayCity && business.displayState) {
-            business.displayLocation = `${business.displayCity}, ${business.displayState}`
-          } else if (business.displayCity) {
-            business.displayLocation = business.displayCity
-          } else if (business.displayState) {
-            business.displayLocation = business.displayState
+  // Handle array of photos
+  if (Array.isArray(photoData)) {
+    photoData.forEach((photo: any) => {
+      if (typeof photo === "string") {
+        // If it's already a URL, use it; otherwise generate Cloudflare URL
+        if (photo.startsWith("http")) {
+          photos.push(photo)
+        } else {
+          photos.push(generateCloudflareImageUrl(photo, "public"))
+        }
+      } else if (photo && typeof photo === "object") {
+        // Handle object format
+        const imageId = photo.id || photo.imageId || photo.url
+        if (imageId) {
+          if (imageId.startsWith("http")) {
+            photos.push(imageId)
           } else {
-            business.displayLocation = `Zip: ${business.zipCode}`
+            photos.push(generateCloudflareImageUrl(imageId, "public"))
+          }
+        }
+      }
+    })
+  }
+  // Handle single photo object
+  else if (typeof photoData === "object") {
+    const imageId = photoData.id || photoData.imageId || photoData.url
+    if (imageId) {
+      if (imageId.startsWith("http")) {
+        photos.push(imageId)
+      } else {
+        photos.push(generateCloudflareImageUrl(imageId, "public"))
+      }
+    }
+  }
+  // Handle single photo string
+  else if (typeof photoData === "string") {
+    if (photoData.startsWith("http")) {
+      photos.push(photoData)
+    } else {
+      photos.push(generateCloudflareImageUrl(photoData, "public"))
+    }
+  }
+
+  return photos
+}
+
+// Enhanced function to load business photos using the same approach as pool-services
+export async function loadWindowsDoorsBusinessPhotos(businessId: string): Promise<string[]> {
+  try {
+    console.log(`Loading photos for business: ${businessId}`)
+
+    const allPhotos: string[] = []
+
+    // List of potential photo keys to check (same as pool-services)
+    const photoKeys = [
+      `business:${businessId}`,
+      `business:${businessId}:media`,
+      `business:${businessId}:adDesign`,
+      `business:${businessId}:photos`,
+      `business:${businessId}:photoAlbum`,
+      `business:${businessId}:images`,
+      `business:${businessId}:adDesign:businessInfo`,
+    ]
+
+    for (const key of photoKeys) {
+      try {
+        const data = await safeRedisGet(key)
+
+        if (data && typeof data === "object") {
+          // Check for photoAlbum field in the data
+          if (data.photoAlbum) {
+            console.log(`Found photoAlbum in ${key}:`, data.photoAlbum)
+            const photos = processPhotoData(data.photoAlbum)
+            allPhotos.push(...photos)
           }
 
-          console.log(`✅ Added windows/doors business: ${business.displayName}`)
-          businesses.push(business)
+          // Check for media.photoAlbum field
+          if (data.media && data.media.photoAlbum) {
+            console.log(`Found media.photoAlbum in ${key}:`, data.media.photoAlbum)
+            const photos = processPhotoData(data.media.photoAlbum)
+            allPhotos.push(...photos)
+          }
+
+          // Check for adDesign.photoAlbum field
+          if (data.adDesign && data.adDesign.photoAlbum) {
+            console.log(`Found adDesign.photoAlbum in ${key}:`, data.adDesign.photoAlbum)
+            const photos = processPhotoData(data.adDesign.photoAlbum)
+            allPhotos.push(...photos)
+          }
+
+          // Check for photos field
+          if (data.photos) {
+            console.log(`Found photos in ${key}:`, data.photos)
+            const photos = processPhotoData(data.photos)
+            allPhotos.push(...photos)
+          }
+
+          // Check for images field
+          if (data.images) {
+            console.log(`Found images in ${key}:`, data.images)
+            const photos = processPhotoData(data.images)
+            allPhotos.push(...photos)
+          }
+        }
+        // Handle direct photo data (for keys like business:id:photos)
+        else if (data) {
+          console.log(`Found direct photo data in ${key}:`, data)
+          const photos = processPhotoData(data)
+          allPhotos.push(...photos)
         }
       } catch (error) {
-        console.error(`Error fetching business ${businessId}:`, getErrorMessage(error))
+        console.log(`No data or error for key ${key}:`, getErrorMessage(error))
         continue
       }
     }
 
-    console.log(`Successfully retrieved ${businesses.length} windows/doors businesses`)
-    return businesses
+    // Remove duplicates
+    const uniquePhotos = [...new Set(allPhotos)]
+
+    console.log(`Total unique photos found for business ${businessId}:`, uniquePhotos.length)
+    return uniquePhotos
   } catch (error) {
-    console.error(`Error getting businesses for windows/doors page:`, getErrorMessage(error))
+    console.error("Error loading business photos:", getErrorMessage(error))
     return []
   }
 }
 
-// Load business photos
-export async function loadWindowsDoorsBusinessPhotos(businessId: string): Promise<any[]> {
+// Get businesses for Windows and Doors page
+export async function getBusinessesForWindowsDoorsPage() {
   try {
-    console.log(`Loading photos for business ${businessId}`)
-    const photosData = await safeRedisGet(`business:${businessId}:photos`)
+    console.log("🔍 Fetching businesses for Windows and Doors category...")
 
-    if (!photosData) {
-      console.log(`No photos found for business ${businessId}`)
+    // Try multiple possible category keys for windows and doors
+    const possibleKeys = [
+      "category:windows-doors:businesses",
+      "category:home-improvement:windows-doors:businesses",
+      "category:Home, Lawn, and Manual Labor:businesses",
+    ]
+
+    let businessIds: string[] = []
+
+    for (const categoryKey of possibleKeys) {
+      try {
+        const ids = await safeRedisSmembers(categoryKey)
+        if (ids && ids.length > 0) {
+          console.log(`Found ${ids.length} businesses in category: ${categoryKey}`)
+          businessIds = ids
+          break
+        }
+      } catch (error) {
+        console.log(`No businesses found in category: ${categoryKey}`)
+        continue
+      }
+    }
+
+    if (businessIds.length === 0) {
+      console.log("No businesses found in any windows-doors category index")
       return []
     }
 
-    // Handle different data types
-    if (Array.isArray(photosData)) {
-      console.log(`Found ${photosData.length} photos as array for business ${businessId}`)
-      return photosData
+    console.log(`Found ${businessIds.length} businesses in category index`)
+
+    const businesses = []
+    for (const businessId of businessIds) {
+      try {
+        const business = await safeRedisGet(`business:${businessId}`)
+        if (business && typeof business === "object") {
+          // Get subcategories to filter for windows/doors services
+          const subcategories =
+            (await safeRedisGet(`business:${businessId}:categories`)) ||
+            (await safeRedisGet(`business:${businessId}:allSubcategories`)) ||
+            []
+
+          let subcategoryArray: any[] = []
+          if (Array.isArray(subcategories)) {
+            subcategoryArray = subcategories
+          } else if (typeof subcategories === "string") {
+            const parsed = safeJsonParse(subcategories, [])
+            subcategoryArray = ensureArray(parsed)
+          }
+
+          // Check if business offers windows/doors services
+          const hasWindowsDoorsServices = subcategoryArray.some((subcat) => {
+            const path = typeof subcat === "string" ? subcat : subcat?.fullPath || subcat?.name || ""
+            const windowsDoorsKeywords = [
+              "window",
+              "door",
+              "glass",
+              "glazing",
+              "locksmith",
+              "security film",
+              "tinting",
+              "curtain",
+              "blind",
+              "drapery",
+            ]
+            return windowsDoorsKeywords.some((keyword) => path.toLowerCase().includes(keyword.toLowerCase()))
+          })
+
+          if (hasWindowsDoorsServices) {
+            businesses.push({
+              id: businessId,
+              ...business,
+              displayName: (business as any).businessName || (business as any).name || `Business ${businessId}`,
+              displayPhone: (business as any).phone || "Phone not available",
+              displayLocation: (business as any).address || (business as any).location || "Location not available",
+              subcategories: subcategoryArray,
+            })
+          }
+        }
+      } catch (error) {
+        console.error(`Error loading business ${businessId}:`, error)
+      }
     }
 
-    if (typeof photosData === "string") {
-      const photos = safeJsonParse(photosData, [])
-      const photoArray = ensureArray(photos)
-      console.log(`Found ${photoArray.length} photos as JSON string for business ${businessId}`)
-      return photoArray
-    }
-
-    console.log(`Photos data is not in expected format for business ${businessId}`)
-    return []
+    console.log(`✅ Successfully loaded ${businesses.length} windows/doors businesses`)
+    return businesses
   } catch (error) {
-    console.error(`Error loading photos for business ${businessId}:`, getErrorMessage(error))
+    console.error("Error fetching businesses for Windows and Doors:", error)
     return []
   }
 }
 
-// Load business reviews with defensive Redis operations
+// Get business reviews with defensive Redis operations
 export async function getWindowsDoorsBusinessReviews(businessId: string): Promise<any[]> {
   try {
-    console.log(`Loading reviews for business ${businessId}`)
+    console.log(`🔍 Loading reviews for business ${businessId}`)
+
+    // Use safe Redis operations to handle WRONGTYPE errors
     const reviewsData = await safeRedisGet(`business:${businessId}:reviews`)
 
     if (!reviewsData) {
@@ -465,42 +447,77 @@ export async function getWindowsDoorsBusinessReviews(businessId: string): Promis
     console.log(`Reviews data is not in expected format for business ${businessId}`)
     return []
   } catch (error) {
-    console.error(`Error loading reviews for business ${businessId}:`, getErrorMessage(error))
+    console.error(`❌ Error loading reviews for business ${businessId}:`, getErrorMessage(error))
     return []
   }
 }
 
 // Check if business is favorite
-export async function checkWindowsDoorsBusinessIsFavorite(businessId: string): Promise<boolean> {
+export async function checkWindowsDoorsBusinessIsFavorite(businessId: string) {
   try {
-    // This would need user session logic, for now return false
-    return false
+    const session = await getUserSession()
+    if (!session?.user) {
+      return false
+    }
+
+    const favorites = await safeRedisGet(`user:${session.user.id}:favorites`)
+    if (!Array.isArray(favorites)) {
+      return false
+    }
+
+    return favorites.some((fav) => fav.id === businessId)
   } catch (error) {
-    console.error(`Error checking if business ${businessId} is favorite:`, getErrorMessage(error))
+    console.error("Error checking if business is favorite:", error)
     return false
   }
 }
 
 // Add business to favorites
-export async function addWindowsDoorsBusinessToFavorites(
-  businessData: any,
-): Promise<{ success: boolean; message: string }> {
+export async function addWindowsDoorsBusinessToFavorites(business: any) {
   try {
-    // This would need user session and favorites logic
-    return { success: false, message: "Favorites functionality not implemented in isolated action" }
+    const session = await getUserSession()
+    if (!session?.user) {
+      return { success: false, message: "Please log in to save businesses" }
+    }
+
+    const userId = session.user.id
+    const favorites = (await safeRedisGet(`user:${userId}:favorites`)) || []
+    const favoritesArray = Array.isArray(favorites) ? favorites : []
+
+    // Check if already exists
+    const exists = favoritesArray.some((fav) => fav.id === business.id)
+    if (exists) {
+      return { success: false, message: "Business already in favorites" }
+    }
+
+    // Add to favorites
+    favoritesArray.push({
+      id: business.id,
+      businessName: business.businessName,
+      displayName: business.displayName,
+      phone: business.phone,
+      email: business.email,
+      address: business.address,
+      zipCode: business.zipCode,
+      addedAt: Date.now(),
+    })
+
+    const redis = getRedisClient()
+    await redis.set(`user:${userId}:favorites`, JSON.stringify(favoritesArray))
+
+    return { success: true, message: "Business saved to favorites!" }
   } catch (error) {
-    console.error(`Error adding business to favorites:`, getErrorMessage(error))
-    return { success: false, message: "Failed to add to favorites" }
+    console.error("Error adding business to favorites:", error)
+    return { success: false, message: "Failed to save business" }
   }
 }
 
 // Get user session
-export async function getWindowsDoorsUserSession(): Promise<any> {
+export async function getWindowsDoorsUserSession() {
   try {
-    // This would need session logic
-    return null
+    return await getUserSession()
   } catch (error) {
-    console.error(`Error getting user session:`, getErrorMessage(error))
+    console.error("Error getting user session:", error)
     return null
   }
 }
