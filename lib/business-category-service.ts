@@ -5,6 +5,7 @@ import { KEY_PREFIXES } from "@/lib/db-schema"
 import { getCategoryNameForPagePath } from "@/lib/category-mapping"
 import type { Business } from "@/lib/definitions"
 import type { ZipCodeData } from "@/lib/zip-code-types"
+import { getAllCategoryMappings } from "@/lib/category-mapping"
 
 // Helper function to safely extract error messages
 function getErrorMessage(error: unknown): string {
@@ -230,20 +231,35 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
     const categoryName = getCategoryNameForPagePath(pagePath)
     if (!categoryName) {
       console.log(`No category mapping found for page: ${pagePath}`)
+      console.log(`Available mappings:`, Object.keys(getAllCategoryMappings()))
       return []
     }
 
     console.log(`Looking for businesses in category: ${categoryName}`)
 
     // Get all business IDs that selected this category
-    const businessIds = await safeRedisSmembers(`${KEY_PREFIXES.CATEGORY}${categoryName}:businesses`)
+    const categoryKey = `${KEY_PREFIXES.CATEGORY}${categoryName}:businesses`
+    console.log(`Checking Redis key: ${categoryKey}`)
+
+    const businessIds = await safeRedisSmembers(categoryKey)
 
     if (!businessIds || businessIds.length === 0) {
       console.log(`No businesses found for category: ${categoryName}`)
+      console.log(`Checked key: ${categoryKey}`)
+
+      // Debug: Check what category keys exist
+      try {
+        const allKeys = await kv.keys(`${KEY_PREFIXES.CATEGORY}*:businesses`)
+        console.log(`Available category keys:`, allKeys)
+      } catch (keyError) {
+        console.log(`Could not list category keys:`, keyError)
+      }
+
       return []
     }
 
     console.log(`Found ${businessIds.length} businesses for category: ${categoryName}`)
+    console.log(`Business IDs:`, businessIds)
 
     // Fetch each business's full data
     const businesses: Business[] = []
