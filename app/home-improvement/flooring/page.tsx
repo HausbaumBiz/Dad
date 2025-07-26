@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
+import { getBusinessesForFlooringPage } from "@/app/actions/flooring-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
@@ -226,8 +226,8 @@ export default function FlooringPage() {
 
       setLoading(true)
       try {
-        console.log("Fetching businesses for Flooring subcategory...")
-        const result = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Flooring")
+        console.log("Fetching businesses for Flooring category...")
+        const result = await getBusinessesForFlooringPage()
         console.log(`Found ${result.length} total businesses for flooring`)
 
         // If we have a zip code, filter by service area

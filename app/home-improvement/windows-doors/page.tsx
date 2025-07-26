@@ -10,11 +10,14 @@ import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { StarRating } from "@/components/star-rating"
-import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
-import { loadBusinessPhotos } from "@/app/actions/photo-actions"
-import { getBusinessReviews } from "@/app/actions/review-actions"
-import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
-import { getUserSession } from "@/app/actions/user-actions"
+import {
+  getBusinessesForWindowsDoorsPage,
+  loadWindowsDoorsBusinessPhotos,
+  getWindowsDoorsBusinessReviews,
+  checkWindowsDoorsBusinessIsFavorite,
+  addWindowsDoorsBusinessToFavorites,
+  getWindowsDoorsUserSession,
+} from "@/app/actions/windows-doors-actions"
 import { ReviewLoginDialog } from "@/components/review-login-dialog"
 import { Heart, HeartHandshake, Loader2, MapPin, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -52,7 +55,7 @@ export default function WindowsDoorsPage() {
     if (businessPhotos[businessId]) return // Already loaded
 
     try {
-      const photos = await loadBusinessPhotos(businessId)
+      const photos = await loadWindowsDoorsBusinessPhotos(businessId)
       setBusinessPhotos((prev) => ({
         ...prev,
         [businessId]: photos,
@@ -71,7 +74,7 @@ export default function WindowsDoorsPage() {
     if (businessReviews[businessId]) return // Already loaded
 
     try {
-      const reviews = await getBusinessReviews(businessId)
+      const reviews = await getWindowsDoorsBusinessReviews(businessId)
       setBusinessReviews((prev) => ({
         ...prev,
         [businessId]: reviews,
@@ -98,7 +101,7 @@ export default function WindowsDoorsPage() {
     }
   }
 
-  // Function to extract terminal subcategories - moved to top to avoid initialization errors
+  // Function to extract terminal subcategories
   const getAllTerminalSubcategories = (subcategories) => {
     if (!Array.isArray(subcategories)) return []
 
@@ -174,13 +177,11 @@ export default function WindowsDoorsPage() {
   console.log(`Applied filters: ${JSON.stringify(selectedFilters)}`)
   console.log(`Showing ${filteredBusinesses.length} of ${businesses.length} businesses`)
 
-  const subcategoryPath = "Home, Lawn, and Manual Labor > Windows and Doors"
-
   // Check user session and load favorites
   useEffect(() => {
     async function checkUserAndFavorites() {
       try {
-        const session = await getUserSession()
+        const session = await getWindowsDoorsUserSession()
         if (session?.user) {
           setCurrentUser(session.user)
           console.log("User session found:", session.user.email)
@@ -188,7 +189,7 @@ export default function WindowsDoorsPage() {
           // Load user's favorite businesses
           const favoriteChecks = await Promise.all(
             businesses.map(async (business) => {
-              const isFavorite = await checkIfBusinessIsFavorite(business.id)
+              const isFavorite = await checkWindowsDoorsBusinessIsFavorite(business.id)
               return { businessId: business.id, isFavorite }
             }),
           )
@@ -245,7 +246,7 @@ export default function WindowsDoorsPage() {
     setSavingStates((prev) => ({ ...prev, [business.id]: true }))
 
     try {
-      const result = await addFavoriteBusiness({
+      const result = await addWindowsDoorsBusinessToFavorites({
         id: business.id,
         businessName: business.businessName,
         displayName: business.displayName,
@@ -295,10 +296,10 @@ export default function WindowsDoorsPage() {
     async function fetchBusinesses() {
       try {
         setLoading(true)
-        console.log(`Fetching businesses for ${subcategoryPath} subcategory with zip code filtering...`)
+        console.log(`Fetching businesses for Windows and Doors category with zip code filtering...`)
 
-        const result = await getBusinessesForSubcategory(subcategoryPath)
-        console.log(`Found ${result.length} total businesses for base path: ${subcategoryPath}`)
+        const result = await getBusinessesForWindowsDoorsPage()
+        console.log(`Found ${result.length} total businesses for Windows and Doors`)
 
         let filteredBusinesses = result
 
@@ -371,7 +372,7 @@ export default function WindowsDoorsPage() {
     }
 
     fetchBusinesses()
-  }, [subcategoryPath, userZipCode])
+  }, [userZipCode])
 
   // Function to handle opening reviews dialog
   const handleOpenReviews = (provider) => {

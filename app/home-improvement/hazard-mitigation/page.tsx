@@ -8,7 +8,6 @@ import { Toaster } from "@/components/ui/toaster"
 import { useState, useEffect } from "react"
 import { ReviewsDialog } from "@/components/reviews-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
-import { getBusinessesForSubcategory } from "@/app/actions/simplified-category-actions"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
@@ -18,6 +17,7 @@ import { getBusinessReviews } from "@/app/actions/review-actions"
 import { StarRating } from "@/components/star-rating"
 import { Heart, HeartHandshake, Loader2, MapPin, Phone } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { getHazardMitigationBusinesses } from "@/app/actions/hazard-mitigation-actions"
 
 export default function HazardMitigationPage() {
   const { toast } = useToast()
@@ -227,15 +227,23 @@ export default function HazardMitigationPage() {
       setLoading(true)
       try {
         console.log("Fetching businesses for Hazard Mitigation subcategory...")
-        const result = await getBusinessesForSubcategory("Home, Lawn, and Manual Labor > Hazard Mitigation")
-        console.log(`Found ${result.length} total businesses for hazard mitigation`)
+
+        // Use the server action
+        const result = await getHazardMitigationBusinesses()
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to fetch businesses")
+        }
+
+        const allBusinesses = result.businesses || []
+        console.log(`Found ${allBusinesses.length} total businesses for hazard mitigation`)
 
         // If we have a zip code, filter by service area
         if (userZipCode) {
           console.log(`Filtering businesses that service zip code: ${userZipCode}`)
           const filteredBusinesses = []
 
-          for (const business of result) {
+          for (const business of allBusinesses) {
             try {
               const response = await fetch(`/api/admin/business/${business.id}/service-area`)
               if (response.ok) {
@@ -285,7 +293,7 @@ export default function HazardMitigationPage() {
           setBusinesses(filteredBusinesses)
         } else {
           console.log("No user zip code available, showing all businesses")
-          setBusinesses(result)
+          setBusinesses(allBusinesses)
         }
       } catch (error) {
         console.error("Error fetching businesses:", error)

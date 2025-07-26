@@ -197,7 +197,15 @@ export async function getBusinessReviews(businessId: string): Promise<Review[]> 
           })
         } catch (error) {
           console.error(`[getBusinessReviews] Error getting review IDs:`, error)
-          throw new Error(`Failed to get review IDs: ${error instanceof Error ? error.message : "Unknown error"}`)
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : typeof error === "string"
+                ? error
+                : error && typeof error === "object"
+                  ? JSON.stringify(error)
+                  : "Unknown error"
+          throw new Error(`Failed to get review IDs: ${errorMessage}`)
         }
 
         console.log(`[getBusinessReviews] Found ${reviewIds.length} review IDs:`, reviewIds)
@@ -275,9 +283,10 @@ export async function getBusinessReviews(businessId: string): Promise<Review[]> 
                 // Ensure overallRating exists
                 if (typeof review.overallRating !== "number") {
                   if (review.ratings && typeof review.ratings === "object") {
-                    const ratingsArray = Object.values(review.ratings).filter((r) => typeof r === "number")
-                    if (ratingsArray.length > 0) {
-                      review.overallRating = ratingsArray.reduce((sum, rating) => sum + rating, 0) / ratingsArray.length
+                    const ratingsValues = Object.values(review.ratings)
+                    const validRatings = ratingsValues.filter((r) => typeof r === "number" && !isNaN(r))
+                    if (validRatings.length > 0) {
+                      review.overallRating = validRatings.reduce((sum, rating) => sum + rating, 0) / validRatings.length
                     } else {
                       review.overallRating = 0
                     }
