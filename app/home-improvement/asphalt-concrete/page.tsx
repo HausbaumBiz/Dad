@@ -616,7 +616,7 @@ export default function AsphaltConcretePage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:w-32">
                       {/* Save Card Button */}
                       <Button
                         variant={favoriteBusinesses.has(business.id) ? "default" : "outline"}

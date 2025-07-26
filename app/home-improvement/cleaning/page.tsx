@@ -648,7 +648,7 @@ export default function CleaningPage() {
                       />
                     </div>
 
-                    <div className="flex flex-row lg:flex-col gap-2 lg:w-32">
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:w-32">
                       <Button className="flex-1 lg:flex-none" onClick={() => handleOpenReviews(provider)}>
                         Ratings
                       </Button>
