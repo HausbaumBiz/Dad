@@ -8,11 +8,22 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
-import { MainHeader } from "@/components/main-header"
-import { MainFooter } from "@/components/main-footer"
-import { Heart, Phone, MapPin, Mail, Calendar, Trash2, Loader2, AlertCircle, Scissors, Briefcase } from "lucide-react"
+import {
+  Heart,
+  Phone,
+  MapPin,
+  Mail,
+  Calendar,
+  Trash2,
+  Loader2,
+  AlertCircle,
+  Scissors,
+  Briefcase,
+  Home,
+} from "lucide-react"
 import { getFavoriteBusinesses, removeFavoriteBusiness, type FavoriteBusiness } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
+import Link from "next/link"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -113,14 +124,26 @@ export default function FavoritesPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <MainHeader />
+        {/* Simple header */}
+        <header className="bg-white shadow-sm">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Link href="/" className="flex items-center text-primary hover:text-primary/80">
+                <Home className="h-5 w-5 mr-2" />
+                Back to Home
+              </Link>
+              <h1 className="text-xl font-semibold">My Favorites</h1>
+              <div></div>
+            </div>
+          </div>
+        </header>
+
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
             <p>Loading your favorites...</p>
           </div>
         </div>
-        <MainFooter />
       </div>
     )
   }
@@ -128,7 +151,20 @@ export default function FavoritesPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <MainHeader />
+        {/* Simple header */}
+        <header className="bg-white shadow-sm">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Link href="/" className="flex items-center text-primary hover:text-primary/80">
+                <Home className="h-5 w-5 mr-2" />
+                Back to Home
+              </Link>
+              <h1 className="text-xl font-semibold">My Favorites</h1>
+              <div></div>
+            </div>
+          </div>
+        </header>
+
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-12">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -137,14 +173,25 @@ export default function FavoritesPage() {
             <Button onClick={() => window.location.reload()}>Try Again</Button>
           </div>
         </div>
-        <MainFooter />
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <MainHeader />
+      {/* Simple header */}
+      <header className="bg-white shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center text-primary hover:text-primary/80">
+              <Home className="h-5 w-5 mr-2" />
+              Back to Home
+            </Link>
+            <h1 className="text-xl font-semibold">My Favorites</h1>
+            <div></div>
+          </div>
+        </div>
+      </header>
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
@@ -192,7 +239,7 @@ export default function FavoritesPage() {
                       Start exploring businesses and save your favorites for quick access
                     </p>
                     <Button asChild>
-                      <a href="/">Browse Businesses</a>
+                      <Link href="/">Browse Businesses</Link>
                     </Button>
                   </CardContent>
                 </Card>
@@ -290,7 +337,7 @@ export default function FavoritesPage() {
 
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm" className="flex-1 bg-transparent" asChild>
-                            <a href={`/business/${business.id}`}>View Profile</a>
+                            <Link href={`/business/${business.id}`}>View Profile</Link>
                           </Button>
                           {business.phone && (
                             <Button size="sm" className="flex-1" asChild>
@@ -313,7 +360,7 @@ export default function FavoritesPage() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No Saved Coupons Yet</h3>
                   <p className="text-gray-600 mb-4">Browse business profiles to find and save exclusive coupons</p>
                   <Button asChild>
-                    <a href="/coupons">Browse Coupons</a>
+                    <Link href="/coupons">Browse Coupons</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -327,7 +374,7 @@ export default function FavoritesPage() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No Bookmarked Jobs Yet</h3>
                   <p className="text-gray-600 mb-4">Save interesting job listings to apply to them later</p>
                   <Button asChild>
-                    <a href="/job-listings">Browse Jobs</a>
+                    <Link href="/job-listings">Browse Jobs</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -336,7 +383,6 @@ export default function FavoritesPage() {
         </div>
       </div>
 
-      <MainFooter />
       <Toaster />
     </div>
   )

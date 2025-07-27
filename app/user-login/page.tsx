@@ -2,279 +2,187 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
-import Image from "next/image"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronLeft, CheckCircle, Eye, EyeOff } from "lucide-react"
-import { useSearchParams } from "next/navigation"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, Eye, EyeOff } from "lucide-react"
+import Link from "next/link"
 import { loginUser } from "@/app/actions/user-actions"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 
 export default function UserLoginPage() {
-  const { toast } = useToast()
-  const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  })
   const [error, setError] = useState("")
-  const searchParams = useSearchParams()
-  const registered = searchParams.get("registered")
-  const returnTo = searchParams.get("returnTo") || "/"
+  const [rememberMe, setRememberMe] = useState(false)
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target
-    setFormData((prev) => ({ ...prev, [id]: value }))
-  }
-
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword)
-  }
-
-  useEffect(() => {
-    // Load stored credentials if they exist and haven't expired
-    const storedCredentials = localStorage.getItem("userLoginCredentials")
-    if (storedCredentials) {
-      try {
-        const { email, password, timestamp } = JSON.parse(storedCredentials)
-        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000
-
-        if (Date.now() - timestamp < thirtyDaysInMs) {
-          setFormData({ email, password })
-          setRememberMe(true)
-        } else {
-          // Credentials expired, remove them
-          localStorage.removeItem("userLoginCredentials")
-        }
-      } catch (error) {
-        // Invalid stored data, remove it
-        localStorage.removeItem("userLoginCredentials")
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!rememberMe) {
-      // If remember me is unchecked, remove stored credentials
-      localStorage.removeItem("userLoginCredentials")
-    }
-  }, [rememberMe])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("[handleSubmit] Form submission started")
-
-    setIsSubmitting(true)
-    setError("") // Clear previous errors
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setIsLoading(true)
+    setError("")
 
     try {
-      // Validate form data
-      if (!formData.email || !formData.password) {
-        console.log("[handleSubmit] Missing form data")
-        setError("Email and password are required")
-        setIsSubmitting(false)
-        return
+      const formData = new FormData(event.currentTarget)
+
+      // Add remember me to form data
+      if (rememberMe) {
+        formData.set("rememberMe", "on")
       }
 
-      console.log("[handleSubmit] Creating FormData object")
-      // Create a FormData object from the form data
-      const formDataObj = new FormData()
-      formDataObj.append("email", formData.email)
-      formDataObj.append("password", formData.password)
-      formDataObj.append("rememberMe", rememberMe.toString())
+      console.log("[Login Page] Submitting login form")
 
-      console.log("[handleSubmit] Calling loginUser action")
-      // Call the server action
-      const result = await loginUser(formDataObj)
-      console.log("[handleSubmit] Login result:", result.success ? "success" : "failed")
+      const result = await loginUser(formData)
 
-      // Handle the result
       if (result.success) {
-        // Handle successful login
-        console.log("[handleSubmit] Login successful, showing toast")
-        toast({
-          title: "Login successful",
-          description: "You have been logged in successfully",
-          variant: "default",
-        })
+        console.log("[Login Page] Login successful, redirecting to:", result.redirectTo)
+        toast.success("Login successful! Redirecting...")
 
-        // Save credentials if remember me is checked
-        if (rememberMe) {
-          const credentialsToStore = {
-            email: formData.email,
-            password: formData.password,
-            timestamp: Date.now(),
-          }
-          localStorage.setItem("userLoginCredentials", JSON.stringify(credentialsToStore))
-        }
-
-        // Navigate to the return URL or home page
-        console.log("[handleSubmit] Redirecting to:", result.redirectTo || returnTo)
-        router.push(result.redirectTo || returnTo)
+        // Use window.location.href for full page refresh to ensure proper state update
+        window.location.href = result.redirectTo || "/"
       } else {
-        // Handle login failure
-        console.log("[handleSubmit] Login failed:", result.message)
-        setError(result.message || "Invalid username or password")
-        toast({
-          title: "Login failed",
-          description: result.message,
-          variant: "destructive",
-        })
+        console.log("[Login Page] Login failed:", result.message)
+        setError(result.message)
+        toast.error(result.message)
       }
     } catch (error) {
-      console.error("[handleSubmit] Login error:", error)
+      console.error("[Login Page] Login error:", error)
       setError("An unexpected error occurred. Please try again.")
-      toast({
-        title: "An error occurred",
-        description: "Please try again later",
-        variant: "destructive",
-      })
+      toast.error("An unexpected error occurred. Please try again.")
     } finally {
-      setIsSubmitting(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <Button variant="ghost" asChild className="pl-0">
-            <Link href="/" className="flex items-center text-primary">
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              Back to Home
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Or{" "}
+            <Link href="/user-register" className="font-medium text-primary hover:text-primary/80">
+              create a new account
             </Link>
-          </Button>
+          </p>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-center gap-8">
-          <div className="md:w-1/4 flex flex-col items-center">
-            <Image
-              src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png"
-              alt="Hausbaum Logo"
-              width={600}
-              height={300}
-              className="max-w-full h-auto mb-6"
-            />
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome back</CardTitle>
+            <CardDescription>Enter your credentials to access your account</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-            <Card className="w-full">
-              <CardContent className="p-4">
-                <p className="text-gray-700">
-                  Sign in to access your account, manage your service requests, and leave reviews for service providers.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="w-full md:w-1/3">
-            <CardHeader>
-              <CardTitle className="text-2xl text-center">User Login</CardTitle>
-              <p className="text-center text-gray-600">Welcome back!</p>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {registered && (
-                  <Alert className="mb-4 bg-green-50 border-green-200 text-green-800">
-                    <CheckCircle className="h-4 w-4 text-green-800" />
-                    <AlertDescription>Registration successful! Please log in with your new account.</AlertDescription>
-                  </Alert>
-                )}
-
-                {error && (
-                  <Alert className="mb-4 bg-red-50 border-red-200 text-red-800">
-                    <AlertDescription className="flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4 mr-2"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
-                      </svg>
-                      {error}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={formData.email} onChange={handleChange} required />
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="email">Email address</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className="mt-1"
+                    placeholder="Enter your email"
+                    disabled={isLoading}
+                  />
                 </div>
 
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="password">Password</Label>
-                  <div className="relative">
+                  <div className="relative mt-1">
                     <Input
                       id="password"
+                      name="password"
                       type={showPassword ? "text" : "password"}
-                      value={formData.password}
-                      onChange={handleChange}
+                      autoComplete="current-password"
                       required
+                      placeholder="Enter your password"
+                      disabled={isLoading}
                     />
-                    <button
+                    <Button
                       type="button"
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                      onClick={togglePasswordVisibility}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </Button>
                   </div>
                 </div>
+              </div>
 
+              <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="rememberMe"
+                    id="remember-me"
                     checked={rememberMe}
-                    onCheckedChange={(checked) => setRememberMe(checked === true)}
+                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    disabled={isLoading}
                   />
-                  <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
-                    Remember me for 30 days
+                  <Label htmlFor="remember-me" className="text-sm">
+                    Remember me
                   </Label>
                 </div>
 
-                <div className="text-right">
-                  <Link href="#" className="text-sm text-primary hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
+                <Link href="/forgot-password" className="text-sm text-primary hover:text-primary/80">
+                  Forgot your password?
+                </Link>
+              </div>
 
-                <Button
-                  type="submit"
-                  className="w-full bg-primary hover:bg-primary/90 text-white"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Logging in..." : "Login"}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign in"
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">New to Hausbaum?</span>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <Button variant="outline" className="w-full bg-transparent" asChild>
+                  <Link href="/user-register">Create new account</Link>
                 </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                <div className="text-center mt-4">
-                  <p className="text-sm text-gray-600">
-                    Don't have an account?{" "}
-                    <Link href="/user-register" className="text-primary hover:underline">
-                      Register
-                    </Link>
-                  </p>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+        <div className="text-center">
+          <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">
+            ← Back to home
+          </Link>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

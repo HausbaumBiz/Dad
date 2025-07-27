@@ -46,30 +46,12 @@ export default function HomePage() {
       // Remove the cookie by setting it to expire
       document.cookie = "registrationSuccess=; max-age=0; path=/;"
     }
-
-    // Fetch user data with error handling and retry logic
-    const fetchUserData = async () => {
-      try {
-        const response = await fetch("/api/user/session", {
-          method: "GET",
-          credentials: "include", // Important: include cookies in the request
-        })
-
-        if (response.ok) {
-          const userData = await response.json()
-          if (userData && userData.firstName && userData.lastName) {
-            setUserName(`${userData.firstName} ${userData.lastName}`)
-          }
-        } else {
-          console.log("User not authenticated or session API returned an error")
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error)
-      }
-    }
-
-    fetchUserData()
   }, [toast])
+
+  const handleUserChange = (newUserName: string | null) => {
+    console.log("[HomePage] User changed to:", newUserName)
+    setUserName(newUserName)
+  }
 
   const handleZipSubmit = () => {
     if (zipCode) {
@@ -302,6 +284,9 @@ export default function HomePage() {
             <h2 className="text-lg font-medium text-gray-700 max-w-md">
               Connecting you with trusted local experts and service professionals
             </h2>
+            {userName && (
+              <div className="mt-2 text-sm text-green-700 font-medium">Welcome back, {userName.split(" ")[0]}! 👋</div>
+            )}
             <div className="mt-2 text-sm text-gray-600">
               {!userName && (
                 <>
@@ -320,7 +305,7 @@ export default function HomePage() {
           </div>
 
           <div className="mt-4 md:mt-0 flex flex-col items-end">
-            <UserMenu userName={userName || undefined} />
+            <UserMenu userName={userName} onUserChange={handleUserChange} />
 
             <div className="text-sm text-gray-600 mt-2">
               <Button variant="outline" asChild className="text-sm bg-transparent">
@@ -333,6 +318,7 @@ export default function HomePage() {
           </div>
         </div>
       </header>
+
       <main className="flex-grow container mx-auto px-4 py-8">
         {/* Hero Section with Rotating Images */}
         <div className="relative overflow-hidden rounded-xl mb-10 bg-gradient-to-r from-primary to-primary/80">
