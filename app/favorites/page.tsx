@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 
 export default function FavoritesPage() {
   const { toast } = useToast()
@@ -42,6 +43,9 @@ export default function FavoritesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false)
 
   // Check user session and load favorites
   useEffect(() => {
@@ -119,6 +123,13 @@ export default function FavoritesPage() {
     } catch {
       return "Unknown date"
     }
+  }
+
+  // Handle opening business profile dialog
+  const handleViewProfile = (businessId: string, businessName: string) => {
+    setSelectedBusinessId(businessId)
+    setSelectedBusinessName(businessName)
+    setIsProfileDialogOpen(true)
   }
 
   if (isLoading) {
@@ -336,14 +347,16 @@ export default function FavoritesPage() {
                         <Separator className="my-4" />
 
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm" className="flex-1 bg-transparent" asChild>
-                            <Link href={`/business/${business.id}`}>View Profile</Link>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 bg-transparent"
+                            onClick={() =>
+                              handleViewProfile(business.id, business.displayName || business.businessName)
+                            }
+                          >
+                            View Profile
                           </Button>
-                          {business.phone && (
-                            <Button size="sm" className="flex-1" asChild>
-                              <a href={`tel:${business.phone}`}>Call Now</a>
-                            </Button>
-                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -382,6 +395,20 @@ export default function FavoritesPage() {
           </Tabs>
         </div>
       </div>
+
+      {/* Business Profile Dialog */}
+      {selectedBusinessId && (
+        <BusinessProfileDialog
+          isOpen={isProfileDialogOpen}
+          onClose={() => {
+            setIsProfileDialogOpen(false)
+            setSelectedBusinessId(null)
+            setSelectedBusinessName("")
+          }}
+          businessId={selectedBusinessId}
+          businessName={selectedBusinessName}
+        />
+      )}
 
       <Toaster />
     </div>
