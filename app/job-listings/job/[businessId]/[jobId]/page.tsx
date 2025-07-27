@@ -6,6 +6,8 @@ import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { useToast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 import {
   ChevronLeft,
   MapPin,
@@ -18,13 +20,22 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react"
+import { addFavoriteJob, checkIfJobIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
 
 export default function JobDetailPage() {
+  const { toast } = useToast()
   const params = useParams()
   const [job, setJob] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [isJobSaved, setIsJobSaved] = useState(false)
+  const [savingJob, setSavingJob] = useState(false)
+  const [checkingUser, setCheckingUser] = useState(true)
 
   useEffect(() => {
     async function fetchJob() {
@@ -71,6 +82,109 @@ export default function JobDetailPage() {
 
     fetchJob()
   }, [params])
+
+  // Check user session and job save status
+  useEffect(() => {
+    async function loadUserData() {
+      try {
+        setCheckingUser(true)
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+
+        // If user is logged in and we have a job, check if it's saved
+        if (session?.user && job?.id) {
+          const isSaved = await checkIfJobIsFavorite(job.id)
+          setIsJobSaved(isSaved)
+        } else {
+          setIsJobSaved(false)
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error)
+        setCurrentUser(null)
+        setIsJobSaved(false)
+      } finally {
+        setCheckingUser(false)
+      }
+    }
+
+    if (job) {
+      loadUserData()
+    }
+  }, [job])
+
+  // Handle saving a job to favorites
+  const handleSaveJob = async () => {
+    if (!currentUser) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to save job listings to your bookmarks",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!job) {
+      toast({
+        title: "Error",
+        description: "Job data not available",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (isJobSaved) {
+      toast({
+        title: "Already Saved",
+        description: "This job is already in your bookmarked jobs",
+      })
+      return
+    }
+
+    setSavingJob(true)
+
+    try {
+      const result = await addFavoriteJob({
+        id: job.id,
+        businessId: job.businessId,
+        jobTitle: job.jobTitle,
+        businessName: job.businessName,
+        payType: job.payType,
+        hourlyMin: job.hourlyMin,
+        hourlyMax: job.hourlyMax,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
+        otherPay: job.otherPay,
+        workHours: job.workHours,
+        categories: job.categories,
+        contactName: job.contactName,
+        contactEmail: job.contactEmail,
+        businessAddress: job.businessAddress,
+      })
+
+      if (result.success) {
+        setIsJobSaved(true)
+        toast({
+          title: "Job Saved!",
+          description: `${job.jobTitle} has been added to your bookmarked jobs`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving job:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save job listing. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingJob(false)
+    }
+  }
 
   // Format benefits for display
   const formatBenefits = (benefits: Record<string, { enabled: boolean; details?: string }>) => {
@@ -234,6 +348,32 @@ export default function JobDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Mobile Save Button - Show on small screens */}
+            <div className="lg:hidden">
+              {!checkingUser && currentUser && (
+                <Card>
+                  <CardContent className="p-4">
+                    <Button
+                      variant={isJobSaved ? "default" : "outline"}
+                      onClick={handleSaveJob}
+                      disabled={savingJob}
+                      className="w-full flex items-center justify-center gap-2"
+                      size="lg"
+                    >
+                      {savingJob ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : isJobSaved ? (
+                        <BookmarkCheck className="h-4 w-4" />
+                      ) : (
+                        <Bookmark className="h-4 w-4" />
+                      )}
+                      {isJobSaved ? "Saved to Bookmarks" : "Save Job"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
 
           {/* Sidebar */}
@@ -290,11 +430,47 @@ export default function JobDetailPage() {
               </CardContent>
             </Card>
 
-            <div className="sticky top-6">
-              <Button className="w-full" size="lg">
-                Apply for this Job
-              </Button>
-            </div>
+            {/* Desktop Save Button - Show below Contact Information on large screens */}
+            {!checkingUser && currentUser && (
+              <div className="hidden lg:block">
+                <Card>
+                  <CardContent className="p-6">
+                    <Button
+                      variant={isJobSaved ? "default" : "outline"}
+                      onClick={handleSaveJob}
+                      disabled={savingJob}
+                      className="w-full flex items-center justify-center gap-2"
+                      size="lg"
+                    >
+                      {savingJob ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : isJobSaved ? (
+                        <BookmarkCheck className="h-4 w-4" />
+                      ) : (
+                        <Bookmark className="h-4 w-4" />
+                      )}
+                      {isJobSaved ? "Saved to Bookmarks" : "Save Job"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Login prompt for non-authenticated users */}
+            {!checkingUser && !currentUser && (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <Bookmark className="h-8 w-8 text-gray-400 mx-auto mb-3" />
+                  <h3 className="font-medium text-gray-900 mb-2">Save This Job</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Log in to save this job to your bookmarks and access it later
+                  </p>
+                  <Button asChild variant="outline" className="w-full bg-transparent">
+                    <Link href="/user-login">Log In to Save</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </main>
@@ -317,6 +493,8 @@ export default function JobDetailPage() {
           </div>
         </div>
       </footer>
+
+      <Toaster />
     </div>
   )
 }
