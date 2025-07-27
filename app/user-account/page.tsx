@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import Image from "next/image"
-import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -147,8 +146,6 @@ export default function UserAccountPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <MainHeader />
-
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
@@ -362,7 +359,10 @@ export default function UserAccountPage() {
                           </CardContent>
                           <CardFooter className="bg-gray-50 border-t flex justify-between">
                             <Button variant="outline">Update Payment Method</Button>
-                            <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                            <Button
+                              variant="outline"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent"
+                            >
                               Cancel Subscription
                             </Button>
                           </CardFooter>

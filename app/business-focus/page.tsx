@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 import { KeywordsSection } from "@/components/keywords-section"
 import { CategorySelector, type CategorySelection } from "@/components/category-selector"
@@ -155,8 +154,6 @@ export default function BusinessFocusPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <MainHeader />
-
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8 text-center">

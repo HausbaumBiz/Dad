@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -1245,8 +1244,6 @@ export default function StatisticsPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <MainHeader />
-
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">

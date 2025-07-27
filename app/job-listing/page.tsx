@@ -6,7 +6,6 @@ import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Check, Eye, Info, Edit, MapPin, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -514,8 +513,6 @@ export default function JobListingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <MainHeader />
-
       <main className="flex-1">
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Job Listing Workbench</h1>

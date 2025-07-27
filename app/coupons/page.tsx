@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
-import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -931,8 +930,6 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <MainHeader />
-
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-8">
           <div className="relative w-16 h-16">
@@ -1258,7 +1255,12 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
 
                   {coupons.length > 0 && (
                     <div className="mt-6 flex flex-col items-center">
-                      <Button variant="outline" onClick={handleSaveAllCoupons} disabled={savingImages} className="mb-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleSaveAllCoupons}
+                        disabled={savingImages}
+                        className="mb-2 bg-transparent"
+                      >
                         {savingImages ? (
                           <>
                             <span className="mr-2">
