@@ -20,8 +20,17 @@ import {
   Scissors,
   Briefcase,
   Home,
+  DollarSign,
+  Clock,
 } from "lucide-react"
-import { getFavoriteBusinesses, removeFavoriteBusiness, type FavoriteBusiness } from "@/app/actions/favorite-actions"
+import {
+  getFavoriteBusinesses,
+  removeFavoriteBusiness,
+  getFavoriteJobs,
+  removeFavoriteJob,
+  type FavoriteBusiness,
+  type FavoriteJob,
+} from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
 import Link from "next/link"
 import {
@@ -40,6 +49,7 @@ import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 export default function FavoritesPage() {
   const { toast } = useToast()
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<FavoriteBusiness[]>([])
+  const [favoriteJobs, setFavoriteJobs] = useState<FavoriteJob[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -63,10 +73,12 @@ export default function FavoritesPage() {
 
         setCurrentUser(session.user)
 
-        // Load favorite businesses
-        const favorites = await getFavoriteBusinesses()
-        console.log("Loaded favorites:", favorites)
-        setFavoriteBusinesses(favorites)
+        // Load favorite businesses and jobs
+        const [businesses, jobs] = await Promise.all([getFavoriteBusinesses(), getFavoriteJobs()])
+
+        console.log("Loaded favorites:", { businesses, jobs })
+        setFavoriteBusinesses(businesses)
+        setFavoriteJobs(jobs)
       } catch (err) {
         console.error("Error loading favorites:", err)
         setError("Failed to load favorites")
@@ -111,6 +123,34 @@ export default function FavoritesPage() {
     }
   }
 
+  // Handle removing a job from favorites
+  const handleRemoveFavoriteJob = async (jobId: string, jobTitle: string) => {
+    try {
+      const result = await removeFavoriteJob(jobId)
+
+      if (result.success) {
+        setFavoriteJobs((prev) => prev.filter((fav) => fav.id !== jobId))
+        toast({
+          title: "Removed from Bookmarks",
+          description: `${jobTitle} has been removed from your bookmarked jobs`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error removing favorite job:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove job from bookmarks",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Format date for display
   const formatDate = (dateString: string) => {
     try {
@@ -123,6 +163,30 @@ export default function FavoritesPage() {
     } catch {
       return "Unknown date"
     }
+  }
+
+  // Format pay range for job display
+  const formatJobPayRange = (job: FavoriteJob) => {
+    if (job.payType === "hourly" && (job.hourlyMin || job.hourlyMax)) {
+      if (job.hourlyMin && job.hourlyMax) {
+        return `$${job.hourlyMin} - $${job.hourlyMax}/hr`
+      } else if (job.hourlyMin) {
+        return `$${job.hourlyMin}/hr`
+      } else if (job.hourlyMax) {
+        return `Up to $${job.hourlyMax}/hr`
+      }
+    } else if (job.payType === "salary" && (job.salaryMin || job.salaryMax)) {
+      if (job.salaryMin && job.salaryMax) {
+        return `$${job.salaryMin} - $${job.salaryMax}/yr`
+      } else if (job.salaryMin) {
+        return `$${job.salaryMin}/yr`
+      } else if (job.salaryMax) {
+        return `Up to $${job.salaryMax}/yr`
+      }
+    } else if (job.payType === "other" && job.otherPay) {
+      return job.otherPay
+    }
+    return "Not specified"
   }
 
   // Handle opening business profile dialog
@@ -233,9 +297,11 @@ export default function FavoritesPage() {
               <TabsTrigger value="jobs" className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4" />
                 Bookmarked Jobs
-                <Badge variant="secondary" className="ml-1">
-                  0
-                </Badge>
+                {favoriteJobs.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {favoriteJobs.length}
+                  </Badge>
+                )}
               </TabsTrigger>
             </TabsList>
 
@@ -381,16 +447,124 @@ export default function FavoritesPage() {
 
             {/* Bookmarked Jobs Tab */}
             <TabsContent value="jobs" className="mt-6">
-              <Card>
-                <CardContent className="text-center py-12">
-                  <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Bookmarked Jobs Yet</h3>
-                  <p className="text-gray-600 mb-4">Save interesting job listings to apply to them later</p>
-                  <Button asChild>
-                    <Link href="/job-listings">Browse Jobs</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+              {favoriteJobs.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Bookmarked Jobs Yet</h3>
+                    <p className="text-gray-600 mb-4">Save interesting job listings to apply to them later</p>
+                    <Button asChild>
+                      <Link href="/job-listings">Browse Jobs</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {favoriteJobs.map((job) => (
+                    <Card key={job.id} className="hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg leading-tight">{job.jobTitle}</CardTitle>
+                            <p className="text-sm text-gray-600 mt-1">{job.businessName}</p>
+                            <div className="flex items-center gap-1 mt-1">
+                              <Calendar className="h-3 w-3 text-gray-400" />
+                              <span className="text-xs text-gray-500">Saved {formatDate(job.dateAdded)}</span>
+                            </div>
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Remove from Bookmarks</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to remove "{job.jobTitle}" from your bookmarked jobs? This
+                                  action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleRemoveFavoriteJob(job.id, job.jobTitle)}
+                                  className="bg-red-500 hover:bg-red-600"
+                                >
+                                  Remove
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          {/* Pay */}
+                          <div className="flex items-center gap-2 text-sm">
+                            <DollarSign className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="text-gray-700">{formatJobPayRange(job)}</span>
+                          </div>
+
+                          {/* Work Hours */}
+                          {job.workHours && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Clock className="h-4 w-4 text-primary flex-shrink-0" />
+                              <span className="text-gray-700">{job.workHours}</span>
+                            </div>
+                          )}
+
+                          {/* Categories */}
+                          {job.categories && job.categories.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {job.categories.slice(0, 2).map((category, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                                >
+                                  {category}
+                                </span>
+                              ))}
+                              {job.categories.length > 2 && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                                  +{job.categories.length - 2} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Contact */}
+                          <div className="flex items-center gap-2 text-sm">
+                            <Mail className="h-4 w-4 text-primary flex-shrink-0" />
+                            <a href={`mailto:${job.contactEmail}`} className="text-blue-600 hover:underline truncate">
+                              {job.contactEmail}
+                            </a>
+                          </div>
+                        </div>
+
+                        <Separator className="my-4" />
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 bg-transparent"
+                            onClick={() => handleViewProfile(job.businessId, job.businessName)}
+                          >
+                            View Business
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

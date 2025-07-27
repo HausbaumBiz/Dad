@@ -4,10 +4,12 @@ import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, ArrowLeft, X } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import { Loader2, ArrowLeft, X, Bookmark, BookmarkCheck } from "lucide-react"
 import { getBusinessJobs } from "@/app/actions/job-actions"
+import { addFavoriteJob, checkIfJobIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
 import type { JobListing } from "@/app/actions/job-actions"
-import Image from "next/image"
 
 interface BusinessJobsDialogProps {
   isOpen: boolean
@@ -17,10 +19,14 @@ interface BusinessJobsDialogProps {
 }
 
 export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }: BusinessJobsDialogProps) {
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [jobs, setJobs] = useState<JobListing[]>([])
   const [error, setError] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<JobListing | null>(null)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set())
+  const [savingJobs, setSavingJobs] = useState<Set<string>>(new Set())
   const fixAppliedRef = useRef(false)
 
   const loadBusinessJobs = async () => {
@@ -35,6 +41,34 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       setLoading(false)
     }
   }
+
+  // Check user session and load saved jobs status
+  useEffect(() => {
+    async function loadUserData() {
+      try {
+        const session = await getUserSession()
+        setCurrentUser(session?.user || null)
+
+        // If user is logged in and we have jobs, check which ones are saved
+        if (session?.user && jobs.length > 0) {
+          const savedJobsSet = new Set<string>()
+          for (const job of jobs) {
+            const isSaved = await checkIfJobIsFavorite(job.id)
+            if (isSaved) {
+              savedJobsSet.add(job.id)
+            }
+          }
+          setSavedJobs(savedJobsSet)
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error)
+      }
+    }
+
+    if (jobs.length > 0) {
+      loadUserData()
+    }
+  }, [jobs])
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -169,6 +203,75 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
       })
   }
 
+  // Handle saving a job to favorites
+  const handleSaveJob = async (job: JobListing) => {
+    if (!currentUser) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to save job listings",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (savedJobs.has(job.id)) {
+      toast({
+        title: "Already Saved",
+        description: "This job is already in your bookmarks",
+      })
+      return
+    }
+
+    setSavingJobs((prev) => new Set(prev).add(job.id))
+
+    try {
+      const result = await addFavoriteJob({
+        id: job.id,
+        businessId: job.businessId,
+        jobTitle: job.jobTitle,
+        businessName: job.businessName,
+        payType: job.payType,
+        hourlyMin: job.hourlyMin,
+        hourlyMax: job.hourlyMax,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
+        otherPay: job.otherPay,
+        workHours: job.workHours,
+        categories: job.categories,
+        contactName: job.contactName,
+        contactEmail: job.contactEmail,
+        businessAddress: job.businessAddress,
+      })
+
+      if (result.success) {
+        setSavedJobs((prev) => new Set(prev).add(job.id))
+        toast({
+          title: "Job Saved!",
+          description: result.message,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving job:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save job listing. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingJobs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(job.id)
+        return newSet
+      })
+    }
+  }
+
   // View full job details
   const viewFullJob = (job: JobListing) => {
     setSelectedJob(job)
@@ -185,7 +288,7 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
 
     return (
       <div className="space-y-2 w-full max-w-full min-h-0">
-        <div className="flex items-center">
+        <div className="flex items-center justify-between">
           <Button
             variant="ghost"
             size="sm"
@@ -195,35 +298,32 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
             <ArrowLeft className="h-3 w-3" />
             Back
           </Button>
+
+          {currentUser && (
+            <Button
+              variant={savedJobs.has(selectedJob.id) ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSaveJob(selectedJob)}
+              disabled={savingJobs.has(selectedJob.id)}
+              className="flex items-center gap-1"
+            >
+              {savingJobs.has(selectedJob.id) ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : savedJobs.has(selectedJob.id) ? (
+                <BookmarkCheck className="h-3 w-3" />
+              ) : (
+                <Bookmark className="h-3 w-3" />
+              )}
+              {savedJobs.has(selectedJob.id) ? "Saved" : "Save"}
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-col gap-2 job-details-container w-full max-w-full">
-          {/* Logo - Updated for better aspect ratio */}
-          <div className="flex items-center justify-start w-full">
-            <div className="flex-shrink-0 flex items-center justify-center">
-              {selectedJob.logoUrl ? (
-                <div className="relative w-10 h-10 sm:w-16 sm:h-16 md:w-24 md:h-24 rounded-md overflow-hidden border flex items-center justify-center bg-white job-logo-container">
-                  <Image
-                    src={selectedJob.logoUrl || "/placeholder.svg"}
-                    alt={`${selectedJob.businessName} logo`}
-                    className="object-contain max-w-full max-h-full w-auto h-auto"
-                    width={64}
-                    height={64}
-                    unoptimized
-                  />
-                </div>
-              ) : (
-                <div className="w-10 h-10 sm:w-16 sm:h-16 md:w-24 md:h-24 bg-gray-100 rounded-md flex items-center justify-center job-logo-container">
-                  <span className="text-gray-400 text-xs text-center">No logo</span>
-                </div>
-              )}
-
-              {/* Job header - moved next to logo */}
-              <div className="flex-1 job-content ml-3">
-                <h2 className="text-base sm:text-lg md:text-xl font-bold job-title">{selectedJob.jobTitle}</h2>
-                <p className="text-xs sm:text-sm md:text-base text-gray-600">{selectedJob.businessName}</p>
-              </div>
-            </div>
+          {/* Job header - no logo */}
+          <div className="flex flex-col gap-1 w-full">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold job-title">{selectedJob.jobTitle}</h2>
+            <p className="text-xs sm:text-sm md:text-base text-gray-600">{selectedJob.businessName}</p>
           </div>
 
           <div className="w-full grid grid-cols-2 gap-2">
@@ -354,73 +454,70 @@ export function BusinessJobsDialog({ isOpen, onClose, businessId, businessName }
         {jobs.map((job) => (
           <Card key={job.id} className="overflow-hidden w-full">
             <CardContent className="p-2 job-card">
-              <div className="flex flex-row gap-2 w-full">
-                {/* Logo - Updated for better aspect ratio */}
-                <div className="flex-shrink-0 flex items-center justify-center">
-                  {job.logoUrl ? (
-                    <div className="relative w-8 h-8 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-md overflow-hidden border flex items-center justify-center bg-white job-logo-container">
-                      <Image
-                        src={job.logoUrl || "/placeholder.svg"}
-                        alt={`${job.businessName} logo`}
-                        className="object-contain max-w-full max-h-full w-auto h-auto"
-                        width={32}
-                        height={32}
-                        unoptimized
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 md:w-16 md:h-16 bg-gray-100 rounded-md flex items-center justify-center job-logo-container">
-                      <span className="text-gray-400 text-[8px] text-center">No logo</span>
+              {/* Job details - no logo */}
+              <div className="flex flex-col gap-1 w-full job-content">
+                <h3 className="text-sm sm:text-base font-semibold">{job.jobTitle}</h3>
+                <p className="text-gray-600 text-xs">{job.businessName}</p>
+
+                <div className="mt-1 space-y-0.5">
+                  <div className="flex flex-wrap items-center">
+                    <span className="text-xs font-medium text-gray-700">Pay: </span>
+                    <span className="text-xs ml-1">{formatPayRange(job)}</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center">
+                    <span className="text-xs font-medium text-gray-700">Hours: </span>
+                    <span className="text-xs ml-1">{job.workHours || "Not specified"}</span>
+                  </div>
+
+                  {job.categories && job.categories.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-gray-700">Categories: </span>
+                      <div className="flex flex-wrap gap-0.5 mt-0.5 job-categories-container">
+                        {job.categories.slice(0, 1).map((category, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-1 py-0 rounded-full text-[10px] font-medium bg-primary/10 text-primary"
+                          >
+                            {category}
+                          </span>
+                        ))}
+                        {job.categories.length > 1 && (
+                          <span className="inline-flex items-center px-1 py-0 rounded-full text-[10px] font-medium bg-gray-100 text-gray-700">
+                            +{job.categories.length - 1}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-
-                {/* Job details */}
-                <div className="flex-1 job-content overflow-hidden">
-                  <h3 className="text-sm sm:text-base font-semibold truncate">{job.jobTitle}</h3>
-                  <p className="text-gray-600 text-xs truncate">{job.businessName}</p>
-
-                  <div className="mt-1 space-y-0.5">
-                    <div className="flex flex-wrap items-center">
-                      <span className="text-xs font-medium text-gray-700">Pay: </span>
-                      <span className="text-xs ml-1">{formatPayRange(job)}</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center">
-                      <span className="text-xs font-medium text-gray-700">Hours: </span>
-                      <span className="text-xs ml-1 truncate">{job.workHours || "Not specified"}</span>
-                    </div>
-
-                    {job.categories && job.categories.length > 0 && (
-                      <div>
-                        <span className="text-xs font-medium text-gray-700">Categories: </span>
-                        <div className="flex flex-wrap gap-0.5 mt-0.5 job-categories-container">
-                          {job.categories.slice(0, 1).map((category, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-1 py-0 rounded-full text-[10px] font-medium bg-primary/10 text-primary"
-                            >
-                              {category}
-                            </span>
-                          ))}
-                          {job.categories.length > 1 && (
-                            <span className="inline-flex items-center px-1 py-0 rounded-full text-[10px] font-medium bg-gray-100 text-gray-700">
-                              +{job.categories.length - 1}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
 
-              {/* View full job button */}
-              <div className="mt-1.5 flex justify-end">
+              {/* Action buttons */}
+              <div className="mt-1.5 flex justify-between items-center gap-2">
+                {currentUser && (
+                  <Button
+                    variant={savedJobs.has(job.id) ? "default" : "outline"}
+                    size="sm"
+                    className="flex items-center gap-0.5 text-xs h-6 px-1.5"
+                    onClick={() => handleSaveJob(job)}
+                    disabled={savingJobs.has(job.id)}
+                  >
+                    {savingJobs.has(job.id) ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : savedJobs.has(job.id) ? (
+                      <BookmarkCheck className="h-3 w-3" />
+                    ) : (
+                      <Bookmark className="h-3 w-3" />
+                    )}
+                    {savedJobs.has(job.id) ? "Saved" : "Save"}
+                  </Button>
+                )}
+
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex items-center gap-0.5 job-action-button text-xs h-6 px-1.5"
+                  className="flex items-center gap-0.5 job-action-button text-xs h-6 px-1.5 bg-transparent ml-auto"
                   onClick={() => viewFullJob(job)}
                 >
                   View Job
