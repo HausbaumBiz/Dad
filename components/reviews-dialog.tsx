@@ -489,11 +489,11 @@ export function ReviewsDialog({
                           {/* Review Comment */}
                           <p className="text-gray-700 leading-relaxed">{review.comment}</p>
 
-                          {/* Detailed Ratings */}
+                          {/* Detailed Ratings - Modified for mobile */}
                           {review.ratings && (
                             <div className="border-t pt-4">
                               <h5 className="text-sm font-medium mb-3">Detailed Ratings</h5>
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                 {ratingCategories.map((category) => {
                                   const rating = review.ratings[category.key as keyof Review["ratings"]] || 0
                                   return (
