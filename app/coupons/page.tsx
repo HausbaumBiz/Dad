@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Trash2, CheckCircle, Save, FileText, AlertTriangle } from "lucide-react"
+import { Trash2, CheckCircle, Save, FileText, AlertTriangle, ArrowLeft } from "lucide-react"
 import Image from "next/image"
 import {
   Dialog,
@@ -178,6 +178,10 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
     size: "small", // Always set to "small"
     businessName: "",
   })
+
+  const handleReturnToWorkbench = () => {
+    router.push("/workbench")
+  }
 
   useEffect(() => {
     async function loadBusinessData() {
@@ -931,16 +935,27 @@ By using this coupon, you acknowledge that you have read, understood, and agree 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="relative w-16 h-16">
-            <Image
-              src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png"
-              alt="Penny Saver"
-              fill
-              className="object-contain"
-            />
+        <div className="flex items-center justify-between mb-8">
+          <Button
+            variant="outline"
+            onClick={handleReturnToWorkbench}
+            className="flex items-center gap-2 bg-transparent"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Return to Workbench
+          </Button>
+          <div className="flex items-center gap-4 flex-1 justify-center">
+            <div className="relative w-16 h-16">
+              <Image
+                src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/money-saver-icon-xJgsaAlHhdg5K2XK0YJNmll4BFxSN2.png"
+                alt="Penny Saver"
+                fill
+                className="object-contain"
+              />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800">Penny Saver Workbench</h1>
           </div>
-          <h1 className="text-3xl font-bold text-gray-800">Penny Saver Workbench</h1>
+          <div className="w-[140px]"></div> {/* Spacer for balance */}
         </div>
 
         {/* Success Dialog */}

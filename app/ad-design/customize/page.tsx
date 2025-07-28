@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import type React from "react"
 
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -54,6 +54,7 @@ interface PhotoItem {
 
 export default function CustomizeAdDesignPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const designId = searchParams.get("design")
   const colorParam = searchParams.get("color") || "blue"
   const [selectedDesign, setSelectedDesign] = useState<number | null>(designId ? Number.parseInt(designId) : 5)
@@ -928,6 +929,11 @@ export default function CustomizeAdDesignPage() {
     }
   }
 
+  // Add function to handle return to workbench
+  const handleReturnToWorkbench = () => {
+    router.push("/workbench")
+  }
+
   // Update the fetchSavedCoupons function to properly fetch coupons
 
   const fetchSavedCoupons = async () => {
@@ -1356,7 +1362,12 @@ export default function CustomizeAdDesignPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-6">Customize Your AdBox</h1>
+              <div className="flex items-center justify-between mb-6">
+                <h1 className="text-3xl font-bold text-gray-900">Customize Your AdBox</h1>
+                <Button type="button" variant="outline" onClick={handleReturnToWorkbench}>
+                  Return to Workbench
+                </Button>
+              </div>
 
               {selectedDesign ? (
                 <>
@@ -1927,11 +1938,11 @@ export default function CustomizeAdDesignPage() {
                 </div>
               </Card>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-3">
                 <Button type="submit" disabled={isLoading}>
                   {isLoading ? "Saving..." : "Save Changes"}
                 </Button>
-                <Button type="button" variant="secondary" onClick={handleFinalizeAndSubmit} className="ml-4">
+                <Button type="button" variant="secondary" onClick={handleFinalizeAndSubmit}>
                   Finalize & Submit
                 </Button>
               </div>

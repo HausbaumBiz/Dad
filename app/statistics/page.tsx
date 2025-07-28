@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MapPin, RefreshCw, Star } from "lucide-react"
+import { MapPin, RefreshCw, Star, ArrowLeft } from "lucide-react"
 import { getBusinessAnalytics, resetBusinessAnalytics, type ZipCodeAnalytics } from "@/app/actions/analytics-actions"
 import { getBusinessReviews, type Review } from "@/app/actions/review-actions"
 import { useToast } from "@/components/ui/use-toast"
@@ -191,6 +191,10 @@ export default function StatisticsPage() {
     willRemoveFrom: string[]
   } | null>(null)
   const [addingAwardToPhotos, setAddingAwardToPhotos] = useState<string | null>(null)
+
+  const handleReturnToWorkbench = () => {
+    router.push("/workbench")
+  }
 
   // Load analytics data
   useEffect(() => {
@@ -1246,6 +1250,15 @@ export default function StatisticsPage() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReturnToWorkbench}
+            className="flex items-center gap-2 bg-transparent"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Return to Workbench
+          </Button>
           <div className="flex items-center gap-4">
             <div className="relative w-16 h-16">
               <Image
@@ -1257,6 +1270,7 @@ export default function StatisticsPage() {
             </div>
             <h1 className="text-3xl font-bold text-gray-800">Statistics Dashboard</h1>
           </div>
+          <div></div> {/* Empty div for spacing */}
         </div>
 
         <Tabs defaultValue="overview" className="w-full" onValueChange={setActiveTab}>

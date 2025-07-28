@@ -9,7 +9,7 @@ import { SuggestCategoryModal } from "@/components/suggest-category-modal"
 import { CategoryChangeWarning } from "@/components/category-change-warning"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Loader2 } from "lucide-react"
+import { Search, Loader2, ArrowLeft } from "lucide-react"
 import { saveBusinessCategories, getBusinessCategories } from "@/app/actions/category-actions"
 import { useToast } from "@/components/ui/use-toast"
 import { Suspense } from "react"
@@ -42,6 +42,10 @@ export default function BusinessFocusPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
+
+  const handleReturnToWorkbench = () => {
+    router.push("/workbench")
+  }
 
   // Detect category changes
   const initialCategoryNames = useMemo(() => initialCategories.map((cat) => cat.category), [initialCategories])
@@ -156,11 +160,23 @@ export default function BusinessFocusPage() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Business Focus & Service Area</h1>
-            <p className="text-gray-600">
-              Define your business focus and service area to help customers find you more easily.
-            </p>
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                variant="outline"
+                onClick={handleReturnToWorkbench}
+                className="flex items-center gap-2 bg-transparent"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Return to Workbench
+              </Button>
+            </div>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">Business Focus & Service Area</h1>
+              <p className="text-gray-600">
+                Define your business focus and service area to help customers find you more easily.
+              </p>
+            </div>
           </div>
 
           <Suspense fallback={<ServiceAreaLoading />}>

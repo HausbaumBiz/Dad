@@ -19,7 +19,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, CheckCircle, CreditCard, Key, Trash2, User } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { AlertCircle, ArrowLeft, CheckCircle, CreditCard, Key, Trash2, User } from "lucide-react"
 import { getCurrentBusiness } from "@/app/actions/business-actions"
 
 // Business type definition (simplified version from business-actions.ts)
@@ -56,6 +57,12 @@ export default function UserAccountPage() {
   // State for upgrade success message
   const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(false)
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false)
+
+  const router = useRouter()
+
+  const handleReturnToWorkbench = () => {
+    router.push("/workbench")
+  }
 
   // Fetch business data on component mount
   useEffect(() => {
@@ -148,7 +155,16 @@ export default function UserAccountPage() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+          <Button
+            onClick={handleReturnToWorkbench}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2 bg-transparent"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Return to Workbench
+          </Button>
+          <div className="flex items-center gap-4 flex-1 justify-center">
             <div className="relative w-16 h-16">
               <Image
                 src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/user-account-icon%20sm-PZ61Ko9nsGv5oeESUWjM2pDekdeewQ.png"
@@ -159,6 +175,7 @@ export default function UserAccountPage() {
             </div>
             <h1 className="text-3xl font-bold text-gray-800">Business Account</h1>
           </div>
+          <div className="w-[140px]"></div> {/* Spacer to balance the layout */}
         </div>
 
         {loading ? (

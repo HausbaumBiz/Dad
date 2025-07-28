@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Check, Eye, Info, Edit, MapPin, Search } from "lucide-react"
+import { Check, Eye, Info, Edit, MapPin, Search, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MainFooter } from "@/components/main-footer"
 import Image from "next/image"
@@ -139,6 +139,11 @@ export default function JobListingPage() {
       ...prev,
       [id]: value,
     }))
+  }
+
+  // Handle return to workbench
+  const handleReturnToWorkbench = () => {
+    router.push("/workbench")
   }
 
   // Handle ZIP code search
@@ -515,7 +520,20 @@ export default function JobListingPage() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <main className="flex-1">
         <div className="container mx-auto px-4 py-8">
-          <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Job Listing Workbench</h1>
+          <div className="flex items-center justify-between mb-6">
+            <Button
+              variant="outline"
+              onClick={handleReturnToWorkbench}
+              className="flex items-center gap-2 bg-transparent"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Return to Workbench
+            </Button>
+            <div className="flex-1 text-center">
+              <h1 className="text-3xl font-bold text-gray-800">Job Listing Workbench</h1>
+            </div>
+            <div className="w-[180px]"></div> {/* Spacer for balance */}
+          </div>
 
           {/* Add business ID display and edit button */}
           <div className="flex justify-center items-center gap-2 mb-4">
