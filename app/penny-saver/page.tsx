@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, Search, MapPin, Download, Share2, Calendar, Tag, Sparkles, Loader2, Check } from "lucide-react"
 import { ZipCodeDialog } from "@/components/zip-code-dialog"
-import { MainHeader } from "@/components/main-header"
 import { MainFooter } from "@/components/main-footer"
 import { getCouponsByZipCode, type Coupon } from "@/app/actions/coupon-actions"
 import { getAllBusinessCategories } from "@/app/actions/business-category-actions"
@@ -287,8 +286,6 @@ export default function PennySaverPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <MainHeader />
-
       <main className="flex-grow container mx-auto px-4 py-8">
         {/* Back to Home Button */}
         <div className="mb-6">
@@ -460,7 +457,7 @@ export default function PennySaverPage() {
                 <div className="text-center py-12 relative z-10">
                   <p className="text-gray-500 text-lg mb-4">No coupons found in the "{selectedCategory}" category.</p>
                   <p className="text-gray-400">Try selecting a different category or view all coupons.</p>
-                  <Button variant="outline" className="mt-4" onClick={() => setSelectedCategory("all")}>
+                  <Button variant="outline" className="mt-4 bg-transparent" onClick={() => setSelectedCategory("all")}>
                     View All Coupons
                   </Button>
                 </div>
@@ -509,7 +506,7 @@ export default function PennySaverPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex items-center"
+                            className="flex items-center bg-transparent"
                             onClick={() => handleSaveCoupon(coupon)}
                             disabled={savingCouponId === coupon.id}
                           >
@@ -523,7 +520,7 @@ export default function PennySaverPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex items-center"
+                            className="flex items-center bg-transparent"
                             onClick={() => handleShareCoupon(coupon)}
                             disabled={sharingCouponId === coupon.id}
                           >
