@@ -12,7 +12,6 @@ import { getBusinessesForCategoryPage } from "@/app/actions/simplified-category-
 import { useToast } from "@/components/ui/use-toast"
 import { Phone, MapPin } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { getCloudflareImageUrl } from "@/lib/cloudflare-images-utils"
 import { PhotoCarousel } from "@/components/photo-carousel"
 import { addFavoriteBusiness, checkIfBusinessIsFavorite } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
@@ -20,6 +19,7 @@ import { Heart, HeartHandshake } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { StarRating } from "@/components/star-rating"
 import { getBusinessRating } from "@/app/actions/review-actions"
+import { loadBusinessPhotos } from "@/app/actions/photo-actions"
 
 // Enhanced Business interface with service area support
 interface Business {
@@ -58,105 +58,6 @@ interface Business {
   description?: string
   displayLocation?: string
   email?: string
-}
-
-// Function to load business photos from Cloudflare using public URLs
-const loadBusinessPhotos = async (businessId: string): Promise<string[]> => {
-  try {
-    console.log(`[Pet Care] Loading photos for business ${businessId}`)
-
-    // Fetch business media data from the updated API
-    const response = await fetch(`/api/businesses/${businessId}`)
-    if (!response.ok) {
-      console.error(`[Pet Care] Failed to fetch business data: ${response.status} ${response.statusText}`)
-      return []
-    }
-
-    const businessData = await response.json()
-    console.log(`[Pet Care] Business data for ${businessId}:`, businessData)
-
-    // Try multiple possible locations for photo data
-    let photoAlbum = null
-
-    // Check direct photos property first
-    if (businessData.photos && Array.isArray(businessData.photos)) {
-      photoAlbum = businessData.photos
-    }
-    // Check direct photoAlbum property
-    else if (businessData.photoAlbum && Array.isArray(businessData.photoAlbum)) {
-      photoAlbum = businessData.photoAlbum
-    }
-    // Check nested media.photos
-    else if (businessData.media?.photos && Array.isArray(businessData.media.photos)) {
-      photoAlbum = businessData.media.photos
-    }
-    // Check nested media.photoAlbum
-    else if (businessData.media?.photoAlbum && Array.isArray(businessData.media.photoAlbum)) {
-      photoAlbum = businessData.media.photoAlbum
-    }
-    // Check adDesign.photos
-    else if (businessData.adDesign?.photos && Array.isArray(businessData.adDesign.photos)) {
-      photoAlbum = businessData.adDesign.photos
-    }
-    // Check adDesign.photoAlbum
-    else if (businessData.adDesign?.photoAlbum && Array.isArray(businessData.adDesign.photoAlbum)) {
-      photoAlbum = businessData.adDesign.photoAlbum
-    }
-
-    if (!photoAlbum || !Array.isArray(photoAlbum)) {
-      console.log(`[Pet Care] No photo album found for business ${businessId}`)
-      return []
-    }
-
-    console.log(`[Pet Care] Found ${photoAlbum.length} photos in album for business ${businessId}`)
-
-    // Convert Cloudflare image IDs to public URLs
-    const photoUrls = photoAlbum
-      .map((photo: any, index: number) => {
-        // Handle different photo data structures
-        let imageId = null
-
-        if (typeof photo === "string") {
-          // If photo is just a string, check if it's already a URL or an image ID
-          if (photo.startsWith("http") || photo.startsWith("https")) {
-            console.log(`[Pet Care] Photo ${index} already has full URL: ${photo}`)
-            return photo
-          }
-          imageId = photo
-        } else if (photo && typeof photo === "object") {
-          // If photo is an object, try to extract the image ID or URL
-          const url = photo.url || photo.src || photo.imageUrl
-          if (url && (url.startsWith("http") || url.startsWith("https"))) {
-            console.log(`[Pet Care] Photo ${index} already has full URL: ${url}`)
-            return url
-          }
-
-          imageId = photo.imageId || photo.id || photo.cloudflareId || photo.key || url
-        }
-
-        if (!imageId) {
-          console.warn(`[Pet Care] No image ID found for photo ${index}:`, photo)
-          return null
-        }
-
-        // Generate public Cloudflare URL
-        try {
-          const publicUrl = getCloudflareImageUrl(imageId, "public")
-          console.log(`[Pet Care] Generated URL for image ${imageId}: ${publicUrl}`)
-          return publicUrl
-        } catch (error) {
-          console.error(`[Pet Care] Error generating URL for image ${imageId}:`, error)
-          return null
-        }
-      })
-      .filter(Boolean) // Remove null/undefined URLs
-
-    console.log(`[Pet Care] Successfully loaded ${photoUrls.length} photos for business ${businessId}`)
-    return photoUrls
-  } catch (error) {
-    console.error(`[Pet Care] Error loading photos for business ${businessId}:`, error)
-    return []
-  }
 }
 
 // Format phone number for display
@@ -417,9 +318,12 @@ export default function PetCarePage() {
                 `[Pet Care] Processing business ${business.id}: ${business.displayName || business.businessName}`,
               )
 
-              // Load photos and rating data concurrently
+              // Load photos and rating data concurrently using the existing actions
               const [photos, ratingData] = await Promise.all([
-                loadBusinessPhotos(business.id || ""),
+                loadBusinessPhotos(business.id || "").catch((error) => {
+                  console.error(`[Pet Care] Failed to load photos for business ${business.id}:`, error)
+                  return []
+                }),
                 getBusinessRating(business.id || "").catch((error) => {
                   console.error(`[Pet Care] Failed to get rating for business ${business.id}:`, error)
                   return { rating: 0, reviewCount: 0 }
@@ -427,6 +331,7 @@ export default function PetCarePage() {
               ])
 
               console.log(`[Pet Care] Rating data for business ${business.id}:`, ratingData)
+              console.log(`[Pet Care] Photos loaded for business ${business.id}:`, photos.length)
 
               const enhancedBusiness = {
                 ...business,
@@ -735,7 +640,7 @@ export default function PetCarePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/placeholder.svg?height=500&width=500"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/cat%20and%20dog-7hvR8Ytt6JBV7PFG8N6uigZg80K6xP.png"
             alt="Pet Care Services"
             width={500}
             height={500}

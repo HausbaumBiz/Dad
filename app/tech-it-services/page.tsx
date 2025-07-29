@@ -470,8 +470,8 @@ export default function TechITServicesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="flex justify-center">
           <Image
-            src="/placeholder.svg?height=500&width=500"
-            alt="Tech and IT Services"
+            src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/computers02-IpX5wthByfA85KlfoBTWbvIbENr465.png"
+            alt="Computer and technology equipment for IT services"
             width={500}
             height={500}
             className="rounded-lg shadow-lg max-w-full h-auto"
