@@ -22,17 +22,23 @@ import {
   Home,
   DollarSign,
   Clock,
+  Download,
+  Printer,
 } from "lucide-react"
 import {
   getFavoriteBusinesses,
   removeFavoriteBusiness,
   getFavoriteJobs,
   removeFavoriteJob,
+  getFavoriteCoupons,
+  removeFavoriteCoupon,
   type FavoriteBusiness,
   type FavoriteJob,
+  type FavoriteCoupon,
 } from "@/app/actions/favorite-actions"
 import { getUserSession } from "@/app/actions/user-actions"
 import Link from "next/link"
+import Image from "next/image"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,11 +51,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { BusinessProfileDialog } from "@/components/business-profile-dialog"
+import { useMobile } from "@/hooks/use-mobile"
 
 export default function FavoritesPage() {
   const { toast } = useToast()
+  const isMobile = useMobile()
   const [favoriteBusinesses, setFavoriteBusinesses] = useState<FavoriteBusiness[]>([])
   const [favoriteJobs, setFavoriteJobs] = useState<FavoriteJob[]>([])
+  const [favoriteCoupons, setFavoriteCoupons] = useState<FavoriteCoupon[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -73,12 +82,17 @@ export default function FavoritesPage() {
 
         setCurrentUser(session.user)
 
-        // Load favorite businesses and jobs
-        const [businesses, jobs] = await Promise.all([getFavoriteBusinesses(), getFavoriteJobs()])
+        // Load favorite businesses, jobs, and coupons
+        const [businesses, jobs, coupons] = await Promise.all([
+          getFavoriteBusinesses(),
+          getFavoriteJobs(),
+          getFavoriteCoupons(),
+        ])
 
-        console.log("Loaded favorites:", { businesses, jobs })
+        console.log("Loaded favorites:", { businesses, jobs, coupons })
         setFavoriteBusinesses(businesses)
         setFavoriteJobs(jobs)
+        setFavoriteCoupons(coupons)
       } catch (err) {
         console.error("Error loading favorites:", err)
         setError("Failed to load favorites")
@@ -151,6 +165,34 @@ export default function FavoritesPage() {
     }
   }
 
+  // Handle removing a coupon from favorites
+  const handleRemoveFavoriteCoupon = async (couponId: string, couponTitle: string) => {
+    try {
+      const result = await removeFavoriteCoupon(couponId)
+
+      if (result.success) {
+        setFavoriteCoupons((prev) => prev.filter((fav) => fav.id !== couponId))
+        toast({
+          title: "Removed from Saved Coupons",
+          description: `${couponTitle} has been removed from your saved coupons`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error removing favorite coupon:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove coupon from favorites",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Format date for display
   const formatDate = (dateString: string) => {
     try {
@@ -194,6 +236,70 @@ export default function FavoritesPage() {
     setSelectedBusinessId(businessId)
     setSelectedBusinessName(businessName)
     setIsProfileDialogOpen(true)
+  }
+
+  // Handle coupon download/print
+  const handleCouponAction = async (coupon: FavoriteCoupon) => {
+    if (!coupon.imageUrl) {
+      toast({
+        title: "Error",
+        description: "Coupon image not available",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      if (isMobile) {
+        // Download on mobile
+        const response = await fetch(coupon.imageUrl)
+        const blob = await response.blob()
+        const downloadUrl = window.URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = downloadUrl
+        link.download = `coupon-${coupon.id}.jpg`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(downloadUrl)
+
+        toast({
+          title: "Coupon Downloaded",
+          description: "The coupon has been saved to your device",
+        })
+      } else {
+        // Print on desktop
+        const printWindow = window.open("", "_blank")
+        if (printWindow) {
+          printWindow.document.write(`
+            <html>
+              <head>
+                <title>Print Coupon</title>
+                <style>
+                  body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+                  img { max-width: 100%; max-height: 100vh; }
+                  @media print {
+                    body { height: auto; }
+                    img { max-height: none; }
+                  }
+                </style>
+              </head>
+              <body>
+                <img src="${coupon.imageUrl}" alt="Coupon" onload="window.print();window.close()">
+              </body>
+            </html>
+          `)
+          printWindow.document.close()
+        }
+      }
+    } catch (error) {
+      console.error("Error handling coupon action:", error)
+      toast({
+        title: "Error",
+        description: "Failed to process coupon",
+        variant: "destructive",
+      })
+    }
   }
 
   if (isLoading) {
@@ -290,9 +396,11 @@ export default function FavoritesPage() {
               <TabsTrigger value="coupons" className="flex items-center gap-2">
                 <Scissors className="h-4 w-4" />
                 Saved Coupons
-                <Badge variant="secondary" className="ml-1">
-                  0
-                </Badge>
+                {favoriteCoupons.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {favoriteCoupons.length}
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="jobs" className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4" />
@@ -433,16 +541,126 @@ export default function FavoritesPage() {
 
             {/* Saved Coupons Tab */}
             <TabsContent value="coupons" className="mt-6">
-              <Card>
-                <CardContent className="text-center py-12">
-                  <Scissors className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Saved Coupons Yet</h3>
-                  <p className="text-gray-600 mb-4">Browse business profiles to find and save exclusive coupons</p>
-                  <Button asChild>
-                    <Link href="/coupons">Browse Coupons</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+              {favoriteCoupons.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <Scissors className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Saved Coupons Yet</h3>
+                    <p className="text-gray-600 mb-4">Browse business profiles to find and save exclusive coupons</p>
+                    <Button asChild>
+                      <Link href="/coupons">Browse Coupons</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {favoriteCoupons.map((coupon) => (
+                    <Card key={coupon.id} className="hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg leading-tight">{coupon.title}</CardTitle>
+                            <p className="text-sm text-gray-600 mt-1">{coupon.businessName}</p>
+                            <div className="flex items-center gap-1 mt-1">
+                              <Calendar className="h-3 w-3 text-gray-400" />
+                              <span className="text-xs text-gray-500">Saved {formatDate(coupon.dateAdded)}</span>
+                            </div>
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Remove from Saved Coupons</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to remove "{coupon.title}" from your saved coupons? This action
+                                  cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleRemoveFavoriteCoupon(coupon.id, coupon.title)}
+                                  className="bg-red-500 hover:bg-red-600"
+                                >
+                                  Remove
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          {/* Coupon Image */}
+                          {coupon.imageUrl && (
+                            <div className="relative aspect-[4/3] w-full rounded-lg overflow-hidden bg-gray-100">
+                              <Image
+                                src={coupon.imageUrl || "/placeholder.svg"}
+                                alt={coupon.title}
+                                fill
+                                className="object-contain"
+                                sizes="(max-width: 768px) 100vw, 33vw"
+                              />
+                            </div>
+                          )}
+
+                          {/* Description */}
+                          {coupon.description && (
+                            <p className="text-sm text-gray-600 line-clamp-2">{coupon.description}</p>
+                          )}
+
+                          {/* Expiration Date */}
+                          {coupon.expirationDate && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
+                              <span className="text-gray-700">Expires: {formatDate(coupon.expirationDate)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <Separator className="my-4" />
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 bg-transparent"
+                            onClick={() => handleCouponAction(coupon)}
+                          >
+                            {isMobile ? (
+                              <>
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                              </>
+                            ) : (
+                              <>
+                                <Printer className="h-4 w-4 mr-2" />
+                                Print
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewProfile(coupon.businessId, coupon.businessName)}
+                          >
+                            View Business
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             {/* Bookmarked Jobs Tab */}

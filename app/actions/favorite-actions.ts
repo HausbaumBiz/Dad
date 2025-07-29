@@ -33,6 +33,20 @@ interface FavoriteJob {
   dateAdded: string
 }
 
+interface FavoriteCoupon {
+  id: string
+  businessId: string
+  businessName: string
+  title: string
+  description?: string
+  startDate?: string
+  expirationDate?: string
+  imageId?: string
+  imageUrl?: string
+  size?: string
+  dateAdded: string
+}
+
 // Helper function to safely stringify data
 function safeStringify(data: any): string {
   try {
@@ -82,6 +96,29 @@ function safeStringifyJob(data: any): string {
   }
 }
 
+// Helper function to safely stringify coupon data
+function safeStringifyCoupon(data: any): string {
+  try {
+    const sanitizedData = {
+      id: String(data.id || ""),
+      businessId: String(data.businessId || ""),
+      businessName: String(data.businessName || ""),
+      title: String(data.title || ""),
+      description: String(data.description || ""),
+      startDate: String(data.startDate || ""),
+      expirationDate: String(data.expirationDate || ""),
+      imageId: String(data.imageId || ""),
+      imageUrl: String(data.imageUrl || ""),
+      size: String(data.size || "small"),
+      dateAdded: String(data.dateAdded || new Date().toISOString()),
+    }
+    return JSON.stringify(sanitizedData)
+  } catch (error) {
+    console.error("Error stringifying coupon data:", error)
+    throw new Error("Failed to serialize coupon data")
+  }
+}
+
 // Helper function to safely parse JSON data
 function safeParse(data: any): FavoriteBusiness | null {
   try {
@@ -110,6 +147,22 @@ function safeParseJob(data: any): FavoriteJob | null {
     return null
   } catch (error) {
     console.error("Error parsing favorite job data:", error)
+    return null
+  }
+}
+
+// Helper function to safely parse coupon JSON data
+function safeParseCoupon(data: any): FavoriteCoupon | null {
+  try {
+    if (typeof data === "string") {
+      const parsed = JSON.parse(data)
+      return parsed
+    } else if (typeof data === "object" && data !== null) {
+      return data as FavoriteCoupon
+    }
+    return null
+  } catch (error) {
+    console.error("Error parsing favorite coupon data:", error)
     return null
   }
 }
@@ -232,6 +285,63 @@ export async function addFavoriteJob(jobData: {
   }
 }
 
+export async function addFavoriteCoupon(couponData: {
+  id: string
+  businessId: string
+  businessName: string
+  title: string
+  description?: string
+  startDate?: string
+  expirationDate?: string
+  imageId?: string
+  imageUrl?: string
+  size?: string
+}) {
+  try {
+    const session = await getUserSession()
+    if (!session?.user?.id) {
+      return { success: false, message: "You must be logged in to save coupons" }
+    }
+
+    const userId = session.user.id
+
+    // Check if coupon is already in favorites
+    const existingFavorite = await kv.get(`user:${userId}:favorite_coupon:${couponData.id}`)
+    if (existingFavorite) {
+      return { success: false, message: "Coupon is already saved to your favorites" }
+    }
+
+    // Create favorite coupon object
+    const favoriteCoupon: FavoriteCoupon = {
+      id: couponData.id,
+      businessId: couponData.businessId,
+      businessName: couponData.businessName,
+      title: couponData.title,
+      description: couponData.description || "",
+      startDate: couponData.startDate || "",
+      expirationDate: couponData.expirationDate || "",
+      imageId: couponData.imageId || "",
+      imageUrl: couponData.imageUrl || "",
+      size: couponData.size || "small",
+      dateAdded: new Date().toISOString(),
+    }
+
+    // Save individual favorite coupon
+    await kv.set(`user:${userId}:favorite_coupon:${couponData.id}`, safeStringifyCoupon(favoriteCoupon))
+
+    // Add to user's favorite coupons set
+    await kv.sadd(`user:${userId}:favorite_coupons`, couponData.id)
+
+    return {
+      success: true,
+      message: `${couponData.title} has been saved to your favorite coupons!`,
+    }
+  } catch (error) {
+    console.error("Error adding favorite coupon:", error)
+    return { success: false, message: "Failed to save coupon. Please try again." }
+  }
+}
+
 export async function removeFavoriteBusiness(businessId: string) {
   try {
     const session = await getUserSession()
@@ -273,6 +383,28 @@ export async function removeFavoriteJob(jobId: string) {
   } catch (error) {
     console.error("Error removing favorite job:", error)
     return { success: false, message: "Failed to remove job listing. Please try again." }
+  }
+}
+
+export async function removeFavoriteCoupon(couponId: string) {
+  try {
+    const session = await getUserSession()
+    if (!session?.user?.id) {
+      return { success: false, message: "You must be logged in to remove saved coupons" }
+    }
+
+    const userId = session.user.id
+
+    // Remove individual favorite coupon
+    await kv.del(`user:${userId}:favorite_coupon:${couponId}`)
+
+    // Remove from user's favorite coupons set
+    await kv.srem(`user:${userId}:favorite_coupons`, couponId)
+
+    return { success: true, message: "Coupon removed from favorites" }
+  } catch (error) {
+    console.error("Error removing favorite coupon:", error)
+    return { success: false, message: "Failed to remove coupon. Please try again." }
   }
 }
 
@@ -378,6 +510,57 @@ export async function getFavoriteJobs(): Promise<FavoriteJob[]> {
   }
 }
 
+export async function getFavoriteCoupons(): Promise<FavoriteCoupon[]> {
+  try {
+    const session = await getUserSession()
+    if (!session?.user?.id) {
+      return []
+    }
+
+    const userId = session.user.id
+
+    // Get all favorite coupon IDs
+    const favoriteCouponIds = await kv.smembers(`user:${userId}:favorite_coupons`)
+    if (!favoriteCouponIds || favoriteCouponIds.length === 0) {
+      return []
+    }
+
+    // Get all favorite coupon data
+    const favoriteCoupons: FavoriteCoupon[] = []
+
+    for (const couponId of favoriteCouponIds) {
+      try {
+        const couponData = await kv.get(`user:${userId}:favorite_coupon:${couponId}`)
+        if (couponData) {
+          const parsed = safeParseCoupon(couponData)
+          if (parsed) {
+            favoriteCoupons.push(parsed)
+          } else {
+            console.warn(`Failed to parse favorite coupon data for coupon ${couponId}`)
+            // Clean up corrupted data
+            await kv.srem(`user:${userId}:favorite_coupons`, couponId)
+            await kv.del(`user:${userId}:favorite_coupon:${couponId}`)
+          }
+        } else {
+          // Clean up orphaned reference
+          await kv.srem(`user:${userId}:favorite_coupons`, couponId)
+        }
+      } catch (error) {
+        console.error(`Error parsing favorite coupon data for coupon ${couponId}:`, error)
+        // Clean up corrupted data
+        await kv.srem(`user:${userId}:favorite_coupons`, couponId)
+        await kv.del(`user:${userId}:favorite_coupon:${couponId}`)
+      }
+    }
+
+    // Sort by date added (newest first)
+    return favoriteCoupons.sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime())
+  } catch (error) {
+    console.error("Error getting favorite coupons:", error)
+    return []
+  }
+}
+
 export async function checkIfBusinessIsFavorite(businessId: string): Promise<boolean> {
   try {
     const session = await getUserSession()
@@ -410,6 +593,22 @@ export async function checkIfJobIsFavorite(jobId: string): Promise<boolean> {
   }
 }
 
+export async function checkIfCouponIsFavorite(couponId: string): Promise<boolean> {
+  try {
+    const session = await getUserSession()
+    if (!session?.user?.id) {
+      return false
+    }
+
+    const userId = session.user.id
+    const isFavorite = await kv.sismember(`user:${userId}:favorite_coupons`, couponId)
+    return Boolean(isFavorite)
+  } catch (error) {
+    console.error("Error checking if coupon is favorite:", error)
+    return false
+  }
+}
+
 // Cleanup function to remove corrupted favorites
 export async function cleanupCorruptedFavorites() {
   try {
@@ -421,6 +620,7 @@ export async function cleanupCorruptedFavorites() {
     const userId = session.user.id
     const favoriteIds = await kv.smembers(`user:${userId}:favorites`)
     const favoriteJobIds = await kv.smembers(`user:${userId}:favorite_jobs`)
+    const favoriteCouponIds = await kv.smembers(`user:${userId}:favorite_coupons`)
 
     let cleanedCount = 0
 
@@ -454,6 +654,21 @@ export async function cleanupCorruptedFavorites() {
       }
     }
 
+    for (const couponId of favoriteCouponIds) {
+      try {
+        const couponData = await kv.get(`user:${userId}:favorite_coupon:${couponId}`)
+        if (!couponData || !safeParseCoupon(couponData)) {
+          await kv.srem(`user:${userId}:favorite_coupons`, couponId)
+          await kv.del(`user:${userId}:favorite_coupon:${couponId}`)
+          cleanedCount++
+        }
+      } catch (error) {
+        await kv.srem(`user:${userId}:favorite_coupons`, couponId)
+        await kv.del(`user:${userId}:favorite_coupon:${couponId}`)
+        cleanedCount++
+      }
+    }
+
     return { success: true, message: `Cleaned up ${cleanedCount} corrupted favorites` }
   } catch (error) {
     console.error("Error cleaning up corrupted favorites:", error)
@@ -462,4 +677,4 @@ export async function cleanupCorruptedFavorites() {
 }
 
 // Export the types for use in other components
-export type { FavoriteBusiness, FavoriteJob }
+export type { FavoriteBusiness, FavoriteJob, FavoriteCoupon }

@@ -25,9 +25,13 @@ import {
   Check,
   FileText,
   Printer,
+  Heart,
+  HeartOff,
 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useMobile } from "@/hooks/use-mobile"
+import { addFavoriteCoupon, removeFavoriteCoupon, checkIfCouponIsFavorite } from "@/app/actions/favorite-actions"
+import { getUserSession } from "@/app/actions/user-actions"
 
 // Define a valid placeholder image URL
 const PLACEHOLDER_IMAGE = "/placeholder.svg?text=No+Image+Available"
@@ -74,10 +78,14 @@ export function BusinessCouponsDialog({
   const [activeTab, setActiveTab] = useState<string>("all")
   const [isDownloading, setIsDownloading] = useState(false)
   const [showFullSizeImage, setShowFullSizeImage] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [savedCoupons, setSavedCoupons] = useState<Set<string>>(new Set())
+  const [savingCoupons, setSavingCoupons] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (isOpen && businessId) {
       loadCoupons()
+      checkUserSession()
     }
   }, [isOpen, businessId])
 
@@ -90,6 +98,16 @@ export function BusinessCouponsDialog({
       return () => clearTimeout(timer)
     }
   }, [isCopied])
+
+  const checkUserSession = async () => {
+    try {
+      const session = await getUserSession()
+      setCurrentUser(session?.user || null)
+    } catch (error) {
+      console.error("Error checking user session:", error)
+      setCurrentUser(null)
+    }
+  }
 
   const loadCoupons = async () => {
     setLoading(true)
@@ -181,6 +199,18 @@ export function BusinessCouponsDialog({
 
       setCoupons(couponData)
 
+      // Check which coupons are already saved (if user is logged in)
+      if (currentUser) {
+        const savedCouponIds = new Set<string>()
+        for (const coupon of couponData) {
+          const isSaved = await checkIfCouponIsFavorite(coupon.id)
+          if (isSaved) {
+            savedCouponIds.add(coupon.id)
+          }
+        }
+        setSavedCoupons(savedCouponIds)
+      }
+
       // Load global terms and conditions
       try {
         const termsResult = await getGlobalCouponTerms(businessId)
@@ -198,6 +228,88 @@ export function BusinessCouponsDialog({
       setError("Failed to load coupons")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSaveCoupon = async (coupon: any) => {
+    if (!currentUser) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to save coupons to your favorites.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const couponId = coupon.id
+    setSavingCoupons((prev) => new Set(prev).add(couponId))
+
+    try {
+      const isSaved = savedCoupons.has(couponId)
+
+      if (isSaved) {
+        // Remove from favorites
+        const result = await removeFavoriteCoupon(couponId)
+        if (result.success) {
+          setSavedCoupons((prev) => {
+            const newSet = new Set(prev)
+            newSet.delete(couponId)
+            return newSet
+          })
+          toast({
+            title: "Coupon Removed",
+            description: result.message,
+          })
+        } else {
+          toast({
+            title: "Error",
+            description: result.message,
+            variant: "destructive",
+          })
+        }
+      } else {
+        // Add to favorites
+        const couponData = {
+          id: coupon.id,
+          businessId: businessId,
+          businessName: businessName,
+          title: coupon.title || "Coupon",
+          description: coupon.description || "",
+          startDate: coupon.startDate || "",
+          expirationDate: coupon.expirationDate || "",
+          imageId: coupon.imageId || "",
+          imageUrl: coupon.imageUrl || "",
+          size: coupon.size || "small",
+        }
+
+        const result = await addFavoriteCoupon(couponData)
+        if (result.success) {
+          setSavedCoupons((prev) => new Set(prev).add(couponId))
+          toast({
+            title: "Coupon Saved",
+            description: result.message,
+          })
+        } else {
+          toast({
+            title: "Error",
+            description: result.message,
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error saving/removing coupon:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save coupon. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingCoupons((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(couponId)
+        return newSet
+      })
     }
   }
 
@@ -557,7 +669,7 @@ export function BusinessCouponsDialog({
           ) : error ? (
             <div className="text-center py-8 text-red-500">
               <p>{error}</p>
-              <Button variant="outline" className="mt-4" onClick={loadCoupons}>
+              <Button variant="outline" className="mt-4 bg-transparent" onClick={loadCoupons}>
                 Try Again
               </Button>
             </div>
@@ -573,7 +685,7 @@ export function BusinessCouponsDialog({
                   onClick={toggleView}
                   variant="outline"
                   size="sm"
-                  className="flex items-center gap-1.5 transition-all duration-300 ease-in-out"
+                  className="flex items-center gap-1.5 transition-all duration-300 ease-in-out bg-transparent"
                 >
                   <FileText className="h-4 w-4" />
                   {activeTab === "all" ? "Terms & Conditions" : "All Coupons"}
@@ -597,7 +709,25 @@ export function BusinessCouponsDialog({
                               <div className="relative aspect-[4/3] w-full p-4 bg-gray-50 max-w-full lg:p-6">
                                 {renderCouponImage(coupon, "4/3")}
                               </div>
-                              <div className="absolute bottom-2 right-2">
+                              <div className="absolute bottom-2 right-2 flex gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleSaveCoupon(coupon)
+                                  }}
+                                  disabled={savingCoupons.has(coupon.id)}
+                                >
+                                  {savingCoupons.has(coupon.id) ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : savedCoupons.has(coupon.id) ? (
+                                    <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+                                  ) : (
+                                    <HeartOff className="h-4 w-4" />
+                                  )}
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="icon"
@@ -635,7 +765,25 @@ export function BusinessCouponsDialog({
                               <div className="relative aspect-[5/2.5] w-full p-4 bg-gray-50 max-w-full lg:p-6">
                                 {renderCouponImage(coupon, "5/2.5")}
                               </div>
-                              <div className="absolute bottom-2 right-2">
+                              <div className="absolute bottom-2 right-2 flex gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full bg-white/80 hover:bg-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleSaveCoupon(coupon)
+                                  }}
+                                  disabled={savingCoupons.has(coupon.id)}
+                                >
+                                  {savingCoupons.has(coupon.id) ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : savedCoupons.has(coupon.id) ? (
+                                    <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+                                  ) : (
+                                    <HeartOff className="h-4 w-4" />
+                                  )}
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="icon"
@@ -665,7 +813,12 @@ export function BusinessCouponsDialog({
                   <div className="bg-white rounded-lg border">
                     <div className="flex justify-between items-center p-4 border-b">
                       <h3 className="text-lg font-medium">Global Terms & Conditions</h3>
-                      <Button variant="outline" size="sm" onClick={printTerms} className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={printTerms}
+                        className="flex items-center gap-1 bg-transparent"
+                      >
                         <Printer className="h-4 w-4" />
                         <span>Print</span>
                       </Button>
@@ -757,7 +910,7 @@ export function BusinessCouponsDialog({
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-xs"
+                          className="text-xs bg-transparent"
                           onClick={() => {
                             // Force reload with new URL format
                             setImageErrors((prev) => {
@@ -860,7 +1013,29 @@ export function BusinessCouponsDialog({
               </div>
 
               <div className="flex justify-center gap-2 mt-4 pb-2">
-                <Button variant="outline" size="sm" onClick={handleViewTerms} className="coupon-action-button">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSaveCoupon(selectedCoupon)}
+                  disabled={savingCoupons.has(selectedCoupon.id)}
+                  className="coupon-action-button"
+                >
+                  {savingCoupons.has(selectedCoupon.id) ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : savedCoupons.has(selectedCoupon.id) ? (
+                    <Heart className="mr-2 h-4 w-4 fill-red-500 text-red-500" />
+                  ) : (
+                    <HeartOff className="mr-2 h-4 w-4" />
+                  )}
+                  {savedCoupons.has(selectedCoupon.id) ? "Saved" : "Save Coupon"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleViewTerms}
+                  className="coupon-action-button bg-transparent"
+                >
                   <Info className="mr-2 h-4 w-4" />
                   Terms & Conditions
                 </Button>
@@ -871,7 +1046,7 @@ export function BusinessCouponsDialog({
                     size="sm"
                     onClick={isMobile ? downloadCoupon : printCoupon}
                     disabled={isDownloading}
-                    className="coupon-action-button"
+                    className="coupon-action-button bg-transparent"
                   >
                     {isDownloading ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
