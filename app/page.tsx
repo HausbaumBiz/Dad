@@ -3,26 +3,36 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Search, MapPin, ChevronRight, Facebook, Twitter, Linkedin } from "lucide-react"
+import { Search, MapPin, ChevronRight, Facebook, Twitter, Linkedin, ArrowLeft, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import Image from "next/image"
 import { ZipCodeDialog } from "@/components/zip-code-dialog"
+import { BusinessProfileDialog } from "@/components/business-profile-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { UserMenu } from "@/components/user-menu"
-import { CategorySubcategories } from "@/components/category-subcategories"
+import { searchBusinesses } from "@/app/actions/search-actions"
+import type { SearchResult } from "@/app/actions/search-actions"
 
 export default function HomePage() {
   const { toast } = useToast()
   const [zipCode, setZipCode] = useState("")
   const [savedZipCode, setSavedZipCode] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
   const [categoriesActive, setCategoriesActive] = useState(false)
   const [isZipDialogOpen, setIsZipDialogOpen] = useState(false)
   const [selectedCategoryHref, setSelectedCategoryHref] = useState("")
   const [userName, setUserName] = useState<string | null>(null)
   const [selectedSubcategories, setSelectedSubcategories] = useState<Record<string, string[]>>({})
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>("")
+  const [isBusinessProfileOpen, setIsBusinessProfileOpen] = useState(false)
 
   useEffect(() => {
     const savedZip = localStorage.getItem("savedZipCode")
@@ -71,18 +81,88 @@ export default function HomePage() {
       localStorage.setItem("savedZipCode", zipCode)
       setSavedZipCode(zipCode)
 
-      // Enable categories
+      // Enable categories and search
       setCategoriesActive(true)
+      setShowSearchResults(false) // Hide search results when changing zip code
 
       toast({
         title: "ZIP Code Set",
-        description: `Now showing businesses in area ${zipCode}`,
+        description: `Now showing businesses in area ${zipCode}. You can now search for businesses!`,
       })
 
       console.log(`✅ ZIP code ${zipCode} saved`)
     } else {
       alert("Please enter a Zip Code.")
     }
+  }
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!searchQuery.trim()) {
+      toast({
+        title: "Search Required",
+        description: "Please enter a search term.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!savedZipCode) {
+      toast({
+        title: "ZIP Code Required",
+        description: "Please enter your ZIP code first to search for businesses in your area.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSearching(true)
+    setShowSearchResults(false)
+
+    try {
+      console.log(`🔍 Searching for "${searchQuery}" in zip code ${savedZipCode}`)
+
+      const result = await searchBusinesses(searchQuery.trim(), savedZipCode)
+
+      if (result.success) {
+        setSearchResults(result.results || [])
+        setShowSearchResults(true)
+
+        if (result.results && result.results.length > 0) {
+          toast({
+            title: "Search Complete",
+            description: `Found ${result.results.length} business${result.results.length !== 1 ? "es" : ""} matching your search.`,
+          })
+        } else {
+          toast({
+            title: "No Results",
+            description: result.message || "No businesses found matching your search.",
+          })
+        }
+      } else {
+        toast({
+          title: "Search Error",
+          description: result.message || "An error occurred while searching.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Search error:", error)
+      toast({
+        title: "Search Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleBackToCategories = () => {
+    setShowSearchResults(false)
+    setSearchQuery("")
+    setSearchResults([])
   }
 
   const handleCategoryClick = (href: string, e: React.MouseEvent) => {
@@ -121,6 +201,13 @@ export default function HomePage() {
 
     // You can add logic here to filter or navigate based on subcategory selection
     console.log(`Selected subcategories for ${categoryTitle}:`, selected)
+  }
+
+  const handleViewDetails = (businessId: string, businessName: string) => {
+    console.log(`👁️ Opening business profile for ${businessName} (${businessId})`)
+    setSelectedBusinessId(businessId)
+    setSelectedBusinessName(businessName)
+    setIsBusinessProfileOpen(true)
   }
 
   const categories = [
@@ -428,6 +515,7 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ZIP Code Input Section */}
         <div className="max-w-xl mx-auto mb-10 bg-white rounded-lg shadow-md p-6">
           <div className="flex flex-col items-center">
             {savedZipCode && (
@@ -457,158 +545,299 @@ export default function HomePage() {
           </div>
         </div>
 
-        <h2 className="text-2xl font-bold text-center mb-8">Select a Category</h2>
+        {/* Business Search Section - Only show when ZIP code is set */}
+        {savedZipCode && (
+          <div className="max-w-2xl mx-auto mb-10 bg-white rounded-lg shadow-md p-6">
+            <div className="text-center mb-4">
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">Search for Businesses</h3>
+              <p className="text-gray-600 text-sm">
+                Search by business name, keywords, or services in your area ({savedZipCode})
+              </p>
+            </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-12">
-          {categories.map((category, index) => (
-            <Card key={index} className="overflow-hidden transition-all duration-200 hover:shadow-lg">
-              <a
-                href={`${category.href}${savedZipCode ? `?zip=${savedZipCode}` : ""}`}
-                onClick={(e) => handleCategoryClick(category.href, e)}
-                className="block"
-              >
-                <div className="aspect-square relative overflow-hidden rounded-t-lg">
-                  <Image
-                    src={category.image || "/placeholder.svg"}
-                    alt={category.title}
-                    fill
-                    className="object-cover"
-                    unoptimized={true}
-                  />
+            <form onSubmit={handleSearch} className="flex space-x-2 items-center">
+              <div className="flex-grow">
+                <Input
+                  type="text"
+                  placeholder="Search for businesses, services, or keywords..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full"
+                  disabled={isSearching}
+                />
+              </div>
+              <Button type="submit" disabled={isSearching}>
+                <Search className="mr-2 h-4 w-4" />
+                {isSearching ? "Searching..." : "Search"}
+              </Button>
+            </form>
+          </div>
+        )}
+
+        {/* Search Results Section */}
+        {showSearchResults && (
+          <div className="max-w-6xl mx-auto mb-10">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">
+                  Search Results for "{searchQuery}" in {savedZipCode}
+                </h3>
+                <Button variant="outline" onClick={handleBackToCategories} className="flex items-center bg-transparent">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Categories
+                </Button>
+              </div>
+
+              {searchResults.length > 0 ? (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {searchResults.map((result) => (
+                    <Card key={result.id} className="hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex flex-col h-full">
+                          <h4 className="font-bold text-xl mb-2 text-primary">{result.businessName}</h4>
+
+                          <div className="flex items-center mb-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {result.category}
+                            </Badge>
+                          </div>
+
+                          {result.description && (
+                            <p className="text-gray-600 text-sm mb-3 line-clamp-3">{result.description}</p>
+                          )}
+
+                          <div className="flex items-center text-gray-500 text-sm mb-2">
+                            <MapPin className="mr-1 h-4 w-4" />
+                            <span>ZIP Code: {result.zipCode}</span>
+                          </div>
+
+                          {result.phone && (
+                            <div className="flex items-center text-gray-500 text-sm mb-2">
+                              <Phone className="mr-1 h-4 w-4" />
+                              <span>{result.phone}</span>
+                            </div>
+                          )}
+
+                          {result.email && (
+                            <div className="flex items-center text-gray-500 text-sm mb-3">
+                              <Mail className="mr-1 h-4 w-4" />
+                              <span className="truncate">{result.email}</span>
+                            </div>
+                          )}
+
+                          {result.keywords && result.keywords.length > 0 && (
+                            <div className="mb-4">
+                              <p className="text-xs text-gray-500 mb-1">Keywords:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {result.keywords.slice(0, 5).map((keyword, index) => (
+                                  <Badge key={index} variant="outline" className="text-xs">
+                                    {keyword}
+                                  </Badge>
+                                ))}
+                                {result.keywords.length > 5 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{result.keywords.length - 5} more
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="mt-auto">
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              onClick={() => handleViewDetails(result.id, result.businessName)}
+                            >
+                              View Details
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-                <CardContent className="p-4">
-                  <h3 className="text-lg font-medium text-center mb-2">{category.title}</h3>
-                </CardContent>
-              </a>
-
-              {category.subcategories && (
-                <div className="px-4 pb-4">
-                  <CategorySubcategories
-                    categoryTitle={category.title}
-                    subcategories={category.subcategories}
-                    onSelectionChange={(selected) => handleSubcategorySelection(category.title, selected)}
-                  />
+              ) : (
+                <div className="text-center py-12">
+                  <div className="mb-4">
+                    <Search className="mx-auto h-16 w-16 text-gray-300" />
+                  </div>
+                  <h4 className="text-xl font-semibold text-gray-600 mb-2">No businesses found</h4>
+                  <p className="text-gray-500 text-sm mb-4">
+                    No businesses found matching "{searchQuery}" in zip code {savedZipCode}
+                  </p>
+                  <div className="text-gray-400 text-xs">
+                    <p>Try:</p>
+                    <ul className="list-disc list-inside mt-1">
+                      <li>Different keywords or search terms</li>
+                      <li>Checking your spelling</li>
+                      <li>Using more general terms</li>
+                      <li>Browsing categories below</li>
+                    </ul>
+                  </div>
                 </div>
               )}
-            </Card>
-          ))}
-        </div>
-
-        <div className="max-w-5xl mx-auto mb-16">
-          <h2 className="text-2xl font-bold text-center mb-8">What Our Customers Say</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <Card className="overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex flex-col items-center text-center space-y-4">
-                  <div className="relative w-20 h-20 rounded-full overflow-hidden">
-                    <Image
-                      src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/whiteman-02-GHmKZGLWeXqHCikTWoVqDZ5kJhCuFy.png"
-                      alt="Customer"
-                      fill
-                      className="object-cover"
-                      unoptimized={true}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground italic mb-4">
-                      "I found an excellent mechanic through Hausbaum. The service was quick and the work was
-                      top-notch!"
-                    </p>
-                    <p className="font-medium">Robert J.</p>
-                    <p className="text-xs text-muted-foreground">Car Owner</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex flex-col items-center text-center space-y-4">
-                  <div className="relative w-20 h-20 rounded-full overflow-hidden">
-                    <Image
-                      src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/bride-portrait-W9zV80cjEo3NrySBis6glFJj6EA8Dx.png"
-                      alt="Customer"
-                      fill
-                      className="object-cover"
-                      unoptimized={true}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground italic mb-4">
-                      "Planning my wedding was so much easier with Hausbaum. I found all the vendors I needed in one
-                      place!"
-                    </p>
-                    <p className="font-medium">Sarah M.</p>
-                    <p className="text-xs text-muted-foreground">Newlywed</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex flex-col items-center text-center space-y-4">
-                  <div className="relative w-20 h-20 rounded-full overflow-hidden">
-                    <Image
-                      src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hispanic-woman-AbGZTpnRm1lnHhBFROEFRr6oECdfXX.png"
-                      alt="Customer"
-                      fill
-                      className="object-cover"
-                      unoptimized={true}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground italic mb-4">
-                      "As a tech professional, I've gained many new clients through Hausbaum. The platform is easy to
-                      use and great for business!"
-                    </p>
-                    <p className="font-medium">Maria L.</p>
-                    <p className="text-xs text-muted-foreground">IT Consultant</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <div className="max-w-md mx-auto text-center mb-12">
-          <h3 className="text-xl font-semibold mb-4">This Week's Penny Saver</h3>
-          <Link
-            href="/penny-saver"
-            onClick={(e) => !categoriesActive && handleCategoryClick("/penny-saver", e)}
-            className="inline-block transition-all duration-300 hover:scale-105"
-          >
-            <div className="relative w-64 h-64 mx-auto bg-gradient-to-r from-amber-100 to-yellow-100 rounded-full overflow-hidden shadow-md hover:shadow-xl">
-              <div
-                className="absolute inset-0 opacity-20"
-                style={{
-                  backgroundImage:
-                    "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/texture0079-ofcVFofcVFofcVFofcVFofcVFofcVF.png')",
-                  backgroundRepeat: "repeat",
-                  mixBlendMode: "multiply",
-                }}
-              ></div>
-              <Image
-                src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/simple%20moneysaver-ZitT1iEylHQVkNDQsMM4jf6eqrNHxN.png"
-                alt="Penny Saver"
-                fill
-                className="object-contain p-4 relative z-10"
-                unoptimized={true}
-              />
-              <div className="absolute inset-0 bg-yellow-400/20 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
             </div>
-          </Link>
-        </div>
-        <div className="max-w-md mx-auto text-center mb-12">
-          <Button
-            asChild
-            className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-full shadow-md hover:shadow-lg transition-all duration-300"
-          >
-            <Link href="/contact-us" className="text-lg font-medium">
-              Contact Us
+          </div>
+        )}
+
+        {/* Categories Section - Hide when showing search results */}
+        {!showSearchResults && (
+          <>
+            <h2 className="text-2xl font-bold text-center mb-8">Select a Category</h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-12">
+              {categories.map((category, index) => (
+                <Card key={index} className="overflow-hidden transition-all duration-200 hover:shadow-lg">
+                  <a
+                    href={`${category.href}${savedZipCode ? `?zip=${savedZipCode}` : ""}`}
+                    onClick={(e) => handleCategoryClick(category.href, e)}
+                    className="block"
+                  >
+                    <div className="aspect-square relative overflow-hidden rounded-t-lg">
+                      <Image
+                        src={category.image || "/placeholder.svg"}
+                        alt={category.title}
+                        fill
+                        className="object-cover"
+                        unoptimized={true}
+                      />
+                    </div>
+                    <CardContent className="p-4">
+                      <h3 className="text-lg font-medium text-center mb-2">{category.title}</h3>
+                    </CardContent>
+                  </a>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Testimonials Section - Hide when showing search results */}
+        {!showSearchResults && (
+          <div className="max-w-5xl mx-auto mb-16">
+            <h2 className="text-2xl font-bold text-center mb-8">What Our Customers Say</h2>
+            <div className="grid md:grid-cols-3 gap-6">
+              <Card className="overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="relative w-20 h-20 rounded-full overflow-hidden">
+                      <Image
+                        src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/whiteman-02-GHmKZGLWeXqHCikTWoVqDZ5kJhCuFy.png"
+                        alt="Customer"
+                        fill
+                        className="object-cover"
+                        unoptimized={true}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground italic mb-4">
+                        "I found an excellent mechanic through Hausbaum. The service was quick and the work was
+                        top-notch!"
+                      </p>
+                      <p className="font-medium">Robert J.</p>
+                      <p className="text-xs text-muted-foreground">Car Owner</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="relative w-20 h-20 rounded-full overflow-hidden">
+                      <Image
+                        src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/bride-portrait-W9zV80cjEo3NrySBis6glFJj6EA8Dx.png"
+                        alt="Customer"
+                        fill
+                        className="object-cover"
+                        unoptimized={true}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground italic mb-4">
+                        "Planning my wedding was so much easier with Hausbaum. I found all the vendors I needed in one
+                        place!"
+                      </p>
+                      <p className="font-medium">Sarah M.</p>
+                      <p className="text-xs text-muted-foreground">Newlywed</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="relative w-20 h-20 rounded-full overflow-hidden">
+                      <Image
+                        src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hispanic-woman-AbGZTpnRm1lnHhBFROEFRr6oECdfXX.png"
+                        alt="Customer"
+                        fill
+                        className="object-cover"
+                        unoptimized={true}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground italic mb-4">
+                        "As a tech professional, I've gained many new clients through Hausbaum. The platform is easy to
+                        use and great for business!"
+                      </p>
+                      <p className="font-medium">Maria L.</p>
+                      <p className="text-xs text-muted-foreground">IT Consultant</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Penny Saver Section - Hide when showing search results */}
+        {!showSearchResults && (
+          <div className="max-w-md mx-auto text-center mb-12">
+            <h3 className="text-xl font-semibold mb-4">This Week's Penny Saver</h3>
+            <Link
+              href="/penny-saver"
+              onClick={(e) => !categoriesActive && handleCategoryClick("/penny-saver", e)}
+              className="inline-block transition-all duration-300 hover:scale-105"
+            >
+              <div className="relative w-64 h-64 mx-auto bg-gradient-to-r from-amber-100 to-yellow-100 rounded-full overflow-hidden shadow-md hover:shadow-xl">
+                <div
+                  className="absolute inset-0 opacity-20"
+                  style={{
+                    backgroundImage:
+                      "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/texture0079-ofcVFofcVFofcVFofcVFofcVFofcVF.png')",
+                    backgroundRepeat: "repeat",
+                    mixBlendMode: "multiply",
+                  }}
+                ></div>
+                <Image
+                  src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/simple%20moneysaver-ZitT1iEylHQVkNDQsMM4jf6eqrNHxN.png"
+                  alt="Penny Saver"
+                  fill
+                  className="object-contain p-4 relative z-10"
+                  unoptimized={true}
+                />
+                <div className="absolute inset-0 bg-yellow-400/20 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+              </div>
             </Link>
-          </Button>
-        </div>
+          </div>
+        )}
+
+        {/* Contact Us Section - Hide when showing search results */}
+        {!showSearchResults && (
+          <div className="max-w-md mx-auto text-center mb-12">
+            <Button
+              asChild
+              className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-full shadow-md hover:shadow-lg transition-all duration-300"
+            >
+              <Link href="/contact-us" className="text-lg font-medium">
+                Contact Us
+              </Link>
+            </Button>
+          </div>
+        )}
       </main>
       <footer className="bg-primary text-white py-8 relative">
         <div
@@ -645,6 +874,21 @@ export default function HomePage() {
         onClose={() => setIsZipDialogOpen(false)}
         onSubmit={handleZipDialogSubmit}
       />
+
+      {/* Business Profile Dialog */}
+      {selectedBusinessId && (
+        <BusinessProfileDialog
+          isOpen={isBusinessProfileOpen}
+          onClose={() => {
+            setIsBusinessProfileOpen(false)
+            setSelectedBusinessId(null)
+            setSelectedBusinessName("")
+          }}
+          businessId={selectedBusinessId}
+          businessName={selectedBusinessName}
+          searchZipCode={savedZipCode}
+        />
+      )}
     </div>
   )
 }

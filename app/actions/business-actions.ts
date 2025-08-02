@@ -71,7 +71,7 @@ function sanitizeBusinessData(business: any): Business {
     email: business.email || "",
     isEmailVerified: Boolean(business.isEmailVerified),
     createdAt: business.createdAt || new Date().toISOString(),
-    updatedAt: business.updatedAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   }
 
   // Add optional fields if they exist
