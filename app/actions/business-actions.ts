@@ -764,11 +764,12 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
       return { success: false, error: "Missing business ID" }
     }
 
-    console.log("Saving business ad design with color data:", {
+    console.log("Saving business ad design with desktop layout data:", {
       designId: designData.designId,
       colorScheme: designData.colorScheme,
       colorValues: designData.colorValues,
       texture: designData.texture,
+      desktopLayout: designData.desktopLayout,
     })
 
     // Define the keys we'll be using
@@ -776,12 +777,14 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
     const colorsKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:colors`
     const businessInfoKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:businessInfo`
     const hiddenFieldsKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:hiddenFields`
+    const desktopLayoutKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:desktopLayout`
 
     // Delete existing keys to avoid type conflicts
     await kv.del(mainKey)
     await kv.del(colorsKey)
     await kv.del(businessInfoKey)
     await kv.del(hiddenFieldsKey)
+    await kv.del(desktopLayoutKey)
 
     // Store design data as JSON string instead of hash to avoid type conflicts
     await kv.set(
@@ -791,6 +794,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
         colorScheme: designData.colorScheme,
         texture: designData.texture || "gradient", // Add texture with default
         customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
+        desktopLayout: designData.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" },
         updatedAt: new Date().toISOString(),
       }),
     )
@@ -810,6 +814,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
           texture: designData.texture || "gradient",
           customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
           customColors: designData.customColors || null, // Add custom colors
+          desktopLayout: designData.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" },
           updatedAt: new Date().toISOString(),
         }),
       )
@@ -825,7 +830,14 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
       await kv.set(hiddenFieldsKey, JSON.stringify(designData.hiddenFields))
     }
 
+    // Store the desktop layout settings separately for easier access
+    if (designData.desktopLayout) {
+      console.log("Saving desktop layout settings:", designData.desktopLayout)
+      await kv.set(desktopLayoutKey, JSON.stringify(designData.desktopLayout))
+    }
+
     revalidatePath(`/ad-design/customize`)
+    revalidatePath(`/ad-design/customize-desktop`)
     revalidatePath(`/workbench`)
 
     return { success: true }
@@ -853,6 +865,7 @@ export async function getBusinessAdDesign(businessId: string) {
     const colorsKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:colors`
     const businessInfoKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:businessInfo`
     const hiddenFieldsKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:hiddenFields`
+    const desktopLayoutKey = `${KEY_PREFIXES.BUSINESS}${businessId}:adDesign:desktopLayout`
 
     // Get the design data from KV
     let designData = null
@@ -866,6 +879,7 @@ export async function getBusinessAdDesign(businessId: string) {
           colorScheme: "blue",
           texture: "gradient",
           customButton: { type: "Menu", name: "Menu", icon: "Menu" },
+          desktopLayout: { layoutType: "standard", videoAspectRatio: "landscape" },
         })
         console.log("Parsed design data:", designData)
 
@@ -877,6 +891,7 @@ export async function getBusinessAdDesign(businessId: string) {
             colorScheme: "blue",
             texture: "gradient",
             customButton: { type: "Menu", name: "Menu", icon: "Menu" },
+            desktopLayout: { layoutType: "standard", videoAspectRatio: "landscape" },
           }
         }
       }
@@ -939,6 +954,24 @@ export async function getBusinessAdDesign(businessId: string) {
       console.error("Error getting hidden fields:", getErrorMessage(error))
     }
 
+    // Get the desktop layout settings
+    let desktopLayout = null
+    try {
+      const desktopLayoutStr = await kv.get(desktopLayoutKey)
+      console.log(`Desktop layout (${desktopLayoutKey}):`, desktopLayoutStr)
+
+      if (desktopLayoutStr) {
+        desktopLayout = safeJsonParse(desktopLayoutStr, { layoutType: "standard", videoAspectRatio: "landscape" })
+        // Ensure desktopLayout is an object, not an array
+        if (Array.isArray(desktopLayout)) {
+          console.warn("Desktop layout is unexpectedly an array, converting to object")
+          desktopLayout = { layoutType: "standard", videoAspectRatio: "landscape" }
+        }
+      }
+    } catch (error) {
+      console.error("Error getting desktop layout:", getErrorMessage(error))
+    }
+
     // If we don't have any design data, try to get it from the old format
     if (!designData) {
       try {
@@ -957,12 +990,14 @@ export async function getBusinessAdDesign(businessId: string) {
               texture: parsedData.texture || "gradient",
               customButton: parsedData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
               customColors: parsedData.customColors || null,
+              desktopLayout: parsedData.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" },
               updatedAt: parsedData.updatedAt || new Date().toISOString(),
             }
 
             businessInfo = parsedData.businessInfo || {}
             colorValues = parsedData.colorValues || {}
             hiddenFields = parsedData.hiddenFields || {}
+            desktopLayout = parsedData.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" }
 
             console.log("Successfully retrieved data from old format")
           }
@@ -999,6 +1034,7 @@ export async function getBusinessAdDesign(businessId: string) {
             colorScheme: "blue",
             texture: "gradient",
             customButton: { type: "Menu", name: "Menu", icon: "Menu" },
+            desktopLayout: { layoutType: "standard", videoAspectRatio: "landscape" },
           }
 
     const safeColorValues =
@@ -1007,6 +1043,10 @@ export async function getBusinessAdDesign(businessId: string) {
       businessInfo && typeof businessInfo === "object" && !Array.isArray(businessInfo) ? businessInfo : {}
     const safeHiddenFields =
       hiddenFields && typeof hiddenFields === "object" && !Array.isArray(hiddenFields) ? hiddenFields : {}
+    const safeDesktopLayout =
+      desktopLayout && typeof desktopLayout === "object" && !Array.isArray(desktopLayout)
+        ? desktopLayout
+        : { layoutType: "standard", videoAspectRatio: "landscape" }
 
     // Ensure customButton is included in the returned data
     const result = {
@@ -1017,12 +1057,14 @@ export async function getBusinessAdDesign(businessId: string) {
       customButton: safeDesignData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
       texture: safeDesignData.texture || "gradient", // Ensure texture is included with default
       customColors: safeDesignData.customColors || null, // Include custom colors
+      desktopLayout: safeDesktopLayout, // Include desktop layout settings
     }
 
-    console.log("Final combined ad design data with colors:", {
+    console.log("Final combined ad design data with desktop layout:", {
       ...result,
       colorValues: result.colorValues,
       colorScheme: result.colorScheme,
+      desktopLayout: result.desktopLayout,
     })
     return result
   } catch (error) {

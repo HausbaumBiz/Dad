@@ -197,6 +197,7 @@ export function BusinessProfileDialog({
           businessInfo: design.businessInfo,
           hiddenFields: design.hiddenFields,
           customButton: design.customButton,
+          desktopLayout: design.desktopLayout,
         })
         setAdDesign(design)
       } else {
@@ -541,6 +542,444 @@ export function BusinessProfileDialog({
     })
   }
 
+  // Get video aspect ratio styles based on desktop layout settings
+  const getVideoAspectRatio = () => {
+    const desktopLayout = adDesign?.desktopLayout
+    if (!desktopLayout) return "pb-[56.25%]" // Default landscape
+
+    switch (desktopLayout.videoAspectRatio) {
+      case "portrait":
+        return "pb-[177.78%]" // 9:16 aspect ratio
+      case "square":
+        return "pb-[100%]" // 1:1 aspect ratio
+      case "landscape":
+      default:
+        return "pb-[56.25%]" // 16:9 aspect ratio
+    }
+  }
+
+  // Render video content based on desktop layout settings
+  const renderVideoContent = () => {
+    const aspectRatioClass = getVideoAspectRatio()
+
+    return (
+      <div className={`relative w-full ${aspectRatioClass}`}>
+        {(() => {
+          if (businessVideo && businessVideo.cloudflareVideoId) {
+            const embedUrl = `https://customer-5093uhykxo17njhi.cloudflarestream.com/${businessVideo.cloudflareVideoId}/iframe`
+            return (
+              <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                <iframe
+                  src={embedUrl}
+                  className="w-full h-full"
+                  allow="accelerometer; gyroscope; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title={`${businessName} video`}
+                  style={{ border: "none" }}
+                  onLoad={() => {
+                    // Track video view when iframe loads
+                    handleVideoView()
+                  }}
+                />
+              </div>
+            )
+          } else {
+            return (
+              <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
+                <img
+                  src="https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public"
+                  alt="Business image"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )
+          }
+        })()}
+      </div>
+    )
+  }
+
+  // Render desktop profile with custom layout based on saved settings
+  const renderDesktopProfile = () => {
+    const desktopLayout = adDesign?.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" }
+
+    const headerContent = (
+      <div
+        className={`text-white rounded-t-lg p-8 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500`}
+        style={{
+          backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
+          backgroundImage:
+            adDesign.texture === "gradient"
+              ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
+          backgroundSize: textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+          backgroundRepeat:
+            textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
+        }}
+      >
+        <h1 className="text-3xl md:text-4xl font-bold">{adDesign.businessInfo?.businessName || businessName}</h1>
+        {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
+          <p className="opacity-90 mt-2">{adDesign.businessInfo.freeText}</p>
+        )}
+      </div>
+    )
+
+    const contactInfoCard = (
+      <Card className="overflow-hidden border-none shadow-md animate-in slide-in-from-left duration-700 delay-200">
+        <CardContent className="p-0">
+          <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
+            <h2 className="font-semibold text-lg">Contact Information</h2>
+          </div>
+          <div className="p-4 space-y-4">
+            {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2 rounded-full"
+                  style={{
+                    backgroundColor: `${colorValues.primary}20`,
+                  }}
+                >
+                  <Phone
+                    className="h-5 w-5"
+                    style={{
+                      color: colorValues.primary,
+                    }}
+                  />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Phone</p>
+                  <button
+                    onClick={() => handlePhoneCall(getPhoneNumber())}
+                    className="font-medium text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {formatPhone(getPhoneNumber())}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!adDesign.hiddenFields?.email && getEmail() && (
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2 rounded-full"
+                  style={{
+                    backgroundColor: `${colorValues.primary}20`,
+                  }}
+                >
+                  <Mail
+                    className="h-5 w-5"
+                    style={{
+                      color: colorValues.primary,
+                    }}
+                  />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Email</p>
+                  <button
+                    onClick={() => handleEmail(getEmail())}
+                    className="font-medium text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {formatEmail(getEmail())}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!adDesign.hiddenFields?.address && (
+              <div className="flex items-start gap-3">
+                <div
+                  className="p-2 rounded-full mt-1"
+                  style={{
+                    backgroundColor: `${colorValues.primary}20`,
+                  }}
+                >
+                  <MapPin
+                    className="h-5 w-5"
+                    style={{
+                      color: colorValues.primary,
+                    }}
+                  />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Address</p>
+                  <button
+                    onClick={() => handleGetDirections(formatAddress(adDesign.businessInfo))}
+                    className="font-medium text-blue-600 hover:underline cursor-pointer text-left"
+                  >
+                    {formatAddress(adDesign.businessInfo)}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+
+    const hoursCard = !adDesign.hiddenFields?.hours ? (
+      <Card className="overflow-hidden border-none shadow-md animate-in slide-in-from-left duration-700 delay-400">
+        <CardContent className="p-0">
+          <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
+            <h2 className="font-semibold text-lg">Hours of Operation</h2>
+          </div>
+          <div className="p-4">
+            <div className="flex items-start gap-3 mb-3">
+              <div
+                className="p-2 rounded-full"
+                style={{
+                  backgroundColor: `${colorValues.primary}20`,
+                }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    color: colorValues.primary,
+                  }}
+                >
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Open Hours</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pl-12">
+              {formatHours(adDesign.businessInfo?.hours).map((line, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between items-center border-b border-dashed border-slate-200 dark:border-slate-700 pb-2 last:border-0 last:pb-0"
+                >
+                  <p className="text-sm font-medium">{line}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    ) : null
+
+    const quickLinksCard = (
+      <Card className="overflow-hidden border-none shadow-md animate-in slide-in-from-left duration-700 delay-600">
+        <CardContent className="p-0">
+          <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
+            <h2 className="font-semibold text-lg">Quick Links</h2>
+          </div>
+          <div className="p-4 grid grid-cols-2 gap-3">
+            {!adDesign.hiddenFields?.photoAlbum && (
+              <button
+                onClick={handlePhotoAlbumClick}
+                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <ImageIcon
+                  className="h-5 w-5"
+                  style={{
+                    color: colorValues.primary,
+                  }}
+                />
+                <span className="text-sm font-medium">Photo Album</span>
+              </button>
+            )}
+
+            {!adDesign.hiddenFields?.savingsButton && (
+              <button
+                onClick={handleCouponsClick}
+                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <Ticket
+                  className="h-5 w-5"
+                  style={{
+                    color: colorValues.primary,
+                  }}
+                />
+                <span className="text-sm font-medium">Coupons</span>
+              </button>
+            )}
+
+            {!adDesign.hiddenFields?.jobsButton && (
+              <button
+                onClick={handleJobsClick}
+                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <Briefcase
+                  className="h-5 w-5"
+                  style={{
+                    color: colorValues.primary,
+                  }}
+                />
+                <span className="text-sm font-medium">Jobs</span>
+              </button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+
+    const videoCard = !adDesign.hiddenFields?.video ? (
+      <Card className="overflow-hidden border-none shadow-md h-full animate-in slide-in-from-right duration-700 delay-300">
+        <CardContent className="p-0 h-full flex flex-col">
+          <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
+            <h2 className="font-semibold text-lg">Featured Video</h2>
+          </div>
+          <div className="p-4 flex-1 flex flex-col">
+            {renderVideoContent()}
+
+            {/* Conditionally render either the website button or the custom button or colored rectangle */}
+            {adDesign.hiddenFields?.customButton &&
+            !adDesign.hiddenFields?.website &&
+            adDesign.businessInfo?.website ? (
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => handleWebsiteClick(adDesign.businessInfo.website)}
+                  className="flex items-center justify-center gap-2 w-full text-white p-3 rounded-md transition-colors hover:opacity-90"
+                  style={{
+                    backgroundColor:
+                      adDesign.texture === "gradient" ? "" : colorValues.textColor ? "#000000" : colorValues.primary,
+                    backgroundImage:
+                      adDesign.texture === "gradient"
+                        ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                        : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
+                    backgroundSize:
+                      textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                    backgroundRepeat:
+                      textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-white"
+                  >
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15,3 21,3 21,9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                  <span>Visit Our Full Website</span>
+                </button>
+              </div>
+            ) : !adDesign.hiddenFields?.customButton ? (
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setIsDocumentsOpen(true)}
+                  className="flex items-center justify-center gap-2 w-full text-white p-3 rounded-md transition-colors hover:opacity-90"
+                  style={{
+                    backgroundColor:
+                      adDesign.texture === "gradient" ? "" : colorValues.textColor ? "#000000" : colorValues.primary,
+                    backgroundImage:
+                      adDesign.texture === "gradient"
+                        ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                        : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
+                    backgroundSize:
+                      textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                    backgroundRepeat:
+                      textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
+                  }}
+                >
+                  {(() => {
+                    const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
+                    return <IconComponent className="h-5 w-5 text-white" />
+                  })()}
+                  <span>{adDesign.customButton?.name || "Menu"}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <div
+                  className="w-full h-12 rounded-md"
+                  style={{
+                    backgroundColor:
+                      adDesign.texture === "gradient" ? "" : colorValues.textColor ? "#000000" : colorValues.primary,
+                    backgroundImage:
+                      adDesign.texture === "gradient"
+                        ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                        : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
+                    backgroundSize:
+                      textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                    backgroundRepeat:
+                      textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    ) : null
+
+    // Render different layouts based on saved desktop layout settings
+    return (
+      <div className="max-w-6xl mx-auto">
+        {headerContent}
+
+        {desktopLayout.layoutType === "standard" && (
+          <div className="grid md:grid-cols-2 gap-6 bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
+            {/* Left Column - Business Info */}
+            <div className="space-y-6">
+              {contactInfoCard}
+              {hoursCard}
+              {quickLinksCard}
+            </div>
+
+            {/* Right Column - Video */}
+            <div className="space-y-6">{videoCard}</div>
+          </div>
+        )}
+
+        {desktopLayout.layoutType === "video-focus" && (
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
+            {/* Video takes priority - full width or larger section */}
+            <div className="grid md:grid-cols-3 gap-6">
+              {/* Video takes 2 columns */}
+              <div className="md:col-span-2">{videoCard}</div>
+
+              {/* Info takes 1 column */}
+              <div className="space-y-4">
+                {contactInfoCard}
+                {quickLinksCard}
+              </div>
+            </div>
+
+            {/* Hours below if not hidden */}
+            {hoursCard && <div className="mt-6">{hoursCard}</div>}
+          </div>
+        )}
+
+        {desktopLayout.layoutType === "info-focus" && (
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
+            {/* Info takes priority */}
+            <div className="grid md:grid-cols-3 gap-6">
+              {/* Info takes 2 columns */}
+              <div className="md:col-span-2 space-y-6">
+                {contactInfoCard}
+                {hoursCard}
+                {quickLinksCard}
+              </div>
+
+              {/* Video takes 1 column */}
+              <div className="space-y-6">{videoCard}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <>
       {/* Add style to hide default close button */}
@@ -709,39 +1148,7 @@ export function BusinessProfileDialog({
                   {/* Mobile Video Section */}
                   {!adDesign.hiddenFields?.video && (
                     <div className="border-t pt-4 mt-4 px-4 animate-in fade-in duration-2000 delay-500">
-                      <div className="relative w-full pb-[56.25%]">
-                        {(() => {
-                          if (businessVideo && businessVideo.cloudflareVideoId) {
-                            const embedUrl = `https://customer-5093uhykxo17njhi.cloudflarestream.com/${businessVideo.cloudflareVideoId}/iframe`
-                            return (
-                              <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
-                                <iframe
-                                  src={embedUrl}
-                                  className="w-full h-full"
-                                  allow="accelerometer; gyroscope; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                  allowFullScreen
-                                  title={`${businessName} video`}
-                                  style={{ border: "none" }}
-                                  onLoad={() => {
-                                    // Track video view when iframe loads
-                                    handleVideoView()
-                                  }}
-                                />
-                              </div>
-                            )
-                          } else {
-                            return (
-                              <div className="absolute inset-0 z-20 rounded-md overflow-hidden">
-                                <img
-                                  src="https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public"
-                                  alt="Business image"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )
-                          }
-                        })()}
-                      </div>
+                      {renderVideoContent()}
                     </div>
                   )}
 
@@ -882,386 +1289,7 @@ export function BusinessProfileDialog({
               </div>
 
               {/* Desktop Layout */}
-              <div className="hidden md:block">
-                <div className="max-w-6xl mx-auto">
-                  {/* Header with Business Name */}
-                  <div
-                    className={`text-white rounded-t-lg p-8 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500`}
-                    style={{
-                      backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
-                      backgroundImage:
-                        adDesign.texture === "gradient"
-                          ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                          : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
-                      backgroundSize:
-                        textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
-                      backgroundRepeat:
-                        textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
-                    }}
-                  >
-                    <h1 className="text-3xl md:text-4xl font-bold">
-                      {adDesign.businessInfo?.businessName || businessName}
-                    </h1>
-                    {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
-                      <p className="opacity-90 mt-2">{adDesign.businessInfo.freeText}</p>
-                    )}
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-6 bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
-                    {/* Left Column - Business Info */}
-                    <div className="space-y-6">
-                      {/* Contact Information */}
-                      <Card className="overflow-hidden border-none shadow-md animate-in slide-in-from-left duration-700 delay-200">
-                        <CardContent className="p-0">
-                          <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
-                            <h2 className="font-semibold text-lg">Contact Information</h2>
-                          </div>
-                          <div className="p-4 space-y-4">
-                            {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className="p-2 rounded-full"
-                                  style={{
-                                    backgroundColor: `${colorValues.primary}20`,
-                                  }}
-                                >
-                                  <Phone
-                                    className="h-5 w-5"
-                                    style={{
-                                      color: colorValues.primary,
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <p className="text-sm text-slate-500 dark:text-slate-400">Phone</p>
-                                  <button
-                                    onClick={() => handlePhoneCall(getPhoneNumber())}
-                                    className="font-medium text-blue-600 hover:underline cursor-pointer"
-                                  >
-                                    {formatPhone(getPhoneNumber())}
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {!adDesign.hiddenFields?.email && getEmail() && (
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className="p-2 rounded-full"
-                                  style={{
-                                    backgroundColor: `${colorValues.primary}20`,
-                                  }}
-                                >
-                                  <Mail
-                                    className="h-5 w-5"
-                                    style={{
-                                      color: colorValues.primary,
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <p className="text-sm text-slate-500 dark:text-slate-400">Email</p>
-                                  <button
-                                    onClick={() => handleEmail(getEmail())}
-                                    className="font-medium text-blue-600 hover:underline cursor-pointer"
-                                  >
-                                    {formatEmail(getEmail())}
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {!adDesign.hiddenFields?.address && (
-                              <div className="flex items-start gap-3">
-                                <div
-                                  className="p-2 rounded-full mt-1"
-                                  style={{
-                                    backgroundColor: `${colorValues.primary}20`,
-                                  }}
-                                >
-                                  <MapPin
-                                    className="h-5 w-5"
-                                    style={{
-                                      color: colorValues.primary,
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <p className="text-sm text-slate-500 dark:text-slate-400">Address</p>
-                                  <button
-                                    onClick={() => handleGetDirections(formatAddress(adDesign.businessInfo))}
-                                    className="font-medium text-blue-600 hover:underline cursor-pointer text-left"
-                                  >
-                                    {formatAddress(adDesign.businessInfo)}
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Hours of Operation */}
-                      {!adDesign.hiddenFields?.hours && (
-                        <Card className="overflow-hidden border-none shadow-md animate-in slide-in-from-left duration-700 delay-400">
-                          <CardContent className="p-0">
-                            <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
-                              <h2 className="font-semibold text-lg">Hours of Operation</h2>
-                            </div>
-                            <div className="p-4">
-                              <div className="flex items-start gap-3 mb-3">
-                                <div
-                                  className="p-2 rounded-full"
-                                  style={{
-                                    backgroundColor: `${colorValues.primary}20`,
-                                  }}
-                                >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    style={{
-                                      color: colorValues.primary,
-                                    }}
-                                  >
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <polyline points="12 6 12 12 16 14"></polyline>
-                                  </svg>
-                                </div>
-                                <div className="flex-1">
-                                  <p className="text-sm text-slate-500 dark:text-slate-400">Open Hours</p>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2 pl-12">
-                                {formatHours(adDesign.businessInfo?.hours).map((line, i) => (
-                                  <div
-                                    key={i}
-                                    className="flex justify-between items-center border-b border-dashed border-slate-200 dark:border-slate-700 pb-2 last:border-0 last:pb-0"
-                                  >
-                                    <p className="text-sm font-medium">{line}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-
-                      {/* Quick Links */}
-                      <Card className="overflow-hidden border-none shadow-md animate-in slide-in-from-left duration-700 delay-600">
-                        <CardContent className="p-0">
-                          <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
-                            <h2 className="font-semibold text-lg">Quick Links</h2>
-                          </div>
-                          <div className="p-4 grid grid-cols-2 gap-3">
-                            {!adDesign.hiddenFields?.photoAlbum && (
-                              <button
-                                onClick={handlePhotoAlbumClick}
-                                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                              >
-                                <ImageIcon
-                                  className="h-5 w-5"
-                                  style={{
-                                    color: colorValues.primary,
-                                  }}
-                                />
-                                <span className="text-sm font-medium">Photo Album</span>
-                              </button>
-                            )}
-
-                            {!adDesign.hiddenFields?.savingsButton && (
-                              <button
-                                onClick={handleCouponsClick}
-                                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                              >
-                                <Ticket
-                                  className="h-5 w-5"
-                                  style={{
-                                    color: colorValues.primary,
-                                  }}
-                                />
-                                <span className="text-sm font-medium">Coupons</span>
-                              </button>
-                            )}
-
-                            {!adDesign.hiddenFields?.jobsButton && (
-                              <button
-                                onClick={handleJobsClick}
-                                className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                              >
-                                <Briefcase
-                                  className="h-5 w-5"
-                                  style={{
-                                    color: colorValues.primary,
-                                  }}
-                                />
-                                <span className="text-sm font-medium">Jobs</span>
-                              </button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Right Column - Video */}
-                    <div className="space-y-6">
-                      {!adDesign.hiddenFields?.video && (
-                        <Card className="overflow-hidden border-none shadow-md h-full animate-in slide-in-from-right duration-700 delay-300">
-                          <CardContent className="p-0 h-full flex flex-col">
-                            <div className="bg-slate-100 dark:bg-slate-800 p-3 border-b">
-                              <h2 className="font-semibold text-lg">Featured Video</h2>
-                            </div>
-                            <div className="p-4 flex-1 flex flex-col">
-                              <div className="relative w-full pb-[56.25%] flex-1">
-                                {(() => {
-                                  if (businessVideo && businessVideo.cloudflareVideoId) {
-                                    const embedUrl = `https://customer-5093uhykxo17njhi.cloudflarestream.com/${businessVideo.cloudflareVideoId}/iframe`
-                                    return (
-                                      <iframe
-                                        src={embedUrl}
-                                        className="absolute top-0 left-0 w-full h-full rounded-md"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowFullScreen
-                                        title={`${businessName} video`}
-                                        style={{ border: "none" }}
-                                        onLoad={() => {
-                                          // Track video view when iframe loads
-                                          handleVideoView()
-                                        }}
-                                      />
-                                    )
-                                  } else {
-                                    return (
-                                      <img
-                                        src="https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/78c875cc-ec1b-4ebb-a52e-a1387c030200/public"
-                                        alt="Business image"
-                                        className="absolute top-0 left-0 w-full h-full object-cover rounded-md"
-                                      />
-                                    )
-                                  }
-                                })()}
-                              </div>
-
-                              {/* Conditionally render either the website button or the custom button or colored rectangle */}
-                              {adDesign.hiddenFields?.customButton &&
-                              !adDesign.hiddenFields?.website &&
-                              adDesign.businessInfo?.website ? (
-                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                  <button
-                                    onClick={() => handleWebsiteClick(adDesign.businessInfo.website)}
-                                    className="flex items-center justify-center gap-2 w-full text-white p-3 rounded-md transition-colors hover:opacity-90"
-                                    style={{
-                                      backgroundColor:
-                                        adDesign.texture === "gradient"
-                                          ? ""
-                                          : colorValues.textColor
-                                            ? "#000000"
-                                            : colorValues.primary,
-                                      backgroundImage:
-                                        adDesign.texture === "gradient"
-                                          ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                                          : textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                              .backgroundImage || "none",
-                                      backgroundSize:
-                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                          .backgroundSize || "auto",
-                                      backgroundRepeat:
-                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                          .backgroundRepeat || "repeat",
-                                    }}
-                                  >
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      className="text-white"
-                                    >
-                                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                                      <polyline points="15,3 21,3 21,9"></polyline>
-                                      <line x1="10" y1="14" x2="21" y2="3"></line>
-                                    </svg>
-                                    <span>Visit Our Full Website</span>
-                                  </button>
-                                </div>
-                              ) : !adDesign.hiddenFields?.customButton ? (
-                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                  <button
-                                    onClick={() => setIsDocumentsOpen(true)}
-                                    className="flex items-center justify-center gap-2 w-full text-white p-3 rounded-md transition-colors hover:opacity-90"
-                                    style={{
-                                      backgroundColor:
-                                        adDesign.texture === "gradient"
-                                          ? ""
-                                          : colorValues.textColor
-                                            ? "#000000"
-                                            : colorValues.primary,
-                                      backgroundImage:
-                                        adDesign.texture === "gradient"
-                                          ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                                          : textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                              .backgroundImage || "none",
-                                      backgroundSize:
-                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                          .backgroundSize || "auto",
-                                      backgroundRepeat:
-                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                          .backgroundRepeat || "repeat",
-                                    }}
-                                  >
-                                    {(() => {
-                                      const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
-                                      return <IconComponent className="h-5 w-5 text-white" />
-                                    })()}
-                                    <span>{adDesign.customButton?.name || "Menu"}</span>
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                  <div
-                                    className="w-full h-12 rounded-md"
-                                    style={{
-                                      backgroundColor:
-                                        adDesign.texture === "gradient"
-                                          ? ""
-                                          : colorValues.textColor
-                                            ? "#000000"
-                                            : colorValues.primary,
-                                      backgroundImage:
-                                        adDesign.texture === "gradient"
-                                          ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                                          : textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                              .backgroundImage || "none",
-                                      backgroundSize:
-                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                          .backgroundSize || "auto",
-                                      backgroundRepeat:
-                                        textureOptions.find((t) => t.value === adDesign.texture)?.style
-                                          .backgroundRepeat || "repeat",
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <div className="hidden md:block">{renderDesktopProfile()}</div>
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
