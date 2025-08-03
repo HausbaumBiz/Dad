@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "@/components/ui/use-toast"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getBusinessMedia, type MediaItem } from "@/app/actions/media-actions"
 import {
   getBusinessAdDesign,
@@ -19,7 +19,6 @@ import {
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
 import { getCloudflareBusinessMedia, type CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import { uploadHeaderImageToCloudflare, getCloudflareDeliveryUrl } from "@/app/actions/cloudflare-image-actions"
-
 import {
   ImageIcon,
   Ticket,
@@ -89,6 +88,8 @@ export default function CustomizeDesktopProfilePage() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const imageRef = useRef<HTMLImageElement>(null)
   const viewWindowRef = useRef<HTMLDivElement>(null)
+
+  const [headerTextColor, setHeaderTextColor] = useState<"white" | "black">("white")
 
   // Desktop layout customization state
   const [layoutType, setLayoutType] = useState<LayoutType>("standard")
@@ -444,6 +445,15 @@ export default function CustomizeDesktopProfilePage() {
         if (savedDesign.texture) {
           setSelectedTexture(savedDesign.texture)
         }
+
+        // Load header text color
+        if (savedDesign.headerTextColor) {
+          console.log("Loading saved header text color:", savedDesign.headerTextColor)
+          setHeaderTextColor(savedDesign.headerTextColor)
+        } else {
+          console.log("No saved header text color found, using default 'white'")
+          setHeaderTextColor("white")
+        }
       }
     } catch (error) {
       console.error("Error loading business data:", error)
@@ -582,6 +592,7 @@ export default function CustomizeDesktopProfilePage() {
           videoAspectRatio,
           backgroundColor,
         },
+        headerTextColor, // Make sure this is included
       }
 
       // Save the updated design
@@ -643,6 +654,10 @@ export default function CustomizeDesktopProfilePage() {
     router.push("/ad-design/customize")
   }
 
+  const getPhoneNumber = () => {
+    return `(${formData.phoneArea}) ${formData.phonePrefix}-${formData.phoneLine}`
+  }
+
   // Get video aspect ratio styles
   const getVideoAspectRatio = () => {
     switch (videoAspectRatio) {
@@ -700,7 +715,7 @@ export default function CustomizeDesktopProfilePage() {
 
     const headerContent = (
       <div
-        className={`text-white rounded-t-lg p-8 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500 relative overflow-hidden`}
+        className={`text-white rounded-t-lg p-8 ${headerTextColor === "black" ? "text-black" : "text-white"} animate-in fade-in duration-500 relative overflow-hidden`}
         style={{
           backgroundColor: currentHeaderImage
             ? "transparent"
@@ -736,7 +751,7 @@ export default function CustomizeDesktopProfilePage() {
             <h2 className="font-semibold text-lg">Contact Information</h2>
           </div>
           <div className="p-4 space-y-4">
-            {!hiddenFields.phone && (
+            {!hiddenFields.phone && getPhoneNumber() && (
               <div className="flex items-center gap-3">
                 <div
                   className="p-2 rounded-full"
@@ -774,7 +789,7 @@ export default function CustomizeDesktopProfilePage() {
                   />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Email</p>
+                  <p className="text-sm text-gray-500">Email</p>
                   <p className="font-medium">{formData.email}</p>
                 </div>
               </div>
@@ -796,7 +811,7 @@ export default function CustomizeDesktopProfilePage() {
                   />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Address</p>
+                  <p className="text-sm text-gray-500">Address</p>
                   <p className="font-medium">{getFormattedAddress()}</p>
                 </div>
               </div>
@@ -1250,6 +1265,28 @@ export default function CustomizeDesktopProfilePage() {
                 <div className="p-3 rounded-md border" style={{ backgroundColor: backgroundColor }}>
                   <p className="text-sm text-gray-600">Preview of selected background color</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Header Text Color Selection */}
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Header Text Color</Label>
+              <Select value={headerTextColor} onValueChange={(value: "white" | "black") => setHeaderTextColor(value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select text color" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="white">White</SelectItem>
+                  <SelectItem value="black">Black</SelectItem>
+                </SelectContent>
+              </Select>
+              <div
+                className="p-3 rounded-md border flex items-center justify-center"
+                style={{ backgroundColor: headerTextColor === "white" ? "#333" : "#f0f0f0" }}
+              >
+                <p className="text-sm font-medium" style={{ color: headerTextColor }}>
+                  Preview of header text color
+                </p>
               </div>
             </div>
 

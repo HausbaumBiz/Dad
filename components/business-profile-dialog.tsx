@@ -6,10 +6,10 @@ import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
-  DialogClose,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogClose,
+  DialogDescription,
 } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { getBusinessAdDesign, getBusinessHeaderImage } from "@/app/actions/business-actions"
@@ -101,6 +101,8 @@ export function BusinessProfileDialog({
   const [videoError, setVideoError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<any>(null)
   const [currentZipCode, setCurrentZipCode] = useState<string | undefined>(undefined)
+  const [showCouponsOpen, setShowCouponsOpen] = useState(false)
+  const [showJobsOpen, setShowJobsOpen] = useState(false)
 
   useEffect(() => {
     if (isOpen && businessId) {
@@ -201,6 +203,7 @@ export function BusinessProfileDialog({
           hiddenFields: design.hiddenFields,
           customButton: design.customButton,
           desktopLayout: design.desktopLayout,
+          headerTextColor: design.headerTextColor,
         })
         setAdDesign(design)
       } else {
@@ -323,6 +326,17 @@ export function BusinessProfileDialog({
   }
 
   const colorValues = getColorValues()
+
+  // Get header text color from saved settings
+  const getHeaderTextColor = () => {
+    if (adDesign?.headerTextColor) {
+      console.log("Using saved headerTextColor:", adDesign.headerTextColor)
+      return adDesign.headerTextColor === "black" ? "text-black" : "text-white"
+    }
+    // Fallback to existing logic
+    console.log("No saved headerTextColor, using fallback logic")
+    return colorValues.textColor ? "text-black" : "text-white"
+  }
 
   // Get texture options
   const textureOptions = [
@@ -482,7 +496,7 @@ export function BusinessProfileDialog({
       Mail,
     }
 
-    return iconMap[iconName] || Menu // Default to Menu if icon not found
+    return iconMap[iconName] || Menu
   }
 
   // Function to handle phone call
@@ -540,7 +554,7 @@ export function BusinessProfileDialog({
       timestamp: Date.now(),
       source: "profile_dialog",
     })
-    setIsCouponsOpen(true)
+    setShowCouponsOpen(true)
   }
 
   // Function to handle jobs click
@@ -551,7 +565,7 @@ export function BusinessProfileDialog({
       timestamp: Date.now(),
       source: "profile_dialog",
     })
-    setIsJobsOpen(true)
+    setShowJobsOpen(true)
   }
 
   // Function to handle video view tracking
@@ -670,6 +684,10 @@ export function BusinessProfileDialog({
   const renderDesktopProfile = () => {
     const desktopLayout = adDesign?.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" }
     const backgroundColor = getBackgroundColor()
+    const layoutType = desktopLayout.layoutType
+    const getBackgroundColorValue = () => {
+      return backgroundColor
+    }
 
     const headerContent = (
       <div className="relative overflow-hidden rounded-t-lg">
@@ -678,7 +696,7 @@ export function BusinessProfileDialog({
 
         {/* Header content overlay */}
         <div
-          className={`relative z-10 text-white p-8 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500`}
+          className={`relative z-10 p-8 ${getHeaderTextColor()} animate-in fade-in duration-500`}
           style={{
             backgroundColor: headerImage
               ? "rgba(0,0,0,0.1)"
@@ -1008,10 +1026,10 @@ export function BusinessProfileDialog({
       <div className="max-w-6xl mx-auto">
         {headerContent}
 
-        {desktopLayout.layoutType === "standard" && (
+        {layoutType === "standard" && (
           <div
             className="grid md:grid-cols-2 gap-6 p-6 rounded-b-lg shadow-lg"
-            style={{ backgroundColor: getBackgroundColor() }}
+            style={{ backgroundColor: getBackgroundColorValue() }}
           >
             {/* Left Column - Business Info */}
             <div className="space-y-6">
@@ -1025,8 +1043,8 @@ export function BusinessProfileDialog({
           </div>
         )}
 
-        {desktopLayout.layoutType === "video-focus" && (
-          <div className="p-6 rounded-b-lg shadow-lg" style={{ backgroundColor: getBackgroundColor() }}>
+        {layoutType === "video-focus" && (
+          <div className="p-6 rounded-b-lg shadow-lg" style={{ backgroundColor: getBackgroundColorValue() }}>
             {/* Video takes priority - full width or larger section */}
             <div className="grid md:grid-cols-3 gap-6">
               {/* Video takes 2 columns */}
@@ -1044,8 +1062,8 @@ export function BusinessProfileDialog({
           </div>
         )}
 
-        {desktopLayout.layoutType === "info-focus" && (
-          <div className="p-6 rounded-b-lg shadow-lg" style={{ backgroundColor: getBackgroundColor() }}>
+        {layoutType === "info-focus" && (
+          <div className="p-6 rounded-b-lg shadow-lg" style={{ backgroundColor: getBackgroundColorValue() }}>
             {/* Info takes priority */}
             <div className="grid md:grid-cols-3 gap-6">
               {/* Info takes 2 columns */}
@@ -1114,7 +1132,7 @@ export function BusinessProfileDialog({
 
                       {/* Mobile header content overlay */}
                       <div
-                        className={`relative z-10 p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
+                        className={`relative z-10 p-5 ${getHeaderTextColor()}`}
                         style={{
                           backgroundColor: headerImage
                             ? "rgba(0,0,0,0.1)"
@@ -1421,16 +1439,16 @@ export function BusinessProfileDialog({
 
       {/* Coupons Dialog */}
       <BusinessCouponsDialog
-        isOpen={isCouponsOpen}
-        onOpenChange={setIsCouponsOpen}
+        isOpen={showCouponsOpen}
+        onOpenChange={setShowCouponsOpen}
         businessId={businessId}
         businessName={businessName}
       />
 
       {/* Jobs Dialog */}
       <BusinessJobsDialog
-        isOpen={isJobsOpen}
-        onClose={() => setIsJobsOpen(false)}
+        isOpen={showJobsOpen}
+        onClose={() => setShowJobsOpen(false)}
         businessId={businessId}
         businessName={businessName}
       />

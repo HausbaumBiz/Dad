@@ -887,6 +887,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
         texture: designData.texture || "gradient", // Add texture with default
         customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
         desktopLayout: designData.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" },
+        headerTextColor: designData.headerTextColor || "white", // Add headerTextColor with default
         updatedAt: new Date().toISOString(),
       }),
     )
@@ -907,6 +908,7 @@ export async function saveBusinessAdDesign(businessId: string, designData: any) 
           customButton: designData.customButton || { type: "Menu", name: "Menu", icon: "Menu" },
           customColors: designData.customColors || null, // Add custom colors
           desktopLayout: designData.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" },
+          headerTextColor: designData.headerTextColor || "white", // Add headerTextColor here too
           updatedAt: new Date().toISOString(),
         }),
       )
@@ -1127,6 +1129,7 @@ export async function getBusinessAdDesign(businessId: string) {
             texture: "gradient",
             customButton: { type: "Menu", name: "Menu", icon: "Menu" },
             desktopLayout: { layoutType: "standard", videoAspectRatio: "landscape" },
+            headerTextColor: "white", // Add default headerTextColor
           }
 
     const safeColorValues =
@@ -1150,6 +1153,7 @@ export async function getBusinessAdDesign(businessId: string) {
       texture: safeDesignData.texture || "gradient", // Ensure texture is included with default
       customColors: safeDesignData.customColors || null, // Include custom colors
       desktopLayout: safeDesktopLayout, // Include desktop layout settings
+      headerTextColor: safeDesignData.headerTextColor || "white", // Include headerTextColor with default
     }
 
     console.log("Final combined ad design data with desktop layout:", {
