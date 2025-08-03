@@ -92,6 +92,7 @@ export default function CustomizeDesktopProfilePage() {
 
   // Desktop layout customization state
   const [layoutType, setLayoutType] = useState<LayoutType>("standard")
+  const [backgroundColor, setBackgroundColor] = useState("#ffffff")
   const [videoAspectRatio, setVideoAspectRatio] = useState<VideoAspectRatio>("landscape")
 
   // Form data state
@@ -259,6 +260,11 @@ export default function CustomizeDesktopProfilePage() {
       }
     : colorMap[selectedColor] || colorMap.blue
 
+  // Get background color value
+  const getBackgroundColorValue = () => {
+    return backgroundColor
+  }
+
   // Load business data
   useEffect(() => {
     const fetchBusinessData = async () => {
@@ -400,6 +406,7 @@ export default function CustomizeDesktopProfilePage() {
         // Load desktop layout settings
         if (savedDesign.desktopLayout) {
           setLayoutType(savedDesign.desktopLayout.layoutType || "standard")
+          setBackgroundColor(savedDesign.desktopLayout.backgroundColor || "#ffffff")
           setVideoAspectRatio(savedDesign.desktopLayout.videoAspectRatio || "landscape")
         }
 
@@ -573,6 +580,7 @@ export default function CustomizeDesktopProfilePage() {
         desktopLayout: {
           layoutType,
           videoAspectRatio,
+          backgroundColor,
         },
       }
 
@@ -998,7 +1006,10 @@ export default function CustomizeDesktopProfilePage() {
         {headerContent}
 
         {layoutType === "standard" && (
-          <div className="grid md:grid-cols-2 gap-6 bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
+          <div
+            className="grid md:grid-cols-2 gap-6 p-6 rounded-b-lg shadow-lg"
+            style={{ backgroundColor: getBackgroundColorValue() }}
+          >
             {/* Left Column - Business Info */}
             <div className="space-y-6">
               {contactInfoCard}
@@ -1012,7 +1023,7 @@ export default function CustomizeDesktopProfilePage() {
         )}
 
         {layoutType === "video-focus" && (
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
+          <div className="p-6 rounded-b-lg shadow-lg" style={{ backgroundColor: getBackgroundColorValue() }}>
             {/* Video takes priority - full width or larger section */}
             <div className="grid md:grid-cols-3 gap-6">
               {/* Video takes 2 columns */}
@@ -1031,7 +1042,7 @@ export default function CustomizeDesktopProfilePage() {
         )}
 
         {layoutType === "info-focus" && (
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
+          <div className="p-6 rounded-b-lg shadow-lg" style={{ backgroundColor: getBackgroundColorValue() }}>
             {/* Info takes priority */}
             <div className="grid md:grid-cols-3 gap-6">
               {/* Info takes 2 columns */}
@@ -1212,20 +1223,34 @@ export default function CustomizeDesktopProfilePage() {
               </RadioGroup>
             </div>
 
-            {/* Layout Descriptions */}
-            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-              <h4 className="font-medium text-gray-900 mb-2">Layout Descriptions:</h4>
-              <ul className="space-y-2">
-                <li>
-                  <strong>Standard:</strong> Equal space for business info and video content
-                </li>
-                <li>
-                  <strong>Video-Focused:</strong> Larger video area with condensed business information
-                </li>
-                <li>
-                  <strong>Info-Focused:</strong> Expanded business information with smaller video area
-                </li>
-              </ul>
+            {/* Background Color Selection */}
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Background Color</Label>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(e) => setBackgroundColor(e.target.value)}
+                    className="w-12 h-12 rounded-md border border-gray-300 cursor-pointer"
+                    title="Select background color"
+                  />
+                  <div className="flex-1">
+                    <Label className="text-sm font-medium">Custom Color</Label>
+                    <input
+                      type="text"
+                      value={backgroundColor}
+                      onChange={(e) => setBackgroundColor(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+                      placeholder="#ffffff"
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                    />
+                  </div>
+                </div>
+                <div className="p-3 rounded-md border" style={{ backgroundColor: backgroundColor }}>
+                  <p className="text-sm text-gray-600">Preview of selected background color</p>
+                </div>
+              </div>
             </div>
 
             {/* Save Button */}

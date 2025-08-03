@@ -651,9 +651,23 @@ export function BusinessProfileDialog({
     )
   }
 
+  // Get the display name for the business
+  const getDisplayName = () => {
+    return adDesign?.businessInfo?.businessName || businessName || "Business Profile"
+  }
+
+  // Get background color from desktop layout settings
+  const getBackgroundColor = () => {
+    if (adDesign?.desktopLayout?.backgroundColor) {
+      return adDesign.desktopLayout.backgroundColor
+    }
+    return "#ffffff" // Default white background
+  }
+
   // Render desktop profile with custom layout based on saved settings
   const renderDesktopProfile = () => {
     const desktopLayout = adDesign?.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" }
+    const backgroundColor = getBackgroundColor()
 
     const headerContent = (
       <div className="relative overflow-hidden rounded-t-lg">
@@ -665,7 +679,7 @@ export function BusinessProfileDialog({
           className={`relative z-10 text-white p-8 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500`}
           style={{
             backgroundColor: headerImage
-              ? "rgba(0,0,0,0.5)"
+              ? "rgba(0,0,0,0.1)"
               : adDesign.texture === "gradient"
                 ? ""
                 : colorValues.primary,
@@ -682,9 +696,7 @@ export function BusinessProfileDialog({
               : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
           }}
         >
-          <h1 className="text-3xl md:text-4xl font-bold drop-shadow-lg">
-            {adDesign.businessInfo?.businessName || businessName}
-          </h1>
+          <h1 className="text-3xl md:text-4xl font-bold drop-shadow-lg">{getDisplayName()}</h1>
           {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
             <p className="opacity-90 mt-2 drop-shadow-md">{adDesign.businessInfo.freeText}</p>
           )}
@@ -944,7 +956,6 @@ export function BusinessProfileDialog({
             ) : !adDesign.hiddenFields?.customButton ? (
               <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <button
-                  onClick={() => setIsDocumentsOpen(true)}
                   className="flex items-center justify-center gap-2 w-full text-white p-3 rounded-md transition-colors hover:opacity-90"
                   style={{
                     backgroundColor:
@@ -990,13 +1001,16 @@ export function BusinessProfileDialog({
       </Card>
     ) : null
 
-    // Render different layouts based on saved desktop layout settings
+    // Render different layouts based on layoutType
     return (
       <div className="max-w-6xl mx-auto">
         {headerContent}
 
         {desktopLayout.layoutType === "standard" && (
-          <div className="grid md:grid-cols-2 gap-6 bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
+          <div
+            className="grid md:grid-cols-2 gap-6 p-6 rounded-b-lg shadow-lg"
+            style={{ backgroundColor: getBackgroundColor() }}
+          >
             {/* Left Column - Business Info */}
             <div className="space-y-6">
               {contactInfoCard}
@@ -1010,7 +1024,7 @@ export function BusinessProfileDialog({
         )}
 
         {desktopLayout.layoutType === "video-focus" && (
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
+          <div className="p-6 rounded-b-lg shadow-lg" style={{ backgroundColor: getBackgroundColor() }}>
             {/* Video takes priority - full width or larger section */}
             <div className="grid md:grid-cols-3 gap-6">
               {/* Video takes 2 columns */}
@@ -1029,7 +1043,7 @@ export function BusinessProfileDialog({
         )}
 
         {desktopLayout.layoutType === "info-focus" && (
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-b-lg shadow-lg">
+          <div className="p-6 rounded-b-lg shadow-lg" style={{ backgroundColor: getBackgroundColor() }}>
             {/* Info takes priority */}
             <div className="grid md:grid-cols-3 gap-6">
               {/* Info takes 2 columns */}
@@ -1100,7 +1114,7 @@ export function BusinessProfileDialog({
                       className={`relative z-10 p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
                       style={{
                         backgroundColor: headerImage
-                          ? "rgba(0,0,0,0.5)"
+                          ? "rgba(0,0,0,0.1)"
                           : adDesign.texture === "gradient"
                             ? ""
                             : colorValues.primary,
@@ -1118,16 +1132,14 @@ export function BusinessProfileDialog({
                             "repeat",
                       }}
                     >
-                      <h3 className="text-2xl font-bold drop-shadow-lg">
-                        {adDesign.businessInfo?.businessName || businessName}
-                      </h3>
+                      <h3 className="text-2xl font-bold drop-shadow-lg">{businessName}</h3>
                       {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
                         <p className="text-base mt-1 opacity-90 drop-shadow-md">{adDesign.businessInfo.freeText}</p>
                       )}
                     </div>
                   </div>
 
-                  <div className="pt-6 px-6 space-y-4">
+                  <div className="pt-6 px-6 space-y-4" style={{ backgroundColor: getBackgroundColor() }}>
                     {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
                       <div className="flex items-start gap-3">
                         <div
@@ -1233,13 +1245,19 @@ export function BusinessProfileDialog({
 
                   {/* Mobile Video Section */}
                   {!adDesign.hiddenFields?.video && (
-                    <div className="border-t pt-4 mt-4 px-4 animate-in fade-in duration-2000 delay-500">
+                    <div
+                      className="border-t pt-4 mt-4 px-4 animate-in fade-in duration-2000 delay-500"
+                      style={{ backgroundColor: getBackgroundColor() }}
+                    >
                       {renderVideoContent()}
                     </div>
                   )}
 
                   {/* Mobile Footer with buttons */}
-                  <div className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4">
+                  <div
+                    className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4"
+                    style={{ backgroundColor: getBackgroundColor() }}
+                  >
                     <div className="grid grid-cols-3 gap-2">
                       {!adDesign.hiddenFields?.photoAlbum && (
                         <Button
