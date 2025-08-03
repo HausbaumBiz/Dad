@@ -57,6 +57,7 @@ import {
   trackVideoView,
   getCurrentZipCode,
 } from "@/lib/analytics-utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 // Add CSS to hide the default close button
 const hideDefaultCloseButtonStyle = `
@@ -1070,7 +1071,7 @@ export function BusinessProfileDialog({
       </style>
 
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="business-profile-dialog-content w-full p-0 m-0 max-w-4xl">
+        <DialogContent className="business-profile-dialog-content w-full p-0 m-0 max-w-4xl max-h-[90vh]">
           <DialogHeader className="sr-only">
             <DialogTitle>{businessName}</DialogTitle>
             <DialogDescription>
@@ -1099,302 +1100,305 @@ export function BusinessProfileDialog({
               </Button>
             </div>
           ) : adDesign ? (
-            <div className="overflow-hidden">
-              {/* Mobile Layout */}
-              <div className="block md:hidden">
-                <Card className="w-full animate-in fade-in duration-1000">
-                  <div className="relative overflow-hidden">
-                    {/* Mobile header image background if available */}
-                    {headerImage && getHeaderImageUrl() && (
-                      <div className="absolute inset-0 z-0" style={getHeaderImageStyles()} />
-                    )}
+            <ScrollArea className="max-h-[calc(90vh-60px)] overflow-hidden">
+              <div className="overflow-hidden">
+                {/* Mobile Layout */}
+                <div className="block md:hidden">
+                  <Card className="w-full animate-in fade-in duration-1000">
+                    <div className="relative overflow-hidden">
+                      {/* Mobile header image background if available */}
+                      {headerImage && getHeaderImageUrl() && (
+                        <div className="absolute inset-0 z-0" style={getHeaderImageStyles()} />
+                      )}
 
-                    {/* Mobile header content overlay */}
-                    <div
-                      className={`relative z-10 p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
-                      style={{
-                        backgroundColor: headerImage
-                          ? "rgba(0,0,0,0.1)"
-                          : adDesign.texture === "gradient"
-                            ? ""
-                            : colorValues.primary,
-                        backgroundImage: headerImage
-                          ? "none"
-                          : adDesign.texture === "gradient"
-                            ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                            : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
-                        backgroundSize: headerImage
-                          ? "auto"
-                          : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
-                        backgroundRepeat: headerImage
-                          ? "repeat"
-                          : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat ||
-                            "repeat",
-                      }}
-                    >
-                      <h3 className="text-2xl font-bold drop-shadow-lg">{businessName}</h3>
-                      {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
-                        <p className="text-base mt-1 opacity-90 drop-shadow-md">{adDesign.businessInfo.freeText}</p>
+                      {/* Mobile header content overlay */}
+                      <div
+                        className={`relative z-10 p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
+                        style={{
+                          backgroundColor: headerImage
+                            ? "rgba(0,0,0,0.1)"
+                            : adDesign.texture === "gradient"
+                              ? ""
+                              : colorValues.primary,
+                          backgroundImage: headerImage
+                            ? "none"
+                            : adDesign.texture === "gradient"
+                              ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage ||
+                                "none",
+                          backgroundSize: headerImage
+                            ? "auto"
+                            : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                          backgroundRepeat: headerImage
+                            ? "repeat"
+                            : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat ||
+                              "repeat",
+                        }}
+                      >
+                        <h3 className="text-2xl font-bold drop-shadow-lg">{businessName}</h3>
+                        {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
+                          <p className="text-base mt-1 opacity-90 drop-shadow-md">{adDesign.businessInfo.freeText}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-6 px-6 space-y-4" style={{ backgroundColor: getBackgroundColor() }}>
+                      {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="h-5 w-5 mt-0.5 flex-shrink-0"
+                            style={{
+                              color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            }}
+                          >
+                            <Phone className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Phone</p>
+                            <button
+                              onClick={() => handlePhoneCall(getPhoneNumber())}
+                              className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
+                            >
+                              {formatPhone(getPhoneNumber())}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!adDesign.hiddenFields?.email && getEmail() && (
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="h-5 w-5 mt-0.5 flex-shrink-0"
+                            style={{
+                              color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            }}
+                          >
+                            <Mail className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Email</p>
+                            <button
+                              onClick={() => handleEmail(getEmail())}
+                              className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
+                            >
+                              {formatEmail(getEmail())}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!adDesign.hiddenFields?.address && (
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="h-5 w-5 mt-0.5 flex-shrink-0"
+                            style={{
+                              color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            }}
+                          >
+                            <MapPin className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Address</p>
+                            <button
+                              onClick={() => handleGetDirections(formatAddress(adDesign.businessInfo))}
+                              className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative text-left"
+                            >
+                              {formatAddress(adDesign.businessInfo)}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!adDesign.hiddenFields?.hours && (
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="h-5 w-5 mt-0.5 flex-shrink-0"
+                            style={{
+                              color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            }}
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Hours of Operation</p>
+                            <div className="space-y-1">
+                              {formatHours(adDesign.businessInfo?.hours).map((line, i) => (
+                                <p key={i} className="text-sm">
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
 
-                  <div className="pt-6 px-6 space-y-4" style={{ backgroundColor: getBackgroundColor() }}>
-                    {!adDesign.hiddenFields?.phone && getPhoneNumber() && (
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="h-5 w-5 mt-0.5 flex-shrink-0"
-                          style={{
-                            color: colorValues.textColor ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <Phone className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Phone</p>
-                          <button
-                            onClick={() => handlePhoneCall(getPhoneNumber())}
-                            className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
-                          >
-                            {formatPhone(getPhoneNumber())}
-                          </button>
-                        </div>
+                    {/* Mobile Video Section */}
+                    {!adDesign.hiddenFields?.video && (
+                      <div
+                        className="border-t pt-4 mt-4 px-4 animate-in fade-in duration-2000 delay-500"
+                        style={{ backgroundColor: getBackgroundColor() }}
+                      >
+                        {renderVideoContent()}
                       </div>
                     )}
 
-                    {!adDesign.hiddenFields?.email && getEmail() && (
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="h-5 w-5 mt-0.5 flex-shrink-0"
-                          style={{
-                            color: colorValues.textColor ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <Mail className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Email</p>
-                          <button
-                            onClick={() => handleEmail(getEmail())}
-                            className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative"
+                    {/* Mobile Footer with buttons */}
+                    <div
+                      className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4"
+                      style={{ backgroundColor: getBackgroundColor() }}
+                    >
+                      <div className="grid grid-cols-3 gap-2">
+                        {!adDesign.hiddenFields?.photoAlbum && (
+                          <Button
+                            variant="outline"
+                            className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
+                            onClick={handlePhotoAlbumClick}
                           >
-                            {formatEmail(getEmail())}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                            <ImageIcon
+                              className="h-5 w-5"
+                              style={{
+                                color: colorValues.textColor ? "#000000" : colorValues.primary,
+                              }}
+                            />
+                            <span className="text-xs">Photo Album</span>
+                          </Button>
+                        )}
 
-                    {!adDesign.hiddenFields?.address && (
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="h-5 w-5 mt-0.5 flex-shrink-0"
-                          style={{
-                            color: colorValues.textColor ? "#000000" : colorValues.primary,
-                          }}
-                        >
-                          <MapPin className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Address</p>
-                          <button
-                            onClick={() => handleGetDirections(formatAddress(adDesign.businessInfo))}
-                            className="text-blue-600 hover:underline active:text-blue-800 cursor-pointer p-1 -m-1 z-50 relative text-left"
+                        {!adDesign.hiddenFields?.savingsButton && (
+                          <Button
+                            variant="outline"
+                            className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
+                            onClick={handleCouponsClick}
                           >
-                            {formatAddress(adDesign.businessInfo)}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                            <Ticket
+                              className="h-5 w-5"
+                              style={{
+                                color: colorValues.textColor ? "#000000" : colorValues.primary,
+                              }}
+                            />
+                            <span className="text-xs">Coupons</span>
+                          </Button>
+                        )}
 
-                    {!adDesign.hiddenFields?.hours && (
-                      <div className="flex items-start gap-3">
+                        {!adDesign.hiddenFields?.jobsButton && (
+                          <Button
+                            variant="outline"
+                            className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
+                            onClick={handleJobsClick}
+                          >
+                            <Briefcase
+                              className="h-5 w-5"
+                              style={{
+                                color: colorValues.textColor ? "#000000" : colorValues.primary,
+                              }}
+                            />
+                            <span className="text-xs">Jobs</span>
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Custom Button or Colored Rectangle - Mobile */}
+                      {!adDesign.hiddenFields?.customButton ? (
+                        <Button
+                          variant="outline"
+                          className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2 bg-transparent"
+                          onClick={() => setIsDocumentsOpen(true)}
+                        >
+                          {(() => {
+                            const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
+                            return (
+                              <IconComponent
+                                className="h-5 w-5"
+                                style={{
+                                  color: colorValues.textColor ? "#000000" : colorValues.primary,
+                                }}
+                              />
+                            )
+                          })()}
+                          <span className="text-xs">{adDesign.customButton?.name || "Menu"}</span>
+                        </Button>
+                      ) : (
                         <div
-                          className="h-5 w-5 mt-0.5 flex-shrink-0"
+                          className="h-12 mt-2 rounded-md"
                           style={{
-                            color: colorValues.textColor ? "#000000" : colorValues.primary,
+                            backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
+                            backgroundImage:
+                              adDesign.texture === "gradient"
+                                ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                                : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage ||
+                                  "none",
+                            backgroundSize:
+                              textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                            backgroundRepeat:
+                              textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat ||
+                              "repeat",
+                          }}
+                        />
+                      )}
+
+                      {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
+                        <button
+                          onClick={() => handleWebsiteClick(adDesign.businessInfo.website)}
+                          className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                          style={{
+                            backgroundColor:
+                              adDesign.texture === "gradient"
+                                ? ""
+                                : colorValues.textColor
+                                  ? "#000000"
+                                  : colorValues.primary,
+                            backgroundImage:
+                              adDesign.texture === "gradient"
+                                ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                                : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage ||
+                                  "none",
+                            backgroundSize:
+                              textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                            backgroundRepeat:
+                              textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat ||
+                              "repeat",
                           }}
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            width="20"
-                            height="20"
+                            width="16"
+                            height="16"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
+                            className="text-white"
                           >
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                           </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Hours of Operation</p>
-                          <div className="space-y-1">
-                            {formatHours(adDesign.businessInfo?.hours).map((line, i) => (
-                              <p key={i} className="text-sm">
-                                {line}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Mobile Video Section */}
-                  {!adDesign.hiddenFields?.video && (
-                    <div
-                      className="border-t pt-4 mt-4 px-4 animate-in fade-in duration-2000 delay-500"
-                      style={{ backgroundColor: getBackgroundColor() }}
-                    >
-                      {renderVideoContent()}
-                    </div>
-                  )}
-
-                  {/* Mobile Footer with buttons */}
-                  <div
-                    className="flex flex-col items-stretch gap-3 border-t pt-4 px-4 pb-4 mt-4"
-                    style={{ backgroundColor: getBackgroundColor() }}
-                  >
-                    <div className="grid grid-cols-3 gap-2">
-                      {!adDesign.hiddenFields?.photoAlbum && (
-                        <Button
-                          variant="outline"
-                          className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
-                          onClick={handlePhotoAlbumClick}
-                        >
-                          <ImageIcon
-                            className="h-5 w-5"
-                            style={{
-                              color: colorValues.textColor ? "#000000" : colorValues.primary,
-                            }}
-                          />
-                          <span className="text-xs">Photo Album</span>
-                        </Button>
-                      )}
-
-                      {!adDesign.hiddenFields?.savingsButton && (
-                        <Button
-                          variant="outline"
-                          className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
-                          onClick={handleCouponsClick}
-                        >
-                          <Ticket
-                            className="h-5 w-5"
-                            style={{
-                              color: colorValues.textColor ? "#000000" : colorValues.primary,
-                            }}
-                          />
-                          <span className="text-xs">Coupons</span>
-                        </Button>
-                      )}
-
-                      {!adDesign.hiddenFields?.jobsButton && (
-                        <Button
-                          variant="outline"
-                          className="flex flex-col items-center justify-center gap-1 h-auto py-3 bg-transparent"
-                          onClick={handleJobsClick}
-                        >
-                          <Briefcase
-                            className="h-5 w-5"
-                            style={{
-                              color: colorValues.textColor ? "#000000" : colorValues.primary,
-                            }}
-                          />
-                          <span className="text-xs">Jobs</span>
-                        </Button>
+                          Visit Website
+                        </button>
                       )}
                     </div>
+                  </Card>
+                </div>
 
-                    {/* Custom Button or Colored Rectangle - Mobile */}
-                    {!adDesign.hiddenFields?.customButton ? (
-                      <Button
-                        variant="outline"
-                        className="flex flex-col items-center justify-center gap-1 h-auto py-3 mt-2 bg-transparent"
-                        onClick={() => setIsDocumentsOpen(true)}
-                      >
-                        {(() => {
-                          const IconComponent = getIconComponent(adDesign.customButton?.icon || "Menu")
-                          return (
-                            <IconComponent
-                              className="h-5 w-5"
-                              style={{
-                                color: colorValues.textColor ? "#000000" : colorValues.primary,
-                              }}
-                            />
-                          )
-                        })()}
-                        <span className="text-xs">{adDesign.customButton?.name || "Menu"}</span>
-                      </Button>
-                    ) : (
-                      <div
-                        className="h-12 mt-2 rounded-md"
-                        style={{
-                          backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
-                          backgroundImage:
-                            adDesign.texture === "gradient"
-                              ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage ||
-                                "none",
-                          backgroundSize:
-                            textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
-                          backgroundRepeat:
-                            textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat ||
-                            "repeat",
-                        }}
-                      />
-                    )}
-
-                    {!adDesign.hiddenFields?.website && adDesign.businessInfo?.website && (
-                      <button
-                        onClick={() => handleWebsiteClick(adDesign.businessInfo.website)}
-                        className="flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-                        style={{
-                          backgroundColor:
-                            adDesign.texture === "gradient"
-                              ? ""
-                              : colorValues.textColor
-                                ? "#000000"
-                                : colorValues.primary,
-                          backgroundImage:
-                            adDesign.texture === "gradient"
-                              ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage ||
-                                "none",
-                          backgroundSize:
-                            textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
-                          backgroundRepeat:
-                            textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat ||
-                            "repeat",
-                        }}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="text-white"
-                        >
-                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                        </svg>
-                        Visit Website
-                      </button>
-                    )}
-                  </div>
-                </Card>
+                {/* Desktop Layout */}
+                <div className="hidden md:block">{renderDesktopProfile()}</div>
               </div>
-
-              {/* Desktop Layout */}
-              <div className="hidden md:block">{renderDesktopProfile()}</div>
-            </div>
+            </ScrollArea>
           ) : (
             <div className="text-center py-8 text-gray-500">
               <p>No profile information available for this business.</p>
