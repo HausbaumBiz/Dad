@@ -479,6 +479,7 @@ export function BusinessProfileDialog({
       Coffee: Coffee,
       Gift: Gift,
       Music: Music,
+      Mail,
     }
 
     return iconMap[iconName] || Menu // Default to Menu if icon not found
@@ -1135,7 +1136,7 @@ export function BusinessProfileDialog({
                               "repeat",
                         }}
                       >
-                        <h3 className="text-2xl font-bold drop-shadow-lg">{businessName}</h3>
+                        <h3 className="text-2xl font-bold drop-shadow-lg">{getDisplayName()}</h3>
                         {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
                           <p className="text-base mt-1 opacity-90 drop-shadow-md">{adDesign.businessInfo.freeText}</p>
                         )}

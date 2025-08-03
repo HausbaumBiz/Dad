@@ -813,11 +813,28 @@ export default function CustomizeAdDesignPage() {
             <h2 className="text-xl font-semibold mb-6">Customize Your Profile</h2>
 
             <Tabs defaultValue="business-info" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="business-info">Business Info</TabsTrigger>
-                <TabsTrigger value="colors">Colors</TabsTrigger>
-                <TabsTrigger value="visibility">Visibility</TabsTrigger>
-                <TabsTrigger value="custom-button">Custom Button</TabsTrigger>
+              <TabsList className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-4 w-full gap-1 h-auto sm:h-10">
+                <TabsTrigger
+                  value="business-info"
+                  className="w-full justify-start text-xs sm:text-sm px-2 py-2 sm:py-1.5"
+                >
+                  <span className="hidden sm:inline">Business Info</span>
+                  <span className="sm:hidden">Business Information</span>
+                </TabsTrigger>
+                <TabsTrigger value="colors" className="w-full justify-start text-xs sm:text-sm px-2 py-2 sm:py-1.5">
+                  Colors & Design
+                </TabsTrigger>
+                <TabsTrigger value="visibility" className="w-full justify-start text-xs sm:text-sm px-2 py-2 sm:py-1.5">
+                  <span className="hidden sm:inline">Visibility</span>
+                  <span className="sm:hidden">Show/Hide Elements</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="custom-button"
+                  className="w-full justify-start text-xs sm:text-sm px-2 py-2 sm:py-1.5"
+                >
+                  <span className="hidden sm:inline">Custom Button</span>
+                  <span className="sm:hidden">Button Settings</span>
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="business-info" className="space-y-4">
