@@ -757,6 +757,98 @@ export async function getBusinessesByCategoryAndZipCode(category: string, zipCod
   return getBusinessesByCategoryAndZipCodeFromDb(category, zipCode)
 }
 
+// Save header image data
+export async function saveBusinessHeaderImage(
+  businessId: string,
+  imageId: string,
+  viewWindowPosition: { x: number; y: number },
+  originalImageDimensions: { width: number; height: number },
+) {
+  try {
+    if (!businessId) {
+      return { success: false, error: "Missing business ID" }
+    }
+
+    console.log("Saving business header image data:", {
+      businessId,
+      imageId,
+      viewWindowPosition,
+      originalImageDimensions,
+    })
+
+    // Define the key for header image data
+    const headerImageKey = `${KEY_PREFIXES.BUSINESS}${businessId}:headerImage`
+
+    // Store header image data as JSON string
+    await kv.set(
+      headerImageKey,
+      JSON.stringify({
+        imageId,
+        viewWindowPosition,
+        originalImageDimensions,
+        updatedAt: new Date().toISOString(),
+      }),
+    )
+
+    revalidatePath(`/ad-design/customize-desktop`)
+    revalidatePath(`/workbench`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error saving business header image:", getErrorMessage(error))
+    return {
+      success: false,
+      error: getErrorMessage(error),
+    }
+  }
+}
+
+// Get header image data
+export async function getBusinessHeaderImage(businessId: string) {
+  try {
+    if (!businessId) {
+      console.log("No business ID provided to getBusinessHeaderImage")
+      return null
+    }
+
+    console.log(`Getting header image for business ID: ${businessId}`)
+
+    // Define the key for header image data
+    const headerImageKey = `${KEY_PREFIXES.BUSINESS}${businessId}:headerImage`
+
+    // Get the header image data from KV
+    let headerImageData = null
+    try {
+      const headerImageDataStr = await kv.get(headerImageKey)
+      console.log(`Header image data (${headerImageKey}):`, headerImageDataStr)
+
+      if (headerImageDataStr) {
+        headerImageData = safeJsonParse(headerImageDataStr, null)
+        console.log("Parsed header image data:", headerImageData)
+
+        // Ensure headerImageData is an object, not an array
+        if (Array.isArray(headerImageData)) {
+          console.error("Header image data is unexpectedly an array, returning null")
+          headerImageData = null
+        }
+      }
+    } catch (error) {
+      console.error("Error getting header image data:", getErrorMessage(error))
+    }
+
+    if (!headerImageData) {
+      console.log("No header image data found for business ID:", businessId)
+      return null
+    }
+
+    console.log("Final header image data:", headerImageData)
+    return headerImageData
+  } catch (error) {
+    console.error("Error getting business header image:", getErrorMessage(error))
+    return null
+  }
+}
+
 // Add this function to save the business ad design
 export async function saveBusinessAdDesign(businessId: string, designData: any) {
   try {
