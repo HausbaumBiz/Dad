@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
-import { getBusinessAdDesign } from "@/app/actions/business-actions"
+import { getBusinessAdDesign, getBusinessHeaderImage } from "@/app/actions/business-actions"
 import {
   Loader2,
   ImageIcon,
@@ -89,6 +89,7 @@ export function BusinessProfileDialog({
   const [loading, setLoading] = useState(true)
   const [adDesign, setAdDesign] = useState<any>(null)
   const [businessData, setBusinessData] = useState<any>(null)
+  const [headerImage, setHeaderImage] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPhotoAlbumOpen, setIsPhotoAlbumOpen] = useState(false)
   const [isCouponsOpen, setIsCouponsOpen] = useState(false)
@@ -141,6 +142,7 @@ export function BusinessProfileDialog({
 
       loadBusinessData()
       loadBusinessAdDesign()
+      loadBusinessHeaderImage()
       loadBusinessVideo()
     }
   }, [isOpen, businessId, searchZipCode, businessName])
@@ -209,6 +211,24 @@ export function BusinessProfileDialog({
       setError("Failed to load business profile")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadBusinessHeaderImage = async () => {
+    try {
+      console.log(`Loading header image for business ID: ${businessId}`)
+      const headerImageData = await getBusinessHeaderImage(businessId)
+
+      if (headerImageData) {
+        console.log("Loaded header image data:", headerImageData)
+        setHeaderImage(headerImageData)
+      } else {
+        console.log("No header image found for this business")
+        setHeaderImage(null)
+      }
+    } catch (err) {
+      console.error("Error loading business header image:", err)
+      setHeaderImage(null)
     }
   }
 
@@ -558,6 +578,38 @@ export function BusinessProfileDialog({
     }
   }
 
+  // Function to get header image URL
+  const getHeaderImageUrl = () => {
+    if (!headerImage || !headerImage.imageId) return null
+    // Construct Cloudflare delivery URL
+    return `https://imagedelivery.net/Fx83XHJ2QHIeAJio-AnNbA/${headerImage.imageId}/public`
+  }
+
+  // Function to get header image styles with positioning
+  const getHeaderImageStyles = () => {
+    if (!headerImage) return {}
+
+    const { viewWindowPosition, originalImageDimensions } = headerImage
+
+    if (!viewWindowPosition || !originalImageDimensions) {
+      // If no positioning data, just show the image normally
+      return {
+        backgroundImage: `url(${getHeaderImageUrl()})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }
+    }
+
+    // Calculate the positioning to recreate the same view window
+    return {
+      backgroundImage: `url(${getHeaderImageUrl()})`,
+      backgroundPosition: `${-viewWindowPosition.x}px ${-viewWindowPosition.y}px`,
+      backgroundSize: `${originalImageDimensions.width}px ${originalImageDimensions.height}px`,
+      backgroundRepeat: "no-repeat",
+    }
+  }
+
   // Render video content based on desktop layout settings
   const renderVideoContent = () => {
     const aspectRatioClass = getVideoAspectRatio()
@@ -604,23 +656,39 @@ export function BusinessProfileDialog({
     const desktopLayout = adDesign?.desktopLayout || { layoutType: "standard", videoAspectRatio: "landscape" }
 
     const headerContent = (
-      <div
-        className={`text-white rounded-t-lg p-8 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500`}
-        style={{
-          backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
-          backgroundImage:
-            adDesign.texture === "gradient"
-              ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
-          backgroundSize: textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
-          backgroundRepeat:
-            textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
-        }}
-      >
-        <h1 className="text-3xl md:text-4xl font-bold">{adDesign.businessInfo?.businessName || businessName}</h1>
-        {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
-          <p className="opacity-90 mt-2">{adDesign.businessInfo.freeText}</p>
-        )}
+      <div className="relative overflow-hidden rounded-t-lg">
+        {/* Header image background if available */}
+        {headerImage && getHeaderImageUrl() && <div className="absolute inset-0 z-0" style={getHeaderImageStyles()} />}
+
+        {/* Header content overlay */}
+        <div
+          className={`relative z-10 text-white p-8 ${colorValues.textColor ? "text-black" : "text-white"} animate-in fade-in duration-500`}
+          style={{
+            backgroundColor: headerImage
+              ? "rgba(0,0,0,0.5)"
+              : adDesign.texture === "gradient"
+                ? ""
+                : colorValues.primary,
+            backgroundImage: headerImage
+              ? "none"
+              : adDesign.texture === "gradient"
+                ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
+            backgroundSize: headerImage
+              ? "auto"
+              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+            backgroundRepeat: headerImage
+              ? "repeat"
+              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
+          }}
+        >
+          <h1 className="text-3xl md:text-4xl font-bold drop-shadow-lg">
+            {adDesign.businessInfo?.businessName || businessName}
+          </h1>
+          {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
+            <p className="opacity-90 mt-2 drop-shadow-md">{adDesign.businessInfo.freeText}</p>
+          )}
+        </div>
       </div>
     )
 
@@ -1021,24 +1089,42 @@ export function BusinessProfileDialog({
               {/* Mobile Layout */}
               <div className="block md:hidden">
                 <Card className="w-full animate-in fade-in duration-1000">
-                  <div
-                    className={`p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
-                    style={{
-                      backgroundColor: adDesign.texture === "gradient" ? "" : colorValues.primary,
-                      backgroundImage:
-                        adDesign.texture === "gradient"
-                          ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                          : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
-                      backgroundSize:
-                        textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
-                      backgroundRepeat:
-                        textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
-                    }}
-                  >
-                    <h3 className="text-2xl font-bold">{adDesign.businessInfo?.businessName || businessName}</h3>
-                    {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
-                      <p className="text-base mt-1 opacity-90">{adDesign.businessInfo.freeText}</p>
+                  <div className="relative overflow-hidden">
+                    {/* Mobile header image background if available */}
+                    {headerImage && getHeaderImageUrl() && (
+                      <div className="absolute inset-0 z-0" style={getHeaderImageStyles()} />
                     )}
+
+                    {/* Mobile header content overlay */}
+                    <div
+                      className={`relative z-10 p-5 ${colorValues.textColor ? "text-black" : "text-white"}`}
+                      style={{
+                        backgroundColor: headerImage
+                          ? "rgba(0,0,0,0.5)"
+                          : adDesign.texture === "gradient"
+                            ? ""
+                            : colorValues.primary,
+                        backgroundImage: headerImage
+                          ? "none"
+                          : adDesign.texture === "gradient"
+                            ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
+                            : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
+                        backgroundSize: headerImage
+                          ? "auto"
+                          : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
+                        backgroundRepeat: headerImage
+                          ? "repeat"
+                          : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat ||
+                            "repeat",
+                      }}
+                    >
+                      <h3 className="text-2xl font-bold drop-shadow-lg">
+                        {adDesign.businessInfo?.businessName || businessName}
+                      </h3>
+                      {!adDesign.hiddenFields?.freeText && adDesign.businessInfo?.freeText && (
+                        <p className="text-base mt-1 opacity-90 drop-shadow-md">{adDesign.businessInfo.freeText}</p>
+                      )}
+                    </div>
                   </div>
 
                   <div className="pt-6 px-6 space-y-4">
