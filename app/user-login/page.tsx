@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { loginUser } from "@/app/actions/user-actions"
@@ -19,11 +20,13 @@ export default function UserLoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
+  const [showDeactivatedDialog, setShowDeactivatedDialog] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setIsLoading(true)
     setError("")
+    setShowDeactivatedDialog(false)
 
     try {
       const formData = new FormData(event.currentTarget)
@@ -36,6 +39,7 @@ export default function UserLoginPage() {
       console.log("[Login Page] Submitting login form")
 
       const result = await loginUser(formData)
+      console.log("[Login Page] Login result:", result)
 
       if (result.success) {
         console.log("[Login Page] Login successful, redirecting to:", result.redirectTo)
@@ -45,8 +49,15 @@ export default function UserLoginPage() {
         window.location.href = result.redirectTo || "/"
       } else {
         console.log("[Login Page] Login failed:", result.message)
-        setError(result.message)
-        toast.error(result.message)
+
+        // Check if the error is about account deactivation
+        if (result.isDeactivated || result.message.includes("deactivated")) {
+          console.log("[Login Page] Showing deactivation dialog")
+          setShowDeactivatedDialog(true)
+        } else {
+          setError(result.message)
+          toast.error(result.message)
+        }
       }
     } catch (error) {
       console.error("[Login Page] Login error:", error)
@@ -183,6 +194,21 @@ export default function UserLoginPage() {
           </Link>
         </div>
       </div>
+
+      {/* Account Deactivated Dialog */}
+      <Dialog open={showDeactivatedDialog} onOpenChange={setShowDeactivatedDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Account Deactivated</DialogTitle>
+            <DialogDescription>
+              Your account has been deactivated by administrators. Contact us if you have any questions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button onClick={() => setShowDeactivatedDialog(false)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

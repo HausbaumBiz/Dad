@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ChevronLeft, CheckCircle, Eye, EyeOff, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { loginBusiness } from "@/app/actions/business-actions"
 
 export default function BusinessLoginPage({
@@ -26,6 +27,7 @@ export default function BusinessLoginPage({
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showVerifiedMessage, setShowVerifiedMessage] = useState(false)
+  const [showDeactivatedDialog, setShowDeactivatedDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -75,6 +77,7 @@ export default function BusinessLoginPage({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setShowDeactivatedDialog(false)
     setIsLoading(true)
 
     try {
@@ -85,7 +88,9 @@ export default function BusinessLoginPage({
         formData.append("rememberMe", "on")
       }
 
+      console.log("Attempting business login for:", email)
       const result = await loginBusiness(formData)
+      console.log("Login result:", result)
 
       if (result.success) {
         // Save credentials if remember me is checked
@@ -100,11 +105,20 @@ export default function BusinessLoginPage({
         // Force redirect to workbench page directly
         router.push("/workbench")
       } else {
-        setError(result.message || "Login failed. Please try again.")
+        // Check if the error is due to account deactivation
+        const errorMessage = result.message || ""
+        console.log("Login error message:", errorMessage)
+
+        if (errorMessage.includes("deactivated") || errorMessage.includes("administrators")) {
+          console.log("Showing deactivation dialog")
+          setShowDeactivatedDialog(true)
+        } else {
+          setError(errorMessage || "Login failed. Please try again.")
+        }
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
       console.error("Login error:", err)
+      setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -232,6 +246,21 @@ export default function BusinessLoginPage({
           </Card>
         </div>
       </main>
+
+      {/* Deactivated Account Dialog */}
+      <Dialog open={showDeactivatedDialog} onOpenChange={setShowDeactivatedDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Account Deactivated</DialogTitle>
+            <DialogDescription className="text-base">
+              Your account has been deactivated by administrators. Contact us if you have any questions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end pt-4">
+            <Button onClick={() => setShowDeactivatedDialog(false)}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

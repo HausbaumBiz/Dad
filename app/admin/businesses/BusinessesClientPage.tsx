@@ -13,9 +13,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, Trash2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { AlertCircle } from "lucide-react"
 import type { Business } from "@/lib/definitions"
 import { getBusinesses, deleteBusiness } from "@/app/actions/business-actions"
+import { BusinessActionsCell } from "./business-actions-cell"
 
 export default function BusinessesClientPage() {
   const [businesses, setBusinesses] = useState<Business[]>([])
@@ -85,6 +87,15 @@ export default function BusinessesClientPage() {
     }
   }
 
+  const getStatusBadge = (business: Business) => {
+    const isActive = business.status !== "inactive"
+    return (
+      <Badge variant={isActive ? "default" : "destructive"} className={isActive ? "bg-green-600" : ""}>
+        {isActive ? "Active" : "Inactive"}
+      </Badge>
+    )
+  }
+
   if (isLoading) {
     return <div className="text-center py-8">Loading businesses...</div>
   }
@@ -98,9 +109,17 @@ export default function BusinessesClientPage() {
     )
   }
 
+  const activeBusinesses = businesses.filter((b) => b.status !== "inactive").length
+  const inactiveBusinesses = businesses.filter((b) => b.status === "inactive").length
+
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">Business Management</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Business Management</h1>
+        <div className="text-sm text-gray-600">
+          Total: {businesses.length} | Active: {activeBusinesses} | Inactive: {inactiveBusinesses}
+        </div>
+      </div>
 
       {/* Result message */}
       {showResultMessage && deleteResult && (
@@ -141,6 +160,9 @@ export default function BusinessesClientPage() {
                     Zip Code
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Verified
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -173,6 +195,7 @@ export default function BusinessesClientPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">{business.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap">{business.zipCode}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(business)}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {business.isEmailVerified ? (
                         <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
@@ -190,22 +213,7 @@ export default function BusinessesClientPage() {
                         : "Unknown"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-3">
-                        <Link
-                          href={`/admin/businesses/${business.id}`}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          View
-                        </Link>
-                        <button
-                          onClick={() => handleDeleteClick(business)}
-                          className="text-red-600 hover:text-red-900 flex items-center"
-                          aria-label={`Delete ${business.businessName}`}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
-                        </button>
-                      </div>
+                      <BusinessActionsCell business={business} />
                     </td>
                   </tr>
                 ))}

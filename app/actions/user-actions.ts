@@ -1,14 +1,14 @@
 "use server"
 
 import { cookies } from "next/headers"
-import { getUserById, getUserByEmail, createUser } from "@/lib/user"
-import bcrypt from "bcryptjs"
 import { redirect } from "next/navigation"
+import { createUser, verifyCredentials, getUserById } from "@/lib/user"
 
 export interface LoginResult {
   success: boolean
   message: string
   redirectTo?: string
+  isDeactivated?: boolean
 }
 
 export interface LogoutResult {
@@ -41,13 +41,14 @@ export async function registerUser(formData: FormData): Promise<RegisterResult> 
     const firstName = formData.get("firstName") as string
     const lastName = formData.get("lastName") as string
     const email = formData.get("email") as string
+    const zipCode = formData.get("zipCode") as string
     const password = formData.get("password") as string
     const confirmPassword = formData.get("confirmPassword") as string
 
     console.log("[registerUser] Attempting registration for:", email)
 
     // Validation
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+    if (!firstName || !lastName || !email || !zipCode || !password || !confirmPassword) {
       return {
         success: false,
         message: "All fields are required",
@@ -68,20 +69,12 @@ export async function registerUser(formData: FormData): Promise<RegisterResult> 
       }
     }
 
-    // Check if user already exists
-    const existingUser = await getUserByEmail(email)
-    if (existingUser) {
-      return {
-        success: false,
-        message: "An account with this email already exists",
-      }
-    }
-
     // Create user
     const result = await createUser({
       firstName,
       lastName,
       email,
+      zipCode,
       password,
     })
 
@@ -95,7 +88,7 @@ export async function registerUser(formData: FormData): Promise<RegisterResult> 
     console.log("[registerUser] Registration successful for:", email)
 
     // Set session cookie
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     cookieStore.set("userId", result.user.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -125,46 +118,47 @@ export async function registerUser(formData: FormData): Promise<RegisterResult> 
 
 export async function loginUser(formData: FormData): Promise<LoginResult> {
   try {
+    console.log("[loginUser] Starting login process")
+
     const email = formData.get("email") as string
     const password = formData.get("password") as string
     const rememberMe = formData.get("rememberMe") === "on"
 
-    console.log("[loginUser] Attempting login for:", email)
+    console.log("[loginUser] Email:", email)
+    console.log("[loginUser] Remember me:", rememberMe)
 
     if (!email || !password) {
-      return {
-        success: false,
-        message: "Email and password are required",
-      }
+      console.log("[loginUser] Missing email or password")
+      return { success: false, message: "Email and password are required" }
     }
 
-    // Get user by email
-    const user = await getUserByEmail(email)
-    if (!user) {
-      console.log("[loginUser] User not found:", email)
-      return {
-        success: false,
-        message: "Invalid email or password",
-      }
-    }
+    // Verify credentials - this will check if account is deactivated
+    console.log("[loginUser] Calling verifyCredentials")
+    const result = await verifyCredentials(email, password)
+    console.log("[loginUser] verifyCredentials result:", result)
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.passwordHash)
-    if (!isValidPassword) {
-      console.log("[loginUser] Invalid password for:", email)
-      return {
-        success: false,
-        message: "Invalid email or password",
-      }
-    }
+    if (!result.success) {
+      console.log("[loginUser] Login failed:", result.message)
 
-    console.log("[loginUser] Login successful for:", email)
+      // Check if this is a deactivation error
+      if (result.isDeactivated || result.message.includes("deactivated")) {
+        console.log("[loginUser] Account is deactivated - returning deactivation message")
+        return {
+          success: false,
+          message: "Your account has been deactivated by administrators. Contact us if you have any questions.",
+          isDeactivated: true,
+        }
+      }
+
+      return result
+    }
 
     // Set session cookie
-    const cookieStore = cookies()
+    console.log("[loginUser] Setting session cookie for user:", result.userId)
+    const cookieStore = await cookies()
     const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60 // 30 days or 1 day
 
-    cookieStore.set("userId", user.id, {
+    cookieStore.set("userId", result.userId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -172,17 +166,11 @@ export async function loginUser(formData: FormData): Promise<LoginResult> {
       path: "/",
     })
 
-    return {
-      success: true,
-      message: "Login successful",
-      redirectTo: "/",
-    }
+    console.log("[loginUser] Login successful, preparing redirect")
+    return { success: true, message: "Login successful", redirectTo: "/" }
   } catch (error) {
-    console.error("[loginUser] Error:", error)
-    return {
-      success: false,
-      message: "An error occurred during login",
-    }
+    console.error("[loginUser] Error in loginUser:", error)
+    return { success: false, message: "Login failed" }
   }
 }
 
@@ -190,7 +178,7 @@ export async function logoutUser(): Promise<LogoutResult> {
   try {
     console.log("[logoutUser] Logging out user")
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     cookieStore.delete("userId")
 
     return {
@@ -208,7 +196,7 @@ export async function logoutUser(): Promise<LogoutResult> {
 
 export async function getUserSession(): Promise<UserSession> {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const userId = cookieStore.get("userId")?.value
 
     if (!userId) {
@@ -221,6 +209,14 @@ export async function getUserSession(): Promise<UserSession> {
     const user = await getUserById(userId)
     if (!user) {
       console.log("[getUserSession] User not found for ID:", userId)
+      return { user: null }
+    }
+
+    // Check if user account is deactivated
+    if (user.status === "inactive") {
+      console.log("[getUserSession] User account is deactivated, clearing session")
+      // Clear the session for deactivated users
+      cookieStore.delete("userId")
       return { user: null }
     }
 
@@ -237,6 +233,31 @@ export async function getUserSession(): Promise<UserSession> {
   } catch (error) {
     console.error("[getUserSession] Error:", error)
     return { user: null }
+  }
+}
+
+export async function getCurrentUser() {
+  try {
+    const cookieStore = await cookies()
+    const userId = cookieStore.get("userId")?.value
+
+    if (!userId) {
+      return null
+    }
+
+    const user = await getUserById(userId)
+
+    // Check if user account is deactivated
+    if (user && user.status === "inactive") {
+      // Clear the session for deactivated users
+      cookieStore.delete("userId")
+      return null
+    }
+
+    return user
+  } catch (error) {
+    console.error("Error getting current user:", error)
+    return null
   }
 }
 

@@ -70,6 +70,7 @@ function sanitizeBusinessData(business: any): Business {
     zipCode: business.zipCode || "",
     email: business.email || "",
     isEmailVerified: Boolean(business.isEmailVerified),
+    status: business.status || "active", // Default to active for backward compatibility
     createdAt: business.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -109,6 +110,7 @@ export async function getBusinesses(): Promise<Business[]> {
           zipCode: "12345",
           email: "demo1@example.com",
           isEmailVerified: true,
+          status: "active",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -120,6 +122,7 @@ export async function getBusinesses(): Promise<Business[]> {
           zipCode: "67890",
           email: "demo2@example.com",
           isEmailVerified: true,
+          status: "inactive",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -374,6 +377,7 @@ export async function registerBusiness(formData: FormData) {
       email,
       passwordHash,
       isEmailVerified: true, // For simplicity, we're setting this to true by default
+      status: "active", // Default to active
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       category,
@@ -422,14 +426,14 @@ export async function registerBusiness(formData: FormData) {
   }
 }
 
-// Login a business - FIXED VERSION
+// Login a business - ENHANCED WITH DEACTIVATION CHECK
 export async function loginBusiness(formData: FormData) {
   try {
     const email = (formData.get("email") as string).toLowerCase()
     const password = formData.get("password") as string
     const rememberMe = formData.get("rememberMe") === "on"
 
-    console.log(`Login attempt for email: ${email}`)
+    console.log(`Business login attempt for email: ${email}`)
 
     // Validate form data
     if (!email || !password) {
@@ -536,6 +540,19 @@ export async function loginBusiness(formData: FormData) {
         return { success: false, message: "Login failed. Please try again." }
       }
 
+      // CHECK ACCOUNT STATUS BEFORE PASSWORD VERIFICATION
+      const accountStatus = business.status || "active" // Default to active for backward compatibility
+      console.log(`Business account status: ${accountStatus}`)
+
+      if (accountStatus === "inactive") {
+        console.log("Business account is deactivated, blocking login")
+        return {
+          success: false,
+          message: "Your account has been deactivated by administrators. Contact us if you have any questions.",
+          isDeactivated: true,
+        }
+      }
+
       // Verify password
       const storedPasswordHash = business.passwordHash
       if (!storedPasswordHash || typeof storedPasswordHash !== "string") {
@@ -593,7 +610,7 @@ export async function loginBusiness(formData: FormData) {
   }
 }
 
-// Update getCurrentBusiness to ensure we get the correct business ID
+// Update getCurrentBusiness to ensure we get the correct business ID and check status
 export async function getCurrentBusiness() {
   try {
     // Check if KV environment variables are available
@@ -608,6 +625,7 @@ export async function getCurrentBusiness() {
         zipCode: "12345",
         email: "demo@example.com",
         isEmailVerified: true,
+        status: "active",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
@@ -670,6 +688,16 @@ export async function getCurrentBusiness() {
       return null
     }
 
+    // Check if business account is deactivated
+    const accountStatus = processedData.status || "active" // Default to active for backward compatibility
+    if (accountStatus === "inactive") {
+      console.log("Business account is deactivated, clearing session")
+      // Clear the cookie for deactivated accounts
+      const cookieStore = await cookies()
+      cookieStore.delete("businessId")
+      return null
+    }
+
     // Safely construct the business object with explicit property access
     const business = {
       id: businessId,
@@ -680,6 +708,7 @@ export async function getCurrentBusiness() {
       zipCode: processedData.zipCode && typeof processedData.zipCode === "string" ? processedData.zipCode : "",
       email: processedData.email && typeof processedData.email === "string" ? processedData.email : "",
       isEmailVerified: Boolean(processedData.isEmailVerified),
+      status: accountStatus,
       createdAt:
         processedData.createdAt && typeof processedData.createdAt === "string"
           ? processedData.createdAt
@@ -708,6 +737,7 @@ export async function getCurrentBusiness() {
       id: business.id,
       businessName: business.businessName,
       email: business.email,
+      status: business.status,
     })
 
     return business
@@ -1186,6 +1216,7 @@ export async function getBusinessesWithAdDesignData(): Promise<Business[]> {
           zipCode: "12345",
           email: "demo1@example.com",
           isEmailVerified: true,
+          status: "active",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },

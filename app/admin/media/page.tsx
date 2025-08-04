@@ -31,9 +31,9 @@ export default function AdminMediaPage() {
       const result = await listBusinessBlobs(businessId)
 
       if (result.success) {
-        setBlobs(result.blobs)
+        setBlobs(result.blobs || [])
 
-        if (result.blobs.length === 0) {
+        if ((result.blobs || []).length === 0) {
           toast({
             title: "No media found",
             description: "No media files found for this business ID.",
@@ -47,6 +47,7 @@ export default function AdminMediaPage() {
         })
       }
     } catch (error) {
+      console.error("Error searching for media:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred.",
@@ -89,6 +90,7 @@ export default function AdminMediaPage() {
         })
       }
     } catch (error) {
+      console.error("Error deleting media:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred.",
@@ -97,6 +99,29 @@ export default function AdminMediaPage() {
     } finally {
       setIsDeleting(false)
     }
+  }
+
+  const getFileName = (blob: any): string => {
+    if (!blob) return "Unknown file"
+
+    // Try pathname first
+    if (blob.pathname && typeof blob.pathname === "string") {
+      const parts = blob.pathname.split("/")
+      return parts[parts.length - 1] || "Unknown file"
+    }
+
+    // Try url as fallback
+    if (blob.url && typeof blob.url === "string") {
+      try {
+        const urlObj = new URL(blob.url)
+        const parts = urlObj.pathname.split("/")
+        return parts[parts.length - 1] || "Unknown file"
+      } catch {
+        return "Unknown file"
+      }
+    }
+
+    return "Unknown file"
   }
 
   return (
@@ -148,22 +173,30 @@ export default function AdminMediaPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {blobs.map((blob) => (
-                      <tr key={blob.url}>
+                    {blobs.map((blob, index) => (
+                      <tr key={blob.url || index}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <a
-                            href={blob.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:underline"
-                          >
-                            {blob.pathname.split("/").pop()}
-                          </a>
+                          {blob.url ? (
+                            <a
+                              href={blob.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:underline"
+                            >
+                              {getFileName(blob)}
+                            </a>
+                          ) : (
+                            <span>{getFileName(blob)}</span>
+                          )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatSize(blob.size)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{blob.contentType}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(blob.uploadedAt).toLocaleString()}
+                          {blob.size ? formatSize(blob.size) : "Unknown"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {blob.contentType || "Unknown"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {blob.uploadedAt ? new Date(blob.uploadedAt).toLocaleString() : "Unknown"}
                         </td>
                       </tr>
                     ))}
@@ -179,7 +212,7 @@ export default function AdminMediaPage() {
 }
 
 function formatSize(bytes: number): string {
-  if (bytes === 0) return "0 Bytes"
+  if (!bytes || bytes === 0) return "0 Bytes"
 
   const k = 1024
   const sizes = ["Bytes", "KB", "MB", "GB"]

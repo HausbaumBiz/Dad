@@ -9,6 +9,7 @@ export interface User {
   email: string
   zipCode: string
   passwordHash: string
+  status?: "active" | "inactive"
   createdAt: number
 }
 
@@ -44,6 +45,7 @@ export async function createUser(userData: UserCreateInput) {
       email: userData.email,
       zipCode: userData.zipCode,
       passwordHash,
+      status: "active",
       createdAt: Date.now(),
     }
 
@@ -56,7 +58,7 @@ export async function createUser(userData: UserCreateInput) {
     // Add user ID to the users set for easier retrieval
     await kv.sadd("users", userId)
 
-    return { success: true, userId, message: "User registered successfully" }
+    return { success: true, userId, user, message: "User registered successfully" }
   } catch (error) {
     console.error("Error creating user:", error)
     return { success: false, message: "Failed to create user" }
@@ -130,7 +132,20 @@ export async function verifyCredentials(email: string, password: string) {
       return { success: false, message: "User not found" }
     }
 
-    // Verify password
+    // Check if user account is deactivated BEFORE password verification
+    const userStatus = user.status || "active"
+    console.log("[verifyCredentials] User status:", userStatus)
+
+    if (userStatus === "inactive") {
+      console.log("[verifyCredentials] User account is deactivated - blocking login")
+      return {
+        success: false,
+        message: "Your account has been deactivated by administrators. Contact us if you have any questions.",
+        isDeactivated: true,
+      }
+    }
+
+    // Verify password only if account is active
     console.log("[verifyCredentials] Verifying password")
     const isMatch = await bcrypt.compare(password, user.passwordHash)
     console.log("[verifyCredentials] Password match:", isMatch)
@@ -193,9 +208,13 @@ export async function getAllUsers() {
       try {
         const user = await kv.get<User>(`user:${userId}`)
         if (user && typeof user === "object" && user.id) {
-          // Remove sensitive information
+          // Remove sensitive information and ensure status field exists
           const { passwordHash, ...safeUser } = user
-          users.push(safeUser)
+          const userWithStatus = {
+            ...safeUser,
+            status: user.status || "active", // Default to active if status is missing
+          }
+          users.push(userWithStatus)
         }
       } catch (userError) {
         console.error(`Error getting user ${userId}:`, userError)
@@ -208,5 +227,100 @@ export async function getAllUsers() {
   } catch (error) {
     console.error("Error getting all users:", error)
     return []
+  }
+}
+
+// Deactivate user account
+export async function deactivateUser(userId: string) {
+  try {
+    if (!userId) {
+      return { success: false, message: "User ID is required" }
+    }
+
+    const user = await getUserById(userId)
+    if (!user) {
+      return { success: false, message: "User not found" }
+    }
+
+    if (user.status === "inactive") {
+      return { success: false, message: "User is already inactive" }
+    }
+
+    // Update user status
+    const updatedUser = { ...user, status: "inactive" as const }
+    await kv.set(`user:${userId}`, updatedUser)
+
+    console.log(`[deactivateUser] User ${userId} has been deactivated`)
+    return { success: true, message: "User account deactivated successfully" }
+  } catch (error) {
+    console.error("Error deactivating user:", error)
+    return { success: false, message: "Failed to deactivate user account" }
+  }
+}
+
+// Reactivate user account
+export async function reactivateUser(userId: string) {
+  try {
+    if (!userId) {
+      return { success: false, message: "User ID is required" }
+    }
+
+    const user = await getUserById(userId)
+    if (!user) {
+      return { success: false, message: "User not found" }
+    }
+
+    if (user.status === "active") {
+      return { success: false, message: "User is already active" }
+    }
+
+    // Update user status
+    const updatedUser = { ...user, status: "active" as const }
+    await kv.set(`user:${userId}`, updatedUser)
+
+    console.log(`[reactivateUser] User ${userId} has been reactivated`)
+    return { success: true, message: "User account reactivated successfully" }
+  } catch (error) {
+    console.error("Error reactivating user:", error)
+    return { success: false, message: "Failed to reactivate user account" }
+  }
+}
+
+// Delete user account permanently
+export async function deleteUser(userId: string) {
+  try {
+    if (!userId) {
+      return { success: false, message: "User ID is required" }
+    }
+
+    const user = await getUserById(userId)
+    if (!user) {
+      return { success: false, message: "User not found" }
+    }
+
+    // Delete user data
+    await kv.del(`user:${userId}`)
+
+    // Remove email index
+    await kv.del(`user:email:${user.email}`)
+
+    // Remove from users set
+    await kv.srem("users", userId)
+
+    return { success: true, message: "User account deleted permanently" }
+  } catch (error) {
+    console.error("Error deleting user:", error)
+    return { success: false, message: "Failed to delete user account" }
+  }
+}
+
+// Get user count
+export async function getUserCount() {
+  try {
+    const userIds = await kv.smembers("users")
+    return Array.isArray(userIds) ? userIds.length : 0
+  } catch (error) {
+    console.error("Error getting user count:", error)
+    return 0
   }
 }
