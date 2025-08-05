@@ -71,6 +71,40 @@ export interface JobListing {
   serviceArea: JobServiceArea
 }
 
+// Helper function to check if a business is active
+async function isBusinessActive(businessId: string): Promise<boolean> {
+  try {
+    const businessData = await kv.get(`business:${businessId}`)
+    if (!businessData) {
+      return false
+    }
+
+    let business: any = null
+    if (typeof businessData === "string") {
+      try {
+        business = JSON.parse(businessData)
+      } catch (parseError) {
+        console.error(`Error parsing business data for ${businessId}:`, parseError)
+        return false
+      }
+    } else if (typeof businessData === "object" && businessData !== null) {
+      business = businessData
+    } else {
+      return false
+    }
+
+    // Check status - default to active for backward compatibility
+    const status = business.status || "active"
+    const isActive = status === "active"
+
+    console.log(`Business ${businessId} status: ${status}, isActive: ${isActive}`)
+    return isActive
+  } catch (error) {
+    console.error(`Error checking if business ${businessId} is active:`, error)
+    return false
+  }
+}
+
 // Then modify the saveJobListing function to use Cloudflare Images
 export async function saveJobListing(
   formData: FormData,
@@ -892,7 +926,7 @@ export async function getActiveBusinessJobs(businessId: string): Promise<JobList
   }
 }
 
-// NEW: Function to search jobs by ZIP code
+// NEW: Function to search jobs by ZIP code - ENHANCED WITH BUSINESS STATUS FILTERING
 export async function searchJobsByZipCode(zipCode: string): Promise<JobListing[]> {
   try {
     console.log(`=== searchJobsByZipCode called for zip: ${zipCode} ===`)
@@ -912,6 +946,14 @@ export async function searchJobsByZipCode(zipCode: string): Promise<JobListing[]
 
     for (const jobRef of allJobIds) {
       const [businessId, jobId] = jobRef.split(":")
+
+      // Check if business is active first
+      const isActive = await isBusinessActive(businessId)
+      if (!isActive) {
+        console.log(`❌ Skipped job from inactive business: ${businessId}`)
+        continue
+      }
+
       const jobKey = `job:${businessId}:${jobId}`
       console.log(`Fetching job data for key: ${jobKey}`)
 
@@ -937,7 +979,7 @@ export async function searchJobsByZipCode(zipCode: string): Promise<JobListing[]
           const expired = await isJobExpired(job)
           if (!expired) {
             jobs.push(job)
-            console.log(`✅ Added active job: "${job.jobTitle}"`)
+            console.log(`✅ Added active job from active business: "${job.jobTitle}"`)
           } else {
             console.log(`❌ Skipped expired job: "${job.jobTitle}"`)
           }
@@ -949,7 +991,7 @@ export async function searchJobsByZipCode(zipCode: string): Promise<JobListing[]
       }
     }
 
-    console.log(`=== searchJobsByZipCode completed: ${jobs.length} active jobs found ===`)
+    console.log(`=== searchJobsByZipCode completed: ${jobs.length} active jobs from active businesses found ===`)
     return jobs.sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
       const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
@@ -963,20 +1005,20 @@ export async function searchJobsByZipCode(zipCode: string): Promise<JobListing[]
 
 // Add this new function at the end of the file
 
-// Function to search jobs by ZIP code and optional category
+// Function to search jobs by ZIP code and optional category - ENHANCED WITH BUSINESS STATUS FILTERING
 export async function searchJobsByZipCodeAndCategory(zipCode: string, category?: string): Promise<JobListing[]> {
   try {
     console.log(`=== searchJobsByZipCodeAndCategory called ===`)
     console.log(`Zip Code: ${zipCode}`)
     console.log(`Category: ${category}`)
 
-    // First get all jobs for this ZIP code
+    // First get all jobs for this ZIP code (already filtered by business status)
     const jobs = await searchJobsByZipCode(zipCode)
-    console.log(`Found ${jobs.length} total jobs in zip code ${zipCode}`)
+    console.log(`Found ${jobs.length} total jobs from active businesses in zip code ${zipCode}`)
 
     // If no category specified, return all jobs
     if (!category) {
-      console.log("No category specified, returning all jobs")
+      console.log("No category specified, returning all jobs from active businesses")
       return jobs
     }
 
@@ -1062,7 +1104,9 @@ export async function searchJobsByZipCodeAndCategory(zipCode: string, category?:
       return categoryMatch
     })
 
-    console.log(`Final result: ${filteredJobs.length} jobs matching category "${category}" in zip ${zipCode}`)
+    console.log(
+      `Final result: ${filteredJobs.length} jobs matching category "${category}" in zip ${zipCode} from active businesses`,
+    )
     return filteredJobs
   } catch (error) {
     console.error("Error searching jobs by ZIP code and category:", error)
@@ -1079,8 +1123,15 @@ export async function getJobCategories(): Promise<{ category: string; count: num
     // Track categories and their counts
     const categoryMap = new Map<string, number>()
 
-    // Process each business's jobs
+    // Process each business's jobs (only active businesses)
     for (const businessId of businessIds) {
+      // Check if business is active first
+      const isActive = await isBusinessActive(businessId)
+      if (!isActive) {
+        console.log(`Skipping jobs from inactive business: ${businessId}`)
+        continue
+      }
+
       const jobs = await getActiveBusinessJobs(businessId)
 
       // Count each category
@@ -1107,7 +1158,7 @@ export async function getJobCategories(): Promise<{ category: string; count: num
   }
 }
 
-// Function to search jobs by category
+// Function to search jobs by category - ENHANCED WITH BUSINESS STATUS FILTERING
 export async function searchJobsByCategory(category: string): Promise<JobListing[]> {
   try {
     const jobs: JobListing[] = []
@@ -1118,6 +1169,14 @@ export async function searchJobsByCategory(category: string): Promise<JobListing
 
     for (const jobRef of jobIds) {
       const [businessId, jobId] = jobRef.split(":")
+
+      // Check if business is active first
+      const isActive = await isBusinessActive(businessId)
+      if (!isActive) {
+        console.log(`Skipping job from inactive business: ${businessId}`)
+        continue
+      }
+
       const jobKey = `job:${businessId}:${jobId}`
       const jobData = await kv.get(jobKey)
 

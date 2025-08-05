@@ -1,49 +1,53 @@
 "use client"
 
 import { useState } from "react"
-import { MoreHorizontal, Eye, UserX, UserCheck, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { toast } from "@/hooks/use-toast"
-import Link from "next/link"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { MoreHorizontal, UserX, UserCheck, Trash2, Loader2 } from "lucide-react"
+import { deleteBusiness } from "@/app/actions/business-actions"
+import { deactivateBusinessAccount, reactivateBusinessAccount } from "./actions/admin-business-actions"
+import { toast } from "@/components/ui/use-toast"
 import type { Business } from "@/lib/definitions"
-import { deactivateBusiness, reactivateBusiness, deleteBusinessAccount } from "./actions/admin-business-actions"
 
 interface BusinessActionsCellProps {
   business: Business
+  onBusinessUpdated: () => void
 }
 
-export function BusinessActionsCell({ business }: BusinessActionsCellProps) {
+export function BusinessActionsCell({ business, onBusinessUpdated }: BusinessActionsCellProps) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [loadingAction, setLoadingAction] = useState<string | null>(null)
 
-  const isActive = business.status !== "inactive"
-
-  const handleToggleStatus = async () => {
+  const handleDeactivate = async () => {
     setIsLoading(true)
+    setLoadingAction("deactivate")
+
     try {
-      const result = isActive ? await deactivateBusiness(business.id) : await reactivateBusiness(business.id)
+      const result = await deactivateBusinessAccount(business.id)
 
       if (result.success) {
         toast({
-          title: "Success",
+          title: "Business Deactivated",
           description: result.message,
         })
+        onBusinessUpdated()
       } else {
         toast({
           title: "Error",
@@ -54,25 +58,60 @@ export function BusinessActionsCell({ business }: BusinessActionsCellProps) {
     } catch (error) {
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "Failed to deactivate business account",
         variant: "destructive",
       })
     } finally {
       setIsLoading(false)
+      setLoadingAction(null)
+    }
+  }
+
+  const handleReactivate = async () => {
+    setIsLoading(true)
+    setLoadingAction("reactivate")
+
+    try {
+      const result = await reactivateBusinessAccount(business.id)
+
+      if (result.success) {
+        toast({
+          title: "Business Reactivated",
+          description: result.message,
+        })
+        onBusinessUpdated()
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reactivate business account",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+      setLoadingAction(null)
     }
   }
 
   const handleDelete = async () => {
     setIsLoading(true)
+    setLoadingAction("delete")
+
     try {
-      const result = await deleteBusinessAccount(business.id)
+      const result = await deleteBusiness(business.id)
 
       if (result.success) {
         toast({
-          title: "Success",
+          title: "Business Deleted",
           description: result.message,
         })
-        setShowDeleteDialog(false)
+        onBusinessUpdated()
       } else {
         toast({
           title: "Error",
@@ -83,54 +122,60 @@ export function BusinessActionsCell({ business }: BusinessActionsCellProps) {
     } catch (error) {
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "Failed to delete business",
         variant: "destructive",
       })
     } finally {
       setIsLoading(false)
+      setLoadingAction(null)
+      setIsDeleteDialogOpen(false)
     }
   }
+
+  const isActive = business.status === "active"
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
+          <Button variant="ghost" className="h-8 w-8 p-0" disabled={isLoading}>
             <span className="sr-only">Open menu</span>
-            <MoreHorizontal className="h-4 w-4" />
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem asChild>
-            <Link href={`/admin/businesses/${business.id}`}>
-              <Eye className="mr-2 h-4 w-4" />
-              View Details
-            </Link>
-          </DropdownMenuItem>
-
-          <DropdownMenuItem onClick={handleToggleStatus} disabled={isLoading}>
-            {isActive ? (
-              <>
+          {isActive ? (
+            <DropdownMenuItem
+              onClick={handleDeactivate}
+              disabled={isLoading}
+              className="text-orange-600 focus:text-orange-600"
+            >
+              {loadingAction === "deactivate" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
                 <UserX className="mr-2 h-4 w-4" />
-                Deactivate Account
-              </>
-            ) : (
-              <>
+              )}
+              Deactivate Account
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onClick={handleReactivate}
+              disabled={isLoading}
+              className="text-green-600 focus:text-green-600"
+            >
+              {loadingAction === "reactivate" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
                 <UserCheck className="mr-2 h-4 w-4" />
-                Reactivate Account
-              </>
-            )}
-          </DropdownMenuItem>
-
+              )}
+              Reactivate Account
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
-
           <DropdownMenuItem
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-red-600 focus:text-red-600"
+            onClick={() => setIsDeleteDialogOpen(true)}
             disabled={isLoading}
+            className="text-red-600 focus:text-red-600"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete Account
@@ -138,35 +183,30 @@ export function BusinessActionsCell({ business }: BusinessActionsCellProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to permanently delete the business account for{" "}
-              <strong>{business.businessName}</strong>?
-              <br />
-              <span className="mt-2 block text-red-600 font-medium">
-                This action cannot be undone and will remove all associated data.
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex space-x-2 justify-end pt-4">
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isLoading}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isLoading}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isLoading ? "Deleting..." : "Delete Account"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the business account for{" "}
+              <strong>{business.businessName}</strong> and remove all associated data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={isLoading} className="bg-red-600 hover:bg-red-700">
+              {loadingAction === "delete" ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Business"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

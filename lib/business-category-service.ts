@@ -201,6 +201,40 @@ async function safeRedisSmembers(key: string): Promise<string[]> {
   }
 }
 
+// Helper function to check if a business is active
+async function isBusinessActive(businessId: string): Promise<boolean> {
+  try {
+    const businessData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}`)
+    if (!businessData) {
+      return false
+    }
+
+    let business: any = null
+    if (typeof businessData === "string") {
+      try {
+        business = JSON.parse(businessData)
+      } catch (parseError) {
+        console.error(`Error parsing business data for ${businessId}:`, getErrorMessage(parseError))
+        return false
+      }
+    } else if (typeof businessData === "object" && businessData !== null) {
+      business = businessData
+    } else {
+      return false
+    }
+
+    // Check status - default to active for backward compatibility
+    const status = business.status || "active"
+    const isActive = status === "active"
+
+    console.log(`Business ${businessId} status: ${status}, isActive: ${isActive}`)
+    return isActive
+  } catch (error) {
+    console.error(`Error checking if business ${businessId} is active:`, getErrorMessage(error))
+    return false
+  }
+}
+
 // Save business categories (simplified - only saves the exact category names)
 export async function saveBusinessCategories(businessId: string, selectedCategories: string[]): Promise<boolean> {
   try {
@@ -222,7 +256,7 @@ export async function saveBusinessCategories(businessId: string, selectedCategor
   }
 }
 
-// Get businesses for a specific category page
+// Get businesses for a specific category page - ENHANCED WITH STATUS FILTERING
 export async function getBusinessesForCategoryPage(pagePath: string): Promise<Business[]> {
   try {
     console.log(`Getting businesses for page: ${pagePath} at ${new Date().toISOString()}`)
@@ -261,11 +295,18 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
     console.log(`Found ${businessIds.length} businesses for category: ${categoryName}`)
     console.log(`Business IDs:`, businessIds)
 
-    // Fetch each business's full data
+    // Fetch each business's full data and filter by status
     const businesses: Business[] = []
 
     for (const businessId of businessIds) {
       try {
+        // Check if business is active first
+        const isActive = await isBusinessActive(businessId)
+        if (!isActive) {
+          console.log(`Skipping inactive business: ${businessId}`)
+          continue
+        }
+
         const businessData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}`)
         if (businessData && typeof businessData === "object") {
           // Get ad design data for display name and location
@@ -327,9 +368,9 @@ export async function getBusinessesForCategoryPage(pagePath: string): Promise<Bu
       }
     }
 
-    console.log(`Successfully retrieved ${businesses.length} businesses for page ${pagePath}`)
+    console.log(`Successfully retrieved ${businesses.length} active businesses for page ${pagePath}`)
     console.log(
-      `[${new Date().toISOString()}] Returning ${businesses.length} businesses:`,
+      `[${new Date().toISOString()}] Returning ${businesses.length} active businesses:`,
       businesses.map((b) => `  - ${b.id}: "${b.displayName}" (from ${b.adDesignData ? "ad-design" : "registration"})`),
     )
     return businesses
@@ -558,7 +599,7 @@ export async function removeBusinessFromCategoryIndexes(businessId: string): Pro
   }
 }
 
-// Get businesses for a specific subcategory (optimized to only check relevant businesses)
+// Get businesses for a specific subcategory (optimized to only check relevant businesses) - ENHANCED WITH STATUS FILTERING
 export async function getBusinessesForSubcategory(subcategoryPath: string): Promise<Business[]> {
   try {
     console.log(`Getting businesses for subcategory: ${subcategoryPath} at ${new Date().toISOString()}`)
@@ -582,6 +623,13 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
     // Only check businesses that are already in the main category
     for (const businessId of categoryBusinessIds) {
       try {
+        // Check if business is active first
+        const isActive = await isBusinessActive(businessId)
+        if (!isActive) {
+          console.log(`Skipping inactive business: ${businessId}`)
+          continue
+        }
+
         // Check if this business has the specific subcategory we're looking for
         const hasMatchingSubcategory = await checkBusinessHasSubcategory(businessId, subcategoryPath)
 
@@ -589,7 +637,7 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
           const business = await buildBusinessObject(businessId, [subcategoryPath])
           if (business) {
             businesses.push(business)
-            console.log(`✅ Added matching business ${businessId}: ${business.displayName}`)
+            console.log(`✅ Added matching active business ${businessId}: ${business.displayName}`)
           }
         }
       } catch (error) {
@@ -598,7 +646,7 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
       }
     }
 
-    console.log(`Successfully retrieved ${businesses.length} businesses for subcategory: ${subcategoryPath}`)
+    console.log(`Successfully retrieved ${businesses.length} active businesses for subcategory: ${subcategoryPath}`)
     return businesses
   } catch (error) {
     console.error(`Error getting businesses for subcategory ${subcategoryPath}:`, getErrorMessage(error))

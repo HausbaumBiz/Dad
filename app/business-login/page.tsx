@@ -2,263 +2,206 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronLeft, CheckCircle, Eye, EyeOff, AlertCircle } from "lucide-react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Loader2, AlertCircle, Mail, Phone } from "lucide-react"
 import { loginBusiness } from "@/app/actions/business-actions"
 
-export default function BusinessLoginPage({
-  searchParams,
-}: {
-  searchParams?: { verified?: string }
-}) {
-  const router = useRouter()
+export default function BusinessLoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showVerifiedMessage, setShowVerifiedMessage] = useState(false)
-  const [showDeactivatedDialog, setShowDeactivatedDialog] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-
-  useEffect(() => {
-    // Load stored credentials if they exist and haven't expired
-    const storedCredentials = localStorage.getItem("businessLoginCredentials")
-    if (storedCredentials) {
-      try {
-        const { email, password, timestamp } = JSON.parse(storedCredentials)
-        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000
-
-        if (Date.now() - timestamp < thirtyDaysInMs) {
-          setEmail(email)
-          setPassword(password)
-          setRememberMe(true)
-        } else {
-          // Credentials expired, remove them
-          localStorage.removeItem("businessLoginCredentials")
-        }
-      } catch (error) {
-        // Invalid stored data, remove it
-        localStorage.removeItem("businessLoginCredentials")
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    if (searchParams?.verified === "true") {
-      setShowVerifiedMessage(true)
-
-      // Hide the message after 5 seconds
-      const timer = setTimeout(() => {
-        setShowVerifiedMessage(false)
-      }, 5000)
-
-      return () => clearTimeout(timer)
-    }
-  }, [searchParams?.verified])
-
-  useEffect(() => {
-    if (!rememberMe) {
-      // If remember me is unchecked, remove stored credentials
-      localStorage.removeItem("businessLoginCredentials")
-    }
-  }, [rememberMe])
+  const [error, setError] = useState("")
+  const [isDeactivatedDialogOpen, setIsDeactivatedDialogOpen] = useState(false)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-    setShowDeactivatedDialog(false)
     setIsLoading(true)
+    setError("")
+
+    const formData = new FormData()
+    formData.append("email", email)
+    formData.append("password", password)
+    if (rememberMe) {
+      formData.append("rememberMe", "on")
+    }
 
     try {
-      const formData = new FormData()
-      formData.append("email", email)
-      formData.append("password", password)
-      if (rememberMe) {
-        formData.append("rememberMe", "on")
-      }
-
-      console.log("Attempting business login for:", email)
       const result = await loginBusiness(formData)
-      console.log("Login result:", result)
 
       if (result.success) {
-        // Save credentials if remember me is checked
-        if (rememberMe) {
-          const credentialsToStore = {
-            email,
-            password,
-            timestamp: Date.now(),
-          }
-          localStorage.setItem("businessLoginCredentials", JSON.stringify(credentialsToStore))
-        }
-        // Force redirect to workbench page directly
-        router.push("/workbench")
+        // Redirect to the specified URL
+        router.push(result.redirectUrl || "/workbench")
       } else {
-        // Check if the error is due to account deactivation
-        const errorMessage = result.message || ""
-        console.log("Login error message:", errorMessage)
-
-        if (errorMessage.includes("deactivated") || errorMessage.includes("administrators")) {
-          console.log("Showing deactivation dialog")
-          setShowDeactivatedDialog(true)
+        // Check if this is a deactivated account
+        if (result.isDeactivated) {
+          setIsDeactivatedDialogOpen(true)
         } else {
-          setError(errorMessage || "Login failed. Please try again.")
+          setError(result.message)
         }
       }
-    } catch (err) {
-      console.error("Login error:", err)
+    } catch (error) {
+      console.error("Login error:", error)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword)
-  }
-
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <Button variant="ghost" asChild className="pl-0">
-            <Link href="/" className="flex items-center text-primary">
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              Back to Home
-            </Link>
-          </Button>
-        </div>
-
-        <div className="flex flex-col md:flex-row items-center justify-center gap-8">
-          <div className="md:w-1/3 flex justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <Link href="/">
             <Image
               src="https://tr3hxn479jqfpc0b.public.blob.vercel-storage.com/hausbaumbiz03-pppfkt6a4UyL8TdkxntO73GQrsTeeU.png"
               alt="Hausbaum Logo"
-              width={600}
-              height={300}
-              className="max-w-full h-auto"
+              width={300}
+              height={150}
+              className="mx-auto h-32 w-auto"
             />
-          </div>
-
-          <Card className="w-full md:w-1/3">
-            <CardHeader>
-              <CardTitle className="text-2xl text-center">Business Login</CardTitle>
-              {showVerifiedMessage && (
-                <Alert className="mt-4 bg-green-50 border-green-200">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-600">
-                    Your email has been verified successfully! You can now log in.
-                  </AlertDescription>
-                </Alert>
-              )}
-              {error && (
-                <Alert className="mt-4 bg-red-50 border-red-200">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-600">{error}</AlertDescription>
-                </Alert>
-              )}
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={isLoading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={togglePasswordVisibility}
-                      tabIndex={-1}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="rememberMe"
-                    checked={rememberMe}
-                    onCheckedChange={(checked) => setRememberMe(checked === true)}
-                    disabled={isLoading}
-                  />
-                  <Label htmlFor="rememberMe" className="text-sm font-normal">
-                    Remember me for 30 days
-                  </Label>
-                </div>
-
-                <div className="text-right">
-                  <Link href="#" className="text-sm text-primary hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
-
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white" disabled={isLoading}>
-                  {isLoading ? "Logging in..." : "Login"}
-                </Button>
-
-                <div className="text-center mt-4">
-                  <p className="text-sm text-gray-600">
-                    Need an account?{" "}
-                    <Link href="/business-register" className="text-primary hover:underline">
-                      Create One Here
-                    </Link>
-                  </p>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          </Link>
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Business Login</h2>
+          <p className="mt-2 text-sm text-gray-600">Sign in to your business account</p>
         </div>
-      </main>
+
+        <Card>
+          <form onSubmit={handleSubmit}>
+            <CardHeader>
+              <CardTitle>Welcome Back</CardTitle>
+              <CardDescription>Enter your credentials to access your business dashboard</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  placeholder="Enter your email"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  placeholder="Enter your password"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                  disabled={isLoading}
+                />
+                <Label htmlFor="rememberMe" className="text-sm">
+                  Remember me for 30 days
+                </Label>
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col space-y-4">
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
+
+              <div className="text-center text-sm text-gray-600">
+                Don't have a business account?{" "}
+                <Link href="/business-register" className="font-medium text-primary hover:underline">
+                  Register here
+                </Link>
+              </div>
+            </CardFooter>
+          </form>
+        </Card>
+
+        <div className="text-center">
+          <Link href="/" className="text-sm text-gray-600 hover:text-primary">
+            ← Back to Home
+          </Link>
+        </div>
+      </div>
 
       {/* Deactivated Account Dialog */}
-      <Dialog open={showDeactivatedDialog} onOpenChange={setShowDeactivatedDialog}>
-        <DialogContent>
+      <Dialog open={isDeactivatedDialogOpen} onOpenChange={setIsDeactivatedDialogOpen}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Account Deactivated</DialogTitle>
-            <DialogDescription className="text-base">
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Account Deactivated
+            </DialogTitle>
+            <DialogDescription className="text-base pt-2">
               Your account has been deactivated by administrators. Contact us if you have any questions.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end pt-4">
-            <Button onClick={() => setShowDeactivatedDialog(false)}>Close</Button>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+              <h4 className="font-medium text-gray-900">Contact Information:</h4>
+
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Mail className="h-4 w-4" />
+                <span>support@hausbaum.com</span>
+              </div>
+
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Phone className="h-4 w-4" />
+                <span>(555) 123-4567</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600">
+              Please include your business name and email address when contacting support.
+            </p>
           </div>
+
+          <DialogFooter>
+            <Button onClick={() => setIsDeactivatedDialogOpen(false)} className="w-full">
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

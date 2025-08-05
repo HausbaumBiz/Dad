@@ -18,6 +18,40 @@ export interface Coupon {
   category?: string
 }
 
+// Helper function to check if a business is active
+async function isBusinessActive(businessId: string): Promise<boolean> {
+  try {
+    const businessData = await kv.get(`business:${businessId}`)
+    if (!businessData) {
+      return false
+    }
+
+    let business: any = null
+    if (typeof businessData === "string") {
+      try {
+        business = JSON.parse(businessData)
+      } catch (parseError) {
+        console.error(`Error parsing business data for ${businessId}:`, parseError)
+        return false
+      }
+    } else if (typeof businessData === "object" && businessData !== null) {
+      business = businessData
+    } else {
+      return false
+    }
+
+    // Check status - default to active for backward compatibility
+    const status = business.status || "active"
+    const isActive = status === "active"
+
+    console.log(`Business ${businessId} status: ${status}, isActive: ${isActive}`)
+    return isActive
+  } catch (error) {
+    console.error(`Error checking if business ${businessId} is active:`, error)
+    return false
+  }
+}
+
 export async function saveBusinessCoupons(businessId: string, coupons: Coupon[]) {
   try {
     // If no businessId is provided, get it from the session
@@ -214,7 +248,7 @@ export async function reinstateCoupon(couponId: string, newExpirationDate: strin
   }
 }
 
-// Enhanced getCouponsByZipCode function with better category logging
+// Enhanced getCouponsByZipCode function with better category logging and business status filtering
 export async function getCouponsByZipCode(zipCode: string): Promise<{
   success: boolean
   coupons: (Coupon & { businessId: string; category?: string })[]
@@ -237,12 +271,19 @@ export async function getCouponsByZipCode(zipCode: string): Promise<{
       `Found ${businessesInZip.length} local businesses and ${nationwideBusinesses.length} nationwide businesses for zip code ${zipCode}`,
     )
 
-    // Step 2: Get coupons for each business
+    // Step 2: Get coupons for each business (only active businesses)
     const allCoupons: (Coupon & { businessId: string; category?: string })[] = []
     const categoryStats: { [category: string]: number } = {}
 
     for (const businessId of allBusinessIds) {
       try {
+        // Check if business is active first
+        const isActive = await isBusinessActive(businessId)
+        if (!isActive) {
+          console.log(`Skipping coupons from inactive business: ${businessId}`)
+          continue
+        }
+
         // Get business details
         const businessData = await kv.get(`business:${businessId}`)
         let businessName = "Unknown Business"
@@ -329,7 +370,9 @@ export async function getCouponsByZipCode(zipCode: string): Promise<{
           }
         }
 
-        console.log(`Business ${businessId} (${businessName}) final category: ${businessCategory || "Uncategorized"}`)
+        console.log(
+          `Active business ${businessId} (${businessName}) final category: ${businessCategory || "Uncategorized"}`,
+        )
 
         // Get coupons for this business
         const couponsResult = await getBusinessCoupons(businessId)
@@ -352,7 +395,7 @@ export async function getCouponsByZipCode(zipCode: string): Promise<{
 
           allCoupons.push(...businessCoupons)
           console.log(
-            `Business ${businessId} (${businessName}) contributed ${businessCoupons.length} coupons in category: ${businessCategory || "Uncategorized"}`,
+            `Active business ${businessId} (${businessName}) contributed ${businessCoupons.length} coupons in category: ${businessCategory || "Uncategorized"}`,
           )
         }
       } catch (businessError) {
@@ -371,7 +414,7 @@ export async function getCouponsByZipCode(zipCode: string): Promise<{
       return now <= expDate
     })
 
-    console.log(`Found ${validCoupons.length} valid coupons for zip code ${zipCode}`)
+    console.log(`Found ${validCoupons.length} valid coupons from active businesses for zip code ${zipCode}`)
     console.log(`Category distribution:`, categoryStats)
 
     return {
