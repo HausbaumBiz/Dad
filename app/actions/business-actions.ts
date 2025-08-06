@@ -27,7 +27,30 @@ function getErrorMessage(error: unknown): string {
     return error
   }
   if (error && typeof error === "object") {
-    return JSON.stringify(error)
+    try {
+      // Try to get a meaningful error message from common error object structures
+      if ("message" in error && typeof error.message === "string") {
+        return error.message
+      }
+      if ("error" in error && typeof error.error === "string") {
+        return error.error
+      }
+      if ("details" in error && typeof error.details === "string") {
+        return error.details
+      }
+      // If it's a response-like object, try to extract useful info
+      if ("status" in error && "statusText" in error) {
+        return `HTTP ${error.status}: ${error.statusText}`
+      }
+      // Last resort: stringify but with better formatting
+      const stringified = JSON.stringify(error, null, 2)
+      if (stringified && stringified !== "{}" && stringified !== "[object Object]") {
+        return stringified
+      }
+      return `Error object: ${Object.prototype.toString.call(error)}`
+    } catch (stringifyError) {
+      return `Error occurred (could not stringify): ${Object.prototype.toString.call(error)}`
+    }
   }
   return "Unknown error occurred"
 }
@@ -133,10 +156,34 @@ export async function getBusinesses(): Promise<Business[]> {
     let businessIds: string[] = []
 
     try {
-      businessIds = (await kv.smembers(KEY_PREFIXES.BUSINESSES_SET)) as string[]
-      console.log(`Found ${businessIds.length} business IDs`)
+      console.log("Attempting to fetch business IDs from Redis...")
+      const result = await kv.smembers(KEY_PREFIXES.BUSINESSES_SET)
+      console.log("Raw Redis result:", result, "Type:", typeof result)
+
+      if (Array.isArray(result)) {
+        businessIds = result.filter((id) => typeof id === "string" && id.trim().length > 0)
+      } else if (result === null || result === undefined) {
+        console.log("No businesses set found in Redis")
+        businessIds = []
+      } else {
+        console.warn("Unexpected result type from Redis:", typeof result, result)
+        businessIds = []
+      }
+
+      console.log(`Found ${businessIds.length} business IDs:`, businessIds)
     } catch (error) {
-      console.error("Error fetching business IDs:", getErrorMessage(error))
+      console.error("Error fetching business IDs from Redis:", getErrorMessage(error))
+      console.error("Full error object:", error)
+
+      // Try to provide more specific error information
+      if (error && typeof error === "object") {
+        console.error("Error details:", {
+          name: "name" in error ? error.name : "unknown",
+          message: "message" in error ? error.message : "no message",
+          stack: "stack" in error ? error.stack : "no stack",
+        })
+      }
+
       return []
     }
 
@@ -148,10 +195,15 @@ export async function getBusinesses(): Promise<Business[]> {
     // Fetch each business's data with individual error handling
     const businessesPromises = businessIds.map(async (id) => {
       try {
+        console.log(`Fetching business data for ID: ${id}`)
         const business = (await kv.get(`${KEY_PREFIXES.BUSINESS}${id}`)) as Business | null
+
         if (business && typeof business === "object") {
-          return sanitizeBusinessData({ ...business, id })
+          const sanitized = sanitizeBusinessData({ ...business, id })
+          console.log(`Successfully fetched business: ${sanitized.businessName}`)
+          return sanitized
         }
+
         console.warn(`Business ${id} not found or invalid data`)
         return null
       } catch (err) {
@@ -172,6 +224,7 @@ export async function getBusinesses(): Promise<Business[]> {
     })
   } catch (error) {
     console.error("Error fetching businesses:", getErrorMessage(error))
+    console.error("Full error in getBusinesses:", error)
     return []
   }
 }
