@@ -1,0 +1,36 @@
+=== ZIP Code Import Script ===
+This script imports ZIP code data into the system
+
+No file path provided, will use sample data
+
+No file provided, using sample ZIP code data...
+Found 10 ZIP codes
+10 ZIP codes are valid
+Simulating ZIP code import...
+Processing batch 1 (5 ZIP codes)...
+  - Importing 10001: New York, NY
+  - Importing 90210: Beverly Hills, CA
+  - Importing 60601: Chicago, IL
+  - Importing 33101: Miami, FL
+  - Importing 75201: Dallas, TX
+Processing batch 2 (5 ZIP codes)...
+  - Importing 98101: Seattle, WA
+  - Importing 02101: Boston, MA
+  - Importing 30301: Atlanta, GA
+  - Importing 80201: Denver, CO
+  - Importing 89101: Las Vegas, NV
+
+Import completed successfully!
+Total ZIP codes processed: 10
+
+Imported ZIP codes:
+  10001 - New York, NY (40.7505, -73.9934)
+  90210 - Beverly Hills, CA (34.0901, -118.4065)
+  60601 - Chicago, IL (41.8825, -87.6441)
+  33101 - Miami, FL (25.7743, -80.1937)
+  75201 - Dallas, TX (32.7767, -96.797)
+  98101 - Seattle, WA (47.6062, -122.3321)
+  02101 - Boston, MA (42.3601, -71.0589)
+  30301 - Atlanta, GA (33.749, -84.388)
+  80201 - Denver, CO (39.7392, -104.9903)
+  89101 - Las Vegas, NV (36.1699, -115.1398)
