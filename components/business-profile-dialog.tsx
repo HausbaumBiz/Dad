@@ -13,32 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { getBusinessAdDesign, getBusinessHeaderImage } from "@/app/actions/business-actions"
-import {
-  Loader2,
-  ImageIcon,
-  Ticket,
-  Briefcase,
-  X,
-  Phone,
-  MapPin,
-  Menu,
-  List,
-  FileText,
-  ShoppingCart,
-  Clipboard,
-  Calendar,
-  MessageSquare,
-  Map,
-  Settings,
-  BookOpen,
-  PenTool,
-  Truck,
-  Heart,
-  Coffee,
-  Gift,
-  Music,
-  Mail,
-} from "lucide-react"
+import { Loader2, ImageIcon, Ticket, Briefcase, X, Phone, MapPin, Menu, List, FileText, ShoppingCart, Clipboard, Calendar, MessageSquare, Map, Settings, BookOpen, PenTool, Truck, Heart, Coffee, Gift, Music, Mail } from 'lucide-react'
 import { getCloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import type { CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import { kv } from "@/lib/redis"
@@ -58,19 +33,6 @@ import {
   getCurrentZipCode,
 } from "@/lib/analytics-utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
-
-// Add CSS to hide the default close button
-const hideDefaultCloseButtonStyle = `
-.business-profile-dialog-content [data-radix-dialog-close] {
-  display: none !important;
-}
-.business-profile-dialog-content > button[data-radix-dialog-close] {
-  display: none !important;
-}
-.business-profile-dialog-content .absolute.right-4.top-4 {
-  display: none !important;
-}
-`
 
 interface BusinessProfileDialogProps {
   isOpen: boolean
@@ -696,24 +658,14 @@ export function BusinessProfileDialog({
 
         {/* Header content overlay */}
         <div
-          className={`relative z-10 p-8 ${getHeaderTextColor()} animate-in fade-in duration-500`}
+          className={`relative z-10 ${getHeaderTextColor()} animate-in fade-in duration-500`}
           style={{
-            backgroundColor: headerImage
-              ? "rgba(0,0,0,0.1)"
-              : adDesign.texture === "gradient"
-                ? ""
-                : colorValues.primary,
-            backgroundImage: headerImage
-              ? "none"
-              : adDesign.texture === "gradient"
-                ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage || "none",
-            backgroundSize: headerImage
-              ? "auto"
-              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
-            backgroundRepeat: headerImage
-              ? "repeat"
-              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat || "repeat",
+            paddingTop: '2.645rem',   // 15% increase from 2.3rem
+            paddingBottom: '2.645rem',
+            paddingLeft: '2.3rem',
+            paddingRight: '3.5rem',
+            backgroundColor: 'transparent',
+            backgroundImage: 'none',
           }}
         >
           <h1 className="text-3xl md:text-4xl font-bold drop-shadow-lg">{getDisplayName()}</h1>
@@ -1084,27 +1036,21 @@ export function BusinessProfileDialog({
 
   return (
     <>
-      {/* Add style to hide default close button */}
-      <style jsx global>
-        {hideDefaultCloseButtonStyle}
-      </style>
-
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="business-profile-dialog-content w-full p-0 m-0 max-w-4xl max-h-[90vh]">
+        <DialogContent className="business-profile-dialog-content w-full p-0 m-0 max-w-4xl max-h-[90vh] overflow-hidden left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <DialogHeader className="sr-only">
             <DialogTitle>{businessName}</DialogTitle>
             <DialogDescription>
               Business profile dialog showing detailed information, contact details, and services for {businessName}
             </DialogDescription>
           </DialogHeader>
-
-          {/* Custom close button - mobile: absolute top, desktop: centered above content */}
-          <div className="md:flex md:justify-center md:w-full md:py-1 md:border-b">
-            <DialogClose className="absolute top-2 right-2 z-50 rounded-full p-1.5 bg-gray-100 hover:bg-gray-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none md:relative md:top-auto md:right-auto md:z-auto">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </DialogClose>
-          </div>
+          <DialogClose
+            className="absolute top-4 right-4 z-50 rounded-full p-2 bg-white/90 hover:bg-white shadow-lg transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none backdrop-blur-sm"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
 
           {loading ? (
             <div className="flex justify-center items-center py-12">
@@ -1119,7 +1065,7 @@ export function BusinessProfileDialog({
               </Button>
             </div>
           ) : adDesign ? (
-            <ScrollArea className="max-h-[calc(90vh-60px)] overflow-hidden">
+            <ScrollArea className="max-h-[90vh] overflow-hidden">
               <div className="overflow-hidden">
                 {/* Mobile Layout */}
                 <div className="block md:hidden">
@@ -1132,26 +1078,14 @@ export function BusinessProfileDialog({
 
                       {/* Mobile header content overlay */}
                       <div
-                        className={`relative z-10 p-5 ${getHeaderTextColor()}`}
+                        className={`relative z-10 ${getHeaderTextColor()}`}
                         style={{
-                          backgroundColor: headerImage
-                            ? "rgba(0,0,0,0.1)"
-                            : adDesign.texture === "gradient"
-                              ? ""
-                              : colorValues.primary,
-                          backgroundImage: headerImage
-                            ? "none"
-                            : adDesign.texture === "gradient"
-                              ? `linear-gradient(to right, ${colorValues.primary}, ${colorValues.secondary})`
-                              : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundImage ||
-                                "none",
-                          backgroundSize: headerImage
-                            ? "auto"
-                            : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundSize || "auto",
-                          backgroundRepeat: headerImage
-                            ? "repeat"
-                            : textureOptions.find((t) => t.value === adDesign.texture)?.style.backgroundRepeat ||
-                              "repeat",
+                          paddingTop: '1.653rem',   // 15% increase from 1.4375rem
+                          paddingBottom: '1.653rem',
+                          paddingLeft: '1.4375rem',
+                          paddingRight: '3.5rem',
+                          backgroundColor: 'transparent',
+                          backgroundImage: 'none',
                         }}
                       >
                         <h3 className="text-2xl font-bold drop-shadow-lg">{getDisplayName()}</h3>
