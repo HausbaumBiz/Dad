@@ -19,35 +19,7 @@ import {
 import { getCurrentBusiness } from "@/app/actions/auth-actions"
 import { getCloudflareBusinessMedia, type CloudflareBusinessMedia } from "@/app/actions/cloudflare-media-actions"
 import { uploadHeaderImageToCloudflare, getCloudflareDeliveryUrl } from "@/app/actions/cloudflare-image-actions"
-import {
-  ImageIcon,
-  Ticket,
-  Briefcase,
-  Menu,
-  List,
-  FileText,
-  ShoppingCart,
-  Clipboard,
-  Calendar,
-  MessageSquare,
-  Map,
-  Settings,
-  BookOpen,
-  PenTool,
-  Truck,
-  Heart,
-  Coffee,
-  Gift,
-  Music,
-  Phone,
-  Mail,
-  MapPin,
-  Monitor,
-  Smartphone,
-  Square,
-  Upload,
-  Save,
-} from "lucide-react"
+import { ImageIcon, Ticket, Briefcase, Menu, List, FileText, ShoppingCart, Clipboard, Calendar, MessageSquare, Map, Settings, BookOpen, PenTool, Truck, Heart, Coffee, Gift, Music, Phone, Mail, MapPin, Monitor, Smartphone, Square, Upload, Save } from 'lucide-react'
 
 interface PhotoItem {
   id: string
@@ -446,7 +418,7 @@ export default function CustomizeDesktopProfilePage() {
           setSelectedTexture(savedDesign.texture)
         }
 
-        // Load header text color
+        // Load header text color - FIXED: Ensure proper loading
         if (savedDesign.headerTextColor) {
           console.log("Loading saved header text color:", savedDesign.headerTextColor)
           setHeaderTextColor(savedDesign.headerTextColor)
@@ -576,24 +548,31 @@ export default function CustomizeDesktopProfilePage() {
     }
   }
 
-  // Save desktop layout settings
+  // FIXED: Save desktop layout settings with proper data merging
   const saveDesktopLayout = async () => {
     try {
       setIsSaving(true)
 
-      // Get current design data
+      // Get current design data first
       const currentDesign = await getBusinessAdDesign(businessId)
 
       // Prepare the updated design data with desktop layout settings
+      // IMPORTANT: Preserve all existing data and only update what we need
       const updatedDesign = {
-        ...currentDesign,
+        // Preserve all existing design data
+        ...(currentDesign || {}),
+        // Update desktop layout settings
         desktopLayout: {
           layoutType,
           videoAspectRatio,
           backgroundColor,
         },
-        headerTextColor, // Make sure this is included
+        // CRITICAL FIX: Ensure headerTextColor is properly included
+        headerTextColor,
       }
+
+      console.log("Saving desktop layout with headerTextColor:", headerTextColor)
+      console.log("Full updated design:", updatedDesign)
 
       // Save the updated design
       const result = await saveBusinessAdDesign(businessId, updatedDesign)
@@ -715,7 +694,7 @@ export default function CustomizeDesktopProfilePage() {
 
     const headerContent = (
       <div
-        className={`text-white rounded-t-lg p-8 ${headerTextColor === "black" ? "text-black" : "text-white"} animate-in fade-in duration-500 relative overflow-hidden`}
+        className={`rounded-t-lg p-8 ${headerTextColor === "black" ? "text-black" : "text-white"} animate-in fade-in duration-500 relative overflow-hidden`}
         style={{
           backgroundColor: currentHeaderImage
             ? "transparent"

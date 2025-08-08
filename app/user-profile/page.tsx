@@ -44,6 +44,7 @@ export default function UserProfilePage() {
 
   const handleLogout = async () => {
     await logoutUser()
+    window.location.href = "/"
   }
 
   if (loading) {
@@ -83,7 +84,7 @@ export default function UserProfilePage() {
           </div>
 
           <div className="pt-4">
-            <Button onClick={handleLogout} variant="destructive">
+            <Button onClick={handleLogout} variant="default" className="bg-primary hover:bg-primary/90 text-white">
               Logout
             </Button>
           </div>

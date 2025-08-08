@@ -8,23 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
-import {
-  Heart,
-  Phone,
-  MapPin,
-  Mail,
-  Calendar,
-  Trash2,
-  Loader2,
-  AlertCircle,
-  Scissors,
-  Briefcase,
-  Home,
-  DollarSign,
-  Clock,
-  Download,
-  Printer,
-} from "lucide-react"
+import { Heart, Phone, MapPin, Mail, Calendar, Trash2, Loader2, AlertCircle, Scissors, Briefcase, Home, DollarSign, Clock, Download, Printer } from 'lucide-react'
 import {
   getFavoriteBusinesses,
   removeFavoriteBusiness,
@@ -304,16 +288,26 @@ export default function FavoritesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        {/* Simple header */}
-        <header className="bg-white shadow-sm">
-          <div className="container mx-auto px-4 py-4">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50">
+        {/* Header with blue gradient and dot texture */}
+        <header className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg relative">
+          {/* Noise texture overlay */}
+          <div
+            className="absolute inset-0 opacity-90 pointer-events-none"
+            style={{
+              backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 2px, transparent 2px)",
+              backgroundSize: "10px 10px",
+              mixBlendMode: "overlay",
+              zIndex: 1,
+            }}
+          ></div>
+          <div className="container mx-auto px-4 py-4 relative z-10">
             <div className="flex items-center justify-between">
-              <Link href="/" className="flex items-center text-primary hover:text-primary/80">
+              <Link href="/" className="flex items-center text-white hover:text-gray-100">
                 <Home className="h-5 w-5 mr-2" />
                 Back to Home
               </Link>
-              <h1 className="text-xl font-semibold">My Favorites</h1>
+              <h1 className="text-xl font-semibold drop-shadow-sm">My Favorites</h1>
               <div></div>
             </div>
           </div>
@@ -322,7 +316,7 @@ export default function FavoritesPage() {
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-            <p>Loading your favorites...</p>
+            <p className="text-gray-700">Loading your favorites...</p>
           </div>
         </div>
       </div>
@@ -331,16 +325,26 @@ export default function FavoritesPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        {/* Simple header */}
-        <header className="bg-white shadow-sm">
-          <div className="container mx-auto px-4 py-4">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50">
+        {/* Header with blue gradient and dot texture */}
+        <header className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg relative">
+          {/* Noise texture overlay */}
+          <div
+            className="absolute inset-0 opacity-90 pointer-events-none"
+            style={{
+              backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 2px, transparent 2px)",
+              backgroundSize: "10px 10px",
+              mixBlendMode: "overlay",
+              zIndex: 1,
+            }}
+          ></div>
+          <div className="container mx-auto px-4 py-4 relative z-10">
             <div className="flex items-center justify-between">
-              <Link href="/" className="flex items-center text-primary hover:text-primary/80">
+              <Link href="/" className="flex items-center text-white hover:text-gray-100">
                 <Home className="h-5 w-5 mr-2" />
                 Back to Home
               </Link>
-              <h1 className="text-xl font-semibold">My Favorites</h1>
+              <h1 className="text-xl font-semibold drop-shadow-sm">My Favorites</h1>
               <div></div>
             </div>
           </div>
@@ -351,7 +355,7 @@ export default function FavoritesPage() {
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Unable to Load Favorites</h2>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()}>Try Again</Button>
+            <Button variant="secondary" onClick={() => window.location.reload()}>Try Again</Button>
           </div>
         </div>
       </div>
@@ -359,16 +363,26 @@ export default function FavoritesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Simple header */}
-      <header className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50">
+      {/* Header with blue gradient and dot texture */}
+      <header className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg relative">
+        {/* Noise texture overlay */}
+        <div
+          className="absolute inset-0 opacity-90 pointer-events-none"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 2px, transparent 2px)",
+            backgroundSize: "10px 10px",
+            mixBlendMode: "overlay",
+            zIndex: 1,
+          }}
+        ></div>
+        <div className="container mx-auto px-4 py-4 relative z-10">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center text-primary hover:text-primary/80">
+            <Link href="/" className="flex items-center text-white hover:text-gray-100">
               <Home className="h-5 w-5 mr-2" />
               Back to Home
             </Link>
-            <h1 className="text-xl font-semibold">My Favorites</h1>
+            <h1 className="text-xl font-semibold drop-shadow-sm">My Favorites</h1>
             <div></div>
           </div>
         </div>
@@ -378,35 +392,71 @@ export default function FavoritesPage() {
         <div className="max-w-6xl mx-auto">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">My Favorites</h1>
+            <h1 className="text-3xl font-bold text-primary mb-2 drop-shadow-sm">
+              My Favorites
+            </h1>
             <p className="text-gray-600">Manage your saved businesses, coupons, and job listings</p>
           </div>
 
           <Tabs defaultValue="businesses" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="businesses" className="flex items-center gap-2">
-                <Heart className="h-4 w-4" />
-                Favorite Businesses
+            <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm border border-purple-200 shadow-lg rounded-xl p-1">
+              <TabsTrigger
+                value="businesses"
+                className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:relative rounded-lg transition-all duration-200"
+                style={{
+                  backgroundImage: "data-[state=active]:radial-gradient(circle, rgba(255,255,255,0.15) 2px, transparent 2px)",
+                  backgroundSize: "data-[state=active]:10px 10px",
+                }}
+              >
+                <div className="data-[state=active]:absolute data-[state=active]:inset-0 data-[state=active]:opacity-90 data-[state=active]:pointer-events-none data-[state=active]:rounded-lg"
+                     style={{
+                       backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 2px, transparent 2px)",
+                       backgroundSize: "10px 10px",
+                       mixBlendMode: "overlay",
+                     }}
+                ></div>
+                <Heart className="h-4 w-4 text-purple-500 data-[state=active]:text-white relative z-10" />
+                <span className="relative z-10">Favorite Businesses</span>
                 {favoriteBusinesses.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
+                  <Badge variant="secondary" className="ml-1 bg-gradient-to-r from-primary to-primary/80 text-white relative z-10">
                     {favoriteBusinesses.length}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="coupons" className="flex items-center gap-2">
-                <Scissors className="h-4 w-4" />
-                Saved Coupons
+              <TabsTrigger
+                value="coupons"
+                className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:relative rounded-lg transition-all duration-200"
+              >
+                <div className="data-[state=active]:absolute data-[state=active]:inset-0 data-[state=active]:opacity-90 data-[state=active]:pointer-events-none data-[state=active]:rounded-lg"
+                     style={{
+                       backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 2px, transparent 2px)",
+                       backgroundSize: "10px 10px",
+                       mixBlendMode: "overlay",
+                     }}
+                ></div>
+                <Scissors className="h-4 w-4 text-pink-500 data-[state=active]:text-white relative z-10" />
+                <span className="relative z-10">Saved Coupons</span>
                 {favoriteCoupons.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
+                  <Badge variant="secondary" className="ml-1 bg-gradient-to-r from-primary to-primary/80 text-white relative z-10">
                     {favoriteCoupons.length}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="jobs" className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4" />
-                Bookmarked Jobs
+              <TabsTrigger
+                value="jobs"
+                className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:relative rounded-lg transition-all duration-200"
+              >
+                <div className="data-[state=active]:absolute data-[state=active]:inset-0 data-[state=active]:opacity-90 data-[state=active]:pointer-events-none data-[state=active]:rounded-lg"
+                     style={{
+                       backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 2px, transparent 2px)",
+                       backgroundSize: "10px 10px",
+                       mixBlendMode: "overlay",
+                     }}
+                ></div>
+                <Briefcase className="h-4 w-4 text-orange-500 data-[state=active]:text-white relative z-10" />
+                <span className="relative z-10">Bookmarked Jobs</span>
                 {favoriteJobs.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
+                  <Badge variant="secondary" className="ml-1 bg-gradient-to-r from-primary to-primary/80 text-white relative z-10">
                     {favoriteJobs.length}
                   </Badge>
                 )}
@@ -416,14 +466,14 @@ export default function FavoritesPage() {
             {/* Favorite Businesses Tab */}
             <TabsContent value="businesses" className="mt-6">
               {favoriteBusinesses.length === 0 ? (
-                <Card>
+                <Card className="bg-gradient-to-br from-purple-100 to-pink-100 border-0 shadow-lg">
                   <CardContent className="text-center py-12">
-                    <Heart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <Heart className="h-12 w-12 text-purple-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">No Favorite Businesses Yet</h3>
                     <p className="text-gray-600 mb-4">
                       Start exploring businesses and save your favorites for quick access
                     </p>
-                    <Button asChild>
+                    <Button variant="secondary" asChild>
                       <Link href="/">Browse Businesses</Link>
                     </Button>
                   </CardContent>
@@ -431,7 +481,10 @@ export default function FavoritesPage() {
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {favoriteBusinesses.map((business) => (
-                    <Card key={business.id} className="hover:shadow-md transition-shadow">
+                    <Card
+                      key={business.id}
+                      className="hover:shadow-xl hover:scale-105 transition-all duration-300 bg-white/90 backdrop-blur-sm border-0 shadow-lg"
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -524,7 +577,7 @@ export default function FavoritesPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 bg-transparent"
+                            className="flex-1 bg-transparent hover:bg-primary/10 hover:text-primary"
                             onClick={() =>
                               handleViewProfile(business.id, business.displayName || business.businessName)
                             }
@@ -542,12 +595,12 @@ export default function FavoritesPage() {
             {/* Saved Coupons Tab */}
             <TabsContent value="coupons" className="mt-6">
               {favoriteCoupons.length === 0 ? (
-                <Card>
+                <Card className="bg-gradient-to-br from-pink-100 to-orange-100 border-0 shadow-lg">
                   <CardContent className="text-center py-12">
-                    <Scissors className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <Scissors className="h-12 w-12 text-pink-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">No Saved Coupons Yet</h3>
                     <p className="text-gray-600 mb-4">Browse business profiles to find and save exclusive coupons</p>
-                    <Button asChild>
+                    <Button variant="secondary" asChild>
                       <Link href="/coupons">Browse Coupons</Link>
                     </Button>
                   </CardContent>
@@ -555,7 +608,10 @@ export default function FavoritesPage() {
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {favoriteCoupons.map((coupon) => (
-                    <Card key={coupon.id} className="hover:shadow-md transition-shadow">
+                    <Card
+                      key={coupon.id}
+                      className="hover:shadow-xl hover:scale-105 transition-all duration-300 bg-white/90 backdrop-blur-sm border-0 shadow-lg"
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -633,7 +689,7 @@ export default function FavoritesPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 bg-transparent"
+                            className="flex-1 bg-transparent hover:bg-primary/10 hover:text-primary"
                             onClick={() => handleCouponAction(coupon)}
                           >
                             {isMobile ? (
@@ -651,6 +707,7 @@ export default function FavoritesPage() {
                           <Button
                             variant="outline"
                             size="sm"
+                            className="hover:bg-primary/10 hover:text-primary"
                             onClick={() => handleViewProfile(coupon.businessId, coupon.businessName)}
                           >
                             View Business
@@ -666,12 +723,12 @@ export default function FavoritesPage() {
             {/* Bookmarked Jobs Tab */}
             <TabsContent value="jobs" className="mt-6">
               {favoriteJobs.length === 0 ? (
-                <Card>
+                <Card className="bg-gradient-to-br from-orange-100 to-yellow-100 border-0 shadow-lg">
                   <CardContent className="text-center py-12">
-                    <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <Briefcase className="h-12 w-12 text-orange-400 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">No Bookmarked Jobs Yet</h3>
                     <p className="text-gray-600 mb-4">Save interesting job listings to apply to them later</p>
-                    <Button asChild>
+                    <Button variant="secondary" asChild>
                       <Link href="/job-listings">Browse Jobs</Link>
                     </Button>
                   </CardContent>
@@ -679,7 +736,10 @@ export default function FavoritesPage() {
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {favoriteJobs.map((job) => (
-                    <Card key={job.id} className="hover:shadow-md transition-shadow">
+                    <Card
+                      key={job.id}
+                      className="hover:shadow-xl hover:scale-105 transition-all duration-300 bg-white/90 backdrop-blur-sm border-0 shadow-lg"
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -772,7 +832,7 @@ export default function FavoritesPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 bg-transparent"
+                            className="flex-1 bg-transparent hover:bg-primary/10 hover:text-primary"
                             onClick={() => handleViewProfile(job.businessId, job.businessName)}
                           >
                             View Business
