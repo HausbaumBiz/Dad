@@ -48,6 +48,7 @@
     "clsx": "^2.1.1",
     "cmdk": "latest",
     "crypto": "latest",
+    "csv-parse": "latest",
     "date-fns": "latest",
     "embla-carousel-react": "latest",
     "formdata-node": "latest",

@@ -1,10 +1,11 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Building, MapPin, ImageIcon, Database, Settings, BarChart3, Search, Wrench } from "lucide-react"
+import { Users, Building, MapPin, ImageIcon, Database, Settings, BarChart3, Search, Wrench } from 'lucide-react'
+import PlaceholderBusinessManager from "./placeholder-business-manager"
 
 export const metadata = {
   title: "Admin Dashboard",
-  description: "Admin dashboard for managing the application",
+  description: "Administrative tools and reports",
 }
 
 const adminSections = [
@@ -73,13 +74,19 @@ const adminSections = [
   },
 ]
 
-export default function AdminDashboardPage() {
+export default function AdminPage() {
   return (
-    <div className="space-y-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-        <p className="text-lg text-gray-600">Manage and monitor all aspects of the Hausbaum platform</p>
-      </div>
+    <main className="container mx-auto py-8 space-y-8">
+      <header>
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <p className="text-muted-foreground">Manage data and tools for your platform.</p>
+      </header>
+
+      {/* Manage Placeholder Businesses */}
+      <section aria-labelledby="placeholder-businesses">
+        <h2 id="placeholder-businesses" className="sr-only">Manage Placeholder Businesses</h2>
+        <PlaceholderBusinessManager />
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {adminSections.map((section) => {
@@ -138,6 +145,6 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

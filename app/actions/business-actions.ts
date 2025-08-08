@@ -112,6 +112,12 @@ function sanitizeBusinessData(business: any): Business {
     sanitized.address = business.address
   }
 
+  if (typeof business.isPlaceholder !== "undefined") {
+    // Coerce to boolean
+    // @ts-ignore allow extra persisted field
+    (sanitized as any).isPlaceholder = Boolean(business.isPlaceholder)
+  }
+
   return sanitized
 }
 
@@ -136,6 +142,7 @@ export async function getBusinesses(): Promise<Business[]> {
           status: "active",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          isPlaceholder: false,
         },
         {
           id: "demo-business-2",
@@ -148,6 +155,7 @@ export async function getBusinesses(): Promise<Business[]> {
           status: "inactive",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          isPlaceholder: false,
         },
       ]
     }
@@ -681,6 +689,7 @@ export async function getCurrentBusiness() {
         status: "active",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        isPlaceholder: false,
       }
     }
 

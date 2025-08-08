@@ -656,6 +656,24 @@ export async function getBusinessesForSubcategory(subcategoryPath: string): Prom
 
 // Helper function to check if a business has a specific subcategory
 async function checkBusinessHasSubcategory(businessId: string, targetSubcategoryPath: string): Promise<boolean> {
+  // NEW: Allow placeholder businesses to match all subcategories under their main category
+  try {
+    const mainCategory = targetSubcategoryPath.split(" > ")[0]
+    const placeholderSetKey = `${KEY_PREFIXES.BUSINESS}${businessId}:placeholderCategories`
+    const placeholderCats = await safeRedisSmembers(placeholderSetKey)
+    if (Array.isArray(placeholderCats) && placeholderCats.includes(mainCategory)) {
+      console.log(
+        `✅ Business ${businessId} is a placeholder for category "${mainCategory}", matching all subcategories.`
+      )
+      return true
+    }
+  } catch (e) {
+    console.warn(
+      `Warning checking placeholderCategories for business ${businessId}:`,
+      getErrorMessage(e)
+    )
+  }
+
   try {
     // Get the full category selection data (this should include fullPath)
     const categoriesData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}:categories`)

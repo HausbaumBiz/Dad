@@ -30,6 +30,7 @@ export interface Business {
   reviews?: number
   reviewsData?: any[]
   plan?: string
+  isPlaceholder?: boolean // Added optional property
 }
 
 export interface User {
