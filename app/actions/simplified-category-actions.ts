@@ -1,6 +1,6 @@
 "use server"
 
-import { getBusinessesForCategoryPage as getBusinessesFromService } from "@/lib/business-category-service"
+import { getBusinessesForCategoryPage as getFromService } from "@/lib/business-category-service"
 
 // Helper function to safely extract error messages
 function getErrorMessage(error: unknown): string {
@@ -13,12 +13,13 @@ function getErrorMessage(error: unknown): string {
   return JSON.stringify(error, Object.getOwnPropertyNames(error))
 }
 
-// Simple action to get businesses for a category page
+// Normalizes and forwards to the canonical service so all pages use one source of truth
 export async function getBusinessesForCategoryPage(pagePath: string) {
+  const normalized = pagePath.startsWith("/") ? pagePath : `/${pagePath}`
   try {
-    console.log(`[${new Date().toISOString()}] Fetching businesses for ${pagePath}`)
+    console.log(`[${new Date().toISOString()}] Fetching businesses for ${normalized}`)
 
-    const businesses = await getBusinessesFromService(pagePath)
+    const businesses = await getFromService(normalized)
 
     // Log the business names being returned
     console.log(`[${new Date().toISOString()}] Returning ${businesses.length} businesses:`)
@@ -30,7 +31,7 @@ export async function getBusinessesForCategoryPage(pagePath: string) {
 
     return businesses
   } catch (error) {
-    console.error(`Error getting businesses for page ${pagePath}:`, getErrorMessage(error))
+    console.error(`Error getting businesses for page ${normalized}:`, getErrorMessage(error))
     return []
   }
 }

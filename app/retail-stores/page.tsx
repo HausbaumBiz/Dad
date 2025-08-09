@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { StarRating } from "@/components/star-rating"
 import { getBusinessReviews } from "@/app/actions/review-actions"
+import { useSearchParams } from "next/navigation"
 
 // Enhanced Business interface with service area
 interface Business {
@@ -54,6 +55,7 @@ const getSubcategoryString = (subcategory: any): string => {
 
 export default function RetailStoresPage() {
   const fetchIdRef = useRef(0)
+  const sp = useSearchParams()
 
   const filterOptions = [
     { id: "retail1", label: "Supermarkets/Grocery Stores", value: "Supermarkets/Grocery Stores" },
@@ -146,6 +148,21 @@ export default function RetailStoresPage() {
       console.log("No user zip code found in localStorage")
     }
   }, [])
+
+  useEffect(() => {
+    // Adopt zip= from the URL if present
+    try {
+      const z = sp?.get("zip")
+      if (z && /^\d{5}$/.test(z)) {
+        // Persist and set state so the list filters accordingly
+        localStorage.setItem("savedZipCode", z)
+        setUserZipCode(z)
+        console.log("Applied zip from URL:", z)
+      }
+    } catch (e) {
+      console.warn("Could not read search params:", e)
+    }
+  }, [sp])
 
   // Helper function to check if a business serves a specific zip code
   const businessServesZipCode = (business: Business, targetZipCode: string): boolean => {
