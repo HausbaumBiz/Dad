@@ -204,6 +204,38 @@ async function safeRedisSmembers(key: string): Promise<string[]> {
 // Helper function to check if a business is active
 async function isBusinessActive(businessId: string): Promise<boolean> {
   try {
+    // If marked deleted, treat as inactive
+    try {
+      const deleted = await kv.get(`${KEY_PREFIXES.BUSINESS}${businessId}:deleted`)
+      if (deleted === true || deleted === "true" || deleted === 1 || deleted === "1") {
+        console.log(`Business ${businessId} is tombstoned as deleted`)
+        return false
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // If listed in blocked set, treat as inactive
+    try {
+      // Prefer sismember when available
+      // @ts-ignore
+      if (typeof (kv as any).sismember === "function") {
+        const blocked = await (kv as any).sismember("businesses:blocked", businessId)
+        if (blocked) {
+          console.log(`Business ${businessId} is in blocked set`)
+          return false
+        }
+      } else {
+        const blockedMembers = await kv.smembers("businesses:blocked").catch(() => [])
+        if (Array.isArray(blockedMembers) && blockedMembers.includes(businessId)) {
+          console.log(`Business ${businessId} is in blocked set`)
+          return false
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
     const businessData = await safeRedisGet(`${KEY_PREFIXES.BUSINESS}${businessId}`)
     if (!businessData) {
       return false
@@ -663,15 +695,12 @@ async function checkBusinessHasSubcategory(businessId: string, targetSubcategory
     const placeholderCats = await safeRedisSmembers(placeholderSetKey)
     if (Array.isArray(placeholderCats) && placeholderCats.includes(mainCategory)) {
       console.log(
-        `✅ Business ${businessId} is a placeholder for category "${mainCategory}", matching all subcategories.`
+        `✅ Business ${businessId} is a placeholder for category "${mainCategory}", matching all subcategories.`,
       )
       return true
     }
   } catch (e) {
-    console.warn(
-      `Warning checking placeholderCategories for business ${businessId}:`,
-      getErrorMessage(e)
-    )
+    console.warn(`Warning checking placeholderCategories for business ${businessId}:`, getErrorMessage(e))
   }
 
   try {
