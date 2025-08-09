@@ -115,7 +115,7 @@ function sanitizeBusinessData(business: any): Business {
   if (typeof business.isPlaceholder !== "undefined") {
     // Coerce to boolean
     // @ts-ignore allow extra persisted field
-    (sanitized as any).isPlaceholder = Boolean(business.isPlaceholder)
+    ;(sanitized as any).isPlaceholder = Boolean(business.isPlaceholder)
   }
 
   return sanitized
@@ -315,6 +315,58 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
       console.error(`Error removing business ${id} from category indexes:`, getErrorMessage(error))
     }
 
+    // Revalidate affected category pages
+    try {
+      const pathsToRevalidate: string[] = []
+      try {
+        const categoriesData2 = await kv.get(`${KEY_PREFIXES.BUSINESS}${id}:categories`)
+        let cats: any[] = []
+        if (typeof categoriesData2 === "string") {
+          try {
+            cats = JSON.parse(categoriesData2)
+          } catch {}
+        } else if (Array.isArray(categoriesData2)) {
+          cats = categoriesData2
+        }
+        for (const c of cats) {
+          const p = (c?.path || c?.fullPath || c?.id || "").toString()
+          if (p && !pathsToRevalidate.includes(p)) pathsToRevalidate.push(p.startsWith("/") ? p : `/${p}`)
+        }
+      } catch {}
+      // Also consider primary business.category if present
+      if (business.category) {
+        const p = business.category.startsWith("/") ? business.category : `/${business.category}`
+        if (!pathsToRevalidate.includes(p)) pathsToRevalidate.push(p)
+      }
+      for (const p of pathsToRevalidate) {
+        revalidatePath(p)
+      }
+    } catch (e) {
+      console.warn("Revalidation after delete failed:", (e as Error).message)
+    }
+
+    try {
+      // Remove from path-based index
+      if (business.category) {
+        await kv.srem(`${KEY_PREFIXES.CATEGORY}path:${business.category}`, id)
+      }
+      const categoriesData3 = await kv.get(`${KEY_PREFIXES.BUSINESS}${id}:categories`)
+      if (categoriesData3) {
+        const arr =
+          typeof categoriesData3 === "string"
+            ? JSON.parse(categoriesData3)
+            : Array.isArray(categoriesData3)
+              ? categoriesData3
+              : []
+        for (const c of arr) {
+          const path = (c?.path || c?.fullPath || c?.id || "").toString()
+          if (path) await kv.srem(`${KEY_PREFIXES.CATEGORY}path:${path}`, id)
+        }
+      }
+    } catch (e) {
+      console.warn("Path-index cleanup warning:", (e as Error).message)
+    }
+
     // Get business zip codes and remove from indexes
     try {
       let zipCodes: string[] = []
@@ -369,6 +421,8 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
     await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:zipcodes`)
     await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:nationwide`)
     await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:serviceArea`)
+    await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:placeholderAllSubcategories`)
+    await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:placeholderCategories`)
 
     // Delete the business data
     console.log(`Deleting business data for ${id}`)

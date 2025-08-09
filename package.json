@@ -71,6 +71,7 @@
     "sonner": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "types": "latest",
     "uuid": "latest",
     "vaul": "latest",
     "yet-another-react-lightbox": "latest",

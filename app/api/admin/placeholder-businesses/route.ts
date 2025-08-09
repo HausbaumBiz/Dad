@@ -11,14 +11,15 @@ import {
 } from "@/lib/db-schema"
 import type { Business } from "@/lib/definitions"
 import { put } from "@vercel/blob"
+import { revalidatePath } from "next/cache"
 
 type ParsedRow = {
   "Business Name": string
   "Phone Number": string
   "Business Address": string
   "Zip Code": string
-  "Website"?: string
-  "Email"?: string
+  Website?: string
+  Email?: string
 }
 
 function normalizeHeader(h: string) {
@@ -66,10 +67,7 @@ export async function POST(req: Request) {
 
     const csvText = await csvFile.text()
     const records = parse(csvText, {
-      columns: (headers: string[]) =>
-        headers.map((h) =>
-          normalizeHeader(h),
-        ),
+      columns: (headers: string[]) => headers.map((h) => normalizeHeader(h)),
       skip_empty_lines: true,
       trim: true,
     }) as ParsedRow[]
@@ -172,6 +170,13 @@ export async function POST(req: Request) {
           error: err?.message ? String(err.message) : "Failed to create placeholder business",
         })
       }
+    }
+
+    // Revalidate the chosen category page so placeholders appear immediately
+    try {
+      revalidatePath(categoryPath.startsWith("/") ? categoryPath : `/${categoryPath}`)
+    } catch (e) {
+      console.warn("revalidatePath failed:", (e as Error).message)
     }
 
     const summaryMsg =
