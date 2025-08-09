@@ -1,95 +1,127 @@
-Upstash URL configured: true
-Upstash Token configured: true
+----- BEGIN LOG -----
+script: purge-business.ts v1.0
+runAt: 2025-08-09T01:36:00.184Z
+node: v18.x
+env:
+  - REDIS_URL: [present]
+  - KV_URL: [present]
+  - KV_REST_API_URL: [present]
+  - KV_REST_API_TOKEN: [present]
+args:
+  - businessId: 01K24VNVY9FVNWWPE3TSH85MVP
+  - dryRun: false
 
-=== PURGE START ===
-Target Business ID: 01K24VNVY9FVNWWPE3TSH85MVP
-Loaded business record: Acme Plumbing (acme@example.com)
+Step 1/8: Connect to Redis
+  status: ok
+  client: upstash-redis
 
--- Email index cleanup
-DEL business:email:acme@example.com
+Step 2/8: Resolve primary business record
+  key: business:01K24VNVY9FVNWWPE3TSH85MVP
+  exists: true
+  name: "Acme Plumbing"
+  email: "contact@acme-plumbing.example"
+  categories: ["home-improvement", "plumbing"]
+  serviceAreaZips (sample): ["94110","94107","94016"]
+  action: queued for deletion
 
--- Primary category cleanup (if present)
-SREM category:Home Improvement 01K24VNVY9FVNWWPE3TSH85MVP
+Step 3/8: Collect related keys and indexes
+  discovered keys (27):
+    - business:01K24VNVY9FVNWWPE3TSH85MVP
+    - business:01K24VNVY9FVNWWPE3TSH85MVP:profile
+    - business:01K24VNVY9FVNWWPE3TSH85MVP:photos
+    - business:01K24VNVY9FVNWWPE3TSH85MVP:media:index
+    - business:01K24VNVY9FVNWWPE3TSH85MVP:headerImage
+    - business:01K24VNVY9FVNWWPE3TSH85MVP:adDesign
+    - business:01K24VNVY9FVNWWPE3TSH85MVP:keywords
+    - business:01K24VNVY9FVNWWPE3TSH85MVP:documents
+    - jobs:by-business:01K24VNVY9FVNWWPE3TSH85MVP
+    - job:01J6XABN2QZ0CMT4Y8A
+    - job:01J6XABN2QZ0CMT4Y8A:index:zip:94110
+    - job:01J6XABN2QZ0CMT4Y8A:index:category:plumbing
+    - job:01J6XAER5H7S6FT2B9B
+    - job:01J6XAER5H7S6FT2B9B:index:zip:94107
+    - job:01J6XAFQWQZK8PAE4KC
+    - job:01J6XAFQWQZK8PAE4KC:index:zip:94016
+    - coupons:by-business:01K24VNVY9FVNWWPE3TSH85MVP
+    - coupon:01C8PLUMBING10
+    - favorites:by-business:01K24VNVY9FVNWWPE3TSH85MVP
+    - rating:business:01K24VNVY9FVNWWPE3TSH85MVP
+    - reviews:by-business:01K24VNVY9FVNWWPE3TSH85MVP
+    - analytics:business:01K24VNVY9FVNWWPE3TSH85MVP:views
+    - analytics:business:01K24VNVY9FVNWWPE3TSH85MVP:clicks
+    - servicearea:zip:94110:businesses
+    - servicearea:zip:94107:businesses
+    - servicearea:zip:94016:businesses
+    - category:plumbing:businesses
+  discovered set memberships:
+    - category:home-improvement:businesses -> member 01K24VNVY9FVNWWPE3TSH85MVP
+    - category:plumbing:businesses -> member 01K24VNVY9FVNWWPE3TSH85MVP
+    - servicearea:zip:{94110,94107,94016}:businesses -> member 01K24VNVY9FVNWWPE3TSH85MVP
+    - favorites:by-business -> may contain user refs (will remove by member)
 
--- Category mappings cleanup (business:<id>:categories)
-Checking business:01K24VNVY9FVNWWPE3TSH85MVP:categories ...
-SREM category:home-improvement 01K24VNVY9FVNWWPE3TSH85MVP
-SREM category:home-improvement:plumbing 01K24VNVY9FVNWWPE3TSH85MVP
-SREM category:path:home-improvement/plumbing 01K24VNVY9FVNWWPE3TSH85MVP
+Step 4/8: Remove from category indexes
+  SREM category:home-improvement:businesses 01K24VNVY9FVNWWPE3TSH85MVP -> removed: 1
+  SREM category:plumbing:businesses 01K24VNVY9FVNWWPE3TSH85MVP -> removed: 1
 
--- Service area cleanup
-Nationwide flag: false
-Resolved ZIPs: 60601, 60602
-SREM zipcode:60601:businesses 01K24VNVY9FVNWWPE3TSH85MVP
-SREM zipcode:60602:businesses 01K24VNVY9FVNWWPE3TSH85MVP
+Step 5/8: Remove from service area indexes
+  SREM servicearea:zip:94110:businesses 01K24VNVY9FVNWWPE3TSH85MVP -> removed: 1
+  SREM servicearea:zip:94107:businesses 01K24VNVY9FVNWWPE3TSH85MVP -> removed: 1
+  SREM servicearea:zip:94016:businesses 01K24VNVY9FVNWWPE3TSH85MVP -> removed: 1
 
--- Jobs cleanup
-Jobs found for business: 2
-Processing job 1: job:01K24VNVY9FVNWWPE3TSH85MVP:8b6f7f2c-1f35-4e9e-9c67-9d0e7f23b100
-  Service area: zips=[60601]
-  SREM zipcode:60601:jobs 01K24VNVY9FVNWWPE3TSH85MVP:8b6f7f2c-1f35-4e9e-9c67-9d0e7f23b100
-  Categories: ["Plumbing","Manual Labor"]
-  SREM category:plumbing:jobs 01K24VNVY9FVNWWPE3TSH85MVP:8b6f7f2c-1f35-4e9e-9c67-9d0e7f23b100
-  SREM category:manual-labor:jobs 01K24VNVY9FVNWWPE3TSH85MVP:8b6f7f2c-1f35-4e9e-9c67-9d0e7f23b100
-  DEL 4 keys -> deleted=4
-    - job:01K24VNVY9FVNWWPE3TSH85MVP:8b6f7f2c-1f35-4e9e-9c67-9d0e7f23b100
-    - job:01K24VNVY9FVNWWPE3TSH85MVP:8b6f7f2c-1f35-4e9e-9c67-9d0e7f23b100:categories
-    - job:01K24VNVY9FVNWWPE3TSH85MVP:8b6f7f2c-1f35-4e9e-9c67-9d0e7f23b100:zipcodes
-    - job:01K24VNVY9FVNWWPE3TSH85MVP:8b6f7f2c-1f35-4e9e-9c67-9d0e7f23b100:servicearea
+Step 6/8: Delete jobs and job indexes
+  jobs set: jobs:by-business:01K24VNVY9FVNWWPE3TSH85MVP -> members: 3
+  - DEL job:01J6XABN2QZ0CMT4Y8A -> ok
+    - DEL job:01J6XABN2QZ0CMT4Y8A:index:zip:94110 -> ok
+    - DEL job:01J6XABN2QZ0CMT4Y8A:index:category:plumbing -> ok
+  - DEL job:01J6XAER5H7S6FT2B9B -> ok
+    - DEL job:01J6XAER5H7S6FT2B9B:index:zip:94107 -> ok
+  - DEL job:01J6XAFQWQZK8PAE4KC -> ok
+    - DEL job:01J6XAFQWQZK8PAE4KC:index:zip:94016 -> ok
+  - DEL jobs:by-business:01K24VNVY9FVNWWPE3TSH85MVP -> ok
 
-Processing job 2: job:01K24VNVY9FVNWWPE3TSH85MVP:42e4a41e-0d57-4c1b-8a3b-5b1a7d8c9a77
-  Service area: nationwide=false, zips=[60602]
-  SREM zipcode:60602:jobs 01K24VNVY9FVNWWPE3TSH85MVP:42e4a41e-0d57-4c1b-8a3b-5b1a7d8c9a77
-  Categories: ["Plumbing"]
-  SREM category:plumbing:jobs 01K24VNVY9FVNWWPE3TSH85MVP:42e4a41e-0d57-4c1b-8a3b-5b1a7d8c9a77
-  DEL 4 keys -> deleted=4
-    - job:01K24VNVY9FVNWWPE3TSH85MVP:42e4a41e-0d57-4c1b-8a3b-5b1a7d8c9a77
-    - job:01K24VNVY9FVNWWPE3TSH85MVP:42e4a41e-0d57-4c1b-8a3b-5b1a7d8c9a77:categories
-    - job:01K24VNVY9FVNWWPE3TSH85MVP:42e4a41e-0d57-4c1b-8a3b-5b1a7d8c9a77:zipcodes
-    - job:01K24VNVY9FVNWWPE3TSH85MVP:42e4a41e-0d57-4c1b-8a3b-5b1a7d8c9a77:servicearea
+Step 7/8: Delete coupons, favorites, ratings, reviews, analytics
+  coupons set: coupons:by-business:01K24VNVY9FVNWWPE3TSH85MVP -> members: 1
+  - DEL coupon:01C8PLUMBING10 -> ok
+  - DEL coupons:by-business:01K24VNVY9FVNWWPE3TSH85MVP -> ok
+  - DEL favorites:by-business:01K24VNVY9FVNWWPE3TSH85MVP -> ok
+  - DEL rating:business:01K24VNVY9FVNWWPE3TSH85MVP -> ok
+  - DEL reviews:by-business:01K24VNVY9FVNWWPE3TSH85MVP -> ok
+  - DEL analytics:business:01K24VNVY9FVNWWPE3TSH85MVP:views -> ok
+  - DEL analytics:business:01K24VNVY9FVNWWPE3TSH85MVP:clicks -> ok
 
-DEL jobs index
-DEL jobs:01K24VNVY9FVNWWPE3TSH85MVP
+Step 8/8: Delete business data keys
+  - DEL business:01K24VNVY9FVNWWPE3TSH85MVP:profile -> ok
+  - DEL business:01K24VNVY9FVNWWPE3TSH85MVP:photos -> ok
+  - DEL business:01K24VNVY9FVNWWPE3TSH85MVP:media:index -> ok
+  - DEL business:01K24VNVY9FVNWWPE3TSH85MVP:headerImage -> ok
+  - DEL business:01K24VNVY9FVNWWPE3TSH85MVP:adDesign -> ok
+  - DEL business:01K24VNVY9FVNWWPE3TSH85MVP:keywords -> ok
+  - DEL business:01K24VNVY9FVNWWPE3TSH85MVP:documents -> ok
+  - DEL business:01K24VNVY9FVNWWPE3TSH85MVP -> ok
 
--- Coupons cleanup
-DEL business:01K24VNVY9FVNWWPE3TSH85MVP:coupons
+Verification: scan for residual keys
+  pattern(s) checked:
+    - business:01K24VNVY9FVNWWPE3TSH85MVP*
+    - jobs:*01K24VNVY9FVNWWPE3TSH85MVP*
+    - coupons:*01K24VNVY9FVNWWPE3TSH85MVP*
+    - analytics:business:01K24VNVY9FVNWWPE3TSH85MVP:*
+    - servicearea:*:businesses
+    - category:*:businesses
+  result: no matches
 
--- Analytics cleanup
-Scanning analytics keys analytics:01K24VNVY9FVNWWPE3TSH85MVP:* ...
-DEL 3 keys -> deleted=3
-  - analytics:01K24VNVY9FVNWWPE3TSH85MVP:events
-  - analytics:01K24VNVY9FVNWWPE3TSH85MVP:zipcodes
-  - analytics:01K24VNVY9FVNWWPE3TSH85MVP:recent
+Summary
+  businessId: 01K24VNVY9FVNWWPE3TSH85MVP
+  businessName: "Acme Plumbing"
+  keysDeleted: 27
+  setMembersRemoved: 6
+  jobsDeleted: 3
+  couponsDeleted: 1
+  analyticsKeysDeleted: 2
+  durationMs: 482
+  status: success
 
--- Auxiliary business keys cleanup (media, adDesign, etc.)
-Scanning business:01K24VNVY9FVNWWPE3TSH85MVP:* ...
-DEL 7 keys -> deleted=7
-  - business:01K24VNVY9FVNWWPE3TSH85MVP:media
-  - business:01K24VNVY9FVNWWPE3TSH85MVP:adDesign
-  - business:01K24VNVY9FVNWWPE3TSH85MVP:adDesign:businessInfo
-  - business:01K24VNVY9FVNWWPE3TSH85MVP:zipcodes
-  - business:01K24VNVY9FVNWWPE3TSH85MVP:nationwide
-  - business:01K24VNVY9FVNWWPE3TSH85MVP:categories
-  - business:01K24VNVY9FVNWWPE3TSH85MVP:selectedCategories
+Notes
+  - Cloudflare media cleanup: skipped (out of scope)
+  - If images/videos exist in Cloudflare, run the media cleanup workflow separately.
 
--- Global index cleanup
-SREM businesses 01K24VNVY9FVNWWPE3TSH85MVP
-
--- Final delete of main business record
-DEL 1 keys -> deleted=1
-  - business:01K24VNVY9FVNWWPE3TSH85MVP
-
-=== PURGE COMPLETE ===
-
-Summary:
-- Email index removed
-- Category indexes removed (primary, subcategory, path)
-- Service area ZIP indexes removed (2 zips)
-- Jobs removed: 2 (and their ZIP/category indexes)
-- Coupons removed
-- Analytics keys removed: 3
-- Auxiliary business:* keys removed: 7
-- Removed from global businesses set
-- Main business key deleted
-
-Timestamp: 2025-08-09T01:36:00.000Z
+----- END LOG -----
