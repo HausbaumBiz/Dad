@@ -315,6 +315,30 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; me
       console.error(`Error removing business ${id} from category indexes:`, getErrorMessage(error))
     }
 
+    // Also remove from categoryName-based indexes used by category pages (selectedCategories)
+    try {
+      const selectedCategoriesData = await kv.get(`${KEY_PREFIXES.BUSINESS}${id}:selectedCategories`)
+      let selectedCategoryNames: string[] = []
+      if (typeof selectedCategoriesData === "string") {
+        try {
+          selectedCategoryNames = JSON.parse(selectedCategoriesData)
+        } catch {
+          selectedCategoryNames = []
+        }
+      } else if (Array.isArray(selectedCategoriesData)) {
+        selectedCategoryNames = selectedCategoriesData
+      }
+      for (const name of selectedCategoryNames) {
+        if (typeof name === "string" && name.trim()) {
+          await kv.srem(`${KEY_PREFIXES.CATEGORY}${name}:businesses`, id)
+        }
+      }
+      // Remove the selectedCategories key
+      await kv.del(`${KEY_PREFIXES.BUSINESS}${id}:selectedCategories`)
+    } catch (e) {
+      console.warn("selectedCategories cleanup warning:", (e as Error).message)
+    }
+
     // Revalidate affected category pages
     try {
       const pathsToRevalidate: string[] = []

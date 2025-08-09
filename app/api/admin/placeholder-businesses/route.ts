@@ -4,7 +4,7 @@ import { kv } from "@/lib/redis"
 import { generateId } from "@/lib/utils"
 import {
   saveBusinessToDb,
-  saveBusinessCategories,
+  saveBusinessCategories as saveStandardizedCategories,
   saveBusinessServiceArea,
   KEY_PREFIXES,
   type CategoryData,
@@ -12,6 +12,7 @@ import {
 import type { Business } from "@/lib/definitions"
 import { put } from "@vercel/blob"
 import { revalidatePath } from "next/cache"
+import { getCategoryNameForPagePath } from "@/lib/category-mapping"
 
 type ParsedRow = {
   "Business Name": string
@@ -26,10 +27,17 @@ function normalizeHeader(h: string) {
   return h.trim()
 }
 
+function normalizePagePath(raw: string) {
+  const s = String(raw || "").trim()
+  if (!s) return ""
+  return s.startsWith("/") ? s : `/${s}`
+}
+
 export async function POST(req: Request) {
   try {
     const form = await req.formData()
-    const categoryPath = String(form.get("categoryPath") || "").trim()
+    const rawCategoryPath = String(form.get("categoryPath") || "").trim()
+    const categoryPath = normalizePagePath(rawCategoryPath)
     const csvFile = form.get("csv") as File | null
     const videoFile = form.get("video") as File | null
 
@@ -46,7 +54,10 @@ export async function POST(req: Request) {
       )
     }
 
-    // Upload default video if provided
+    // Determine the canonical category name used for indexing on category pages
+    const categoryName = getCategoryNameForPagePath(categoryPath) || categoryPath.replace(/^\//, "")
+
+    // Optional default video upload for placeholders
     let defaultVideoUrl: string | null = null
     if (videoFile && videoFile.size > 0) {
       try {
@@ -101,44 +112,42 @@ export async function POST(req: Request) {
         const id = generateId()
         const now = new Date().toISOString()
 
-        // Construct minimal business object
+        // Minimal placeholder business object
         const business: Business = {
           id,
           firstName: "",
           lastName: "",
           businessName,
           zipCode: zip,
-          email: email || "", // optional
+          email: email || "",
           isEmailVerified: true,
           status: "active",
           createdAt: now,
           updatedAt: now,
           phone,
           address,
-          category: categoryPath,
-          // mark placeholder (requires interface update)
+          category: categoryPath, // keep raw page path in category for traceability
+          // mark placeholder (persisted; consumers treat this as boolean)
           isPlaceholder: true as any,
         }
 
-        // Persist using existing helpers to ensure consistent indexing
+        // Persist core business and enroll in global set
         await saveBusinessToDb(business)
+        await kv.sadd(KEY_PREFIXES.BUSINESSES_SET, id)
 
-        // Save standardized category mapping: path == id == provided path
+        // Save standardized category objects (path-based) for compatibility
         const categoryData: CategoryData = {
-          id: categoryPath,
+          id: categoryPath, // use the page path verbatim as id
           name: categoryPath,
           path: categoryPath,
         }
-        await saveBusinessCategories(id, [categoryData])
+        await saveStandardizedCategories(id, [categoryData])
 
-        // Save ZIP as service area and also put into zipcodes set for reverse lookup
+        // Save service area (zip) and index by zip
         await saveBusinessServiceArea(id, {
           zipCodes: [zip],
           isNationwide: false,
         })
-
-        // Also add to the global businesses set if not already done there
-        await kv.sadd(KEY_PREFIXES.BUSINESSES_SET, id)
 
         // Save helpful extras
         if (website) {
@@ -148,11 +157,17 @@ export async function POST(req: Request) {
           await kv.set(`${KEY_PREFIXES.BUSINESS}${id}:videoUrl`, defaultVideoUrl)
         }
 
-        // Index by category path for broad matching on category pages (path-based)
+        // Path-based index (kept for diagnostics/back-compat)
         await kv.sadd(`${KEY_PREFIXES.CATEGORY}path:${categoryPath}`, id)
 
-        // Mark that this business should appear under all subcategories for its category
-        await kv.set(`${KEY_PREFIXES.BUSINESS}${id}:placeholderAllSubcategories`, "true")
+        // CRITICAL: Index using the categoryName that category pages read
+        // 1) Persist "selectedCategories" for the business
+        await kv.set(`${KEY_PREFIXES.BUSINESS}${id}:selectedCategories`, JSON.stringify([categoryName]))
+        // 2) Add to CATEGORY:<Category Name>:businesses for fast lookup on category pages
+        await kv.sadd(`${KEY_PREFIXES.CATEGORY}${categoryName}:businesses`, id)
+
+        // Make placeholder match all subcategories under its main category
+        await kv.sadd(`${KEY_PREFIXES.BUSINESS}${id}:placeholderCategories`, categoryName)
 
         results.push({
           row: rowNumber,
@@ -160,6 +175,7 @@ export async function POST(req: Request) {
           businessName,
           zipCode: zip,
           categoryPath,
+          categoryName,
           isPlaceholder: true,
           status: "active",
         })
@@ -174,7 +190,10 @@ export async function POST(req: Request) {
 
     // Revalidate the chosen category page so placeholders appear immediately
     try {
-      revalidatePath(categoryPath.startsWith("/") ? categoryPath : `/${categoryPath}`)
+      revalidatePath(categoryPath)
+      // Also revalidate the backing API route used by some pages (path segment form)
+      const apiPath = `/api/businesses/by-category-page/${categoryPath.replace(/^\//, "")}`
+      revalidatePath(apiPath)
     } catch (e) {
       console.warn("revalidatePath failed:", (e as Error).message)
     }
